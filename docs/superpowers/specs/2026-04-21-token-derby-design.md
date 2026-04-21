@@ -298,6 +298,18 @@ If the same `current_tokens` is posted twice (retry), the second call is a no-op
 - DynamoDB single table, on-demand billing
 - Route 53 A-record alias → CloudFront distribution
 
+### CLI distribution
+
+- **Primary channel:** scoped npm package `@mauricode/token-derby`
+- **Install:** `npm i -g @mauricode/token-derby`
+- **Binary name:** `token-derby` (via `bin` entry in `package.json`)
+- **Optional helper:** `token-derby.mauricode.co.uk/install.sh` — a small shell script that invokes `npm i -g @mauricode/token-derby` for users who prefer `curl | sh`
+- **Engine requirement:** Node 20+ (declared in `package.json` `engines` field)
+- **Release:** manual `npm publish` for MVP. No auto-update mechanism.
+- **Versioning:** semver, starting at `0.1.0`
+
+No pre-bundled binaries (pkg/bun-compile) for MVP — the target audience already runs Claude Code and therefore has Node. Binary distribution can be added later if a non-Node audience emerges.
+
 ### Project structure (to be created)
 
 ```
