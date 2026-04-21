@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.DS_Store
+.superpowers/
+cdk.out/
+.env
+.env.local
