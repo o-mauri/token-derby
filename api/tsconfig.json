@@ -1,0 +1,12 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": ".",
+    "types": ["node"],
+    "paths": {
+      "@token-derby/shared": ["../shared/src/index.ts"]
+    }
+  },
+  "include": ["src/**/*", "test/**/*"]
+}
