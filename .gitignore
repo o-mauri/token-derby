@@ -5,3 +5,12 @@ dist/
 cdk.out/
 .env
 .env.local
+
+# TypeScript
+*.tsbuildinfo
+
+# CDK
+cdk.context.json
+
+# Docker volumes
+docker-data/

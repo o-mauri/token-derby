@@ -1,0 +1,12 @@
+{
+  "name": "token-derby",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": ["shared", "api", "infra"],
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "build": "npm -ws run build",
+    "test": "npm -ws --if-present run test",
+    "lint": "npm -ws --if-present run lint"
+  }
+}
