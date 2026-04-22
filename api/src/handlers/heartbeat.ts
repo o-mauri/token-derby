@@ -1,0 +1,37 @@
+import type { APIGatewayProxyHandlerV2 } from 'aws-lambda';
+import type { HeartbeatRequest, HeartbeatResponse } from '@token-derby/shared';
+import { getRaceByJoinCode } from '../db/races.js';
+import { verifyHeartbeatToken, updateHorseTokens } from '../db/horses.js';
+import { computeStatus, timeLeftSeconds } from '../lib/status.js';
+import { ok, err, parseJson } from '../lib/http.js';
+
+export const handler: APIGatewayProxyHandlerV2 = async (event) => {
+  const join_code = event.pathParameters?.join_code;
+  const horse_id = event.pathParameters?.horse_id;
+  if (!join_code || !horse_id) return err('BAD_REQUEST', 'path params required');
+
+  const auth = event.headers?.authorization ?? event.headers?.Authorization;
+  const token = auth?.startsWith('Bearer ') ? auth.slice(7) : null;
+  if (!token) return err('INVALID_TOKEN', 'Authorization: Bearer required');
+
+  const body = parseJson<HeartbeatRequest>(event.body);
+  if (!body || typeof body.current_tokens !== 'number' || body.current_tokens < 0) {
+    return err('BAD_REQUEST', 'current_tokens (non-negative number) required');
+  }
+
+  const race = await getRaceByJoinCode(join_code);
+  if (!race) return err('RACE_NOT_FOUND', `No race with join code ${join_code}`);
+
+  const verified = await verifyHeartbeatToken(race.race_id, horse_id, token);
+  if (!verified) return err('INVALID_TOKEN', 'heartbeat token does not match');
+
+  const now = new Date();
+  await updateHorseTokens(race.race_id, horse_id, body.current_tokens, now.toISOString());
+
+  const response: HeartbeatResponse = {
+    race_status: computeStatus(race, now),
+    server_time: now.toISOString(),
+    time_left_seconds: timeLeftSeconds(race, now),
+  };
+  return ok(response);
+};
