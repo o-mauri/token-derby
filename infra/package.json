@@ -1,0 +1,26 @@
+{
+  "name": "@token-derby/infra",
+  "version": "0.1.0",
+  "private": true,
+  "bin": {
+    "token-derby-infra": "bin/token-derby.js"
+  },
+  "scripts": {
+    "build": "tsc -p .",
+    "synth": "cdk synth",
+    "deploy": "cdk deploy --require-approval never",
+    "diff": "cdk diff",
+    "destroy": "cdk destroy"
+  },
+  "dependencies": {
+    "@token-derby/shared": "*",
+    "aws-cdk-lib": "^2.160.0",
+    "constructs": "^10.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.0",
+    "aws-cdk": "^2.160.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.6.0"
+  }
+}
