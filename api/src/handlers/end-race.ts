@@ -1,0 +1,27 @@
+import type { APIGatewayProxyHandlerV2 } from 'aws-lambda';
+import type { EndRaceResponse } from '@token-derby/shared';
+import { getRaceByAdminCode, setRaceEnded } from '../db/races.js';
+import { listHorses, setHorseFinalTokens } from '../db/horses.js';
+import { ok, err } from '../lib/http.js';
+
+export const handler: APIGatewayProxyHandlerV2 = async (event) => {
+  const admin_code = event.pathParameters?.admin_code;
+  if (!admin_code) return err('BAD_REQUEST', 'admin_code required');
+
+  const race = await getRaceByAdminCode(admin_code);
+  if (!race) return err('RACE_NOT_FOUND', 'No race for that admin code');
+
+  if (!race.ended_at) {
+    await setRaceEnded(race.race_id, new Date().toISOString());
+  }
+
+  const horses = await listHorses(race.race_id);
+  await Promise.all(
+    horses
+      .filter(h => h.final_tokens === undefined)
+      .map(h => setHorseFinalTokens(race.race_id, h.horse_id, h.current_tokens)),
+  );
+
+  const response: EndRaceResponse = { ok: true };
+  return ok(response);
+};
