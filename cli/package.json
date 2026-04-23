@@ -4,10 +4,15 @@
   "description": "Token Derby CLI — manage your stable, run horses in token races driven by Claude Code output.",
   "type": "module",
   "bin": {
-    "token-derby": "./dist/bin.js"
+    "token-derby": "dist/bin.js"
   },
-  "files": ["dist", "README.md"],
-  "engines": { "node": ">=20" },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
   "publishConfig": {
     "access": "public"
   },
