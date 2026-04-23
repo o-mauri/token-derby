@@ -1,0 +1,36 @@
+{
+  "name": "@mauricode/token-derby",
+  "version": "0.1.0",
+  "description": "Token Derby CLI — manage your stable, run horses in token races driven by Claude Code output.",
+  "type": "module",
+  "bin": {
+    "token-derby": "./dist/bin.js"
+  },
+  "files": ["dist", "README.md"],
+  "engines": { "node": ">=20" },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "dev": "tsx src/bin.ts",
+    "prepublishOnly": "npm run build && npm test"
+  },
+  "dependencies": {
+    "ink": "^5.0.1",
+    "ink-text-input": "^6.0.0",
+    "react": "^18.3.1"
+  },
+  "devDependencies": {
+    "@token-derby/shared": "*",
+    "@types/node": "^22.7.0",
+    "@types/react": "^18.3.0",
+    "ink-testing-library": "^4.0.0",
+    "tsup": "^8.3.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}
