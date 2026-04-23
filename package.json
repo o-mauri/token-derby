@@ -2,7 +2,7 @@
   "name": "token-derby",
   "version": "0.1.0",
   "private": true,
-  "workspaces": ["shared", "api", "infra"],
+  "workspaces": ["shared", "api", "infra", "cli"],
   "engines": { "node": ">=22" },
   "scripts": {
     "build": "npm -ws run build",

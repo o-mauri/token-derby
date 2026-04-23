@@ -10,8 +10,15 @@ A pixel-art daily horse race where each horse is a participant and every length 
 - `shared/` — domain types, API contracts, error codes, constants
 - `api/` — Lambda handlers (`createRace`, `getRace`, `joinRace`, `heartbeat`, `endRace`)
 - `infra/` — AWS CDK stack (eu-west-2, with cross-region ACM in us-east-1)
-- `cli/` — `@mauricode/token-derby` npm package (shipped in Plan 2)
+- `cli/` — [`@mauricode/token-derby`](https://www.npmjs.com/package/@mauricode/token-derby) npm package — see `cli/README.md`
 - `site/` — static race viewer (shipped in Plan 3)
+
+## Install the CLI
+
+```bash
+npm i -g @mauricode/token-derby
+token-derby --help
+```
 
 ## Local development
 
