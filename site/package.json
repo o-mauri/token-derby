@@ -1,0 +1,21 @@
+{
+  "name": "@token-derby/site",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "prebuild": "npm run build --workspace=@token-derby/shared",
+    "build": "tsup && node scripts/copy-public.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "dev": "npx serve dist"
+  },
+  "devDependencies": {
+    "@token-derby/shared": "*",
+    "@types/node": "^22.7.0",
+    "happy-dom": "^15.7.0",
+    "tsup": "^8.3.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}
