@@ -12,6 +12,7 @@
     "access": "public"
   },
   "scripts": {
+    "prebuild": "npm run build --workspace=@token-derby/shared",
     "build": "tsup",
     "test": "vitest run",
     "test:watch": "vitest",
