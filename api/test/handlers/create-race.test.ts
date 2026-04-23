@@ -66,4 +66,25 @@ describe('createRace handler', () => {
     }));
     expect(res.statusCode).toBe(400);
   });
+
+  it('rejects unparseable datetime strings', async () => {
+    const res: any = await handler(event({
+      name: 'Garbage',
+      start_time: 'not-a-date',
+      end_time: 'also-not-a-date',
+      tz: 'UTC',
+    }));
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).code).toBe('BAD_REQUEST');
+  });
+
+  it('rejects non-string tz', async () => {
+    const res: any = await handler(event({
+      name: 'Bad tz',
+      start_time: '2026-04-22T09:00:00Z',
+      end_time: '2026-04-22T17:00:00Z',
+      tz: 42,
+    }));
+    expect(res.statusCode).toBe(400);
+  });
 });

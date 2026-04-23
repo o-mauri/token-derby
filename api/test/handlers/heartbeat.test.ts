@@ -76,4 +76,23 @@ describe('heartbeat handler', () => {
     const res: any = await hbHandler(hbEvent('NOPE99', 'no-horse', 'tok', { current_tokens: 0 }));
     expect(res.statusCode).toBe(404);
   });
+
+  it('returns finished status without writing when race has ended', async () => {
+    const { join_code, race_id, horse_id, heartbeat_token } = await setup();
+    // Freeze the race's current_tokens at 777
+    await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { current_tokens: 777 }));
+
+    // Mark the race as ended
+    const { setRaceEnded } = await import('../../src/db/races.js');
+    await setRaceEnded(race_id, new Date().toISOString());
+
+    // A subsequent heartbeat should NOT overwrite current_tokens
+    const res: any = await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { current_tokens: 9999 }));
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body).race_status).toBe('finished');
+
+    const { listHorses } = await import('../../src/db/horses.js');
+    const horses = await listHorses(race_id);
+    expect(horses[0]?.current_tokens).toBe(777);
+  });
 });

@@ -16,12 +16,19 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
     !body.tz ||
     typeof body.name !== 'string' ||
     typeof body.start_time !== 'string' ||
-    typeof body.end_time !== 'string'
+    typeof body.end_time !== 'string' ||
+    typeof body.tz !== 'string'
   ) {
     return err('BAD_REQUEST', 'name, start_time, end_time, tz are required');
   }
 
-  if (new Date(body.end_time).getTime() <= new Date(body.start_time).getTime()) {
+  const start_ms = new Date(body.start_time).getTime();
+  const end_ms = new Date(body.end_time).getTime();
+  if (Number.isNaN(start_ms) || Number.isNaN(end_ms)) {
+    return err('BAD_REQUEST', 'start_time and end_time must be valid ISO 8601 datetimes');
+  }
+
+  if (end_ms <= start_ms) {
     return err('BAD_REQUEST', 'end_time must be after start_time');
   }
 

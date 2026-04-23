@@ -26,10 +26,14 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
   if (!verified) return err('INVALID_TOKEN', 'heartbeat token does not match');
 
   const now = new Date();
-  await updateHorseTokens(race.race_id, horse_id, body.current_tokens, now.toISOString());
+  const race_status = computeStatus(race, now);
+
+  if (race_status !== 'finished') {
+    await updateHorseTokens(race.race_id, horse_id, body.current_tokens, now.toISOString());
+  }
 
   const response: HeartbeatResponse = {
-    race_status: computeStatus(race, now),
+    race_status,
     server_time: now.toISOString(),
     time_left_seconds: timeLeftSeconds(race, now),
   };

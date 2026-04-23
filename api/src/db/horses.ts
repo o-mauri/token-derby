@@ -1,6 +1,6 @@
 import { PutCommand, QueryCommand, UpdateCommand, GetCommand } from '@aws-sdk/lib-dynamodb';
 import { ddb, TABLE } from './client.js';
-import { horseKey, parseHorseId } from './keys.js';
+import { horseKey, parseHorseId, RACE_PK_PREFIX, HORSE_SK_PREFIX } from './keys.js';
 import type { Horse } from '@token-derby/shared';
 
 export async function putHorse(race_id: string, horse: Horse, heartbeat_token: string): Promise<void> {
@@ -20,8 +20,8 @@ export async function listHorses(race_id: string): Promise<Horse[]> {
     TableName: TABLE,
     KeyConditionExpression: 'pk = :pk AND begins_with(sk, :hp)',
     ExpressionAttributeValues: {
-      ':pk': `RACE#${race_id}`,
-      ':hp': 'HORSE#',
+      ':pk': `${RACE_PK_PREFIX}${race_id}`,
+      ':hp': HORSE_SK_PREFIX,
     },
   }));
   return Items.map(pickHorse);
@@ -76,8 +76,8 @@ export async function countHorses(race_id: string): Promise<number> {
     TableName: TABLE,
     KeyConditionExpression: 'pk = :pk AND begins_with(sk, :hp)',
     ExpressionAttributeValues: {
-      ':pk': `RACE#${race_id}`,
-      ':hp': 'HORSE#',
+      ':pk': `${RACE_PK_PREFIX}${race_id}`,
+      ':hp': HORSE_SK_PREFIX,
     },
     Select: 'COUNT',
   }));
