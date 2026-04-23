@@ -7,25 +7,28 @@ export const FIXED_COLORS = {
   H: '#1F1108',
 } as const;
 
+// Each pair of adjacent rows is intentionally identical so every half-block
+// cell renders as a solid color. The only intentional split is the last row
+// (legs/hooves transition).
 const MAIN_ROWS: readonly string[] = [
   '................................',
-  '......................MM.MM.....',
-  '......................MMBMMBB...',
-  '.....................MMBBBBB....',
-  '....................MBBBBEB.....',
-  '...................MBBBBBBB.....',
-  '...................MBBBBBB......',
-  '.......MMMMMMMMMMMMMMBBBB.......',
-  '....MMMMBBBBBBBBBBBBBBBBBBB.....',
-  '..TTMMBBBBBBBBBBBBBBBBBBBB......',
-  '.TTTMMBBBBBBBBBBBBBBBBBBBBB.....',
-  'TTTTBBBBBBBBSSSSSSBBBBBBBB......',
-  '.TTTBBBBBBBBSSSSSSBBBBBBBB......',
-  '..TTBBBBBBBBBBBBBBBBBBBB........',
-  '...BBBBBBBBBBBBBBBBBBBB.........',
-  '...BBBBBBBBBBBBBBBBBBB..........',
+  '................................',
+  '..........................MMM...',
+  '..........................MMM...',
+  '.........................MBBEBB.',
+  '.........................MBBEBB.',
+  '........................MBBBBBBB',
+  '........................MBBBBBBB',
+  '..................MMMMMMMBBB....',
+  '..................MMMMMMMBBB....',
+  '....BBBBBBBBSSSSSSMMBBBBBB......',
+  '...BBBBBBBBBSSSSSSMMBBBBBB......',
+  '.TTBBBBBBBBBSSSSSSBBBBBBBB......',
+  '.TTBBBBBBBBBSSSSSSBBBBBBBB......',
+  'TTTBBBBBBBBBBBBBBBBBBBBBBB......',
+  'TTTBBBBBBBBBBBBBBBBBBBBB........',
   '...BBB.BBB.....BBB.BBB..........',
-  '....BB..BB......BB..BB..........',
+  '...BBB.BBB.....BBB.BBB..........',
   '....BB..BB......BB..BB..........',
   '....BB..BB......BB..BB..........',
   '....BB..BB......BB..BB..........',
@@ -35,10 +38,10 @@ const MAIN_ROWS: readonly string[] = [
 ];
 
 const MINI_ROWS: readonly string[] = [
-  '.MMBBBBE',
-  'TBBSSSBB',
-  '.BBBBBB.',
-  '.HH..HH.',
+  '.BBSSMBB',
+  '.BBSSMBB',
+  'TBBBBBB.',
+  'THH..HH.',
 ];
 
 export const MAIN_SPRITE: readonly (readonly SlotTag[])[] = parse(MAIN_ROWS, 32, 24);
