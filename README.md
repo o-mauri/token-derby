@@ -11,7 +11,7 @@ A pixel-art daily horse race where each horse is a participant and every length 
 - `api/` — Lambda handlers (`createRace`, `getRace`, `joinRace`, `heartbeat`, `endRace`)
 - `infra/` — AWS CDK stack (eu-west-2, with cross-region ACM in us-east-1)
 - `cli/` — [`@mauricode/token-derby`](https://www.npmjs.com/package/@mauricode/token-derby) npm package — see `cli/README.md`
-- `site/` — static race viewer (shipped in Plan 3)
+- `site/` — static race viewer — see `site/README.md`. Live at [token-derby.mauricode.co.uk](https://token-derby.mauricode.co.uk).
 
 ## Install the CLI
 
