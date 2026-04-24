@@ -1,0 +1,265 @@
+:root {
+  --bg: #1a1229;
+  --panel: #2d1d42;
+  --text: #f5e9d3;
+  --muted: #a68bd8;
+  --accent: #ffd166;
+  --lane: #3d2856;
+  --lane-alt: #362248;
+  --track-gap: 4px;
+  --horse-height: 56px;
+  --sprite-scale: 2;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Courier New", ui-monospace, Menlo, Monaco, monospace;
+  min-height: 100vh;
+}
+
+#app { min-height: 100vh; display: flex; flex-direction: column; }
+
+/* ── Home ──────────────────────────────────────────── */
+
+.home {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 32px;
+  padding: 32px;
+  text-align: center;
+}
+.home h1 {
+  font-size: clamp(2.5rem, 8vw, 4rem);
+  color: var(--accent);
+  letter-spacing: 0.08em;
+  margin: 0;
+}
+.home p { color: var(--muted); margin: 0; max-width: 36ch; }
+.home form { display: flex; gap: 8px; }
+.home input {
+  background: var(--panel);
+  color: var(--text);
+  border: 2px solid var(--lane);
+  padding: 12px 16px;
+  font: inherit;
+  font-size: 1.25rem;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  width: 180px;
+}
+.home input:focus { outline: none; border-color: var(--accent); }
+.home button {
+  background: var(--accent);
+  color: var(--bg);
+  border: none;
+  padding: 12px 24px;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+}
+.home button:hover { filter: brightness(1.1); }
+
+/* ── Race view ─────────────────────────────────────── */
+
+.race {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  min-height: 100vh;
+}
+.race-header {
+  padding: 16px 24px;
+  border-bottom: 2px solid var(--panel);
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.race-header h1 { margin: 0; color: var(--accent); font-size: 1.5rem; letter-spacing: 0.05em; }
+.race-header .meta { color: var(--muted); display: flex; gap: 24px; flex-wrap: wrap; }
+.race-header .meta b { color: var(--text); font-weight: normal; }
+.race-status { text-transform: uppercase; letter-spacing: 0.1em; }
+.race-status--pending { color: var(--accent); }
+.race-status--live { color: #7bed9f; }
+.race-status--finished { color: #a68bd8; }
+
+.track {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--track-gap);
+}
+
+.lane {
+  position: relative;
+  height: var(--horse-height);
+  background: var(--lane);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.lane:nth-child(even) { background: var(--lane-alt); }
+.lane::after {
+  content: "";
+  position: absolute;
+  right: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: repeating-linear-gradient(
+    45deg,
+    var(--accent) 0 6px,
+    transparent 6px 12px
+  );
+}
+.lane-name {
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+}
+
+.horse {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  transition: left 3s linear;
+  width: calc(var(--sprite-scale) * 32px);
+  height: calc(var(--sprite-scale) * 24px);
+}
+.horse-sprite { width: 100%; height: 100%; display: block; }
+.horse-label {
+  position: absolute;
+  top: -18px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: var(--text);
+  font-size: 0.7rem;
+  white-space: nowrap;
+  text-shadow: 0 0 4px var(--bg);
+}
+
+/* ── Pending state extras ─────────────────────────── */
+
+.pending-banner {
+  text-align: center;
+  padding: 16px;
+  background: var(--panel);
+  border-bottom: 2px solid var(--accent);
+  font-size: 1.25rem;
+  color: var(--accent);
+  letter-spacing: 0.1em;
+}
+
+/* ── Finished state extras ────────────────────────── */
+
+.finished .horse { transition: left 1s ease-out, transform 1s ease-out, opacity 1s ease-out; }
+
+.podium {
+  position: fixed;
+  inset: 0;
+  background: rgba(26, 18, 41, 0.85);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  animation: fade-in 1s ease-out forwards;
+  z-index: 10;
+}
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+.podium h2 { color: var(--accent); margin: 0; font-size: 2rem; letter-spacing: 0.1em; }
+.podium ol {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+}
+.podium li {
+  background: var(--panel);
+  padding: 16px;
+  border-radius: 6px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.podium li:nth-child(1) { border: 2px solid gold; transform: translateY(-16px); }
+.podium li:nth-child(2) { border: 2px solid silver; }
+.podium li:nth-child(3) { border: 2px solid #cd7f32; }
+.podium .place { font-size: 2rem; }
+.podium .name { font-weight: bold; }
+.podium .tokens { color: var(--muted); }
+
+.podium .dismiss {
+  background: var(--accent);
+  color: var(--bg);
+  border: none;
+  padding: 8px 16px;
+  font: inherit;
+  cursor: pointer;
+}
+.podium .dismiss:hover { filter: brightness(1.1); }
+
+/* ── Confetti ─────────────────────────────────────── */
+
+.confetti {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 5;
+}
+.confetti span {
+  position: absolute;
+  top: -20px;
+  width: 8px;
+  height: 12px;
+  animation: fall 3s linear forwards;
+}
+@keyframes fall {
+  to { transform: translateY(110vh) rotate(720deg); }
+}
+
+/* ── Animations ───────────────────────────────────── */
+
+@keyframes leg-swing {
+  0%, 100% { transform: translate(-50%, -50%) scaleX(1); }
+  50%      { transform: translate(-50%, -52%) scaleX(1); }
+}
+.horse.live, .horse.pending {
+  animation: leg-swing 0.4s steps(2) infinite;
+}
+.horse.crashed {
+  animation: none;
+  transform: translate(-50%, -50%) rotate(75deg);
+  opacity: 0.4;
+}
+
+/* ── Error / fallback ─────────────────────────────── */
+
+.error {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 32px;
+  text-align: center;
+}
+.error h2 { color: #ff6b6b; margin: 0; }
+.error a { color: var(--accent); }

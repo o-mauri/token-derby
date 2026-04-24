@@ -111,11 +111,6 @@ export class TokenDerbyStack extends cdk.Stack {
       autoDeleteObjects: true,
     });
 
-    new s3deploy.BucketDeployment(this, 'DeployPlaceholder', {
-      sources: [s3deploy.Source.asset(path.resolve(__dirname, '..', 'site-placeholder'))],
-      destinationBucket: siteBucket,
-    });
-
     // ── CloudFront with /api/* proxy to API Gateway ───────────────────
     const apiUrl = cdk.Fn.select(1, cdk.Fn.split('://', httpApi.url!));
     const apiDomain = cdk.Fn.select(0, cdk.Fn.split('/', apiUrl));
@@ -145,6 +140,13 @@ export class TokenDerbyStack extends cdk.Stack {
         { httpStatus: 403, responseHttpStatus: 200, responsePagePath: '/index.html' },
         { httpStatus: 404, responseHttpStatus: 200, responsePagePath: '/index.html' },
       ],
+    });
+
+    new s3deploy.BucketDeployment(this, 'DeploySite', {
+      sources: [s3deploy.Source.asset(path.resolve(__dirname, '..', '..', 'site', 'dist'))],
+      destinationBucket: siteBucket,
+      distribution,
+      distributionPaths: ['/*'],
     });
 
     new route53.ARecord(this, 'AliasRecord', {
