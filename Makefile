@@ -1,6 +1,6 @@
-.PHONY: install build test dynamodb-up dynamodb-down bootstrap deploy-api destroy-api smoke-api
+.PHONY: install build build-site test dynamodb-up dynamodb-down bootstrap deploy destroy smoke-api
 
-# AWS profile for all deployment targets. Override with: make deploy-api AWS_PROFILE=other
+# AWS profile for all deployment targets. Override with: make deploy AWS_PROFILE=other
 AWS_PROFILE ?= personal
 
 install:
@@ -8,6 +8,9 @@ install:
 
 build:
 	npm run build
+
+build-site:
+	npm run build --workspace=@token-derby/site
 
 test:
 	npm test
@@ -25,10 +28,11 @@ bootstrap:
 	echo "Bootstrapping account $$ACCOUNT (profile: $(AWS_PROFILE))"; \
 	cd infra && AWS_PROFILE=$(AWS_PROFILE) npx cdk bootstrap aws://$$ACCOUNT/eu-west-2 aws://$$ACCOUNT/us-east-1
 
-deploy-api:
+# Deploy the whole stack (API + site). Builds site first so site/dist is fresh.
+deploy: build-site
 	cd infra && AWS_PROFILE=$(AWS_PROFILE) npx cdk deploy --require-approval never
 
-destroy-api:
+destroy:
 	cd infra && AWS_PROFILE=$(AWS_PROFILE) npx cdk destroy
 
 # Run end-to-end smoke test against the deployed API
