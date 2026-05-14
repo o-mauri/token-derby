@@ -9,8 +9,8 @@ import { getRaceByJoinCode } from '../../src/db/races.js';
 async function createTestRace(overrides: Record<string, any> = {}) {
   const res: any = await createHandler(createEvent({
     name: 'Join Test',
-    start_time: '2026-04-22T00:00:00Z',
-    end_time: '2026-04-23T23:59:59Z',
+    start_time: new Date(Date.now() - 60_000).toISOString(),
+    end_time: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
     tz: 'UTC',
     ...overrides,
   }));
