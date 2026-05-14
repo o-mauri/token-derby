@@ -19,7 +19,7 @@ export function AnimatedHorseSprite({ sprite, colors, hat }: Props) {
       setFrameIdx(i => (i + 1) % hat.animation!.frames.length);
     }, ms);
     return () => clearInterval(id);
-  }, [hat]);
+  }, [hat.animation]);
 
   const frameColor = hat.animation?.frames[frameIdx];
   return <HorseSprite sprite={sprite} colors={colors} hat={hat} frameColor={frameColor} />;
