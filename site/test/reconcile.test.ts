@@ -130,4 +130,42 @@ describe('reconcileHorses', () => {
     expect(h.style.getPropertyValue('--body')).toBe('#8B4513');
     expect(h.style.getPropertyValue('--saddle')).toBe('#C0392B');
   });
+
+  it('renders token count formatted with thousands separator', () => {
+    const r = race({ horses: [
+      horse('a', 12_847, 'Alpha', '2026-04-22T09:00:00Z'),
+    ] });
+    reconcileHorses(track, r, new Date('2026-04-22T13:00:00Z'));
+    expect(track.querySelector('.horse-tokens')?.textContent).toBe('12,847 tok');
+  });
+
+  it('renders pace as em-dash when null or absent in map', () => {
+    const r = race({ horses: [
+      horse('a', 100, 'Alpha', '2026-04-22T09:00:00Z'),
+    ] });
+    reconcileHorses(track, r, new Date('2026-04-22T13:00:00Z'));
+    expect(track.querySelector('.horse-pace')?.textContent).toBe('—');
+  });
+
+  it('renders pace value when provided', () => {
+    const r = race({ horses: [
+      horse('a', 100, 'Alpha', '2026-04-22T09:00:00Z'),
+    ] });
+    const paces = new Map<string, number | null>([['a', 247]]);
+    reconcileHorses(track, r, new Date('2026-04-22T13:00:00Z'), paces);
+    expect(track.querySelector('.horse-pace')?.textContent).toBe('+247/min');
+  });
+
+  it('updates token count and pace across calls without re-creating the lane', () => {
+    const r1 = race({ horses: [horse('a', 100, 'Alpha', '2026-04-22T09:00:00Z')] });
+    reconcileHorses(track, r1, new Date('2026-04-22T13:00:00Z'), new Map([['a', null]]));
+    const laneFirst = track.querySelector('.lane');
+
+    const r2 = race({ horses: [horse('a', 2_500, 'Alpha', '2026-04-22T09:00:00Z')] });
+    reconcileHorses(track, r2, new Date('2026-04-22T13:00:00Z'), new Map([['a', 1_234]]));
+
+    expect(track.querySelector('.lane')).toBe(laneFirst);
+    expect(track.querySelector('.horse-tokens')?.textContent).toBe('2,500 tok');
+    expect(track.querySelector('.horse-pace')?.textContent).toBe('+1,234/min');
+  });
 });

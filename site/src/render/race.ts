@@ -5,6 +5,7 @@ import { reconcileHorses } from './reconcile.js';
 import { updatePendingBanner, removePendingBanner } from './pending.js';
 import { renderFinishedOverlay } from './finished.js';
 import { formatDuration } from '../time.js';
+import { appendSample, trimWindow, computePace, type Sample } from './pace.js';
 
 const POLL_INTERVAL_MS = 3_000;
 
@@ -38,15 +39,36 @@ export function renderRace(root: HTMLElement, joinCode: string): () => void {
   });
 
   const ctrl = new AbortController();
+  const buffers = new Map<string, Sample[]>();
 
   const onSnapshot = (race: GetRaceResponse) => {
     const now = new Date();
+    const nowMs = now.getTime();
     nameEl.textContent = race.name;
     statusEl.textContent = race.status;
     statusEl.className = `race-status race-status--${race.status}`;
     timeLeftEl.textContent = formatDuration(race.time_left_seconds);
 
-    reconcileHorses(track, race, now);
+    const paceByHorseId = new Map<string, number | null>();
+    if (race.status !== 'finished') {
+      const seen = new Set<string>();
+      for (const horse of race.horses) {
+        seen.add(horse.horse_id);
+        const prev = buffers.get(horse.horse_id) ?? [];
+        const next = trimWindow(appendSample(prev, nowMs, horse.current_tokens), nowMs);
+        buffers.set(horse.horse_id, next);
+        paceByHorseId.set(horse.horse_id, computePace(next));
+      }
+      for (const id of Array.from(buffers.keys())) {
+        if (!seen.has(id)) buffers.delete(id);
+      }
+    } else {
+      for (const horse of race.horses) {
+        paceByHorseId.set(horse.horse_id, computePace(buffers.get(horse.horse_id) ?? []));
+      }
+    }
+
+    reconcileHorses(track, race, now, paceByHorseId);
 
     if (race.status === 'pending') {
       updatePendingBanner(frame, race, now);

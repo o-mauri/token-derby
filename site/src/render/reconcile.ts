@@ -2,10 +2,13 @@ import type { GetRaceResponse, HorseView } from '@token-derby/shared';
 import { elapsedPct, horseXPct } from '../position.js';
 import { buildHorseSvg } from '../sprite-svg.js';
 
+const tokenFmt = new Intl.NumberFormat('en-US');
+
 export function reconcileHorses(
   track: HTMLElement,
   race: GetRaceResponse,
   now: Date,
+  paceByHorseId: ReadonlyMap<string, number | null> = new Map(),
 ): void {
   const ordered = [...race.horses].sort(
     (a, b) => new Date(a.joined_at).getTime() - new Date(b.joined_at).getTime(),
@@ -25,7 +28,7 @@ export function reconcileHorses(
       lane = createLane(track.ownerDocument, horse);
       track.appendChild(lane);
     }
-    updateLane(lane, horse, race.horses, pct);
+    updateLane(lane, horse, race.horses, pct, paceByHorseId.get(horse.horse_id) ?? null);
   }
 }
 
@@ -47,6 +50,14 @@ function createLane(doc: Document, horse: HorseView): HTMLElement {
   nameLabel.textContent = horse.name;
   wrap.appendChild(nameLabel);
 
+  const tokens = doc.createElement('span');
+  tokens.className = 'horse-tokens';
+  wrap.appendChild(tokens);
+
+  const pace = doc.createElement('span');
+  pace.className = 'horse-pace';
+  wrap.appendChild(pace);
+
   wrap.appendChild(buildHorseSvg(doc));
   lane.appendChild(wrap);
   return lane;
@@ -57,6 +68,7 @@ function updateLane(
   horse: HorseView,
   allHorses: readonly HorseView[],
   pct: number,
+  pace: number | null,
 ): void {
   const wrap = lane.querySelector<HTMLElement>('.horse')!;
   const x = horseXPct(horse, allHorses, pct);
@@ -64,4 +76,10 @@ function updateLane(
   wrap.classList.toggle('crashed', horse.crashed);
   wrap.classList.toggle('live', !horse.crashed && pct > 0 && pct < 1);
   wrap.classList.toggle('pending', !horse.crashed && pct === 0);
+
+  const tokensEl = wrap.querySelector<HTMLElement>('.horse-tokens')!;
+  tokensEl.textContent = `${tokenFmt.format(horse.current_tokens)} tok`;
+
+  const paceEl = wrap.querySelector<HTMLElement>('.horse-pace')!;
+  paceEl.textContent = pace === null ? '—' : `+${tokenFmt.format(pace)}/min`;
 }
