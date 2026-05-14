@@ -147,6 +147,11 @@ export class TokenDerbyStack extends cdk.Stack {
       destinationBucket: siteBucket,
       distribution,
       distributionPaths: ['/*'],
+      cacheControl: [
+        s3deploy.CacheControl.setPublic(),
+        s3deploy.CacheControl.maxAge(cdk.Duration.seconds(0)),
+        s3deploy.CacheControl.mustRevalidate(),
+      ],
     });
 
     new route53.ARecord(this, 'AliasRecord', {
