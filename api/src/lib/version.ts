@@ -1,7 +1,7 @@
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { CLI_VERSION_HEADER, gteSemver } from '@token-derby/shared';
 
-export const MIN_CLI_VERSION_DEFAULT = '1.0.0';
+export const MIN_CLI_VERSION_DEFAULT = '1.1.0';
 
 export function readCliVersion(event: APIGatewayProxyEventV2): string | undefined {
   const h = event.headers ?? {};

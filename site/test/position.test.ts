@@ -8,6 +8,7 @@ const end = '2026-04-22T17:00:00Z';
 function h(current_tokens: number, extras: Partial<HorseView> = {}): HorseView {
   return {
     horse_id: 'h',
+    stable_horse_id: 'sh',
     name: 'x',
     colors: { body: '#000', mane: '#000', tail: '#000', saddle: '#000' },
     current_tokens,

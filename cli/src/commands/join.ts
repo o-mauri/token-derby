@@ -43,12 +43,14 @@ export async function joinCommand(joinCode: string | undefined): Promise<number>
 
   const ownHorse = race.horses.find(h => h.user_id === identity.user_id) ?? null;
 
+  let chosenStableHorseId: string;
   let chosenName: string;
   let chosenColors: HorseColors;
   let isResume: boolean;
 
   if (ownHorse) {
     // Auto-resume: use server's snapshot of the horse, no picker.
+    chosenStableHorseId = ownHorse.stable_horse_id;
     chosenName = ownHorse.name;
     chosenColors = ownHorse.colors;
     isResume = true;
@@ -60,6 +62,7 @@ export async function joinCommand(joinCode: string | undefined): Promise<number>
     }
     const picked = await pickHorse(stable.horses);
     if (!picked) { console.log('Cancelled.'); return 1; }
+    chosenStableHorseId = picked.stable_horse_id;
     chosenName = picked.name;
     chosenColors = picked.colors;
     isResume = false;
@@ -67,7 +70,9 @@ export async function joinCommand(joinCode: string | undefined): Promise<number>
 
   let joinResp;
   try {
-    joinResp = await joinRace(code, { horse: { name: chosenName, colors: chosenColors } });
+    joinResp = await joinRace(code, {
+      horse: { stable_horse_id: chosenStableHorseId, name: chosenName, colors: chosenColors },
+    });
   } catch (e) {
     if (e instanceof ApiError) {
       if (e.code === 'RACE_FULL') console.error('This race is full.');

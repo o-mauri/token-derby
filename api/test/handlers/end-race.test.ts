@@ -9,7 +9,7 @@ import { getRaceById } from '../../src/db/races.js';
 
 function evt(body: unknown, path: string, routeKey: string, pathParams?: Record<string, string>, auth?: string): APIGatewayProxyEventV2 {
   const headers: Record<string, string> = {
-    'x-cli-version': '1.0.0',
+    'x-cli-version': '1.1.0',
     'x-user-id': '99999999-9999-9999-9999-999999999999',
     'x-user-name': 'End Tester',
   };
@@ -35,7 +35,7 @@ describe('endRace handler', () => {
     const { join_code, race_id, admin_code } = JSON.parse(createRes.body);
 
     const joinRes: any = await joinHandler(evt(
-      { horse: { name: 'Gary', colors: { body: '#fff', mane: '#000', tail: '#000', saddle: '#f00' } } },
+      { horse: { stable_horse_id: 'cccccccc-cccc-cccc-cccc-cccccccccccc', name: 'Gary', colors: { body: '#fff', mane: '#000', tail: '#000', saddle: '#f00' } } },
       `/races/${join_code}/join`, 'POST /races/{join_code}/join', { join_code },
     ));
     const { horse_id, heartbeat_token } = JSON.parse(joinRes.body);

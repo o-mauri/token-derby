@@ -12,7 +12,7 @@ const JOINER_USER_NAME = 'Joiner';
 
 type IdentityOpt = { userId?: string | null; userName?: string | null };
 
-async function createTestRace(overrides: Record<string, any> = {}, cliVersion = '1.0.0') {
+async function createTestRace(overrides: Record<string, any> = {}, cliVersion = '1.1.0') {
   const res: any = await createHandler(createEvent({
     name: 'Join Test',
     start_time: new Date(Date.now() - 60_000).toISOString(),
@@ -23,7 +23,7 @@ async function createTestRace(overrides: Record<string, any> = {}, cliVersion = 
   return JSON.parse(res.body);
 }
 
-function createEvent(body: unknown, cliVersion: string | null = '1.0.0'): APIGatewayProxyEventV2 {
+function createEvent(body: unknown, cliVersion: string | null = '1.1.0'): APIGatewayProxyEventV2 {
   const headers: Record<string, string> = {};
   if (cliVersion) headers['x-cli-version'] = cliVersion;
   headers['x-user-id'] = CREATOR_USER_ID;
@@ -34,7 +34,7 @@ function createEvent(body: unknown, cliVersion: string | null = '1.0.0'): APIGat
 function joinEvent(
   join_code: string,
   body: unknown,
-  cliVersion: string | null = '1.0.0',
+  cliVersion: string | null = '1.1.0',
   identity: IdentityOpt = {},
 ): APIGatewayProxyEventV2 {
   const headers: Record<string, string> = {};
@@ -58,6 +58,7 @@ function joinEvent(
 
 const validHorse = {
   horse: {
+    stable_horse_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
     name: 'Gary',
     colors: { body: '#8B4513', mane: '#000', tail: '#000', saddle: '#C0392B' },
   },
@@ -65,6 +66,7 @@ const validHorse = {
 
 const otherHorse = {
   horse: {
+    stable_horse_id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
     name: 'Beth',
     colors: { body: '#fff', mane: '#000', tail: '#000', saddle: '#f00' },
   },
@@ -103,10 +105,10 @@ describe('joinRace handler', () => {
   it('returns RACE_FULL when at capacity', async () => {
     const { join_code } = await createTestRace({ max_participants: 2 });
     // Two different users join.
-    await joinHandler(joinEvent(join_code, validHorse, '1.0.0', { userId: '33333333-3333-3333-3333-333333333333' }));
-    await joinHandler(joinEvent(join_code, otherHorse, '1.0.0', { userId: '44444444-4444-4444-4444-444444444444' }));
+    await joinHandler(joinEvent(join_code, validHorse, '1.1.0', { userId: '33333333-3333-3333-3333-333333333333' }));
+    await joinHandler(joinEvent(join_code, otherHorse, '1.1.0', { userId: '44444444-4444-4444-4444-444444444444' }));
     // Third (different) user should fail.
-    const res: any = await joinHandler(joinEvent(join_code, validHorse, '1.0.0', { userId: '55555555-5555-5555-5555-555555555555' }));
+    const res: any = await joinHandler(joinEvent(join_code, validHorse, '1.1.0', { userId: '55555555-5555-5555-5555-555555555555' }));
     expect(res.statusCode).toBe(409);
     expect(JSON.parse(res.body).code).toBe('RACE_FULL');
   });
@@ -117,30 +119,46 @@ describe('joinRace handler', () => {
     expect(res.statusCode).toBe(400);
   });
 
+  it('rejects missing stable_horse_id', async () => {
+    const { join_code } = await createTestRace();
+    const { stable_horse_id: _, ...rest } = validHorse.horse;
+    const res: any = await joinHandler(joinEvent(join_code, { horse: rest }));
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).message).toMatch(/stable_horse_id/);
+  });
+
+  it('persists stable_horse_id on the horse snapshot', async () => {
+    const { join_code, race_id } = await createTestRace();
+    const res: any = await joinHandler(joinEvent(join_code, validHorse));
+    expect(res.statusCode).toBe(200);
+    const horses = await listHorses(race_id);
+    expect(horses[0]?.stable_horse_id).toBe(validHorse.horse.stable_horse_id);
+  });
+
   it('accepts matching minor version (patch differs)', async () => {
-    const { join_code } = await createTestRace({}, '1.0.0');
-    const res: any = await joinHandler(joinEvent(join_code, validHorse, '1.0.7'));
+    const { join_code } = await createTestRace({}, '1.1.0');
+    const res: any = await joinHandler(joinEvent(join_code, validHorse, '1.1.7'));
     expect(res.statusCode).toBe(200);
   });
 
   it('rejects different minor version with VERSION_MISMATCH', async () => {
-    const { join_code } = await createTestRace({}, '1.0.0');
-    const res: any = await joinHandler(joinEvent(join_code, validHorse, '1.1.0'));
+    const { join_code } = await createTestRace({}, '1.1.0');
+    const res: any = await joinHandler(joinEvent(join_code, validHorse, '1.2.0'));
     expect(res.statusCode).toBe(426);
     const body = JSON.parse(res.body);
     expect(body.code).toBe('VERSION_MISMATCH');
-    expect(body.message).toMatch(/1\.0\.0/);
+    expect(body.message).toMatch(/1\.1\.0/);
   });
 
   it('rejects different major version with VERSION_MISMATCH', async () => {
-    const { join_code } = await createTestRace({}, '1.0.0');
+    const { join_code } = await createTestRace({}, '1.1.0');
     const res: any = await joinHandler(joinEvent(join_code, validHorse, '2.0.0'));
     expect(res.statusCode).toBe(426);
     expect(JSON.parse(res.body).code).toBe('VERSION_MISMATCH');
   });
 
   it('rejects missing version header on join when race is version-pinned', async () => {
-    const { join_code } = await createTestRace({}, '1.0.0');
+    const { join_code } = await createTestRace({}, '1.1.0');
     const res: any = await joinHandler(joinEvent(join_code, validHorse, null));
     expect(res.statusCode).toBe(426);
     expect(JSON.parse(res.body).code).toBe('VERSION_MISMATCH');
@@ -148,7 +166,7 @@ describe('joinRace handler', () => {
 
   it('rejects missing identity headers with IDENTITY_REQUIRED', async () => {
     const { join_code } = await createTestRace();
-    const res: any = await joinHandler(joinEvent(join_code, validHorse, '1.0.0', { userId: null, userName: null }));
+    const res: any = await joinHandler(joinEvent(join_code, validHorse, '1.1.0', { userId: null, userName: null }));
     expect(res.statusCode).toBe(400);
     expect(JSON.parse(res.body).code).toBe('IDENTITY_REQUIRED');
   });
@@ -185,15 +203,15 @@ describe('joinRace handler', () => {
     expect(res.statusCode).toBe(426);
     const body = JSON.parse(res.body);
     expect(body.code).toBe('VERSION_MISMATCH');
-    expect(body.message).toMatch(/1\.0\.0/);
+    expect(body.message).toMatch(/1\.1\.0/);
   });
 
   it('two different users can both join with horses named the same — they are separate horses', async () => {
     const { join_code, race_id } = await createTestRace();
     const userA = '66666666-6666-6666-6666-666666666666';
     const userB = '77777777-7777-7777-7777-777777777777';
-    const a: any = await joinHandler(joinEvent(join_code, validHorse, '1.0.0', { userId: userA }));
-    const b: any = await joinHandler(joinEvent(join_code, validHorse, '1.0.0', { userId: userB }));
+    const a: any = await joinHandler(joinEvent(join_code, validHorse, '1.1.0', { userId: userA }));
+    const b: any = await joinHandler(joinEvent(join_code, validHorse, '1.1.0', { userId: userB }));
     expect(a.statusCode).toBe(200);
     expect(b.statusCode).toBe(200);
     const horses = await listHorses(race_id);

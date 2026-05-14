@@ -20,6 +20,7 @@ function race(overrides: Partial<GetRaceResponse> = {}): GetRaceResponse {
 function horse(id: string, tokens: number, name: string, joined: string, extras: Partial<HorseView> = {}): HorseView {
   return {
     horse_id: id,
+    stable_horse_id: `sh-${id}`,
     name,
     colors: { body: '#8B4513', mane: '#000', tail: '#000', saddle: '#C0392B' },
     current_tokens: tokens,
@@ -163,7 +164,7 @@ describe('reconcileHorses', () => {
 describe('sortHorses', () => {
   function h(id: string, joined: string): HorseView {
     return {
-      horse_id: id, name: id,
+      horse_id: id, stable_horse_id: `sh-${id}`, name: id,
       colors: { body: '#000', mane: '#000', tail: '#000', saddle: '#000' },
       current_tokens: 0,
       last_heartbeat: 'x',
