@@ -49,11 +49,14 @@ export async function rollCommand(joinCode: string | undefined, opts: RollOpts =
 
   const stable = await loadStable();
   const horse = findHorse(stable, active.horse_name);
-  if (!horse) {
-    console.error(`Horse "${active.horse_name}" not found in stable — hat earned but not saved.`);
-    return 1;
-  }
-  const updatedHorse = { ...horse, hats: [...horse.hats, collected] };
+  const baseHorse = horse ?? {
+    name: active.horse_name,
+    colors: active.horse_colors,
+    created_at: active.joined_at,
+    hats: [],
+    equipped_hat: undefined,
+  };
+  const updatedHorse = { ...baseHorse, hats: [...baseHorse.hats, collected] };
   await upsertHorse(updatedHorse);
 
   console.log(`\nYou rolled: ${hat.name} [${hat.rarity.toUpperCase()}]${collected.tint ? ` (tint: ${collected.tint})` : ''}\n`);

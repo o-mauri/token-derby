@@ -1,4 +1,5 @@
 import { PutCommand, GetCommand, QueryCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
+import { ConditionalCheckFailedException } from '@aws-sdk/client-dynamodb';
 import { ddb, TABLE } from './client.js';
 import { raceMetaKey } from './keys.js';
 import type { Race } from '@token-derby/shared';
@@ -48,13 +49,20 @@ export async function getRaceByAdminCode(admin_code: string): Promise<Race | nul
   return item ? pickRace(item) : null;
 }
 
-export async function setRaceEnded(race_id: string, ended_at: string): Promise<void> {
-  await ddb.send(new UpdateCommand({
-    TableName: TABLE,
-    Key: raceMetaKey(race_id),
-    UpdateExpression: 'SET ended_at = :e',
-    ExpressionAttributeValues: { ':e': ended_at },
-  }));
+export async function setRaceEnded(race_id: string, ended_at: string): Promise<boolean> {
+  try {
+    await ddb.send(new UpdateCommand({
+      TableName: TABLE,
+      Key: raceMetaKey(race_id),
+      UpdateExpression: 'SET ended_at = :e',
+      ExpressionAttributeValues: { ':e': ended_at },
+      ConditionExpression: 'attribute_not_exists(ended_at)',
+    }));
+    return true;
+  } catch (e) {
+    if (e instanceof ConditionalCheckFailedException) return false;
+    throw e;
+  }
 }
 
 function pickRace(item: Record<string, any>): Race {

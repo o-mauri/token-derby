@@ -11,11 +11,7 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
   const race = await getRaceByAdminCode(admin_code);
   if (!race) return err('RACE_NOT_FOUND', 'No race for that admin code');
 
-  const alreadyEnded = Boolean(race.ended_at);
-
-  if (!alreadyEnded) {
-    await setRaceEnded(race.race_id, new Date().toISOString());
-  }
+  const wasFirst = race.ended_at ? false : await setRaceEnded(race.race_id, new Date().toISOString());
 
   const horses = await listHorses(race.race_id);
   await Promise.all(
@@ -24,7 +20,7 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
       .map(h => setHorseFinalTokens(race.race_id, h.horse_id, h.current_tokens)),
   );
 
-  if (!alreadyEnded && horses.length > 0) {
+  if (wasFirst && horses.length > 0) {
     // horses was fetched before setHorseFinalTokens; use current_tokens as fallback for unfrozen horses
     const withFinals = horses.map(h => ({
       ...h,

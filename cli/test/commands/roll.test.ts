@@ -64,4 +64,31 @@ describe('rollCommand', () => {
     const stable = JSON.parse(await fs.readFile(path.join(tmp, 'stable.json'), 'utf8'));
     expect(stable.horses[0].hats).toHaveLength(1);
   });
+
+  it('creates a stable entry if the horse was deleted from the stable', async () => {
+    const activeDir = path.join(tmp, 'active-races');
+    await fs.mkdir(activeDir, { recursive: true });
+    const activeRace = {
+      join_code: 'ORPHAN',
+      race_id: 'r2',
+      horse_id: 'h2',
+      heartbeat_token: 'tok',
+      horse_name: 'Phantom',
+      horse_colors: { body: '#123', mane: '#456', tail: '#789', saddle: '#abc' },
+      joined_at: '2026-05-14T00:00:00Z',
+      last_race_tokens: 50,
+      last_heartbeat_at: '2026-05-14T01:00:00Z',
+    };
+    await fs.writeFile(path.join(activeDir, 'ORPHAN.json'), JSON.stringify(activeRace));
+    // Intentionally no stable.json — horse was deleted
+
+    const { rollCommand } = await import('../../src/commands/roll.js');
+    const code = await rollCommand('ORPHAN', { skipPrompt: true });
+    expect(code).toBe(0);
+
+    const stable = JSON.parse(await fs.readFile(path.join(tmp, 'stable.json'), 'utf8'));
+    const phantom = stable.horses.find((h: any) => h.name === 'Phantom');
+    expect(phantom).toBeDefined();
+    expect(phantom.hats).toHaveLength(1);
+  });
 });
