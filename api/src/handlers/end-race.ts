@@ -25,6 +25,7 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
   );
 
   if (!alreadyEnded && horses.length > 0) {
+    // horses was fetched before setHorseFinalTokens; use current_tokens as fallback for unfrozen horses
     const withFinals = horses.map(h => ({
       ...h,
       final_tokens: h.final_tokens ?? h.current_tokens,
