@@ -58,17 +58,26 @@ export async function setHorseFinalTokens(
   }));
 }
 
-export async function verifyHeartbeatToken(
+export type HorseHeartbeatRecord = {
+  current_tokens: number;
+  last_heartbeat: string;
+};
+
+export async function getHorseForHeartbeat(
   race_id: string,
   horse_id: string,
   heartbeat_token: string,
-): Promise<boolean> {
+): Promise<HorseHeartbeatRecord | null> {
   const { Item } = await ddb.send(new GetCommand({
     TableName: TABLE,
     Key: horseKey(race_id, horse_id),
-    ProjectionExpression: 'heartbeat_token',
+    ProjectionExpression: 'heartbeat_token, current_tokens, last_heartbeat',
   }));
-  return Boolean(Item) && Item!.heartbeat_token === heartbeat_token;
+  if (!Item || Item.heartbeat_token !== heartbeat_token) return null;
+  return {
+    current_tokens: Number(Item.current_tokens ?? 0),
+    last_heartbeat: String(Item.last_heartbeat ?? ''),
+  };
 }
 
 export async function countHorses(race_id: string): Promise<number> {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { putHorse, listHorses, updateHorseTokens, setHorseFinalTokens, verifyHeartbeatToken } from '../../src/db/horses.js';
+import { putHorse, listHorses, updateHorseTokens, setHorseFinalTokens, getHorseForHeartbeat } from '../../src/db/horses.js';
 import type { Horse } from '@token-derby/shared';
 
 function makeHorse(overrides: Partial<Horse> = {}): Horse {
@@ -46,12 +46,17 @@ describe('horses db', () => {
     expect(updated?.final_tokens).toBe(1200);
   });
 
-  it('verifies the heartbeat token', async () => {
+  it('returns horse heartbeat state on valid token, null otherwise', async () => {
     const race_id = `r-${Math.random().toString(36).slice(2)}`;
-    const h = makeHorse();
+    const h = makeHorse({ current_tokens: 250 });
     await putHorse(race_id, h, 'secret-hb');
-    expect(await verifyHeartbeatToken(race_id, h.horse_id, 'secret-hb')).toBe(true);
-    expect(await verifyHeartbeatToken(race_id, h.horse_id, 'wrong')).toBe(false);
-    expect(await verifyHeartbeatToken(race_id, 'no-such-horse', 'secret-hb')).toBe(false);
+
+    const got = await getHorseForHeartbeat(race_id, h.horse_id, 'secret-hb');
+    expect(got).not.toBeNull();
+    expect(got!.current_tokens).toBe(250);
+    expect(got!.last_heartbeat).toBe(h.last_heartbeat);
+
+    expect(await getHorseForHeartbeat(race_id, h.horse_id, 'wrong')).toBeNull();
+    expect(await getHorseForHeartbeat(race_id, 'no-such-horse', 'secret-hb')).toBeNull();
   });
 });

@@ -8,6 +8,7 @@ process.env.AWS_REGION = 'local';
 process.env.AWS_ACCESS_KEY_ID = 'fake';
 process.env.AWS_SECRET_ACCESS_KEY = 'fake';
 process.env.TABLE_NAME = TEST_TABLE;
+process.env.TOKEN_DERBY_MAX_RATE = '1000000000';
 
 const client = new DynamoDBClient({
   endpoint: process.env.DYNAMODB_ENDPOINT,
