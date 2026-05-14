@@ -11,14 +11,16 @@ export async function createRaceCommand(): Promise<number> {
     const name = (await rl.question('Race name: ')).trim();
     if (!name) { console.error('Name required.'); return 1; }
 
-    const start = (await rl.question('Start time (ISO 8601, e.g. 2026-04-23T15:00:00Z): ')).trim();
+    const startRaw = (await rl.question('Start time (ISO 8601, blank = now): ')).trim();
+    const start = startRaw ? startRaw : new Date().toISOString();
     if (!isIso(start)) { console.error('Invalid start time.'); return 1; }
 
-    const end = (await rl.question('End time (ISO 8601): ')).trim();
-    if (!isIso(end)) { console.error('Invalid end time.'); return 1; }
-    if (new Date(end).getTime() <= new Date(start).getTime()) {
-      console.error('End time must be after start time.'); return 1;
+    const durationRaw = (await rl.question('Race duration (hours): ')).trim();
+    const durationHours = parseFloat(durationRaw);
+    if (!Number.isFinite(durationHours) || durationHours <= 0) {
+      console.error('Duration must be a positive number of hours.'); return 1;
     }
+    const end = new Date(new Date(start).getTime() + durationHours * 3600_000).toISOString();
 
     const tz = (await rl.question(`Time zone [${DEFAULT_TZ}]: `)).trim() || DEFAULT_TZ;
     const maxRaw = (await rl.question('Max participants [30]: ')).trim();
