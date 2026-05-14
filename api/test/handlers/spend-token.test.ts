@@ -7,11 +7,17 @@ import { handler as hbHandler } from '../../src/handlers/heartbeat.js';
 import { listHorses } from '../../src/db/horses.js';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 
-function evt(body: unknown, path: string, routeKey: string, pathParams?: Record<string, string>): APIGatewayProxyEventV2 {
+function evt(body: unknown, path: string, routeKey: string, pathParams?: Record<string, string>, auth?: string): APIGatewayProxyEventV2 {
+  const headers: Record<string, string> = {
+    'x-cli-version': '1.0.0',
+    'x-user-id': 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+    'x-user-name': 'Spend Tester',
+  };
+  if (auth) headers.authorization = `Bearer ${auth}`;
   return {
     version: '2.0', routeKey, rawPath: path, rawQueryString: '',
     pathParameters: pathParams,
-    headers: {},
+    headers,
     requestContext: {} as any,
     body: body ? JSON.stringify(body) : undefined,
     isBase64Encoded: false,
@@ -34,7 +40,7 @@ async function setupWinner() {
   await hbHandler(evt({ current_tokens: 500 },
     `/races/${join_code}/horses/${horse_id}/heartbeat`,
     'POST /races/{join_code}/horses/{horse_id}/heartbeat',
-    { join_code, horse_id }));
+    { join_code, horse_id }, heartbeat_token));
   await endHandler(evt(null, `/races/admin/${admin_code}`, 'DELETE /races/admin/{admin_code}', { admin_code }));
   return { join_code, race_id, horse_id, heartbeat_token };
 }
@@ -68,7 +74,7 @@ describe('spendToken handler', () => {
     expect(JSON.parse(res.body).code).toBe('INSUFFICIENT_TOKENS');
   });
 
-  it('returns UNAUTHORIZED for wrong heartbeat_token', async () => {
+  it('returns INVALID_TOKEN for wrong heartbeat_token', async () => {
     const { join_code, horse_id } = await setupWinner();
     const res: any = await spendHandler(evt(
       { heartbeat_token: 'wrong' },
@@ -77,7 +83,7 @@ describe('spendToken handler', () => {
       { join_code, horse_id },
     ));
     expect(res.statusCode).toBe(401);
-    expect(JSON.parse(res.body).code).toBe('UNAUTHORIZED');
+    expect(JSON.parse(res.body).code).toBe('INVALID_TOKEN');
   });
 
   it('returns BAD_REQUEST when path params are missing', async () => {

@@ -30,7 +30,7 @@ export async function rollCommand(joinCode: string | undefined, opts: RollOpts =
     if (e instanceof ApiError) {
       if (e.code === 'INSUFFICIENT_TOKENS') {
         console.error('No loot tokens available. Win a race to earn one!');
-      } else if (e.code === 'UNAUTHORIZED') {
+      } else if (e.code === 'INVALID_TOKEN') {
         console.error('Token verification failed — is this the right join code?');
       } else {
         console.error(`Error: ${e.code} ${e.message}`);
