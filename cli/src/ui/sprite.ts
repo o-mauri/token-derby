@@ -1,6 +1,6 @@
 // Pixel slot tags. `null` = transparent.
 //   B = body, M = mane, T = tail, S = saddle, E = eye (fixed black), H = hoof (fixed dark)
-export type SlotTag = 'B' | 'M' | 'T' | 'S' | 'E' | 'H' | null;
+export type SlotTag = 'B' | 'M' | 'T' | 'S' | 'E' | 'H' | 'A' | 'Q' | null;
 
 export const FIXED_COLORS = {
   E: '#000000',
@@ -67,6 +67,8 @@ function toTag(c: string): SlotTag {
     case 'S': return 'S';
     case 'E': return 'E';
     case 'H': return 'H';
+    case 'A': return 'A';
+    case 'Q': return 'Q';
     case '.': return null;
     default: throw new Error(`unknown sprite char: ${c}`);
   }

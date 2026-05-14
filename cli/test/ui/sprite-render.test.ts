@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { renderSprite, type Cell } from '../../src/ui/sprite-render.js';
 import { MAIN_SPRITE, MINI_SPRITE } from '../../src/ui/sprite.js';
 import { defaultColors } from '../../src/ui/palette.js';
+import type { Hat } from '@token-derby/shared';
 
 describe('renderSprite', () => {
   it('produces height/2 rows of width cells', () => {
@@ -56,5 +57,16 @@ describe('renderSprite', () => {
     expect(grid[1]![0]).toEqual<Cell>({ top: '#0000FF', bottom: null });
   });
 
-  it.todo('resolves A slot to the hat primary colour');
+  it('resolves A slot to the hat primary colour', () => {
+    const hat: Hat = {
+      id: 'test', name: 'Test', rarity: 'common',
+      rows: ['AAAAAAA', 'AAAAAAA'],
+      width: 7, anchor_x: 0,
+      colors: { A: '#AABBCC' },
+    };
+    const tiny: readonly (readonly ('B' | null)[])[] = [['B'], [null]];
+    const grid = renderSprite(tiny as any, defaultColors(), { hat });
+    // First 2 rows are hat rows; row 0 top should be hat A colour
+    expect(grid[0]![0]?.top).toBe('#AABBCC');
+  });
 });
