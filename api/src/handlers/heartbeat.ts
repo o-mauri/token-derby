@@ -1,9 +1,12 @@
 import type { APIGatewayProxyHandlerV2 } from 'aws-lambda';
 import type { HeartbeatRequest, HeartbeatResponse } from '@token-derby/shared';
+import { minorMatches } from '@token-derby/shared';
 import { getRaceByJoinCode } from '../db/races.js';
-import { verifyHeartbeatToken, updateHorseTokens } from '../db/horses.js';
+import { getHorseForHeartbeat, updateHorseTokens } from '../db/horses.js';
 import { computeStatus, timeLeftSeconds } from '../lib/status.js';
+import { clampHeartbeat } from '../lib/rate-cap.js';
 import { ok, err, parseJson } from '../lib/http.js';
+import { readCliVersion } from '../lib/version.js';
 
 export const handler: APIGatewayProxyHandlerV2 = async (event) => {
   const join_code = event.pathParameters?.join_code;
@@ -22,14 +25,31 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
   const race = await getRaceByJoinCode(join_code);
   if (!race) return err('RACE_NOT_FOUND', `No race with join code ${join_code}`);
 
-  const verified = await verifyHeartbeatToken(race.race_id, horse_id, token);
-  if (!verified) return err('INVALID_TOKEN', 'heartbeat token does not match');
+  if (race.cli_version) {
+    const cli_version = readCliVersion(event);
+    if (!minorMatches(cli_version, race.cli_version)) {
+      return err(
+        'VERSION_MISMATCH',
+        `Race requires token-derby v${race.cli_version}. ` +
+          `Install: npm i -g @mauricode/token-derby@~${race.cli_version}`,
+      );
+    }
+  }
+
+  const horse = await getHorseForHeartbeat(race.race_id, horse_id, token);
+  if (!horse) return err('INVALID_TOKEN', 'heartbeat token does not match');
 
   const now = new Date();
   const race_status = computeStatus(race, now);
 
   if (race_status !== 'finished') {
-    await updateHorseTokens(race.race_id, horse_id, body.current_tokens, now.toISOString());
+    const accepted = clampHeartbeat({
+      previous_tokens: horse.current_tokens,
+      previous_heartbeat_iso: horse.last_heartbeat,
+      proposed_tokens: body.current_tokens,
+      now,
+    });
+    await updateHorseTokens(race.race_id, horse_id, accepted, now.toISOString());
   }
 
   const response: HeartbeatResponse = {
