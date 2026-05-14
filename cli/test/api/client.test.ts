@@ -74,6 +74,21 @@ describe('request', () => {
     expect(fetch.mock.calls[0]?.[0]).toBe('https://example.test/api/races/ABC');
     delete process.env.TOKEN_DERBY_API_BASE;
   });
+
+  it('attaches X-Cli-Version header on every request', async () => {
+    const fetch = fakeFetch(200, {});
+    await request('GET', '/foo', undefined, undefined, fetch as any);
+    const init = fetch.mock.calls[0]?.[1] as RequestInit;
+    const headers = init.headers as Record<string, string>;
+    expect(headers['x-cli-version']).toBeTruthy();
+    expect(headers['x-cli-version']).toMatch(/^\d+\.\d+\.\d+/);
+  });
+
+  it('surfaces VERSION_MISMATCH error envelope', async () => {
+    const fetch = fakeFetch(426, { code: 'VERSION_MISMATCH', message: 'upgrade pls' });
+    await expect(request('POST', '/foo', {}, undefined, fetch as any))
+      .rejects.toMatchObject({ code: 'VERSION_MISMATCH', status: 426 });
+  });
 });
 
 describe('ApiError', () => {

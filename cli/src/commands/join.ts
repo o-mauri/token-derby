@@ -32,6 +32,7 @@ export async function joinCommand(joinCode: string | undefined): Promise<number>
       if (e.code === 'RACE_FULL') console.error(`This race is full.`);
       else if (e.code === 'RACE_FINISHED') console.error('This race has ended.');
       else if (e.code === 'RACE_NOT_FOUND') console.error(`No race with join code ${code}.`);
+      else if (e.code === 'VERSION_MISMATCH') console.error(e.message);
       else console.error(`Error: ${e.code} ${e.message}`);
       return 1;
     }

@@ -1,11 +1,20 @@
 import type { APIGatewayProxyHandlerV2 } from 'aws-lambda';
 import type { CreateRaceRequest, CreateRaceResponse } from '@token-derby/shared';
-import { DEFAULT_MAX_PARTICIPANTS } from '@token-derby/shared';
+import { DEFAULT_MAX_PARTICIPANTS, parseSemver } from '@token-derby/shared';
 import { generateRaceId, generateJoinCode, generateAdminCode } from '../lib/codes.js';
 import { putRace, getRaceByJoinCode } from '../db/races.js';
 import { ok, err, parseJson } from '../lib/http.js';
+import { readCliVersion } from '../lib/version.js';
 
 export const handler: APIGatewayProxyHandlerV2 = async (event) => {
+  const cli_version = readCliVersion(event);
+  if (!cli_version) {
+    return err('BAD_REQUEST', 'X-Cli-Version header required — upgrade your CLI');
+  }
+  if (!parseSemver(cli_version)) {
+    return err('BAD_REQUEST', `X-Cli-Version must be MAJOR.MINOR.PATCH (got "${cli_version}")`);
+  }
+
   const body = parseJson<CreateRaceRequest>(event.body);
   if (!body) return err('BAD_REQUEST', 'JSON body required');
 
@@ -46,6 +55,7 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
       max_participants: body.max_participants ?? DEFAULT_MAX_PARTICIPANTS,
       join_code,
       created_at: new Date().toISOString(),
+      cli_version,
     },
     admin_code,
   );

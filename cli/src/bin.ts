@@ -6,10 +6,9 @@ import { createRaceCommand } from './commands/create.js';
 import { joinCommand } from './commands/join.js';
 import { rejoinCommand } from './commands/rejoin.js';
 import { endCommand } from './commands/end.js';
+import { CLI_VERSION } from './version.js';
 
-const VERSION = '0.1.0';
-
-const HELP = `token-derby v${VERSION}
+const HELP = `token-derby v${CLI_VERSION}
 
 Stable management:
   token-derby stable create               Make a new horse (interactive)
@@ -32,7 +31,7 @@ async function main(): Promise<number> {
   const cmd = argv[0];
 
   if (!cmd || cmd === '--help' || cmd === '-h') { console.log(HELP); return 0; }
-  if (cmd === '--version' || cmd === '-v') { console.log(VERSION); return 0; }
+  if (cmd === '--version' || cmd === '-v') { console.log(CLI_VERSION); return 0; }
 
   if (cmd === 'stable') {
     const sub = argv[1];

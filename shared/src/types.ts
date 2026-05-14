@@ -27,6 +27,7 @@ export type Race = {
   join_code: string;
   created_at: string;
   ended_at?: string;
+  cli_version?: string;
 };
 
 export type HorseView = Horse & {

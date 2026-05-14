@@ -6,29 +6,33 @@ import { listHorses } from '../../src/db/horses.js';
 import { setRaceEnded } from '../../src/db/races.js';
 import { getRaceByJoinCode } from '../../src/db/races.js';
 
-async function createTestRace(overrides: Record<string, any> = {}) {
+async function createTestRace(overrides: Record<string, any> = {}, cliVersion = '0.2.0') {
   const res: any = await createHandler(createEvent({
     name: 'Join Test',
-    start_time: '2026-04-22T00:00:00Z',
-    end_time: '2026-04-23T23:59:59Z',
+    start_time: new Date(Date.now() - 60_000).toISOString(),
+    end_time: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
     tz: 'UTC',
     ...overrides,
-  }));
+  }, cliVersion));
   return JSON.parse(res.body);
 }
 
-function createEvent(body: unknown): APIGatewayProxyEventV2 {
-  return { version: '2.0', routeKey: 'POST /races', rawPath: '/races', rawQueryString: '', headers: {}, requestContext: {} as any, body: JSON.stringify(body), isBase64Encoded: false };
+function createEvent(body: unknown, cliVersion: string | null = '0.2.0'): APIGatewayProxyEventV2 {
+  const headers: Record<string, string> = {};
+  if (cliVersion) headers['x-cli-version'] = cliVersion;
+  return { version: '2.0', routeKey: 'POST /races', rawPath: '/races', rawQueryString: '', headers, requestContext: {} as any, body: JSON.stringify(body), isBase64Encoded: false };
 }
 
-function joinEvent(join_code: string, body: unknown): APIGatewayProxyEventV2 {
+function joinEvent(join_code: string, body: unknown, cliVersion: string | null = '0.2.0'): APIGatewayProxyEventV2 {
+  const headers: Record<string, string> = {};
+  if (cliVersion) headers['x-cli-version'] = cliVersion;
   return {
     version: '2.0',
     routeKey: 'POST /races/{join_code}/join',
     rawPath: `/races/${join_code}/join`,
     rawQueryString: '',
     pathParameters: { join_code },
-    headers: {},
+    headers,
     requestContext: {} as any,
     body: JSON.stringify(body),
     isBase64Encoded: false,
@@ -83,5 +87,54 @@ describe('joinRace handler', () => {
     const { join_code } = await createTestRace();
     const res: any = await joinHandler(joinEvent(join_code, { horse: { name: 'x' } }));
     expect(res.statusCode).toBe(400);
+  });
+
+  it('accepts matching minor version (patch differs)', async () => {
+    const { join_code } = await createTestRace({}, '0.2.0');
+    const res: any = await joinHandler(joinEvent(join_code, validHorse, '0.2.7'));
+    expect(res.statusCode).toBe(200);
+  });
+
+  it('rejects different minor version with VERSION_MISMATCH', async () => {
+    const { join_code } = await createTestRace({}, '0.2.0');
+    const res: any = await joinHandler(joinEvent(join_code, validHorse, '0.3.0'));
+    expect(res.statusCode).toBe(426);
+    const body = JSON.parse(res.body);
+    expect(body.code).toBe('VERSION_MISMATCH');
+    expect(body.message).toMatch(/0\.2\.0/);
+  });
+
+  it('rejects different major version with VERSION_MISMATCH', async () => {
+    const { join_code } = await createTestRace({}, '0.2.0');
+    const res: any = await joinHandler(joinEvent(join_code, validHorse, '1.0.0'));
+    expect(res.statusCode).toBe(426);
+    expect(JSON.parse(res.body).code).toBe('VERSION_MISMATCH');
+  });
+
+  it('rejects missing version header on join when race is version-pinned', async () => {
+    const { join_code } = await createTestRace({}, '0.2.0');
+    const res: any = await joinHandler(joinEvent(join_code, validHorse, null));
+    expect(res.statusCode).toBe(426);
+    expect(JSON.parse(res.body).code).toBe('VERSION_MISMATCH');
+  });
+
+  it('accepts any version when race has no cli_version (legacy)', async () => {
+    // Simulate a legacy race by writing directly without cli_version.
+    const { putRace } = await import('../../src/db/races.js');
+    const { generateRaceId, generateJoinCode, generateAdminCode } = await import('../../src/lib/codes.js');
+    const legacyCode = generateJoinCode();
+    await putRace({
+      race_id: generateRaceId(),
+      name: 'Legacy',
+      start_time: new Date(Date.now() - 60_000).toISOString(),
+      end_time: new Date(Date.now() + 3600_000).toISOString(),
+      tz: 'UTC',
+      max_participants: 30,
+      join_code: legacyCode,
+      created_at: new Date().toISOString(),
+    } as any, generateAdminCode());
+
+    const res: any = await joinHandler(joinEvent(legacyCode, validHorse, '99.99.99'));
+    expect(res.statusCode).toBe(200);
   });
 });

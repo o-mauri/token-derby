@@ -1,10 +1,12 @@
 import type { APIGatewayProxyHandlerV2 } from 'aws-lambda';
 import type { JoinRaceRequest, JoinRaceResponse } from '@token-derby/shared';
+import { minorMatches } from '@token-derby/shared';
 import { generateHorseId, generateHeartbeatToken } from '../lib/codes.js';
 import { getRaceByJoinCode } from '../db/races.js';
 import { putHorse, countHorses } from '../db/horses.js';
 import { computeStatus } from '../lib/status.js';
 import { ok, err, parseJson } from '../lib/http.js';
+import { readCliVersion } from '../lib/version.js';
 
 export const handler: APIGatewayProxyHandlerV2 = async (event) => {
   const join_code = event.pathParameters?.join_code;
@@ -23,6 +25,19 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
   if (!race) return err('RACE_NOT_FOUND', `No race with join code ${join_code}`);
   if (computeStatus(race, new Date()) === 'finished') {
     return err('RACE_FINISHED', 'This race has ended');
+  }
+
+  // Races created before version pinning shipped have no cli_version — they predate the feature.
+  // For new races (with cli_version) the joiner must match the race's MAJOR.MINOR.
+  if (race.cli_version) {
+    const cli_version = readCliVersion(event);
+    if (!minorMatches(cli_version, race.cli_version)) {
+      return err(
+        'VERSION_MISMATCH',
+        `This race was created with token-derby v${race.cli_version}. ` +
+          `Install a matching version: npm i -g @mauricode/token-derby@~${race.cli_version}`,
+      );
+    }
   }
 
   const existing = await countHorses(race.race_id);

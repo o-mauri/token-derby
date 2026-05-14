@@ -1,4 +1,6 @@
 import { apiBase } from '../config.js';
+import { CLI_VERSION } from '../version.js';
+import { CLI_VERSION_HEADER } from '@token-derby/shared';
 
 export type ApiErrorCode =
   | 'RACE_NOT_FOUND'
@@ -7,6 +9,7 @@ export type ApiErrorCode =
   | 'INVALID_TOKEN'
   | 'RATE_LIMITED'
   | 'BAD_REQUEST'
+  | 'VERSION_MISMATCH'
   | 'NETWORK_ERROR';
 
 export class ApiError extends Error {
@@ -31,6 +34,7 @@ export async function request<T>(
 ): Promise<T> {
   const url = path.startsWith('http') ? path : `${apiBase()}${path}`;
   const headers: Record<string, string> = {};
+  headers[CLI_VERSION_HEADER] = CLI_VERSION;
   if (authToken) headers['authorization'] = `Bearer ${authToken}`;
   if (body !== undefined) headers['content-type'] = 'application/json';
 

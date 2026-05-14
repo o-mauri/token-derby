@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useApp } from 'ink';
+import { Box, Text, useApp } from 'ink';
 import type { GetRaceResponse, HeartbeatResponse } from '@token-derby/shared';
 import { StatusScreen } from '../ui/StatusScreen.js';
 import { runHeartbeatLoop } from './heartbeat-loop.js';
@@ -7,6 +7,7 @@ import { runPollLoop } from './poll-loop.js';
 import { sumOutputTokens } from '../tokens/transcripts.js';
 import { initialBaseline } from '../tokens/baseline.js';
 import * as endpoints from '../api/endpoints.js';
+import { ApiError } from '../api/client.js';
 import { saveActiveRace, type ActiveRace } from '../stable/active-race.js';
 import { HEARTBEAT_INTERVAL_MS, POLL_INTERVAL_MS, HEARTBEAT_RETRY_DELAYS_MS } from '../config.js';
 
@@ -22,6 +23,7 @@ export function RunRace({ active, startingBaseline, pendingMode }: RunRaceProps)
   const [lastHbAt, setLastHbAt] = useState<Date | null>(null);
   const [lastHbOk, setLastHbOk] = useState<boolean>(true);
   const [tickNow, setTickNow] = useState<Date>(new Date());
+  const [fatalError, setFatalError] = useState<string | null>(null);
 
   const baselineRef = useRef(startingBaseline);
   const pendingRef = useRef(pendingMode);
@@ -77,7 +79,15 @@ export function RunRace({ active, startingBaseline, pendingMode }: RunRaceProps)
         setLastHbOk(true);
         if (resp.race_status === 'finished') exit();
       },
-      onError: () => setLastHbOk(false),
+      onError: (err) => {
+        if (err instanceof ApiError && err.code === 'VERSION_MISMATCH') {
+          setFatalError(err.message);
+          ctrl.current.abort();
+          exit();
+          return;
+        }
+        setLastHbOk(false);
+      },
       onFinished: () => exit(),
       abortSignal: ctrl.current.signal,
     });
@@ -102,6 +112,15 @@ export function RunRace({ active, startingBaseline, pendingMode }: RunRaceProps)
   const lastHeartbeatAgoSec = lastHbAt
     ? Math.max(0, Math.floor((tickNow.getTime() - lastHbAt.getTime()) / 1000))
     : null;
+
+  if (fatalError) {
+    return (
+      <Box flexDirection="column" padding={1}>
+        <Text color="red" bold>CLI version mismatch — disconnected</Text>
+        <Text>{fatalError}</Text>
+      </Box>
+    );
+  }
 
   return (
     <StatusScreen

@@ -4,7 +4,8 @@ export type ErrorCode =
   | 'RACE_FINISHED'
   | 'INVALID_TOKEN'
   | 'RATE_LIMITED'
-  | 'BAD_REQUEST';
+  | 'BAD_REQUEST'
+  | 'VERSION_MISMATCH';
 
 export type ErrorEnvelope = {
   code: ErrorCode;
@@ -17,5 +18,6 @@ export const ERROR_STATUS: Record<ErrorCode, number> = {
   RACE_NOT_FOUND: 404,
   RACE_FULL: 409,
   RACE_FINISHED: 410,
+  VERSION_MISMATCH: 426,
   RATE_LIMITED: 429,
 };

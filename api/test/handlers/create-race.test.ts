@@ -3,13 +3,15 @@ import { handler } from '../../src/handlers/create-race.js';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { getRaceByJoinCode, getRaceByAdminCode } from '../../src/db/races.js';
 
-function event(body: unknown): APIGatewayProxyEventV2 {
+function event(body: unknown, cliVersion: string | null = '0.2.0'): APIGatewayProxyEventV2 {
+  const headers: Record<string, string> = { 'content-type': 'application/json' };
+  if (cliVersion) headers['x-cli-version'] = cliVersion;
   return {
     version: '2.0',
     routeKey: 'POST /races',
     rawPath: '/races',
     rawQueryString: '',
-    headers: { 'content-type': 'application/json' },
+    headers,
     requestContext: {} as any,
     body: JSON.stringify(body),
     isBase64Encoded: false,
@@ -86,5 +88,40 @@ describe('createRace handler', () => {
       tz: 42,
     }));
     expect(res.statusCode).toBe(400);
+  });
+
+  it('rejects missing X-Cli-Version header', async () => {
+    const res: any = await handler(event({
+      name: 'No version',
+      start_time: '2026-04-22T09:00:00Z',
+      end_time: '2026-04-22T17:00:00Z',
+      tz: 'UTC',
+    }, null));
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).code).toBe('BAD_REQUEST');
+    expect(JSON.parse(res.body).message).toMatch(/X-Cli-Version/i);
+  });
+
+  it('rejects malformed X-Cli-Version header', async () => {
+    const res: any = await handler(event({
+      name: 'Bad version',
+      start_time: '2026-04-22T09:00:00Z',
+      end_time: '2026-04-22T17:00:00Z',
+      tz: 'UTC',
+    }, 'not-semver'));
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).code).toBe('BAD_REQUEST');
+  });
+
+  it('persists cli_version on the race', async () => {
+    const res: any = await handler(event({
+      name: 'Version test',
+      start_time: '2026-04-22T09:00:00Z',
+      end_time: '2026-04-22T17:00:00Z',
+      tz: 'UTC',
+    }, '0.5.3'));
+    const body = JSON.parse(res.body);
+    const race = await getRaceByJoinCode(body.join_code);
+    expect(race?.cli_version).toBe('0.5.3');
   });
 });

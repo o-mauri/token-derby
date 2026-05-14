@@ -5,9 +5,11 @@ import { handler as joinHandler } from '../../src/handlers/join-race.js';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { listHorses } from '../../src/db/horses.js';
 
-async function setup() {
+async function setup(cliVersion = '0.2.0') {
   const createRes: any = await createHandler({
-    version: '2.0', routeKey: 'POST /races', rawPath: '/races', rawQueryString: '', headers: {}, requestContext: {} as any, isBase64Encoded: false,
+    version: '2.0', routeKey: 'POST /races', rawPath: '/races', rawQueryString: '',
+    headers: { 'x-cli-version': cliVersion },
+    requestContext: {} as any, isBase64Encoded: false,
     body: JSON.stringify({
       name: 'HB Test',
       start_time: new Date(Date.now() - 60_000).toISOString(),
@@ -18,21 +20,32 @@ async function setup() {
   const { join_code, race_id } = JSON.parse(createRes.body);
   const joinRes: any = await joinHandler({
     version: '2.0', routeKey: 'POST /races/{join_code}/join', rawPath: `/races/${join_code}/join`, rawQueryString: '',
-    pathParameters: { join_code }, headers: {}, requestContext: {} as any, isBase64Encoded: false,
+    pathParameters: { join_code },
+    headers: { 'x-cli-version': cliVersion },
+    requestContext: {} as any, isBase64Encoded: false,
     body: JSON.stringify({ horse: { name: 'Gary', colors: { body: '#8B4513', mane: '#000', tail: '#000', saddle: '#C0392B' } } }),
   });
   const { horse_id, heartbeat_token } = JSON.parse(joinRes.body);
   return { join_code, race_id, horse_id, heartbeat_token };
 }
 
-function hbEvent(join_code: string, horse_id: string, heartbeat_token: string | null, body: unknown): APIGatewayProxyEventV2 {
+function hbEvent(
+  join_code: string,
+  horse_id: string,
+  heartbeat_token: string | null,
+  body: unknown,
+  cliVersion: string | null = '0.2.0',
+): APIGatewayProxyEventV2 {
+  const headers: Record<string, string> = {};
+  if (heartbeat_token) headers.authorization = `Bearer ${heartbeat_token}`;
+  if (cliVersion) headers['x-cli-version'] = cliVersion;
   return {
     version: '2.0',
     routeKey: 'POST /races/{join_code}/horses/{horse_id}/heartbeat',
     rawPath: `/races/${join_code}/horses/${horse_id}/heartbeat`,
     rawQueryString: '',
     pathParameters: { join_code, horse_id },
-    headers: heartbeat_token ? { authorization: `Bearer ${heartbeat_token}` } : {},
+    headers,
     requestContext: {} as any,
     body: JSON.stringify(body),
     isBase64Encoded: false,
@@ -75,6 +88,25 @@ describe('heartbeat handler', () => {
   it('returns RACE_NOT_FOUND for unknown code', async () => {
     const res: any = await hbHandler(hbEvent('NOPE99', 'no-horse', 'tok', { current_tokens: 0 }));
     expect(res.statusCode).toBe(404);
+  });
+
+  it('rejects heartbeat with mismatched minor version', async () => {
+    const { join_code, horse_id, heartbeat_token } = await setup('0.2.0');
+    const res: any = await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { current_tokens: 1 }, '0.3.0'));
+    expect(res.statusCode).toBe(426);
+    expect(JSON.parse(res.body).code).toBe('VERSION_MISMATCH');
+  });
+
+  it('accepts heartbeat with same minor but different patch', async () => {
+    const { join_code, horse_id, heartbeat_token } = await setup('0.2.0');
+    const res: any = await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { current_tokens: 1 }, '0.2.9'));
+    expect(res.statusCode).toBe(200);
+  });
+
+  it('rejects heartbeat with missing version header', async () => {
+    const { join_code, horse_id, heartbeat_token } = await setup('0.2.0');
+    const res: any = await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { current_tokens: 1 }, null));
+    expect(res.statusCode).toBe(426);
   });
 
   it('returns finished status without writing when race has ended', async () => {

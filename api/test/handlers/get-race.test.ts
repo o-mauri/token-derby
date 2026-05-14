@@ -6,11 +6,13 @@ import { handler as hbHandler } from '../../src/handlers/heartbeat.js';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 
 function evt(body: unknown, path: string, routeKey: string, pathParams?: Record<string, string>, auth?: string): APIGatewayProxyEventV2 {
+  const headers: Record<string, string> = { 'x-cli-version': '0.2.0' };
+  if (auth) headers.authorization = `Bearer ${auth}`;
   return {
     version: '2.0',
     routeKey, rawPath: path, rawQueryString: '',
     pathParameters: pathParams,
-    headers: auth ? { authorization: `Bearer ${auth}` } : {},
+    headers,
     requestContext: {} as any,
     body: body ? JSON.stringify(body) : undefined,
     isBase64Encoded: false,
