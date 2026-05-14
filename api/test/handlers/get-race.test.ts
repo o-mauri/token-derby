@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { randomUUID } from 'node:crypto';
 import { handler as getRaceHandler } from '../../src/handlers/get-race.js';
 import { handler as createHandler } from '../../src/handlers/create-race.js';
 import { handler as joinHandler } from '../../src/handlers/join-race.js';
@@ -17,7 +18,7 @@ function evt(
   userName: string = 'GetRace Tester',
 ): APIGatewayProxyEventV2 {
   const headers: Record<string, string> = {
-    'x-cli-version': '1.0.0',
+    'x-cli-version': '1.1.0',
     'x-user-id': userId,
     'x-user-name': userName,
   };
@@ -46,7 +47,7 @@ describe('getRace handler', () => {
 
   async function joinH(join_code: string, name: string, userId: string) {
     const res: any = await joinHandler(evt(
-      { horse: { name, colors: { body: '#fff', mane: '#000', tail: '#000', saddle: '#f00' } } },
+      { horse: { stable_horse_id: randomUUID(), name, colors: { body: '#fff', mane: '#000', tail: '#000', saddle: '#f00' } } },
       `/races/${join_code}/join`, 'POST /races/{join_code}/join', { join_code },
       undefined, userId, `User ${name}`,
     ));

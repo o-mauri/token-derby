@@ -1,7 +1,7 @@
 import React from 'react';
 import { render } from 'ink';
 import { HorseCreator } from '../ui/HorseCreator.js';
-import { upsertHorse, loadStable, findHorse } from '../stable/stable.js';
+import { upsertHorse, loadStable, findHorse, newStableHorseId } from '../stable/stable.js';
 import * as readline from 'node:readline/promises';
 import { stdin, stdout } from 'node:process';
 
@@ -23,7 +23,8 @@ export async function stableCreateCommand(): Promise<number> {
             return;
           }
         }
-        await upsertHorse({ name, colors, created_at: new Date().toISOString() });
+        const stable_horse_id = existing?.stable_horse_id ?? newStableHorseId();
+        await upsertHorse({ stable_horse_id, name, colors, created_at: new Date().toISOString() });
         app.unmount();
         console.log(`✓ Saved "${name}" to your stable.`);
       },

@@ -7,6 +7,7 @@ export type HorseColors = {
 
 export type Horse = {
   horse_id: string;
+  stable_horse_id: string;
   name: string;
   colors: HorseColors;
   current_tokens: number;

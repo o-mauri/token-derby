@@ -8,6 +8,7 @@ import type { Horse } from '@token-derby/shared';
 function makeHorse(overrides: Partial<Horse> = {}): Horse {
   return {
     horse_id: `h-${Math.random().toString(36).slice(2)}`,
+    stable_horse_id: `sh-${Math.random().toString(36).slice(2)}`,
     name: 'Gallopin Gary',
     colors: { body: '#8B4513', mane: '#000', tail: '#000', saddle: '#C0392B' },
     current_tokens: 0,

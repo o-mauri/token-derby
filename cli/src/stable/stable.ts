@@ -1,8 +1,10 @@
 import * as fs from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
 import type { HorseColors } from '@token-derby/shared';
 import { homeDir, stableFile } from '../paths.js';
 
 export type StableHorse = {
+  stable_horse_id: string;
   name: string;
   colors: HorseColors;
   created_at: string;
@@ -12,12 +14,27 @@ export type Stable = {
   horses: StableHorse[];
 };
 
+export function newStableHorseId(): string {
+  return randomUUID();
+}
+
 export async function loadStable(): Promise<Stable> {
   try {
     const raw = await fs.readFile(stableFile(), 'utf8');
     const parsed = JSON.parse(raw);
     if (!parsed || !Array.isArray(parsed.horses)) return { horses: [] };
-    return parsed as Stable;
+    const stable = parsed as { horses: Array<Partial<StableHorse> & { name: string; colors: HorseColors; created_at: string }> };
+    let mutated = false;
+    const horses: StableHorse[] = stable.horses.map(h => {
+      if (typeof h.stable_horse_id === 'string' && h.stable_horse_id.length > 0) {
+        return h as StableHorse;
+      }
+      mutated = true;
+      return { ...h, stable_horse_id: newStableHorseId() } as StableHorse;
+    });
+    const result: Stable = { horses };
+    if (mutated) await saveStable(result);
+    return result;
   } catch (e: any) {
     if (e?.code === 'ENOENT') return { horses: [] };
     if (e instanceof SyntaxError) return { horses: [] };

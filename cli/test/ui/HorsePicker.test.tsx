@@ -8,9 +8,9 @@ import type { StableHorse } from '../../src/stable/stable.js';
 function tick() { return new Promise<void>(resolve => setTimeout(resolve, 0)); }
 
 const stable: StableHorse[] = [
-  { name: 'Gary', colors: { body: '#8B4513', mane: '#000', tail: '#000', saddle: '#C0392B' }, created_at: '2026-01-01T00:00:00Z' },
-  { name: 'Pony', colors: { body: '#FFFFFF', mane: '#000', tail: '#000', saddle: '#1B4F72' }, created_at: '2026-01-02T00:00:00Z' },
-  { name: 'Dash', colors: { body: '#CD853F', mane: '#FFD700', tail: '#FFD700', saddle: '#196F3D' }, created_at: '2026-01-03T00:00:00Z' },
+  { stable_horse_id: '00000000-0000-0000-0000-00000000000a', name: 'Gary', colors: { body: '#8B4513', mane: '#000', tail: '#000', saddle: '#C0392B' }, created_at: '2026-01-01T00:00:00Z' },
+  { stable_horse_id: '00000000-0000-0000-0000-00000000000b', name: 'Pony', colors: { body: '#FFFFFF', mane: '#000', tail: '#000', saddle: '#1B4F72' }, created_at: '2026-01-02T00:00:00Z' },
+  { stable_horse_id: '00000000-0000-0000-0000-00000000000c', name: 'Dash', colors: { body: '#CD853F', mane: '#FFD700', tail: '#FFD700', saddle: '#196F3D' }, created_at: '2026-01-03T00:00:00Z' },
 ];
 
 describe('HorsePicker', () => {

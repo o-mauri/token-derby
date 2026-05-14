@@ -23,6 +23,7 @@ afterEach(async () => {
 });
 
 const gary: StableHorse = {
+  stable_horse_id: '11111111-1111-1111-1111-111111111111',
   name: 'Gary',
   colors: { body: '#8B4513', mane: '#000000', tail: '#000000', saddle: '#C0392B' },
   created_at: '2026-04-23T10:00:00Z',
@@ -74,5 +75,22 @@ describe('stable', () => {
     await fs.writeFile(path.join(tmp, 'stable.json'), 'not json');
     const stable = await loadStable();
     expect(stable.horses).toEqual([]);
+  });
+
+  it('backfills stable_horse_id on load and persists it', async () => {
+    await fs.mkdir(tmp, { recursive: true });
+    const legacy = {
+      horses: [
+        { name: 'Legacy', colors: gary.colors, created_at: gary.created_at },
+      ],
+    };
+    await fs.writeFile(path.join(tmp, 'stable.json'), JSON.stringify(legacy));
+
+    const loaded = await loadStable();
+    expect(loaded.horses).toHaveLength(1);
+    expect(loaded.horses[0]?.stable_horse_id).toMatch(/^[0-9a-f-]{36}$/);
+
+    const reloaded = await loadStable();
+    expect(reloaded.horses[0]?.stable_horse_id).toBe(loaded.horses[0]?.stable_horse_id);
   });
 });

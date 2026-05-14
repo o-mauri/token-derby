@@ -8,7 +8,7 @@ import { listHorses } from '../../src/db/horses.js';
 const TEST_USER_ID = '88888888-8888-8888-8888-888888888888';
 const TEST_USER_NAME = 'HB User';
 
-async function setup(cliVersion = '1.0.0') {
+async function setup(cliVersion = '1.1.0') {
   const createRes: any = await createHandler({
     version: '2.0', routeKey: 'POST /races', rawPath: '/races', rawQueryString: '',
     headers: { 'x-cli-version': cliVersion, 'x-user-id': TEST_USER_ID, 'x-user-name': TEST_USER_NAME },
@@ -26,7 +26,7 @@ async function setup(cliVersion = '1.0.0') {
     pathParameters: { join_code },
     headers: { 'x-cli-version': cliVersion, 'x-user-id': TEST_USER_ID, 'x-user-name': TEST_USER_NAME },
     requestContext: {} as any, isBase64Encoded: false,
-    body: JSON.stringify({ horse: { name: 'Gary', colors: { body: '#8B4513', mane: '#000', tail: '#000', saddle: '#C0392B' } } }),
+    body: JSON.stringify({ horse: { stable_horse_id: '99999999-9999-9999-9999-999999999999', name: 'Gary', colors: { body: '#8B4513', mane: '#000', tail: '#000', saddle: '#C0392B' } } }),
   });
   const { horse_id, heartbeat_token } = JSON.parse(joinRes.body);
   return { join_code, race_id, horse_id, heartbeat_token };
@@ -39,7 +39,7 @@ function hbEvent(
   horse_id: string,
   heartbeat_token: string | null,
   body: unknown,
-  cliVersion: string | null = '1.0.0',
+  cliVersion: string | null = '1.1.0',
   identity: IdentityOpt = {},
 ): APIGatewayProxyEventV2 {
   const headers: Record<string, string> = {};
@@ -101,27 +101,27 @@ describe('heartbeat handler', () => {
   });
 
   it('rejects heartbeat with mismatched minor version', async () => {
-    const { join_code, horse_id, heartbeat_token } = await setup('1.0.0');
-    const res: any = await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { current_tokens: 1 }, '1.1.0'));
+    const { join_code, horse_id, heartbeat_token } = await setup('1.1.0');
+    const res: any = await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { current_tokens: 1 }, '1.2.0'));
     expect(res.statusCode).toBe(426);
     expect(JSON.parse(res.body).code).toBe('VERSION_MISMATCH');
   });
 
   it('accepts heartbeat with same minor but different patch', async () => {
-    const { join_code, horse_id, heartbeat_token } = await setup('1.0.0');
-    const res: any = await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { current_tokens: 1 }, '1.0.9'));
+    const { join_code, horse_id, heartbeat_token } = await setup('1.1.0');
+    const res: any = await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { current_tokens: 1 }, '1.1.9'));
     expect(res.statusCode).toBe(200);
   });
 
   it('rejects heartbeat with missing version header', async () => {
-    const { join_code, horse_id, heartbeat_token } = await setup('1.0.0');
+    const { join_code, horse_id, heartbeat_token } = await setup('1.1.0');
     const res: any = await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { current_tokens: 1 }, null));
     expect(res.statusCode).toBe(426);
   });
 
   it('rejects heartbeat with missing identity headers', async () => {
     const { join_code, horse_id, heartbeat_token } = await setup();
-    const res: any = await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { current_tokens: 1 }, '1.0.0', { userId: null, userName: null }));
+    const res: any = await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { current_tokens: 1 }, '1.1.0', { userId: null, userName: null }));
     expect(res.statusCode).toBe(400);
     expect(JSON.parse(res.body).code).toBe('IDENTITY_REQUIRED');
   });
@@ -132,7 +132,7 @@ describe('heartbeat handler', () => {
     expect(res.statusCode).toBe(426);
     const body = JSON.parse(res.body);
     expect(body.code).toBe('VERSION_MISMATCH');
-    expect(body.message).toMatch(/1\.0\.0/);
+    expect(body.message).toMatch(/1\.1\.0/);
   });
 
   it('returns finished status without writing when race has ended', async () => {

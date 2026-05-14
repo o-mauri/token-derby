@@ -10,7 +10,7 @@ type IdentityOpt = { userId?: string | null; userName?: string | null };
 
 function event(
   body: unknown,
-  cliVersion: string | null = '1.0.0',
+  cliVersion: string | null = '1.1.0',
   identity: IdentityOpt = {},
 ): APIGatewayProxyEventV2 {
   const headers: Record<string, string> = { 'content-type': 'application/json' };
@@ -132,10 +132,10 @@ describe('createRace handler', () => {
       start_time: '2026-04-22T09:00:00Z',
       end_time: '2026-04-22T17:00:00Z',
       tz: 'UTC',
-    }, '1.0.3'));
+    }, '1.1.3'));
     const body = JSON.parse(res.body);
     const race = await getRaceByJoinCode(body.join_code);
-    expect(race?.cli_version).toBe('1.0.3');
+    expect(race?.cli_version).toBe('1.1.3');
   });
 
   it('persists creator identity on the race', async () => {
@@ -157,7 +157,7 @@ describe('createRace handler', () => {
       start_time: '2026-04-22T09:00:00Z',
       end_time: '2026-04-22T17:00:00Z',
       tz: 'UTC',
-    }, '1.0.0', { userId: null, userName: null }));
+    }, '1.1.0', { userId: null, userName: null }));
     expect(res.statusCode).toBe(400);
     expect(JSON.parse(res.body).code).toBe('IDENTITY_REQUIRED');
   });
@@ -168,7 +168,7 @@ describe('createRace handler', () => {
       start_time: '2026-04-22T09:00:00Z',
       end_time: '2026-04-22T17:00:00Z',
       tz: 'UTC',
-    }, '1.0.0', { userId: 'not-a-uuid' }));
+    }, '1.1.0', { userId: 'not-a-uuid' }));
     expect(res.statusCode).toBe(400);
     expect(JSON.parse(res.body).code).toBe('IDENTITY_REQUIRED');
     expect(JSON.parse(res.body).message).toMatch(/UUID/i);
@@ -180,7 +180,7 @@ describe('createRace handler', () => {
       start_time: '2026-04-22T09:00:00Z',
       end_time: '2026-04-22T17:00:00Z',
       tz: 'UTC',
-    }, '1.0.0', { userName: '' }));
+    }, '1.1.0', { userName: '' }));
     expect(res.statusCode).toBe(400);
     expect(JSON.parse(res.body).code).toBe('IDENTITY_REQUIRED');
   });
@@ -191,7 +191,7 @@ describe('createRace handler', () => {
       start_time: '2026-04-22T09:00:00Z',
       end_time: '2026-04-22T17:00:00Z',
       tz: 'UTC',
-    }, '1.0.0', { userName: 'x'.repeat(41) }));
+    }, '1.1.0', { userName: 'x'.repeat(41) }));
     expect(res.statusCode).toBe(400);
     expect(JSON.parse(res.body).code).toBe('IDENTITY_REQUIRED');
   });
@@ -205,7 +205,7 @@ describe('createRace handler', () => {
     }, '0.2.0'));
     expect(res.statusCode).toBe(426);
     expect(JSON.parse(res.body).code).toBe('VERSION_MISMATCH');
-    expect(JSON.parse(res.body).message).toMatch(/1\.0\.0/);
+    expect(JSON.parse(res.body).message).toMatch(/1\.1\.0/);
   });
 
   it('respects TOKEN_DERBY_MIN_CLI_VERSION env override', async () => {

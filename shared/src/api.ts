@@ -18,6 +18,7 @@ export type GetRaceResponse = RaceView;
 
 export type JoinRaceRequest = {
   horse: {
+    stable_horse_id: string;
     name: string;
     colors: HorseColors;
   };

@@ -26,8 +26,11 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
   if ('error' in identity) return err('IDENTITY_REQUIRED', identity.error);
 
   const body = parseJson<JoinRaceRequest>(event.body);
-  if (!body?.horse?.name || !body.horse.colors) {
-    return err('BAD_REQUEST', 'horse.name and horse.colors required');
+  if (!body?.horse?.name || !body.horse.colors || !body.horse.stable_horse_id) {
+    return err('BAD_REQUEST', 'horse.stable_horse_id, horse.name and horse.colors required');
+  }
+  if (typeof body.horse.stable_horse_id !== 'string') {
+    return err('BAD_REQUEST', 'horse.stable_horse_id must be a string');
   }
   const c = body.horse.colors;
   if (!c.body || !c.mane || !c.tail || !c.saddle) {
@@ -86,6 +89,7 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
     race.race_id,
     {
       horse_id,
+      stable_horse_id: body.horse.stable_horse_id,
       name: body.horse.name,
       colors: body.horse.colors,
       current_tokens: 0,
