@@ -134,4 +134,10 @@ describe('loot token operations', () => {
     const result = await spendLootToken(race_id, h.horse_id);
     expect(result).toBe(false);
   });
+
+  it('spendLootToken returns false for a non-existent horse', async () => {
+    const race_id = `r-${Math.random().toString(36).slice(2)}`;
+    const result = await spendLootToken(race_id, 'horse-does-not-exist');
+    expect(result).toBe(false);
+  });
 });

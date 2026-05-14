@@ -1,4 +1,5 @@
 import { PutCommand, QueryCommand, UpdateCommand, GetCommand } from '@aws-sdk/lib-dynamodb';
+import { ConditionalCheckFailedException } from '@aws-sdk/client-dynamodb';
 import { ddb, TABLE } from './client.js';
 import { horseKey, parseHorseId, RACE_PK_PREFIX, HORSE_SK_PREFIX } from './keys.js';
 import type { Horse } from '@token-derby/shared';
@@ -133,7 +134,7 @@ export async function spendLootToken(race_id: string, horse_id: string): Promise
     }));
     return true;
   } catch (e) {
-    if ((e as { name?: string })?.name === 'ConditionalCheckFailedException') return false;
+    if (e instanceof ConditionalCheckFailedException) return false;
     throw e;
   }
 }
