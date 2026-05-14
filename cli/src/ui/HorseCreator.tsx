@@ -11,9 +11,10 @@ type Props = {
   onCancel: () => void;
   initialColors?: HorseColors;
   initialName?: string;
+  lockName?: boolean;
 };
 
-export function HorseCreator({ onSubmit, onCancel, initialColors, initialName }: Props) {
+export function HorseCreator({ onSubmit, onCancel, initialColors, initialName, lockName }: Props) {
   const [colors, setColors] = useState<HorseColors>(initialColors ?? defaultColors());
   const [slotIdx, setSlotIdx] = useState(0);
   const [namingMode, setNamingMode] = useState(false);
@@ -29,7 +30,11 @@ export function HorseCreator({ onSubmit, onCancel, initialColors, initialName }:
     if (key.downArrow) { setSlotIdx((slotIdx + 1) % SLOTS.length); return; }
     if (key.leftArrow) { setColors({ ...colors, [slot]: prevColor(slot, colors[slot]) }); return; }
     if (key.rightArrow) { setColors({ ...colors, [slot]: nextColor(slot, colors[slot]) }); return; }
-    if (key.return) { setNamingMode(true); return; }
+    if (key.return) {
+      if (lockName) { onSubmit(initialName ?? '', colors); return; }
+      setNamingMode(true);
+      return;
+    }
   });
 
   const handleNameSubmit = (value: string) => {

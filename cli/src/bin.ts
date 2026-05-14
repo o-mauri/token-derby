@@ -1,6 +1,7 @@
 import { stableCreateCommand } from './commands/stable-create.js';
 import { stableListCommand } from './commands/stable-list.js';
 import { stableDeleteCommand } from './commands/stable-delete.js';
+import { stableEditCommand } from './commands/stable-edit.js';
 import { createRaceCommand } from './commands/create.js';
 import { joinCommand } from './commands/join.js';
 import { rejoinCommand } from './commands/rejoin.js';
@@ -13,6 +14,7 @@ const HELP = `token-derby v${VERSION}
 Stable management:
   token-derby stable create               Make a new horse (interactive)
   token-derby stable list                 Show your saved horses
+  token-derby stable edit <name>          Edit an existing horse's colors
   token-derby stable delete <name>        Remove a horse from your stable
 
 Races:
@@ -36,9 +38,10 @@ async function main(): Promise<number> {
     const sub = argv[1];
     if (sub === 'create') return stableCreateCommand();
     if (sub === 'list') return stableListCommand();
+    if (sub === 'edit') return stableEditCommand(argv[2]);
     if (sub === 'delete') return stableDeleteCommand(argv[2]);
     console.error(`Unknown stable subcommand: ${sub ?? '(none)'}`);
-    console.error('Try: stable create | stable list | stable delete <name>');
+    console.error('Try: stable create | stable list | stable edit <name> | stable delete <name>');
     return 2;
   }
 

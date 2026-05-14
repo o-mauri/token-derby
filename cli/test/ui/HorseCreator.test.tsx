@@ -95,6 +95,30 @@ describe('HorseCreator', () => {
     expect(onSubmit).toHaveBeenCalledWith('Pony', initial);
   });
 
+  it('with lockName, Enter submits immediately with the seeded name and no naming prompt', async () => {
+    const initial = { ...defaultColors(), body: PALETTES.body[2]! };
+    const onSubmit = vi.fn();
+    const { stdin, lastFrame } = render(
+      <HorseCreator
+        onSubmit={onSubmit}
+        onCancel={() => {}}
+        initialColors={initial}
+        initialName="Gary"
+        lockName
+      />,
+    );
+    await tick();
+    stdin.write('\x1B[C'); // right — body advances one
+    await tick();
+    stdin.write('\r');     // enter — should submit directly, not enter naming mode
+    await tick();
+    expect(lastFrame()).not.toContain('Name your horse');
+    expect(onSubmit).toHaveBeenCalledOnce();
+    const [name, colors] = onSubmit.mock.calls[0]!;
+    expect(name).toBe('Gary');
+    expect(colors.body).toBe(PALETTES.body[3]);
+  });
+
   it('rejects empty name on submit', async () => {
     const onSubmit = vi.fn();
     const { stdin, lastFrame } = render(<HorseCreator onSubmit={onSubmit} onCancel={() => {}} />);

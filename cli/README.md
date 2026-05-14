@@ -19,6 +19,9 @@ token-derby stable create
 # 2. Show your stable
 token-derby stable list
 
+# 2a. Tweak an existing horse's colors
+token-derby stable edit <name>
+
 # 3. Create a race
 token-derby create
 
