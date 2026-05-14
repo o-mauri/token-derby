@@ -3,7 +3,6 @@
 A pixel-art daily horse race where each horse is a participant and every length gained is an output token their Claude Code produced. One-shot races, scheduled start/end times, customizable horses, terminal-as-life-support (close the terminal → your horse crashes).
 
 - **Site:** https://token-derby.mauricode.co.uk
-- **Spec:** `docs/superpowers/specs/2026-04-21-token-derby-design.md`
 
 ## Project layout
 
@@ -57,4 +56,4 @@ POST   /races/{join_code}/horses/{horse_id}/heartbeat      -> update current_tok
 DELETE /races/admin/{admin_code}                           -> end the race
 ```
 
-See the spec for request/response shapes and error envelopes.
+Request/response shapes and error envelopes are defined in `shared/src/api.ts` and `shared/src/errors.ts`.

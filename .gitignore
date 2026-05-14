@@ -33,6 +33,7 @@ Thumbs.db
 .worktrees/
 .claude/
 .aider*
+docs/
 
 # CDK
 cdk.out/
