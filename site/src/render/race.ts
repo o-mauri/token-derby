@@ -23,7 +23,7 @@ export function renderRace(root: HTMLElement, joinCode: string): () => void {
       </div>
     </header>
     <div class="track"></div>
-    <footer class="race-header"><div class="meta"><a href="/">← Home</a></div></footer>
+    <footer class="race-header"><div class="meta"><button type="button" class="btn home-btn">← Home</button></div></footer>
   `;
   root.appendChild(frame);
 
@@ -31,6 +31,11 @@ export function renderRace(root: HTMLElement, joinCode: string): () => void {
   const nameEl = frame.querySelector<HTMLElement>('.race-name')!;
   const statusEl = frame.querySelector<HTMLElement>('.race-status')!;
   const timeLeftEl = frame.querySelector<HTMLElement>('.race-time-left')!;
+  const homeBtn = frame.querySelector<HTMLButtonElement>('.home-btn')!;
+  homeBtn.addEventListener('click', () => {
+    window.history.pushState({}, '', '/');
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  });
 
   const ctrl = new AbortController();
 

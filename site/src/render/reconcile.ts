@@ -34,11 +34,6 @@ function createLane(doc: Document, horse: HorseView): HTMLElement {
   lane.className = 'lane';
   lane.dataset.horseId = horse.horse_id;
 
-  const label = doc.createElement('div');
-  label.className = 'lane-name';
-  label.textContent = horse.name;
-  lane.appendChild(label);
-
   const wrap = doc.createElement('div');
   wrap.className = 'horse';
   wrap.dataset.horseId = horse.horse_id;

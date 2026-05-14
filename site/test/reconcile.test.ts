@@ -112,6 +112,15 @@ describe('reconcileHorses', () => {
     expect(track.querySelector('.horse[data-horse-id="a"]')).toBe(alphaFirst);
   });
 
+  it('does not render a static .lane-name element (the horse-label tag replaces it)', () => {
+    const r = race({ horses: [
+      horse('a', 500, 'Alpha', '2026-04-22T09:00:00Z'),
+    ] });
+    reconcileHorses(track, r, new Date('2026-04-22T13:00:00Z'));
+    expect(track.querySelector('.lane-name')).toBeNull();
+    expect(track.querySelector('.horse-label')?.textContent).toBe('Alpha');
+  });
+
   it('applies horse colors as CSS custom properties', () => {
     const r = race({ horses: [
       horse('a', 500, 'Alpha', '2026-04-22T09:00:00Z'),
