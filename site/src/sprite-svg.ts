@@ -10,12 +10,39 @@ const SLOT_COLOR: Record<Exclude<SlotTag, null>, string> = {
   H: '#1F1108',
 };
 
+// Leg segments:  rows 16-17 = upper (thigh),  rows 18-23 = lower (shin+hoof).
+// Back legs x < 14,  Front legs x >= 14.
+const UPPER_LEG_START = 16;
+const LOWER_LEG_START = 18;
+const LEG_SPLIT_X = 14;
+
+function g(doc: Document, cls: string): SVGGElement {
+  const el = doc.createElementNS(SVG_NS, 'g');
+  el.setAttribute('class', cls);
+  return el;
+}
+
 export function buildHorseSvg(doc: Document): SVGSVGElement {
   const svg = doc.createElementNS(SVG_NS, 'svg') as SVGSVGElement;
   svg.setAttribute('viewBox', `0 0 ${SPRITE_WIDTH} ${SPRITE_HEIGHT}`);
   svg.setAttribute('class', 'horse-sprite');
   svg.setAttribute('shape-rendering', 'crispEdges');
   svg.setAttribute('aria-hidden', 'true');
+
+  const bodyGroup = g(doc, 'horse-body');
+
+  // Skeletal leg hierarchy:  hip group > upper rects + knee group > lower rects
+  const backHip   = g(doc, 'leg-back');
+  const backUpper = g(doc, 'leg-back-upper');
+  const backKnee  = g(doc, 'leg-back-lower');
+  backHip.appendChild(backUpper);
+  backHip.appendChild(backKnee);
+
+  const frontHip   = g(doc, 'leg-front');
+  const frontUpper = g(doc, 'leg-front-upper');
+  const frontKnee  = g(doc, 'leg-front-lower');
+  frontHip.appendChild(frontUpper);
+  frontHip.appendChild(frontKnee);
 
   for (let y = 0; y < GRID.length; y++) {
     for (let x = 0; x < SPRITE_WIDTH; x++) {
@@ -27,8 +54,19 @@ export function buildHorseSvg(doc: Document): SVGSVGElement {
       rect.setAttribute('width', '1');
       rect.setAttribute('height', '1');
       rect.setAttribute('fill', SLOT_COLOR[tag]);
-      svg.appendChild(rect);
+
+      if (y >= LOWER_LEG_START) {
+        (x < LEG_SPLIT_X ? backKnee : frontKnee).appendChild(rect);
+      } else if (y >= UPPER_LEG_START) {
+        (x < LEG_SPLIT_X ? backUpper : frontUpper).appendChild(rect);
+      } else {
+        bodyGroup.appendChild(rect);
+      }
     }
   }
+
+  svg.appendChild(backHip);
+  svg.appendChild(frontHip);
+  svg.appendChild(bodyGroup);
   return svg;
 }

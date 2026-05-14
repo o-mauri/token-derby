@@ -2,14 +2,25 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { claudeProjectsDir } from '../paths.js';
 
-export async function sumOutputTokens(): Promise<number> {
+export type TokenTotals = { input: number; output: number };
+
+export async function sumTokens(): Promise<TokenTotals> {
   const root = claudeProjectsDir();
   const files = await listJsonlFiles(root);
-  let total = 0;
+  let input = 0;
+  let output = 0;
   for (const file of files) {
-    total += await sumFile(file);
+    const t = await sumFile(file);
+    input += t.input;
+    output += t.output;
   }
-  return total;
+  return { input, output };
+}
+
+/** @deprecated Use sumTokens() instead */
+export async function sumOutputTokens(): Promise<number> {
+  const { input, output } = await sumTokens();
+  return input + output;
 }
 
 async function listJsonlFiles(root: string): Promise<string[]> {
@@ -38,14 +49,19 @@ async function listJsonlFiles(root: string): Promise<string[]> {
   return out;
 }
 
-async function sumFile(file: string): Promise<number> {
+function addNum(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+}
+
+async function sumFile(file: string): Promise<TokenTotals> {
   let raw: string;
   try {
     raw = await fs.readFile(file, 'utf8');
   } catch {
-    return 0;
+    return { input: 0, output: 0 };
   }
-  let sum = 0;
+  let input = 0;
+  let output = 0;
   for (const line of raw.split('\n')) {
     if (!line.trim()) continue;
     let parsed: any;
@@ -54,8 +70,12 @@ async function sumFile(file: string): Promise<number> {
     } catch {
       continue;
     }
-    const tokens = parsed?.message?.usage?.output_tokens;
-    if (typeof tokens === 'number' && Number.isFinite(tokens)) sum += tokens;
+    const usage = parsed?.message?.usage;
+    if (!usage) continue;
+    input += addNum(usage.input_tokens)
+           + addNum(usage.cache_creation_input_tokens)
+           + addNum(usage.cache_read_input_tokens);
+    output += addNum(usage.output_tokens);
   }
-  return sum;
+  return { input, output };
 }
