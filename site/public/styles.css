@@ -373,8 +373,15 @@ html, body {
   .race-header h1 { font-size: 2rem; }
   .race-header .meta { gap: 40px; font-size: 1.15rem; }
 
-  /* Track sits inside the TV safe zone */
-  .track { padding: 24px 64px; }
+  /* Lock the race to viewport height; track scrolls, header + footer stay fixed */
+  .race { height: 100vh; min-height: 100vh; }
+  .track {
+    padding: 24px 64px;
+    overflow-y: auto;
+    min-height: 0;
+    scrollbar-width: none;
+  }
+  .track::-webkit-scrollbar { display: none; }
 
   /* Labels stack below the sprite; overflow into adjacent lanes is fine */
   .horse-label {

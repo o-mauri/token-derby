@@ -23,10 +23,11 @@ export function computeAutoScrollY(elapsedMs: number, maxScroll: number): number
 
 export type AutoScrollOptions = {
   signal: AbortSignal;
+  target: HTMLElement;
   win?: Window;
 };
 
-export function startAutoScroll({ signal, win = window }: AutoScrollOptions): void {
+export function startAutoScroll({ signal, target, win = window }: AutoScrollOptions): void {
   const mql = win.matchMedia(TV_MEDIA_QUERY);
   const start = win.performance.now();
   let raf = 0;
@@ -34,10 +35,9 @@ export function startAutoScroll({ signal, win = window }: AutoScrollOptions): vo
   const tick = () => {
     if (signal.aborted) return;
     if (mql.matches) {
-      const doc = win.document.documentElement;
-      const maxScroll = doc.scrollHeight - win.innerHeight;
+      const maxScroll = target.scrollHeight - target.clientHeight;
       const y = computeAutoScrollY(win.performance.now() - start, maxScroll);
-      win.scrollTo(0, y);
+      target.scrollTop = y;
     }
     raf = win.requestAnimationFrame(tick);
   };
@@ -47,7 +47,7 @@ export function startAutoScroll({ signal, win = window }: AutoScrollOptions): vo
     'abort',
     () => {
       win.cancelAnimationFrame(raf);
-      if (mql.matches) win.scrollTo(0, 0);
+      if (mql.matches) target.scrollTop = 0;
     },
     { once: true },
   );

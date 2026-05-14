@@ -41,7 +41,7 @@ export function renderRace(root: HTMLElement, joinCode: string): () => void {
 
   const ctrl = new AbortController();
   const buffers = new Map<string, Sample[]>();
-  startAutoScroll({ signal: ctrl.signal });
+  startAutoScroll({ signal: ctrl.signal, target: track });
 
   const onSnapshot = (race: GetRaceResponse) => {
     const now = new Date();
