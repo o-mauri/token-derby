@@ -11,7 +11,8 @@ describe('rollHat', () => {
 
   it('sets obtained_at to an ISO string', () => {
     const result = rollHat();
-    expect(() => new Date(result.obtained_at)).not.toThrow();
+    expect(typeof result.obtained_at).toBe('string');
+    expect(isNaN(new Date(result.obtained_at).getTime())).toBe(false);
   });
 
   it('legendary hats never have a tint', () => {
