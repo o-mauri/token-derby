@@ -30,8 +30,8 @@ export async function loadStable(): Promise<Stable> {
     const parsed = JSON.parse(raw);
     if (!parsed || !Array.isArray(parsed.horses)) return { horses: [] };
     return { horses: parsed.horses.map(normaliseHorse) };
-  } catch (e: any) {
-    if (e?.code === 'ENOENT') return { horses: [] };
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException)?.code === 'ENOENT') return { horses: [] };
     if (e instanceof SyntaxError) return { horses: [] };
     throw e;
   }
