@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   putHorse, listHorses, updateHorseTokens, setHorseFinalTokens,
   getHorseForHeartbeat, findHorseByUser, rotateHeartbeatToken,
+  incrementLootTokens, spendLootToken,
 } from '../../src/db/horses.js';
 import type { Horse } from '@token-derby/shared';
 
@@ -92,5 +93,45 @@ describe('horses db', () => {
     const got = await getHorseForHeartbeat(race_id, h.horse_id, 'new-tok');
     expect(got).not.toBeNull();
     expect(got!.current_tokens).toBe(42);
+  });
+});
+
+describe('loot token operations', () => {
+  it('incrementLootTokens initialises to 1 on first call', async () => {
+    const race_id = `r-${Math.random().toString(36).slice(2)}`;
+    const h = makeHorse();
+    await putHorse(race_id, h, 'tok');
+    await incrementLootTokens(race_id, h.horse_id);
+    const horses = await listHorses(race_id);
+    expect(horses[0]?.loot_tokens).toBe(1);
+  });
+
+  it('incrementLootTokens accumulates', async () => {
+    const race_id = `r-${Math.random().toString(36).slice(2)}`;
+    const h = makeHorse();
+    await putHorse(race_id, h, 'tok');
+    await incrementLootTokens(race_id, h.horse_id);
+    await incrementLootTokens(race_id, h.horse_id);
+    const horses = await listHorses(race_id);
+    expect(horses[0]?.loot_tokens).toBe(2);
+  });
+
+  it('spendLootToken decrements and returns true when tokens available', async () => {
+    const race_id = `r-${Math.random().toString(36).slice(2)}`;
+    const h = makeHorse();
+    await putHorse(race_id, h, 'tok');
+    await incrementLootTokens(race_id, h.horse_id);
+    const result = await spendLootToken(race_id, h.horse_id);
+    expect(result).toBe(true);
+    const horses = await listHorses(race_id);
+    expect(horses[0]?.loot_tokens).toBe(0);
+  });
+
+  it('spendLootToken returns false when no tokens available', async () => {
+    const race_id = `r-${Math.random().toString(36).slice(2)}`;
+    const h = makeHorse();
+    await putHorse(race_id, h, 'tok');
+    const result = await spendLootToken(race_id, h.horse_id);
+    expect(result).toBe(false);
   });
 });

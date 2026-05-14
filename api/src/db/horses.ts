@@ -112,6 +112,32 @@ export async function countHorses(race_id: string): Promise<number> {
   return Count;
 }
 
+export async function incrementLootTokens(race_id: string, horse_id: string): Promise<void> {
+  await ddb.send(new UpdateCommand({
+    TableName: TABLE,
+    Key: horseKey(race_id, horse_id),
+    UpdateExpression: 'SET loot_tokens = if_not_exists(loot_tokens, :zero) + :one',
+    ExpressionAttributeValues: { ':zero': 0, ':one': 1 },
+    ConditionExpression: 'attribute_exists(pk)',
+  }));
+}
+
+export async function spendLootToken(race_id: string, horse_id: string): Promise<boolean> {
+  try {
+    await ddb.send(new UpdateCommand({
+      TableName: TABLE,
+      Key: horseKey(race_id, horse_id),
+      UpdateExpression: 'SET loot_tokens = loot_tokens - :one',
+      ExpressionAttributeValues: { ':one': 1 },
+      ConditionExpression: 'attribute_exists(pk) AND loot_tokens >= :one',
+    }));
+    return true;
+  } catch (e) {
+    if ((e as { name?: string })?.name === 'ConditionalCheckFailedException') return false;
+    throw e;
+  }
+}
+
 function pickHorse(item: Record<string, any>): Horse {
   const horse_id = parseHorseId(item.sk);
   if (!horse_id) throw new Error(`not a horse item: ${item.sk}`);
