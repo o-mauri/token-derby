@@ -3,6 +3,11 @@ import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
+// Module-scope mock — Vitest hoists this before imports
+vi.mock('../../src/api/endpoints.js', () => ({
+  spendToken: vi.fn().mockResolvedValue({ ok: true }),
+}));
+
 let tmp: string;
 
 beforeEach(async () => {
@@ -30,6 +35,7 @@ describe('rollCommand', () => {
   });
 
   it('saves a new hat to the stable horse after a successful spend', async () => {
+    const { spendToken } = await import('../../src/api/endpoints.js');
     const activeDir = path.join(tmp, 'active-races');
     await fs.mkdir(activeDir, { recursive: true });
     const activeRace = {
@@ -49,13 +55,11 @@ describe('rollCommand', () => {
       JSON.stringify({ horses: [{ name: 'Gary', colors: activeRace.horse_colors, created_at: '2026-05-14T00:00:00Z', hats: [] }] }),
     );
 
-    vi.mock('../../src/api/endpoints.js', () => ({
-      spendToken: vi.fn().mockResolvedValue({ ok: true }),
-    }));
-
     const { rollCommand } = await import('../../src/commands/roll.js');
     const code = await rollCommand('TESTJOIN', { skipPrompt: true });
     expect(code).toBe(0);
+
+    expect(vi.mocked(spendToken)).toHaveBeenCalledWith('TESTJOIN', 'h1', 'tok');
 
     const stable = JSON.parse(await fs.readFile(path.join(tmp, 'stable.json'), 'utf8'));
     expect(stable.horses[0].hats).toHaveLength(1);

@@ -59,15 +59,9 @@ export async function rollCommand(joinCode: string | undefined, opts: RollOpts =
   console.log(`\nYou rolled: ${hat.name} [${hat.rarity.toUpperCase()}]${collected.tint ? ` (tint: ${collected.tint})` : ''}\n`);
 
   if (!opts.skipPrompt) {
-    const HatComponent = hat.animation ? AnimatedHorseSprite : HorseSprite;
-    const app = render(
-      React.createElement(HatComponent as any, {
-        sprite: MAIN_SPRITE,
-        colors: active.horse_colors,
-        hat,
-        tint: collected.tint,
-      }),
-    );
+    const app = hat.animation
+      ? render(React.createElement(AnimatedHorseSprite, { sprite: MAIN_SPRITE, colors: active.horse_colors, hat }))
+      : render(React.createElement(HorseSprite, { sprite: MAIN_SPRITE, colors: active.horse_colors, hat, tint: collected.tint }));
     await new Promise(r => setTimeout(r, hat.animation ? 3000 : 500));
     app.unmount();
 
