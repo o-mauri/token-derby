@@ -17,7 +17,7 @@ export function renderSprite(
   colors: HorseColors,
   hatOpts?: HatOpts,
 ): Cell[][] {
-  const spriteWidth = sprite[0]?.length ?? 32;
+  const spriteWidth = sprite[0]?.length ?? 0;
   const hatColors = hatOpts
     ? {
         A: hatOpts.frameColor ?? hatOpts.tint ?? hatOpts.hat.colors.A,
@@ -30,7 +30,7 @@ export function renderSprite(
     : sprite;
 
   const out: Cell[][] = [];
-  for (let y = 0; y + 1 <= rows.length; y += 2) {
+  for (let y = 0; y < rows.length; y += 2) {
     const topRow = rows[y];
     const bottomRow = rows[y + 1];
     if (!topRow) break;
@@ -71,6 +71,5 @@ function tagColor(
   if (tag === 'T') return colors.tail;
   if (tag === 'S') return colors.saddle;
   if (tag === 'A') return hatColors?.A ?? null;
-  if (tag === 'Q') return hatColors?.Q ?? null;
-  return null;
+  return hatColors?.Q ?? null;
 }
