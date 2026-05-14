@@ -1,23 +1,35 @@
 import * as fs from 'node:fs/promises';
-import type { HorseColors } from '@token-derby/shared';
+import type { HorseColors, CollectedHat } from '@token-derby/shared';
 import { homeDir, stableFile } from '../paths.js';
 
 export type StableHorse = {
   name: string;
   colors: HorseColors;
   created_at: string;
+  hats: CollectedHat[];
+  equipped_hat?: number;
 };
 
 export type Stable = {
   horses: StableHorse[];
 };
 
+function normaliseHorse(raw: any): StableHorse {
+  return {
+    name: raw.name,
+    colors: raw.colors,
+    created_at: raw.created_at,
+    hats: Array.isArray(raw.hats) ? raw.hats : [],
+    equipped_hat: typeof raw.equipped_hat === 'number' ? raw.equipped_hat : undefined,
+  };
+}
+
 export async function loadStable(): Promise<Stable> {
   try {
     const raw = await fs.readFile(stableFile(), 'utf8');
     const parsed = JSON.parse(raw);
     if (!parsed || !Array.isArray(parsed.horses)) return { horses: [] };
-    return parsed as Stable;
+    return { horses: parsed.horses.map(normaliseHorse) };
   } catch (e: any) {
     if (e?.code === 'ENOENT') return { horses: [] };
     if (e instanceof SyntaxError) return { horses: [] };

@@ -22,7 +22,13 @@ export async function stableEditCommand(name: string | undefined): Promise<numbe
       initialName: existing.name,
       lockName: true,
       onSubmit: async (_name, colors) => {
-        await upsertHorse({ name: existing.name, colors, created_at: existing.created_at });
+        await upsertHorse({
+          name: existing.name,
+          colors,
+          created_at: existing.created_at,
+          hats: existing.hats,
+          equipped_hat: existing.equipped_hat,
+        });
         app.unmount();
         console.log(`✓ Updated "${existing.name}".`);
       },

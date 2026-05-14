@@ -23,7 +23,7 @@ export async function stableCreateCommand(): Promise<number> {
             return;
           }
         }
-        await upsertHorse({ name, colors, created_at: new Date().toISOString() });
+        await upsertHorse({ name, colors, created_at: new Date().toISOString(), hats: [] });
         app.unmount();
         console.log(`✓ Saved "${name}" to your stable.`);
       },

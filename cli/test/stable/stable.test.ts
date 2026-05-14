@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import type { CollectedHat } from '@token-derby/shared';
 import {
   loadStable,
   upsertHorse,
@@ -26,6 +27,7 @@ const gary: StableHorse = {
   name: 'Gary',
   colors: { body: '#8B4513', mane: '#000000', tail: '#000000', saddle: '#C0392B' },
   created_at: '2026-04-23T10:00:00Z',
+  hats: [],
 };
 
 describe('stable', () => {
@@ -74,5 +76,24 @@ describe('stable', () => {
     await fs.writeFile(path.join(tmp, 'stable.json'), 'not json');
     const stable = await loadStable();
     expect(stable.horses).toEqual([]);
+  });
+
+  it('loads a legacy stable file without hats and defaults hats to []', async () => {
+    await fs.mkdir(tmp, { recursive: true });
+    await fs.writeFile(
+      path.join(tmp, 'stable.json'),
+      JSON.stringify({ horses: [{ name: 'Legacy', colors: gary.colors, created_at: gary.created_at }] }),
+    );
+    const stable = await loadStable();
+    expect(stable.horses[0]?.hats).toEqual([]);
+    expect(stable.horses[0]?.equipped_hat).toBeUndefined();
+  });
+
+  it('persists hats and equipped_hat', async () => {
+    const hat: CollectedHat = { id: 'flat_cap', tint: '#FF0000', obtained_at: '2026-05-14T00:00:00Z' };
+    await upsertHorse({ ...gary, hats: [hat], equipped_hat: 0 });
+    const stable = await loadStable();
+    expect(stable.horses[0]?.hats).toHaveLength(1);
+    expect(stable.horses[0]?.equipped_hat).toBe(0);
   });
 });
