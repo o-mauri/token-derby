@@ -9,12 +9,13 @@ type Props = {
   ownHorseId: string;
   ownHorseName: string;
   ownColors: HorseColors;
+  ownUserName: string;
   lastHeartbeatAgoSec: number | null;
   lastHeartbeatOk: boolean;
 };
 
 export function StatusScreen(props: Props) {
-  const { race, ownHorseId, ownHorseName, ownColors, lastHeartbeatAgoSec, lastHeartbeatOk } = props;
+  const { race, ownHorseId, ownHorseName, ownColors, ownUserName, lastHeartbeatAgoSec, lastHeartbeatOk } = props;
 
   if (!race) {
     return (
@@ -37,14 +38,17 @@ export function StatusScreen(props: Props) {
 
       <Box marginTop={1} flexDirection="row">
         <HorseSprite sprite={MINI_SPRITE} colors={ownColors} />
-        <Text>  {ownHorseName}</Text>
+        <Box flexDirection="column">
+          <Text>  {ownHorseName}</Text>
+          <Text>  <Text dimColor>({ownUserName})</Text></Text>
+        </Box>
       </Box>
 
       <Box flexDirection="column" marginTop={1}>
         <Text>Tokens (race):  {own?.current_tokens ?? 0}</Text>
         <Text>Position:       {own?.rank ?? '—'} of {race.horses.length}</Text>
         <Text>
-          Leader:         {leader ? `${leader.name} (${leader.current_tokens})` : '—'}
+          Leader:         {leader ? `${leader.name}${leader.user_name ? ` (${leader.user_name})` : ''} — ${leader.current_tokens}` : '—'}
         </Text>
         <Text>Race elapsed:   {(elapsedPct * 100).toFixed(0)}%  {bar(elapsedPct, 20)}</Text>
         <Text>Time left:      {timeLeft}</Text>

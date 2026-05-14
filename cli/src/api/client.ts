@@ -1,6 +1,7 @@
 import { apiBase } from '../config.js';
 import { CLI_VERSION } from '../version.js';
-import { CLI_VERSION_HEADER } from '@token-derby/shared';
+import { CLI_VERSION_HEADER, USER_ID_HEADER, USER_NAME_HEADER } from '@token-derby/shared';
+import { loadIdentity, type Identity } from '../identity/identity.js';
 
 export type ApiErrorCode =
   | 'RACE_NOT_FOUND'
@@ -10,6 +11,8 @@ export type ApiErrorCode =
   | 'RATE_LIMITED'
   | 'BAD_REQUEST'
   | 'VERSION_MISMATCH'
+  | 'IDENTITY_REQUIRED'
+  | 'DUPLICATE_HORSE'
   | 'NETWORK_ERROR';
 
 export class ApiError extends Error {
@@ -25,6 +28,17 @@ export class ApiError extends Error {
 
 type FetchFn = typeof fetch;
 
+let identityCache: Promise<Identity | null> | null = null;
+function getIdentity(): Promise<Identity | null> {
+  if (!identityCache) identityCache = loadIdentity();
+  return identityCache;
+}
+
+// Tests can reset the cached identity.
+export function _resetIdentityCacheForTests(): void {
+  identityCache = null;
+}
+
 export async function request<T>(
   method: string,
   path: string,
@@ -35,6 +49,11 @@ export async function request<T>(
   const url = path.startsWith('http') ? path : `${apiBase()}${path}`;
   const headers: Record<string, string> = {};
   headers[CLI_VERSION_HEADER] = CLI_VERSION;
+  const identity = await getIdentity();
+  if (identity) {
+    headers[USER_ID_HEADER] = identity.user_id;
+    headers[USER_NAME_HEADER] = identity.display_name;
+  }
   if (authToken) headers['authorization'] = `Bearer ${authToken}`;
   if (body !== undefined) headers['content-type'] = 'application/json';
 

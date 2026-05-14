@@ -2,7 +2,7 @@ import type { APIGatewayProxyHandlerV2 } from 'aws-lambda';
 import type { GetRaceResponse, Horse, HorseView, RaceStatus } from '@token-derby/shared';
 import { getRaceByJoinCode, setRaceEnded } from '../db/races.js';
 import { listHorses } from '../db/horses.js';
-import { computeStatus, isHorseCrashed, timeLeftSeconds } from '../lib/status.js';
+import { computeStatus, timeLeftSeconds } from '../lib/status.js';
 import { ok, err } from '../lib/http.js';
 
 export const handler: APIGatewayProxyHandlerV2 = async (event) => {
@@ -22,7 +22,7 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
   }
 
   const horses = await listHorses(race.race_id);
-  const ranked = rankHorses(horses, race, now);
+  const ranked = rankHorses(horses);
 
   const response: GetRaceResponse = {
     race_id: race.race_id,
@@ -42,14 +42,10 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
   return ok(response);
 };
 
-function rankHorses(horses: Horse[], race: Parameters<typeof computeStatus>[0], now: Date): HorseView[] {
+function rankHorses(horses: Horse[]): HorseView[] {
   const sorted = [...horses].sort((a, b) => {
     if (b.current_tokens !== a.current_tokens) return b.current_tokens - a.current_tokens;
     return new Date(a.joined_at).getTime() - new Date(b.joined_at).getTime();
   });
-  return sorted.map((h, i) => ({
-    ...h,
-    rank: i + 1,
-    crashed: isHorseCrashed(race, h.last_heartbeat, now),
-  }));
+  return sorted.map((h, i) => ({ ...h, rank: i + 1 }));
 }

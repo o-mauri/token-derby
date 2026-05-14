@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { putHorse, listHorses, updateHorseTokens, setHorseFinalTokens, getHorseForHeartbeat } from '../../src/db/horses.js';
+import {
+  putHorse, listHorses, updateHorseTokens, setHorseFinalTokens,
+  getHorseForHeartbeat, findHorseByUser, rotateHeartbeatToken,
+} from '../../src/db/horses.js';
 import type { Horse } from '@token-derby/shared';
 
 function makeHorse(overrides: Partial<Horse> = {}): Horse {
@@ -10,6 +13,8 @@ function makeHorse(overrides: Partial<Horse> = {}): Horse {
     current_tokens: 0,
     last_heartbeat: new Date().toISOString(),
     joined_at: new Date().toISOString(),
+    user_id: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
+    user_name: 'Test User',
     ...overrides,
   };
 }
@@ -58,5 +63,34 @@ describe('horses db', () => {
 
     expect(await getHorseForHeartbeat(race_id, h.horse_id, 'wrong')).toBeNull();
     expect(await getHorseForHeartbeat(race_id, 'no-such-horse', 'secret-hb')).toBeNull();
+  });
+
+  it('finds a horse by user_id', async () => {
+    const race_id = `r-${Math.random().toString(36).slice(2)}`;
+    const userA = 'dddddddd-dddd-dddd-dddd-dddddddddddd';
+    const userB = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee';
+    const h1 = makeHorse({ name: 'Alpha', user_id: userA });
+    const h2 = makeHorse({ name: 'Beta', user_id: userB });
+    await putHorse(race_id, h1, 'tok1');
+    await putHorse(race_id, h2, 'tok2');
+
+    const found = await findHorseByUser(race_id, userA);
+    expect(found?.horse_id).toBe(h1.horse_id);
+    expect(found?.user_name).toBe('Test User');
+
+    expect(await findHorseByUser(race_id, 'ffffffff-ffff-ffff-ffff-ffffffffffff')).toBeNull();
+  });
+
+  it('rotates heartbeat token while leaving other fields alone', async () => {
+    const race_id = `r-${Math.random().toString(36).slice(2)}`;
+    const h = makeHorse({ current_tokens: 42 });
+    await putHorse(race_id, h, 'old-tok');
+
+    await rotateHeartbeatToken(race_id, h.horse_id, 'new-tok');
+
+    expect(await getHorseForHeartbeat(race_id, h.horse_id, 'old-tok')).toBeNull();
+    const got = await getHorseForHeartbeat(race_id, h.horse_id, 'new-tok');
+    expect(got).not.toBeNull();
+    expect(got!.current_tokens).toBe(42);
   });
 });

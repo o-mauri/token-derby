@@ -7,11 +7,15 @@ import { computeStatus, timeLeftSeconds } from '../lib/status.js';
 import { clampHeartbeat } from '../lib/rate-cap.js';
 import { ok, err, parseJson } from '../lib/http.js';
 import { readCliVersion } from '../lib/version.js';
+import { readIdentity } from '../lib/identity.js';
 
 export const handler: APIGatewayProxyHandlerV2 = async (event) => {
   const join_code = event.pathParameters?.join_code;
   const horse_id = event.pathParameters?.horse_id;
   if (!join_code || !horse_id) return err('BAD_REQUEST', 'path params required');
+
+  const identity = readIdentity(event);
+  if ('error' in identity) return err('IDENTITY_REQUIRED', identity.error);
 
   const auth = event.headers?.authorization ?? event.headers?.Authorization;
   const token = auth?.startsWith('Bearer ') ? auth.slice(7) : null;

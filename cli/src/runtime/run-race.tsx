@@ -15,9 +15,10 @@ export type RunRaceProps = {
   active: ActiveRace;
   startingBaseline: number;
   pendingMode: boolean;
+  ownUserName: string;
 };
 
-export function RunRace({ active, startingBaseline, pendingMode }: RunRaceProps) {
+export function RunRace({ active, startingBaseline, pendingMode, ownUserName }: RunRaceProps) {
   const { exit } = useApp();
   const [race, setRace] = useState<GetRaceResponse | null>(null);
   const [lastHbAt, setLastHbAt] = useState<Date | null>(null);
@@ -128,6 +129,7 @@ export function RunRace({ active, startingBaseline, pendingMode }: RunRaceProps)
       ownHorseId={active.horse_id}
       ownHorseName={active.horse_name}
       ownColors={active.horse_colors}
+      ownUserName={ownUserName}
       lastHeartbeatAgoSec={lastHeartbeatAgoSec}
       lastHeartbeatOk={lastHbOk}
     />

@@ -1,5 +1,9 @@
-import { describe, it, expect, vi } from 'vitest';
-import { request, ApiError } from '../../src/api/client.js';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import * as fs from 'node:fs/promises';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import { request, ApiError, _resetIdentityCacheForTests } from '../../src/api/client.js';
+import { saveIdentity } from '../../src/identity/identity.js';
 
 function fakeFetch(status: number, body: unknown) {
   return vi.fn().mockResolvedValue({
@@ -9,6 +13,20 @@ function fakeFetch(status: number, body: unknown) {
     text: async () => JSON.stringify(body),
   });
 }
+
+let tmp: string;
+
+beforeEach(async () => {
+  tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'td-client-'));
+  process.env.TOKEN_DERBY_HOME = tmp;
+  _resetIdentityCacheForTests();
+});
+
+afterEach(async () => {
+  delete process.env.TOKEN_DERBY_HOME;
+  await fs.rm(tmp, { recursive: true, force: true });
+  _resetIdentityCacheForTests();
+});
 
 describe('request', () => {
   it('returns parsed JSON on 2xx', async () => {
@@ -88,6 +106,39 @@ describe('request', () => {
     const fetch = fakeFetch(426, { code: 'VERSION_MISMATCH', message: 'upgrade pls' });
     await expect(request('POST', '/foo', {}, undefined, fetch as any))
       .rejects.toMatchObject({ code: 'VERSION_MISMATCH', status: 426 });
+  });
+
+  it('attaches X-User-Id and X-User-Name when identity is set', async () => {
+    await saveIdentity({
+      user_id: '12345678-1234-1234-1234-123456789012',
+      display_name: 'Alice',
+      created_at: '2026-05-14T10:00:00Z',
+    });
+    const fetch = fakeFetch(200, {});
+    await request('GET', '/foo', undefined, undefined, fetch as any);
+    const init = fetch.mock.calls[0]?.[1] as RequestInit;
+    const headers = init.headers as Record<string, string>;
+    expect(headers['x-user-id']).toBe('12345678-1234-1234-1234-123456789012');
+    expect(headers['x-user-name']).toBe('Alice');
+  });
+
+  it('omits identity headers when no identity is saved', async () => {
+    const fetch = fakeFetch(200, {});
+    await request('GET', '/foo', undefined, undefined, fetch as any);
+    const init = fetch.mock.calls[0]?.[1] as RequestInit;
+    const headers = init.headers as Record<string, string>;
+    expect(headers['x-user-id']).toBeUndefined();
+    expect(headers['x-user-name']).toBeUndefined();
+  });
+
+  it('surfaces IDENTITY_REQUIRED and DUPLICATE_HORSE error envelopes', async () => {
+    const fIdent = fakeFetch(400, { code: 'IDENTITY_REQUIRED', message: 'need uid' });
+    await expect(request('POST', '/x', {}, undefined, fIdent as any))
+      .rejects.toMatchObject({ code: 'IDENTITY_REQUIRED', status: 400 });
+
+    const fDup = fakeFetch(409, { code: 'DUPLICATE_HORSE', message: "you're as Gary" });
+    await expect(request('POST', '/x', {}, undefined, fDup as any))
+      .rejects.toMatchObject({ code: 'DUPLICATE_HORSE', status: 409 });
   });
 });
 

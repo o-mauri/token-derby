@@ -4,11 +4,15 @@ import { stableDeleteCommand } from './commands/stable-delete.js';
 import { stableEditCommand } from './commands/stable-edit.js';
 import { createRaceCommand } from './commands/create.js';
 import { joinCommand } from './commands/join.js';
-import { rejoinCommand } from './commands/rejoin.js';
 import { endCommand } from './commands/end.js';
+import { initCommand } from './commands/init.js';
 import { CLI_VERSION } from './version.js';
+import { loadIdentity } from './identity/identity.js';
 
 const HELP = `token-derby v${CLI_VERSION}
+
+Identity:
+  token-derby init                        Set up your jockey identity (run this first)
 
 Stable management:
   token-derby stable create               Make a new horse (interactive)
@@ -18,12 +22,12 @@ Stable management:
 
 Races:
   token-derby create                      Create a new race (interactive)
-  token-derby join <join-code>            Pick a horse and join a race
-  token-derby rejoin <join-code>          Resume a race after a disconnect
+  token-derby join <join-code>            Join (or resume) a race
   token-derby end <admin-code>            End a race early
 
 Environment:
   TOKEN_DERBY_API_BASE                    Override API base URL (default: production)
+  TOKEN_DERBY_HOME                        Override identity/stable directory
 `;
 
 async function main(): Promise<number> {
@@ -32,6 +36,15 @@ async function main(): Promise<number> {
 
   if (!cmd || cmd === '--help' || cmd === '-h') { console.log(HELP); return 0; }
   if (cmd === '--version' || cmd === '-v') { console.log(CLI_VERSION); return 0; }
+
+  if (cmd === 'init') return initCommand();
+
+  // Every other command requires an identity. `init` is the only escape hatch.
+  const identity = await loadIdentity();
+  if (!identity) {
+    console.error('Run `token-derby init` to set up your identity before using any other command.');
+    return 1;
+  }
 
   if (cmd === 'stable') {
     const sub = argv[1];
@@ -46,7 +59,6 @@ async function main(): Promise<number> {
 
   if (cmd === 'create') return createRaceCommand();
   if (cmd === 'join')   return joinCommand(argv[1]);
-  if (cmd === 'rejoin') return rejoinCommand(argv[1]);
   if (cmd === 'end')    return endCommand(argv[1]);
 
   console.error(`Unknown command: ${cmd}`);

@@ -13,6 +13,8 @@ export type Horse = {
   last_heartbeat: string;
   joined_at: string;
   final_tokens?: number;
+  user_id: string;
+  user_name: string;
 };
 
 export type RaceStatus = 'pending' | 'live' | 'finished';
@@ -28,11 +30,12 @@ export type Race = {
   created_at: string;
   ended_at?: string;
   cli_version?: string;
+  creator_user_id?: string;
+  creator_user_name?: string;
 };
 
 export type HorseView = Horse & {
   rank: number;
-  crashed: boolean;
 };
 
 export type RaceView = Race & {

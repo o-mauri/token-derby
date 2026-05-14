@@ -14,7 +14,8 @@ function h(current_tokens: number, extras: Partial<HorseView> = {}): HorseView {
     last_heartbeat: start,
     joined_at: start,
     rank: 1,
-    crashed: false,
+    user_id: 'user-1',
+    user_name: 'User',
     ...extras,
   };
 }

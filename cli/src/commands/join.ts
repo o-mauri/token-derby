@@ -1,11 +1,13 @@
 import React from 'react';
 import { render } from 'ink';
+import type { HorseColors, HorseView } from '@token-derby/shared';
 import { loadStable } from '../stable/stable.js';
 import { HorsePicker } from '../ui/HorsePicker.js';
 import { joinRace, getRace } from '../api/endpoints.js';
 import { ApiError } from '../api/client.js';
-import { saveActiveRace, type ActiveRace } from '../stable/active-race.js';
+import { saveActiveRace, loadActiveRace, type ActiveRace } from '../stable/active-race.js';
 import { RunRace, buildInitialState } from '../runtime/run-race.js';
+import { loadIdentity } from '../identity/identity.js';
 import type { StableHorse } from '../stable/stable.js';
 
 export async function joinCommand(joinCode: string | undefined): Promise<number> {
@@ -15,52 +17,91 @@ export async function joinCommand(joinCode: string | undefined): Promise<number>
   }
   const code = joinCode.toUpperCase();
 
-  const stable = await loadStable();
-  if (stable.horses.length === 0) {
-    console.error('Your stable is empty. Run `token-derby stable create` first.');
+  const identity = await loadIdentity();
+  if (!identity) {
+    // Defensive — bin.ts already checks. Kept so this command is self-contained.
+    console.error('Run `token-derby init` to set up your identity.');
     return 1;
   }
 
-  const picked = await pickHorse(stable.horses);
-  if (!picked) { console.log('Cancelled.'); return 1; }
+  // Pre-flight: fetch the race view to detect whether this user is already in it.
+  let race;
+  try {
+    race = await getRace(code);
+  } catch (e) {
+    if (e instanceof ApiError) {
+      if (e.code === 'RACE_NOT_FOUND') console.error(`No race with join code ${code}.`);
+      else console.error(`Error: ${e.code} ${e.message}`);
+      return 1;
+    }
+    throw e;
+  }
+  if (race.status === 'finished') {
+    console.error('This race has already ended.');
+    return 1;
+  }
+
+  const ownHorse = race.horses.find(h => h.user_id === identity.user_id) ?? null;
+
+  let chosenName: string;
+  let chosenColors: HorseColors;
+  let isResume: boolean;
+
+  if (ownHorse) {
+    // Auto-resume: use server's snapshot of the horse, no picker.
+    chosenName = ownHorse.name;
+    chosenColors = ownHorse.colors;
+    isResume = true;
+  } else {
+    const stable = await loadStable();
+    if (stable.horses.length === 0) {
+      console.error('Your stable is empty. Run `token-derby stable create` first.');
+      return 1;
+    }
+    const picked = await pickHorse(stable.horses);
+    if (!picked) { console.log('Cancelled.'); return 1; }
+    chosenName = picked.name;
+    chosenColors = picked.colors;
+    isResume = false;
+  }
 
   let joinResp;
   try {
-    joinResp = await joinRace(code, { horse: { name: picked.name, colors: picked.colors } });
+    joinResp = await joinRace(code, { horse: { name: chosenName, colors: chosenColors } });
   } catch (e) {
     if (e instanceof ApiError) {
-      if (e.code === 'RACE_FULL') console.error(`This race is full.`);
+      if (e.code === 'RACE_FULL') console.error('This race is full.');
       else if (e.code === 'RACE_FINISHED') console.error('This race has ended.');
       else if (e.code === 'RACE_NOT_FOUND') console.error(`No race with join code ${code}.`);
       else if (e.code === 'VERSION_MISMATCH') console.error(e.message);
+      else if (e.code === 'DUPLICATE_HORSE') console.error(e.message);
+      else if (e.code === 'IDENTITY_REQUIRED') console.error(`Error: ${e.message}`);
       else console.error(`Error: ${e.code} ${e.message}`);
       return 1;
     }
     throw e;
   }
 
-  const race = await getRace(code);
-  if (race.status === 'finished') {
-    console.error('Race finished after join. Exiting.');
-    return 1;
-  }
-  const status: 'pending' | 'live' = race.status;
+  // For resume, try to carry forward our last token total from active-races state.
+  const prior = await loadActiveRace(code);
+  const lastTokens = isResume && prior?.horse_id === joinResp.horse_id ? prior.last_race_tokens : (ownHorse?.current_tokens ?? 0);
 
+  const status: 'pending' | 'live' = race.status;
   const active: ActiveRace = {
     join_code: code,
     race_id: race.race_id,
     horse_id: joinResp.horse_id,
     heartbeat_token: joinResp.heartbeat_token,
-    horse_name: picked.name,
-    horse_colors: picked.colors,
-    joined_at: new Date().toISOString(),
-    last_race_tokens: 0,
+    horse_name: chosenName,
+    horse_colors: chosenColors,
+    joined_at: ownHorse?.joined_at ?? new Date().toISOString(),
+    last_race_tokens: lastTokens,
     last_heartbeat_at: new Date(0).toISOString(),
   };
   await saveActiveRace(active);
 
-  const initial = await buildInitialState({ active, raceStatus: status, rejoin: false });
-  const app = render(React.createElement(RunRace, { active, ...initial }));
+  const initial = await buildInitialState({ active, raceStatus: status, rejoin: isResume });
+  const app = render(React.createElement(RunRace, { active, ...initial, ownUserName: identity.display_name }));
   await app.waitUntilExit();
   return 0;
 }

@@ -10,7 +10,7 @@ export function reconcileHorses(
   now: Date,
   paceByHorseId: ReadonlyMap<string, number | null> = new Map(),
 ): void {
-  const visible = filterAndSortHorses(race.horses);
+  const visible = sortHorses(race.horses);
   const visibleIds = new Set(visible.map((h) => h.horse_id));
   const pct = elapsedPct(race.start_time, race.end_time, now);
 
@@ -34,17 +34,10 @@ export function reconcileHorses(
   }
 }
 
-export function filterAndSortHorses(horses: readonly HorseView[]): HorseView[] {
-  const liveNames = new Set<string>();
-  for (const h of horses) {
-    if (!h.crashed) liveNames.add(h.name);
-  }
-  const visible = horses.filter((h) => !(h.crashed && liveNames.has(h.name)));
-
-  return visible.slice().sort((a, b) => {
-    if (a.crashed !== b.crashed) return a.crashed ? 1 : -1;
-    return new Date(a.joined_at).getTime() - new Date(b.joined_at).getTime();
-  });
+export function sortHorses(horses: readonly HorseView[]): HorseView[] {
+  return horses
+    .slice()
+    .sort((a, b) => new Date(a.joined_at).getTime() - new Date(b.joined_at).getTime());
 }
 
 function createLane(doc: Document, horse: HorseView): HTMLElement {
@@ -64,6 +57,13 @@ function createLane(doc: Document, horse: HorseView): HTMLElement {
   nameLabel.className = 'horse-label';
   nameLabel.textContent = horse.name;
   wrap.appendChild(nameLabel);
+
+  if (horse.user_name) {
+    const userLabel = doc.createElement('span');
+    userLabel.className = 'user-label';
+    userLabel.textContent = `(${horse.user_name})`;
+    wrap.appendChild(userLabel);
+  }
 
   const tokens = doc.createElement('span');
   tokens.className = 'horse-tokens';
@@ -88,9 +88,8 @@ function updateLane(
   const wrap = lane.querySelector<HTMLElement>('.horse')!;
   const x = horseXPct(horse, allHorses, pct);
   wrap.style.left = `${x}%`;
-  wrap.classList.toggle('crashed', horse.crashed);
-  wrap.classList.toggle('live', !horse.crashed && pct > 0 && pct < 1);
-  wrap.classList.toggle('pending', !horse.crashed && pct === 0);
+  wrap.classList.toggle('live', pct > 0 && pct < 1);
+  wrap.classList.toggle('pending', pct === 0);
 
   const tokensEl = wrap.querySelector<HTMLElement>('.horse-tokens')!;
   tokensEl.textContent = `${tokenFmt.format(horse.current_tokens)} tok`;

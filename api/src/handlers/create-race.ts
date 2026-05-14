@@ -5,6 +5,7 @@ import { generateRaceId, generateJoinCode, generateAdminCode } from '../lib/code
 import { putRace, getRaceByJoinCode } from '../db/races.js';
 import { ok, err, parseJson } from '../lib/http.js';
 import { readCliVersion } from '../lib/version.js';
+import { readIdentity } from '../lib/identity.js';
 
 export const handler: APIGatewayProxyHandlerV2 = async (event) => {
   const cli_version = readCliVersion(event);
@@ -14,6 +15,9 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
   if (!parseSemver(cli_version)) {
     return err('BAD_REQUEST', `X-Cli-Version must be MAJOR.MINOR.PATCH (got "${cli_version}")`);
   }
+
+  const identity = readIdentity(event);
+  if ('error' in identity) return err('IDENTITY_REQUIRED', identity.error);
 
   const body = parseJson<CreateRaceRequest>(event.body);
   if (!body) return err('BAD_REQUEST', 'JSON body required');
@@ -56,6 +60,8 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
       join_code,
       created_at: new Date().toISOString(),
       cli_version,
+      creator_user_id: identity.user_id,
+      creator_user_name: identity.user_name,
     },
     admin_code,
   );

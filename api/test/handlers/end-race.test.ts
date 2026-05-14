@@ -8,7 +8,11 @@ import { listHorses } from '../../src/db/horses.js';
 import { getRaceById } from '../../src/db/races.js';
 
 function evt(body: unknown, path: string, routeKey: string, pathParams?: Record<string, string>, auth?: string): APIGatewayProxyEventV2 {
-  const headers: Record<string, string> = { 'x-cli-version': '0.2.0' };
+  const headers: Record<string, string> = {
+    'x-cli-version': '1.0.0',
+    'x-user-id': '99999999-9999-9999-9999-999999999999',
+    'x-user-name': 'End Tester',
+  };
   if (auth) headers.authorization = `Bearer ${auth}`;
   return {
     version: '2.0', routeKey, rawPath: path, rawQueryString: '',

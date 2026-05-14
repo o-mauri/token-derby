@@ -80,6 +80,25 @@ export async function getHorseForHeartbeat(
   };
 }
 
+export async function findHorseByUser(race_id: string, user_id: string): Promise<Horse | null> {
+  const horses = await listHorses(race_id);
+  return horses.find(h => h.user_id === user_id) ?? null;
+}
+
+export async function rotateHeartbeatToken(
+  race_id: string,
+  horse_id: string,
+  new_token: string,
+): Promise<void> {
+  await ddb.send(new UpdateCommand({
+    TableName: TABLE,
+    Key: horseKey(race_id, horse_id),
+    UpdateExpression: 'SET heartbeat_token = :t',
+    ExpressionAttributeValues: { ':t': new_token },
+    ConditionExpression: 'attribute_exists(pk)',
+  }));
+}
+
 export async function countHorses(race_id: string): Promise<number> {
   const { Count = 0 } = await ddb.send(new QueryCommand({
     TableName: TABLE,

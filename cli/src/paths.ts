@@ -9,6 +9,10 @@ export function stableFile(): string {
   return path.join(homeDir(), 'stable.json');
 }
 
+export function identityFile(): string {
+  return path.join(homeDir(), 'identity.json');
+}
+
 export function activeRaceFile(joinCode: string): string {
   return path.join(homeDir(), 'active-races', `${joinCode}.json`);
 }
