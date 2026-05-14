@@ -79,4 +79,25 @@ describe('spendToken handler', () => {
     expect(res.statusCode).toBe(401);
     expect(JSON.parse(res.body).code).toBe('UNAUTHORIZED');
   });
+
+  it('returns BAD_REQUEST when path params are missing', async () => {
+    const res: any = await spendHandler(evt(
+      { heartbeat_token: 'tok' },
+      '/races//horses//spend-token',
+      'POST /races/{join_code}/horses/{horse_id}/spend-token',
+    ));
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).code).toBe('BAD_REQUEST');
+  });
+
+  it('returns RACE_NOT_FOUND for unknown join_code', async () => {
+    const res: any = await spendHandler(evt(
+      { heartbeat_token: 'tok' },
+      '/races/no-such-code/horses/horse-1/spend-token',
+      'POST /races/{join_code}/horses/{horse_id}/spend-token',
+      { join_code: 'no-such-code', horse_id: 'horse-1' },
+    ));
+    expect(res.statusCode).toBe(404);
+    expect(JSON.parse(res.body).code).toBe('RACE_NOT_FOUND');
+  });
 });
