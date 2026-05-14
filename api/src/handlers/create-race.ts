@@ -4,7 +4,7 @@ import { DEFAULT_MAX_PARTICIPANTS, parseSemver } from '@token-derby/shared';
 import { generateRaceId, generateJoinCode, generateAdminCode } from '../lib/codes.js';
 import { putRace, getRaceByJoinCode } from '../db/races.js';
 import { ok, err, parseJson } from '../lib/http.js';
-import { readCliVersion } from '../lib/version.js';
+import { readCliVersion, meetsMinimumCliVersion, minCliVersion } from '../lib/version.js';
 import { readIdentity } from '../lib/identity.js';
 
 export const handler: APIGatewayProxyHandlerV2 = async (event) => {
@@ -14,6 +14,13 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
   }
   if (!parseSemver(cli_version)) {
     return err('BAD_REQUEST', `X-Cli-Version must be MAJOR.MINOR.PATCH (got "${cli_version}")`);
+  }
+  if (!meetsMinimumCliVersion(cli_version)) {
+    return err(
+      'VERSION_MISMATCH',
+      `This API requires token-derby v${minCliVersion()} or newer. ` +
+        `Upgrade: npm i -g @mauricode/token-derby@latest`,
+    );
   }
 
   const identity = readIdentity(event);

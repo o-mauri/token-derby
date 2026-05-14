@@ -126,6 +126,15 @@ describe('heartbeat handler', () => {
     expect(JSON.parse(res.body).code).toBe('IDENTITY_REQUIRED');
   });
 
+  it('rejects heartbeat from a CLI version older than the API minimum', async () => {
+    const { join_code, horse_id, heartbeat_token } = await setup();
+    const res: any = await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { current_tokens: 1 }, '0.2.0'));
+    expect(res.statusCode).toBe(426);
+    const body = JSON.parse(res.body);
+    expect(body.code).toBe('VERSION_MISMATCH');
+    expect(body.message).toMatch(/1\.0\.0/);
+  });
+
   it('returns finished status without writing when race has ended', async () => {
     const { join_code, race_id, horse_id, heartbeat_token } = await setup();
     // Freeze the race's current_tokens at 777

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseSemver, minorMatches } from '@token-derby/shared';
+import { parseSemver, minorMatches, gteSemver } from '@token-derby/shared';
 
 describe('parseSemver', () => {
   it('parses canonical versions', () => {
@@ -40,5 +40,37 @@ describe('minorMatches', () => {
     expect(minorMatches(undefined, '0.2.0')).toBe(false);
     expect(minorMatches('0.2.0', undefined)).toBe(false);
     expect(minorMatches('garbage', '0.2.0')).toBe(false);
+  });
+});
+
+describe('gteSemver', () => {
+  it('returns true when a equals b', () => {
+    expect(gteSemver('1.0.0', '1.0.0')).toBe(true);
+  });
+
+  it('returns true when a is newer by patch', () => {
+    expect(gteSemver('1.0.1', '1.0.0')).toBe(true);
+    expect(gteSemver('1.0.100', '1.0.99')).toBe(true);
+  });
+
+  it('returns true when a is newer by minor', () => {
+    expect(gteSemver('1.1.0', '1.0.99')).toBe(true);
+  });
+
+  it('returns true when a is newer by major', () => {
+    expect(gteSemver('2.0.0', '1.99.99')).toBe(true);
+  });
+
+  it('returns false when a is older', () => {
+    expect(gteSemver('0.9.99', '1.0.0')).toBe(false);
+    expect(gteSemver('1.0.0', '1.0.1')).toBe(false);
+    expect(gteSemver('1.0.0', '1.1.0')).toBe(false);
+  });
+
+  it('returns false when either side is unparseable', () => {
+    expect(gteSemver('garbage', '1.0.0')).toBe(false);
+    expect(gteSemver('1.0.0', 'garbage')).toBe(false);
+    expect(gteSemver(undefined, '1.0.0')).toBe(false);
+    expect(gteSemver(null, '1.0.0')).toBe(false);
   });
 });

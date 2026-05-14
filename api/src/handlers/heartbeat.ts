@@ -6,13 +6,22 @@ import { getHorseForHeartbeat, updateHorseTokens } from '../db/horses.js';
 import { computeStatus, timeLeftSeconds } from '../lib/status.js';
 import { clampHeartbeat } from '../lib/rate-cap.js';
 import { ok, err, parseJson } from '../lib/http.js';
-import { readCliVersion } from '../lib/version.js';
+import { readCliVersion, meetsMinimumCliVersion, minCliVersion } from '../lib/version.js';
 import { readIdentity } from '../lib/identity.js';
 
 export const handler: APIGatewayProxyHandlerV2 = async (event) => {
   const join_code = event.pathParameters?.join_code;
   const horse_id = event.pathParameters?.horse_id;
   if (!join_code || !horse_id) return err('BAD_REQUEST', 'path params required');
+
+  const caller_version = readCliVersion(event);
+  if (caller_version && !meetsMinimumCliVersion(caller_version)) {
+    return err(
+      'VERSION_MISMATCH',
+      `This API requires token-derby v${minCliVersion()} or newer. ` +
+        `Upgrade: npm i -g @mauricode/token-derby@latest`,
+    );
+  }
 
   const identity = readIdentity(event);
   if ('error' in identity) return err('IDENTITY_REQUIRED', identity.error);

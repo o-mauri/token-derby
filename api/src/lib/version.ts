@@ -1,5 +1,7 @@
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
-import { CLI_VERSION_HEADER } from '@token-derby/shared';
+import { CLI_VERSION_HEADER, gteSemver } from '@token-derby/shared';
+
+export const MIN_CLI_VERSION_DEFAULT = '1.0.0';
 
 export function readCliVersion(event: APIGatewayProxyEventV2): string | undefined {
   const h = event.headers ?? {};
@@ -11,4 +13,12 @@ export function readCliVersion(event: APIGatewayProxyEventV2): string | undefine
     }
   }
   return undefined;
+}
+
+export function minCliVersion(): string {
+  return process.env.TOKEN_DERBY_MIN_CLI_VERSION ?? MIN_CLI_VERSION_DEFAULT;
+}
+
+export function meetsMinimumCliVersion(cli_version: string): boolean {
+  return gteSemver(cli_version, minCliVersion());
 }

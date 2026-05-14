@@ -6,12 +6,21 @@ import { getRaceByJoinCode } from '../db/races.js';
 import { putHorse, countHorses, findHorseByUser, rotateHeartbeatToken } from '../db/horses.js';
 import { computeStatus } from '../lib/status.js';
 import { ok, err, parseJson } from '../lib/http.js';
-import { readCliVersion } from '../lib/version.js';
+import { readCliVersion, meetsMinimumCliVersion, minCliVersion } from '../lib/version.js';
 import { readIdentity } from '../lib/identity.js';
 
 export const handler: APIGatewayProxyHandlerV2 = async (event) => {
   const join_code = event.pathParameters?.join_code;
   if (!join_code) return err('BAD_REQUEST', 'join_code path parameter required');
+
+  const caller_version = readCliVersion(event);
+  if (caller_version && !meetsMinimumCliVersion(caller_version)) {
+    return err(
+      'VERSION_MISMATCH',
+      `This API requires token-derby v${minCliVersion()} or newer. ` +
+        `Upgrade: npm i -g @mauricode/token-derby@latest`,
+    );
+  }
 
   const identity = readIdentity(event);
   if ('error' in identity) return err('IDENTITY_REQUIRED', identity.error);

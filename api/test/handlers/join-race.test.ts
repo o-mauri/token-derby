@@ -179,6 +179,15 @@ describe('joinRace handler', () => {
     expect(body.message).toMatch(/Gary/);
   });
 
+  it('rejects join from a CLI version older than the API minimum', async () => {
+    const { join_code } = await createTestRace();
+    const res: any = await joinHandler(joinEvent(join_code, validHorse, '0.2.0'));
+    expect(res.statusCode).toBe(426);
+    const body = JSON.parse(res.body);
+    expect(body.code).toBe('VERSION_MISMATCH');
+    expect(body.message).toMatch(/1\.0\.0/);
+  });
+
   it('two different users can both join with horses named the same — they are separate horses', async () => {
     const { join_code, race_id } = await createTestRace();
     const userA = '66666666-6666-6666-6666-666666666666';

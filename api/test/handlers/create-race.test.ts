@@ -195,4 +195,32 @@ describe('createRace handler', () => {
     expect(res.statusCode).toBe(400);
     expect(JSON.parse(res.body).code).toBe('IDENTITY_REQUIRED');
   });
+
+  it('rejects X-Cli-Version older than the API minimum with VERSION_MISMATCH', async () => {
+    const res: any = await handler(event({
+      name: 'Old client',
+      start_time: '2026-04-22T09:00:00Z',
+      end_time: '2026-04-22T17:00:00Z',
+      tz: 'UTC',
+    }, '0.2.0'));
+    expect(res.statusCode).toBe(426);
+    expect(JSON.parse(res.body).code).toBe('VERSION_MISMATCH');
+    expect(JSON.parse(res.body).message).toMatch(/1\.0\.0/);
+  });
+
+  it('respects TOKEN_DERBY_MIN_CLI_VERSION env override', async () => {
+    process.env.TOKEN_DERBY_MIN_CLI_VERSION = '2.0.0';
+    try {
+      const res: any = await handler(event({
+        name: 'Below env override',
+        start_time: '2026-04-22T09:00:00Z',
+        end_time: '2026-04-22T17:00:00Z',
+        tz: 'UTC',
+      }, '1.5.0'));
+      expect(res.statusCode).toBe(426);
+      expect(JSON.parse(res.body).message).toMatch(/2\.0\.0/);
+    } finally {
+      delete process.env.TOKEN_DERBY_MIN_CLI_VERSION;
+    }
+  });
 });
