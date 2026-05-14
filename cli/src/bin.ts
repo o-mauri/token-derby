@@ -6,6 +6,7 @@ import { createRaceCommand } from './commands/create.js';
 import { joinCommand } from './commands/join.js';
 import { endCommand } from './commands/end.js';
 import { initCommand } from './commands/init.js';
+import { rollCommand } from './commands/roll.js';
 import { CLI_VERSION } from './version.js';
 import { loadIdentity } from './identity/identity.js';
 
@@ -24,6 +25,7 @@ Races:
   token-derby create                      Create a new race (interactive)
   token-derby join <join-code>            Join (or resume) a race
   token-derby end <admin-code>            End a race early
+  token-derby roll <join-code>            Roll a hat with a loot token
 
 Environment:
   TOKEN_DERBY_API_BASE                    Override API base URL (default: production)
@@ -60,6 +62,7 @@ async function main(): Promise<number> {
   if (cmd === 'create') return createRaceCommand();
   if (cmd === 'join')   return joinCommand(argv[1]);
   if (cmd === 'end')    return endCommand(argv[1]);
+  if (cmd === 'roll')   return rollCommand(argv[1]);
 
   console.error(`Unknown command: ${cmd}`);
   console.error(HELP);

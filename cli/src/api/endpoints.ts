@@ -2,6 +2,7 @@ import type {
   CreateRaceRequest, CreateRaceResponse,
   GetRaceResponse, JoinRaceRequest, JoinRaceResponse,
   HeartbeatRequest, HeartbeatResponse, EndRaceResponse,
+  SpendTokenRequest, SpendTokenResponse,
 } from '@token-derby/shared';
 import { request } from './client.js';
 
@@ -28,4 +29,13 @@ export function heartbeat(joinCode: string, horseId: string, token: string, body
 
 export function endRace(adminCode: string) {
   return request<EndRaceResponse>('DELETE', `/races/admin/${encodeURIComponent(adminCode)}`, undefined, undefined);
+}
+
+export function spendToken(joinCode: string, horseId: string, heartbeatToken: string) {
+  return request<SpendTokenResponse>(
+    'POST',
+    `/races/${encodeURIComponent(joinCode)}/horses/${encodeURIComponent(horseId)}/spend-token`,
+    { heartbeat_token: heartbeatToken } satisfies SpendTokenRequest,
+    undefined,
+  );
 }

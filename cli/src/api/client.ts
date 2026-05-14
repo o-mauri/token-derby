@@ -13,6 +13,7 @@ export type ApiErrorCode =
   | 'VERSION_MISMATCH'
   | 'IDENTITY_REQUIRED'
   | 'DUPLICATE_HORSE'
+  | 'INSUFFICIENT_TOKENS'
   | 'NETWORK_ERROR';
 
 export class ApiError extends Error {
