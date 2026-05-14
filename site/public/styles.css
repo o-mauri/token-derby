@@ -362,8 +362,8 @@ html, body {
 @media (min-aspect-ratio: 2/1) and (min-width: 1920px) {
   :root {
     --sprite-scale: 3;
-    --horse-height: 170px;
-    --track-gap: 6px;
+    --horse-height: 90px;
+    --track-gap: 4px;
   }
 
   html { font-size: 18px; }
@@ -376,19 +376,19 @@ html, body {
   /* Track sits inside the TV safe zone */
   .track { padding: 24px 64px; }
 
-  /* Hide raw token count on TV — pace tells the story, reduces clutter from distance */
-  .horse-tokens { display: none; }
-
-  /* Name chip — bigger, more readable */
+  /* Labels stack below the sprite; overflow into adjacent lanes is fine */
   .horse-label {
     top: calc(100% + 6px);
     font-size: 1rem;
     padding: 4px 12px;
     letter-spacing: 0.06em;
   }
-  /* Pace stacked below name */
+  .horse-tokens {
+    top: calc(100% + 32px);
+    font-size: 0.85rem;
+  }
   .horse-pace {
-    top: calc(100% + 38px);
+    top: calc(100% + 52px);
     font-size: 1.05rem;
   }
 
