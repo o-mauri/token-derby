@@ -3,9 +3,9 @@ import { HATS } from './definitions.js';
 import { TINT_POOL } from './tints.js';
 
 const TIERS: { rarity: HatRarity; weight: number }[] = [
-  { rarity: 'common',    weight: 0.60 },
-  { rarity: 'rare',      weight: 0.25 },
-  { rarity: 'epic',      weight: 0.12 },
+  { rarity: 'common', weight: 0.60 },
+  { rarity: 'rare', weight: 0.25 },
+  { rarity: 'epic', weight: 0.12 },
   { rarity: 'legendary', weight: 0.03 },
 ];
 
@@ -30,7 +30,7 @@ export function rollHat(): CollectedHat {
   const tint = rarity === 'legendary' ? undefined : pickRandom(TINT_POOL);
   return {
     id: hat.id,
-    tint: tint ?? undefined,
+    tint,
     obtained_at: new Date().toISOString(),
   };
 }

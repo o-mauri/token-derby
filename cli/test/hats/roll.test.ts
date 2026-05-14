@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { rollHat } from '../../src/hats/roll.js';
 import { HATS } from '../../src/hats/definitions.js';
+import { TINT_POOL } from '../../src/hats/tints.js';
 
 describe('rollHat', () => {
   it('returns a CollectedHat with a valid hat id', () => {
@@ -16,23 +17,23 @@ describe('rollHat', () => {
   });
 
   it('legendary hats never have a tint', () => {
+    expect.assertions(400); // 200 rarity assertions + 200 tint assertions
     vi.spyOn(Math, 'random').mockReturnValue(0.99);
     const results = Array.from({ length: 200 }, () => rollHat());
     vi.restoreAllMocks();
     for (const r of results) {
       const hat = HATS.find(h => h.id === r.id)!;
-      if (hat.rarity === 'legendary') {
-        expect(r.tint).toBeUndefined();
-      }
+      expect(hat.rarity).toBe('legendary');
+      expect(r.tint).toBeUndefined();
     }
   });
 
-  it('non-legendary hats can have a tint or undefined', () => {
+  it('non-legendary hats have a tint from TINT_POOL', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0);
     const results = Array.from({ length: 100 }, () => rollHat());
     vi.restoreAllMocks();
     for (const r of results) {
-      expect(r.tint === undefined || typeof r.tint === 'string').toBe(true);
+      expect(TINT_POOL).toContain(r.tint);
     }
   });
 
