@@ -245,17 +245,83 @@ html, body {
 
 /* ── Animations ───────────────────────────────────── */
 
-@keyframes leg-swing {
-  0%, 100% { transform: translate(-50%, -50%) scaleX(1); }
-  50%      { transform: translate(-50%, -52%) scaleX(1); }
+/* Skeletal pivot points */
+.leg-back              { transform-origin: 6px 16px; }   /* back hip  */
+.leg-back-lower        { transform-origin: 6px 18px; }   /* back knee */
+.leg-front             { transform-origin: 18px 16px; }  /* front hip */
+.leg-front-lower       { transform-origin: 18px 18px; }  /* front knee */
+
+/* Smooth sub-pixel rendering on animated legs */
+.leg-back, .leg-front  { shape-rendering: auto; }
+
+/* ── Hip swing ──────────────────────── */
+@keyframes hip-back {
+  0%   { transform: rotate(18deg); }   /* pushed back  */
+  50%  { transform: rotate(-16deg); }  /* swung forward */
+  100% { transform: rotate(18deg); }
+}
+@keyframes hip-front {
+  0%   { transform: rotate(-16deg); }  /* reaching forward */
+  50%  { transform: rotate(18deg); }   /* pushed back      */
+  100% { transform: rotate(-16deg); }
+}
+
+/* ── Knee bend (nested inside hip group) ── */
+@keyframes knee-back {
+  0%        { transform: rotate(0deg); }     /* straight on ground */
+  30%       { transform: rotate(-28deg); }   /* folds up as leg lifts */
+  50%       { transform: rotate(-12deg); }   /* partially bent at full forward */
+  80%       { transform: rotate(-20deg); }   /* bends on downswing */
+  100%      { transform: rotate(0deg); }     /* straight on landing */
+}
+@keyframes knee-front {
+  0%        { transform: rotate(0deg); }     /* straight at full reach */
+  20%       { transform: rotate(20deg); }    /* bends as it pushes back */
+  50%       { transform: rotate(0deg); }     /* straight at back */
+  70%       { transform: rotate(28deg); }    /* folds as leg lifts forward */
+  100%      { transform: rotate(0deg); }     /* straightens on landing */
+}
+
+/* ── Body bob ───────────────────────── */
+@keyframes body-bob {
+  0%, 100% { transform: translate(-50%, -50%); }
+  25%      { transform: translate(-50%, calc(-50% - 1px)); }
+  75%      { transform: translate(-50%, calc(-50% + 0.5px)); }
+}
+
+/* ── Apply to live / pending horses ── */
+.horse.live .leg-back,
+.horse.pending .leg-back {
+  animation: hip-back 0.4s ease-in-out infinite;
+}
+.horse.live .leg-back-lower,
+.horse.pending .leg-back-lower {
+  animation: knee-back 0.4s ease-in-out infinite;
+}
+.horse.live .leg-front,
+.horse.pending .leg-front {
+  animation: hip-front 0.4s ease-in-out infinite;
+}
+.horse.live .leg-front-lower,
+.horse.pending .leg-front-lower {
+  animation: knee-front 0.4s ease-in-out infinite;
 }
 .horse.live, .horse.pending {
-  animation: leg-swing 0.4s steps(2) infinite;
+  animation: body-bob 0.4s ease-in-out infinite;
 }
+
+/* ── Crashed ─────────────────────────── */
 .horse.crashed {
   animation: none;
   transform: translate(-50%, -50%) rotate(75deg);
   opacity: 0.4;
+}
+.horse.crashed .leg-back,
+.horse.crashed .leg-front,
+.horse.crashed .leg-back-lower,
+.horse.crashed .leg-front-lower {
+  animation: none;
+  transform: none;
 }
 
 /* ── Error / fallback ─────────────────────────────── */
