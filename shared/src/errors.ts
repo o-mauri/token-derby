@@ -7,7 +7,8 @@ export type ErrorCode =
   | 'BAD_REQUEST'
   | 'VERSION_MISMATCH'
   | 'IDENTITY_REQUIRED'
-  | 'DUPLICATE_HORSE';
+  | 'DUPLICATE_HORSE'
+  | 'INSUFFICIENT_TOKENS';
 
 export type ErrorEnvelope = {
   code: ErrorCode;
@@ -18,6 +19,7 @@ export const ERROR_STATUS: Record<ErrorCode, number> = {
   BAD_REQUEST: 400,
   IDENTITY_REQUIRED: 400,
   INVALID_TOKEN: 401,
+  INSUFFICIENT_TOKENS: 402,
   RACE_NOT_FOUND: 404,
   RACE_FULL: 409,
   DUPLICATE_HORSE: 409,

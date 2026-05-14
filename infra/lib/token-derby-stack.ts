@@ -80,6 +80,7 @@ export class TokenDerbyStack extends cdk.Stack {
     const joinRaceFn = makeFn('JoinRaceFn', 'join-race');
     const heartbeatFn = makeFn('HeartbeatFn', 'heartbeat');
     const endRaceFn = makeFn('EndRaceFn', 'end-race');
+    const spendTokenFn = makeFn('SpendTokenFn', 'spend-token');
 
     // ── HTTP API Gateway ───────────────────────────────────────────────
     const httpApi = new HttpApi(this, 'TokenDerbyApi', {
@@ -96,6 +97,7 @@ export class TokenDerbyStack extends cdk.Stack {
     httpApi.addRoutes({ path: '/api/races/{join_code}/join', methods: [HttpMethod.POST], integration: new HttpLambdaIntegration('JoinRaceInt', joinRaceFn) });
     httpApi.addRoutes({ path: '/api/races/{join_code}/horses/{horse_id}/heartbeat', methods: [HttpMethod.POST], integration: new HttpLambdaIntegration('HeartbeatInt', heartbeatFn) });
     httpApi.addRoutes({ path: '/api/races/admin/{admin_code}', methods: [HttpMethod.DELETE], integration: new HttpLambdaIntegration('EndRaceInt', endRaceFn) });
+    httpApi.addRoutes({ path: '/api/races/{join_code}/horses/{horse_id}/spend-token', methods: [HttpMethod.POST], integration: new HttpLambdaIntegration('SpendTokenInt', spendTokenFn) });
 
     // API throttling (rate-limit guardrails, not hard security)
     const defaultStage = httpApi.defaultStage!.node.defaultChild as apigatewayv2.CfnStage;
