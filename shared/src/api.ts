@@ -41,3 +41,11 @@ export type HeartbeatResponse = {
 export type EndRaceResponse = {
   ok: true;
 };
+
+export type SpendTokenRequest = {
+  heartbeat_token: string;
+};
+
+export type SpendTokenResponse = {
+  ok: true;
+};

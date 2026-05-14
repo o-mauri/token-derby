@@ -5,6 +5,31 @@ export type HorseColors = {
   saddle: string;
 };
 
+export type HatRarity = 'common' | 'rare' | 'epic' | 'legendary';
+export type HatId = string;
+export type HatColors = { A: string; Q?: string };
+
+export type Hat = {
+  id: HatId;
+  name: string;
+  rarity: HatRarity;
+  rows: readonly string[];
+  width: number;
+  anchor_x: number;
+  colors: HatColors;
+  animation?: {
+    type: 'cycle';
+    frames: readonly string[];
+    fps: number;
+  };
+};
+
+export type CollectedHat = {
+  id: HatId;
+  tint?: string;
+  obtained_at: string;
+};
+
 export type Horse = {
   horse_id: string;
   name: string;
@@ -13,6 +38,7 @@ export type Horse = {
   last_heartbeat: string;
   joined_at: string;
   final_tokens?: number;
+  loot_tokens?: number;
   user_id: string;
   user_name: string;
 };

@@ -55,4 +55,6 @@ describe('renderSprite', () => {
     expect(grid).toHaveLength(2);
     expect(grid[1]![0]).toEqual<Cell>({ top: '#0000FF', bottom: null });
   });
+
+  it.todo('resolves A slot to the hat primary colour');
 });
