@@ -55,14 +55,14 @@ describe('sumOutputTokens', () => {
     expect(await sumOutputTokens()).toBe(350);
   });
 
-  it('skips lines without message.usage.output_tokens', async () => {
+  it('skips lines without message.usage and sums input + output from those that have it', async () => {
     await writeJsonl('p/s.jsonl', [
       { type: 'system' },
       { type: 'assistant', message: { content: 'x' } },
       { type: 'assistant', message: { usage: { input_tokens: 100 } } },
       { type: 'assistant', message: { usage: { output_tokens: 42 } } },
     ]);
-    expect(await sumOutputTokens()).toBe(42);
+    expect(await sumOutputTokens()).toBe(142);
   });
 
   it('tolerates malformed JSON lines (logs nothing, continues)', async () => {
