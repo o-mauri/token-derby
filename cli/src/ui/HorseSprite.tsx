@@ -1,16 +1,20 @@
 import React from 'react';
 import { Box, Text } from 'ink';
-import type { HorseColors } from '@token-derby/shared';
-import { renderSprite, type Cell } from './sprite-render.js';
+import type { HorseColors, Hat } from '@token-derby/shared';
+import { renderSprite, type Cell, type HatOpts } from './sprite-render.js';
 import type { SlotTag } from './sprite.js';
 
 type Props = {
   sprite: readonly (readonly SlotTag[])[];
   colors: HorseColors;
+  hat?: Hat;
+  tint?: string;
+  frameColor?: string;
 };
 
-export function HorseSprite({ sprite, colors }: Props) {
-  const grid = renderSprite(sprite, colors);
+export function HorseSprite({ sprite, colors, hat, tint, frameColor }: Props) {
+  const hatOpts: HatOpts | undefined = hat ? { hat, tint, frameColor } : undefined;
+  const grid = renderSprite(sprite, colors, hatOpts);
   return (
     <Box flexDirection="column">
       {grid.map((row, y) => (
