@@ -40,6 +40,7 @@ export async function stableEditCommand(name: string | undefined): Promise<numbe
   // Phase 2: hat picker (only when horse has hats)
   let equippedIdx = existing.equipped_hat;
 
+  // Esc in HatPicker calls onDone(existing.equipped_hat), preserving the prior selection.
   if (existing.hats.length > 0) {
     const hatApp = render(
       React.createElement(HatPicker, {
