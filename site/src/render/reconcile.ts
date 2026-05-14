@@ -10,9 +10,8 @@ export function reconcileHorses(
   now: Date,
   paceByHorseId: ReadonlyMap<string, number | null> = new Map(),
 ): void {
-  const ordered = [...race.horses].sort(
-    (a, b) => new Date(a.joined_at).getTime() - new Date(b.joined_at).getTime(),
-  );
+  const visible = filterAndSortHorses(race.horses);
+  const visibleIds = new Set(visible.map((h) => h.horse_id));
   const pct = elapsedPct(race.start_time, race.end_time, now);
 
   const existing = new Map<string, HTMLElement>();
@@ -21,15 +20,31 @@ export function reconcileHorses(
     if (id) existing.set(id, lane);
   }
 
-  for (let i = 0; i < ordered.length; i++) {
-    const horse = ordered[i]!;
+  for (const [id, lane] of existing) {
+    if (!visibleIds.has(id)) lane.remove();
+  }
+
+  for (const horse of visible) {
     let lane = existing.get(horse.horse_id);
     if (!lane) {
       lane = createLane(track.ownerDocument, horse);
-      track.appendChild(lane);
     }
+    track.appendChild(lane);
     updateLane(lane, horse, race.horses, pct, paceByHorseId.get(horse.horse_id) ?? null);
   }
+}
+
+export function filterAndSortHorses(horses: readonly HorseView[]): HorseView[] {
+  const liveNames = new Set<string>();
+  for (const h of horses) {
+    if (!h.crashed) liveNames.add(h.name);
+  }
+  const visible = horses.filter((h) => !(h.crashed && liveNames.has(h.name)));
+
+  return visible.slice().sort((a, b) => {
+    if (a.crashed !== b.crashed) return a.crashed ? 1 : -1;
+    return new Date(a.joined_at).getTime() - new Date(b.joined_at).getTime();
+  });
 }
 
 function createLane(doc: Document, horse: HorseView): HTMLElement {

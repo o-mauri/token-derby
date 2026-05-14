@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { reconcileHorses } from '../src/render/reconcile.js';
+import { reconcileHorses, filterAndSortHorses } from '../src/render/reconcile.js';
 import type { GetRaceResponse, HorseView } from '@token-derby/shared';
 
 function race(overrides: Partial<GetRaceResponse> = {}): GetRaceResponse {
@@ -167,5 +167,109 @@ describe('reconcileHorses', () => {
     expect(track.querySelector('.lane')).toBe(laneFirst);
     expect(track.querySelector('.horse-tokens')?.textContent).toBe('2,500 tok');
     expect(track.querySelector('.horse-pace')?.textContent).toBe('+1,234/min');
+  });
+
+  it('moves crashed horses to bottom lanes', () => {
+    const r1 = race({ horses: [
+      horse('a', 100, 'Alpha', '2026-04-22T09:00:00Z'),
+      horse('b', 200, 'Bravo', '2026-04-22T09:01:00Z'),
+      horse('c', 300, 'Charlie', '2026-04-22T09:02:00Z'),
+    ] });
+    reconcileHorses(track, r1, new Date('2026-04-22T13:00:00Z'));
+
+    const r2 = race({ horses: [
+      horse('a', 100, 'Alpha', '2026-04-22T09:00:00Z', { crashed: true }),
+      horse('b', 200, 'Bravo', '2026-04-22T09:01:00Z'),
+      horse('c', 300, 'Charlie', '2026-04-22T09:02:00Z'),
+    ] });
+    reconcileHorses(track, r2, new Date('2026-04-22T13:00:00Z'));
+
+    const lanes = Array.from(track.querySelectorAll<HTMLDivElement>('.lane'));
+    const labels = lanes.map((l) => l.querySelector('.horse-label')?.textContent);
+    expect(labels).toEqual(['Bravo', 'Charlie', 'Alpha']);
+  });
+
+  it('keeps the same DOM element when a horse crashes (does not destroy lane state)', () => {
+    const r1 = race({ horses: [
+      horse('a', 100, 'Alpha', '2026-04-22T09:00:00Z'),
+      horse('b', 200, 'Bravo', '2026-04-22T09:01:00Z'),
+    ] });
+    reconcileHorses(track, r1, new Date('2026-04-22T13:00:00Z'));
+    const alphaLane = track.querySelector('.lane[data-horse-id="a"]');
+
+    const r2 = race({ horses: [
+      horse('a', 100, 'Alpha', '2026-04-22T09:00:00Z', { crashed: true }),
+      horse('b', 200, 'Bravo', '2026-04-22T09:01:00Z'),
+    ] });
+    reconcileHorses(track, r2, new Date('2026-04-22T13:00:00Z'));
+
+    expect(track.querySelector('.lane[data-horse-id="a"]')).toBe(alphaLane);
+  });
+
+  it('removes a crashed horse when a live horse with the same name joins', () => {
+    const r1 = race({ horses: [
+      horse('a', 100, 'Alpha', '2026-04-22T09:00:00Z', { crashed: true }),
+    ] });
+    reconcileHorses(track, r1, new Date('2026-04-22T13:00:00Z'));
+    expect(track.querySelectorAll('.lane')).toHaveLength(1);
+
+    const r2 = race({ horses: [
+      horse('a', 100, 'Alpha', '2026-04-22T09:00:00Z', { crashed: true }),
+      horse('a2', 0, 'Alpha', '2026-04-22T12:55:00Z'),
+    ] });
+    reconcileHorses(track, r2, new Date('2026-04-22T13:00:00Z'));
+
+    const lanes = Array.from(track.querySelectorAll<HTMLDivElement>('.lane'));
+    expect(lanes).toHaveLength(1);
+    expect(lanes[0]!.dataset.horseId).toBe('a2');
+  });
+});
+
+describe('filterAndSortHorses', () => {
+  function h(id: string, name: string, joined: string, crashed = false): HorseView {
+    return {
+      horse_id: id, name,
+      colors: { body: '#000', mane: '#000', tail: '#000', saddle: '#000' },
+      current_tokens: 0,
+      last_heartbeat: 'x',
+      joined_at: joined,
+      rank: 1,
+      crashed,
+    };
+  }
+
+  it('keeps original join order when nobody is crashed', () => {
+    const out = filterAndSortHorses([
+      h('a', 'Alpha', '2026-04-22T09:00:00Z'),
+      h('b', 'Bravo', '2026-04-22T09:01:00Z'),
+      h('c', 'Charlie', '2026-04-22T09:02:00Z'),
+    ]);
+    expect(out.map((x) => x.horse_id)).toEqual(['a', 'b', 'c']);
+  });
+
+  it('places crashed horses after non-crashed', () => {
+    const out = filterAndSortHorses([
+      h('a', 'Alpha', '2026-04-22T09:00:00Z', true),
+      h('b', 'Bravo', '2026-04-22T09:01:00Z'),
+      h('c', 'Charlie', '2026-04-22T09:02:00Z', true),
+      h('d', 'Delta', '2026-04-22T09:03:00Z'),
+    ]);
+    expect(out.map((x) => x.horse_id)).toEqual(['b', 'd', 'a', 'c']);
+  });
+
+  it('drops a crashed horse when a live horse shares its name', () => {
+    const out = filterAndSortHorses([
+      h('old', 'Alpha', '2026-04-22T09:00:00Z', true),
+      h('new', 'Alpha', '2026-04-22T09:10:00Z'),
+    ]);
+    expect(out.map((x) => x.horse_id)).toEqual(['new']);
+  });
+
+  it('keeps a crashed horse whose name is unique', () => {
+    const out = filterAndSortHorses([
+      h('a', 'Alpha', '2026-04-22T09:00:00Z', true),
+      h('b', 'Bravo', '2026-04-22T09:01:00Z'),
+    ]);
+    expect(out.map((x) => x.horse_id)).toEqual(['b', 'a']);
   });
 });

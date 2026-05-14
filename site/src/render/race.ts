@@ -6,6 +6,7 @@ import { updatePendingBanner, removePendingBanner } from './pending.js';
 import { renderFinishedOverlay } from './finished.js';
 import { formatDuration } from '../time.js';
 import { appendSample, trimWindow, computePace, type Sample } from './pace.js';
+import { startAutoScroll } from './autoscroll.js';
 
 const POLL_INTERVAL_MS = 3_000;
 
@@ -40,6 +41,7 @@ export function renderRace(root: HTMLElement, joinCode: string): () => void {
 
   const ctrl = new AbortController();
   const buffers = new Map<string, Sample[]>();
+  startAutoScroll({ signal: ctrl.signal });
 
   const onSnapshot = (race: GetRaceResponse) => {
     const now = new Date();

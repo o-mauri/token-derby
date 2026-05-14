@@ -118,7 +118,6 @@ html, body {
   height: var(--horse-height);
   background: var(--lane);
   border-radius: 4px;
-  overflow: hidden;
 }
 .lane:nth-child(even) { background: var(--lane-alt); }
 .lane::after {
@@ -139,6 +138,7 @@ html, body {
   transition: left 3s linear;
   width: calc(var(--sprite-scale) * 32px);
   height: calc(var(--sprite-scale) * 24px);
+  z-index: 1;
 }
 .horse-sprite { width: 100%; height: 100%; display: block; }
 .horse-label,
@@ -356,3 +356,62 @@ html, body {
 }
 .error h2 { color: #ff6b6b; margin: 0; }
 .error a { color: var(--accent); }
+
+/* ── Ultrawide / TV (21:9+, ≥1920px) ──────────────── */
+
+@media (min-aspect-ratio: 2/1) and (min-width: 1920px) {
+  :root {
+    --sprite-scale: 3;
+    --horse-height: 170px;
+    --track-gap: 6px;
+  }
+
+  html { font-size: 18px; }
+
+  /* Header */
+  .race-header { padding: 28px 64px; }
+  .race-header h1 { font-size: 2rem; }
+  .race-header .meta { gap: 40px; font-size: 1.15rem; }
+
+  /* Track sits inside the TV safe zone */
+  .track { padding: 24px 64px; }
+
+  /* Hide raw token count on TV — pace tells the story, reduces clutter from distance */
+  .horse-tokens { display: none; }
+
+  /* Name chip — bigger, more readable */
+  .horse-label {
+    top: calc(100% + 6px);
+    font-size: 1rem;
+    padding: 4px 12px;
+    letter-spacing: 0.06em;
+  }
+  /* Pace stacked below name */
+  .horse-pace {
+    top: calc(100% + 38px);
+    font-size: 1.05rem;
+  }
+
+  /* Pending / finished extras */
+  .pending-banner { padding: 24px; font-size: 1.75rem; }
+
+  /* Home page hero scales up for TV viewing */
+  .home { gap: 48px; padding: 48px; }
+  .home p { font-size: 1.35rem; max-width: 50ch; }
+  .home input {
+    font-size: 1.5rem;
+    width: 240px;
+    padding: 14px 20px;
+  }
+  .home button { font-size: 1.25rem; padding: 14px 28px; }
+
+  .btn { font-size: 1.1rem; padding: 12px 24px; }
+
+  /* Podium */
+  .podium { gap: 32px; }
+  .podium h2 { font-size: 2.5rem; }
+  .podium li { padding: 24px; gap: 12px; }
+  .podium .place { font-size: 2.5rem; }
+  .podium .name { font-size: 1.25rem; }
+  .podium .tokens { font-size: 1.1rem; }
+}
