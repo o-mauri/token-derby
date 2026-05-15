@@ -133,7 +133,7 @@ html, body {
 }
 .horse {
   position: absolute;
-  top: 50%;
+  top: 30%;
   transform: translate(-50%, -50%);
   transition: left 3s linear;
   width: calc(var(--sprite-scale) * 32px);
