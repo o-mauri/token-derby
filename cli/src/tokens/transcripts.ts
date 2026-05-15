@@ -17,10 +17,16 @@ export async function sumTokens(): Promise<TokenTotals> {
   return { input, output };
 }
 
-/** @deprecated Use sumTokens() instead */
 export async function sumOutputTokens(): Promise<number> {
   const { input, output } = await sumTokens();
-  return input + output;
+  return countInputTokens() ? input + output : output;
+}
+
+function countInputTokens(): boolean {
+  const v = process.env.TOKEN_DERBY_COUNT_INPUT_TOKENS;
+  if (!v) return false;
+  const s = v.toLowerCase();
+  return s === '1' || s === 'true' || s === 'yes' || s === 'on';
 }
 
 async function listJsonlFiles(root: string): Promise<string[]> {

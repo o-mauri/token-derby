@@ -1,4 +1,4 @@
-import { GetCommand, QueryCommand, TransactWriteCommand } from '@aws-sdk/lib-dynamodb';
+import { GetCommand, QueryCommand, TransactWriteCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { ddb, TABLE } from './client.js';
 import {
   stableHorseKey,
@@ -141,4 +141,28 @@ export async function deleteStableHorse(user_id: string, horse: StableHorse): Pr
       },
     ],
   }));
+}
+
+/**
+ * Atomically add XP to a stable horse. If the horse has been deleted, the
+ * conditional check fails and the call is a no-op (XP is forfeit).
+ */
+export async function awardHorseXp(
+  user_id: string,
+  stable_horse_id: string,
+  delta: number,
+): Promise<void> {
+  if (delta <= 0) return;
+  try {
+    await ddb.send(new UpdateCommand({
+      TableName: TABLE,
+      Key: stableHorseKey(user_id, stable_horse_id),
+      UpdateExpression: 'ADD xp :d',
+      ConditionExpression: 'attribute_exists(pk)',
+      ExpressionAttributeValues: { ':d': delta },
+    }));
+  } catch (e: any) {
+    if (e?.name === 'ConditionalCheckFailedException') return;
+    throw e;
+  }
 }

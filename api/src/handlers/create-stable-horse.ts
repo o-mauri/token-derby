@@ -29,6 +29,7 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
     name,
     colors: { body: c.body, mane: c.mane, tail: c.tail, saddle: c.saddle },
     created_at: new Date().toISOString(),
+    xp: 0,
   };
   try {
     await putStableHorse(auth.user_id, horse);

@@ -42,18 +42,20 @@ describe('stable handlers', () => {
     expect(JSON.parse(res.body).horses).toEqual([]);
   });
 
-  it('create + list round-trips', async () => {
+  it('create + list round-trips, new horses start at xp = 0', async () => {
     const user = await makeUser('StableCreate');
     const created: any = await createStableHorse(authedEvent(user, 'POST', '/jockey/me/horses', { name: 'Gary', colors: COLORS }));
     expect(created.statusCode).toBe(200);
     const horse = JSON.parse(created.body);
     expect(horse.stable_horse_id).toBeTruthy();
     expect(horse.name).toBe('Gary');
+    expect(horse.xp).toBe(0);
 
     const listed: any = await listStable(authedEvent(user, 'GET', '/jockey/me/horses'));
     const horses = JSON.parse(listed.body).horses;
     expect(horses).toHaveLength(1);
     expect(horses[0].stable_horse_id).toBe(horse.stable_horse_id);
+    expect(horses[0].xp).toBe(0);
   });
 
   it('rejects duplicate horse names within the same user', async () => {

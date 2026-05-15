@@ -74,6 +74,7 @@ describe('joinRace handler', () => {
     expect(horses[0]?.user_name).toBe('JR_Joiner1');
     expect(horses[0]?.stable_horse_id).toBe(horse.stable_horse_id);
     expect(horses[0]?.colors).toEqual(COLORS);
+    expect(horses[0]?.xp).toBe(0);
   });
 
   it('returns STABLE_HORSE_NOT_FOUND for unknown stable_horse_id', async () => {

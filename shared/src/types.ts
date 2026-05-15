@@ -16,6 +16,8 @@ export type Horse = {
   final_tokens?: number;
   user_id: string;
   user_name: string;
+  xp: number;
+  xp_awarded?: number;
 };
 
 export type RaceStatus = 'pending' | 'live' | 'finished';
@@ -79,4 +81,5 @@ export type StableHorse = {
   name: string;
   colors: HorseColors;
   created_at: string;
+  xp: number;
 };

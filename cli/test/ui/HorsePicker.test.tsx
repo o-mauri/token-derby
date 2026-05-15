@@ -8,9 +8,9 @@ import type { StableHorse } from '@token-derby/shared';
 function tick() { return new Promise<void>(resolve => setTimeout(resolve, 0)); }
 
 const stable: StableHorse[] = [
-  { stable_horse_id: '00000000-0000-0000-0000-00000000000a', name: 'Gary', colors: { body: '#8B4513', mane: '#000', tail: '#000', saddle: '#C0392B' }, created_at: '2026-01-01T00:00:00Z' },
-  { stable_horse_id: '00000000-0000-0000-0000-00000000000b', name: 'Pony', colors: { body: '#FFFFFF', mane: '#000', tail: '#000', saddle: '#1B4F72' }, created_at: '2026-01-02T00:00:00Z' },
-  { stable_horse_id: '00000000-0000-0000-0000-00000000000c', name: 'Dash', colors: { body: '#CD853F', mane: '#FFD700', tail: '#FFD700', saddle: '#196F3D' }, created_at: '2026-01-03T00:00:00Z' },
+  { stable_horse_id: '00000000-0000-0000-0000-00000000000a', name: 'Gary', colors: { body: '#8B4513', mane: '#000', tail: '#000', saddle: '#C0392B' }, created_at: '2026-01-01T00:00:00Z', xp: 0 },
+  { stable_horse_id: '00000000-0000-0000-0000-00000000000b', name: 'Pony', colors: { body: '#FFFFFF', mane: '#000', tail: '#000', saddle: '#1B4F72' }, created_at: '2026-01-02T00:00:00Z', xp: 150 },
+  { stable_horse_id: '00000000-0000-0000-0000-00000000000c', name: 'Dash', colors: { body: '#CD853F', mane: '#FFD700', tail: '#FFD700', saddle: '#196F3D' }, created_at: '2026-01-03T00:00:00Z', xp: 1500 },
 ];
 
 describe('HorsePicker', () => {
@@ -50,6 +50,16 @@ describe('HorsePicker', () => {
     stdin.write('\x1B');
     await tick();
     expect(onCancel).toHaveBeenCalledOnce();
+  });
+
+  it('renders level chip next to each horse name (derived from xp)', async () => {
+    const { lastFrame } = render(<HorsePicker horses={stable} onPick={() => {}} onCancel={() => {}} />);
+    await tick();
+    const frame = lastFrame() ?? '';
+    // Gary has 0 XP → Lvl. 1; Pony has 150 → Lvl. 2 (≥ 50); Dash has 1500 → Lvl. 6 (≥ 1040)
+    expect(frame).toMatch(/Gary\s+\[Lvl\. 1\]/);
+    expect(frame).toMatch(/Pony\s+\[Lvl\. 2\]/);
+    expect(frame).toMatch(/Dash\s+\[Lvl\. 6\]/);
   });
 
   it('renders empty-state message when stable is empty', async () => {

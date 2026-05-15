@@ -3,6 +3,7 @@ import { Box, Text, useInput } from 'ink';
 import { HorseSprite } from './HorseSprite.js';
 import { MINI_SPRITE } from './sprite.js';
 import type { StableHorse } from '@token-derby/shared';
+import { levelFromXp } from '@token-derby/shared';
 
 type Props = {
   horses: StableHorse[];
@@ -36,7 +37,7 @@ export function HorsePicker({ horses, onPick, onCancel }: Props) {
       {horses.map((h, i) => (
         <Box key={h.stable_horse_id} flexDirection="column">
           <Box flexDirection="row">
-            <Text>{i === idx ? '►' : ' '} {h.name}</Text>
+            <Text>{i === idx ? '►' : ' '} {h.name} <Text color="cyan">[Lvl. {levelFromXp(h.xp)}]</Text></Text>
           </Box>
           <Box flexDirection="row">
             <Text>  </Text>

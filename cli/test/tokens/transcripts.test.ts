@@ -13,6 +13,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   delete process.env.TOKEN_DERBY_CLAUDE_DIR;
+  delete process.env.TOKEN_DERBY_COUNT_INPUT_TOKENS;
   await fs.rm(tmp, { recursive: true, force: true });
 });
 
@@ -55,14 +56,23 @@ describe('sumOutputTokens', () => {
     expect(await sumOutputTokens()).toBe(350);
   });
 
-  it('skips lines without message.usage and sums input + output from those that have it', async () => {
+  it('skips lines without message.usage and sums output only by default', async () => {
     await writeJsonl('p/s.jsonl', [
       { type: 'system' },
       { type: 'assistant', message: { content: 'x' } },
       { type: 'assistant', message: { usage: { input_tokens: 100 } } },
       { type: 'assistant', message: { usage: { output_tokens: 42 } } },
     ]);
-    expect(await sumOutputTokens()).toBe(142);
+    expect(await sumOutputTokens()).toBe(42);
+  });
+
+  it('includes input tokens when TOKEN_DERBY_COUNT_INPUT_TOKENS is set', async () => {
+    process.env.TOKEN_DERBY_COUNT_INPUT_TOKENS = '1';
+    await writeJsonl('p/s.jsonl', [
+      { type: 'assistant', message: { usage: { input_tokens: 100, cache_creation_input_tokens: 5, cache_read_input_tokens: 3 } } },
+      { type: 'assistant', message: { usage: { output_tokens: 42 } } },
+    ]);
+    expect(await sumOutputTokens()).toBe(150);
   });
 
   it('tolerates malformed JSON lines (logs nothing, continues)', async () => {

@@ -1,6 +1,7 @@
 import React from 'react';
 import { render, Box, Text } from 'ink';
 import type { StableHorse } from '@token-derby/shared';
+import { levelFromXp } from '@token-derby/shared';
 import { listStable } from '../api/endpoints.js';
 import { ApiError } from '../api/client.js';
 import { HorseSprite } from '../ui/HorseSprite.js';
@@ -40,7 +41,7 @@ function StableList({ horses }: { horses: StableHorse[] }) {
       {horses.map(h => (
         <Box key={h.stable_horse_id} flexDirection="row" marginTop={1}>
           <HorseSprite sprite={MINI_SPRITE} colors={h.colors} />
-          <Text>  {h.name}</Text>
+          <Text>  {h.name} <Text color="cyan">[Lvl. {levelFromXp(h.xp)}]</Text></Text>
         </Box>
       ))}
     </Box>

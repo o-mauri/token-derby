@@ -29,6 +29,7 @@ function horse(id: string, tokens: number, name: string, joined: string, extras:
     rank: 1,
     user_id: `user-${id}`,
     user_name: `User ${id.toUpperCase()}`,
+    xp: 0,
     ...extras,
   };
 }
@@ -86,6 +87,17 @@ describe('reconcileHorses', () => {
     reconcileHorses(track, r, new Date('2026-04-22T13:00:00Z'));
     expect(track.querySelector('.lane-name')).toBeNull();
     expect(track.querySelector('.horse-label')?.textContent).toBe('Alpha');
+  });
+
+  it('renders a level chip derived from horse.xp', () => {
+    const r = race({ horses: [
+      horse('a', 500, 'Alpha', '2026-04-22T09:00:00Z', { xp: 0 }),
+      horse('b', 500, 'Bravo', '2026-04-22T09:01:00Z', { xp: 1500 }),
+    ] });
+    reconcileHorses(track, r, new Date('2026-04-22T13:00:00Z'));
+    const chips = Array.from(track.querySelectorAll('.horse-level')).map(el => el.textContent);
+    // Alpha at 0 xp → Lvl. 1; Bravo at 1500 → Lvl. 6 (threshold for Lvl 6 is 1040)
+    expect(chips).toEqual(['Lvl. 1', 'Lvl. 6']);
   });
 
   it('renders the user_name in a .user-label under the horse name', () => {

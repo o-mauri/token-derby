@@ -1,5 +1,6 @@
 import React from 'react';
 import { render } from 'ink';
+import { levelFromXp } from '@token-derby/shared';
 import { HorseCreator } from '../ui/HorseCreator.js';
 import { listStable, updateStableHorse } from '../api/endpoints.js';
 import { ApiError } from '../api/client.js';
@@ -24,6 +25,7 @@ export async function stableEditCommand(name: string | undefined): Promise<numbe
       initialColors: existing.colors,
       initialName: existing.name,
       lockName: true,
+      initialLevel: levelFromXp(existing.xp),
       onSubmit: async (_name, colors) => {
         try {
           await updateStableHorse(existing.stable_horse_id, { colors });

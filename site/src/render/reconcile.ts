@@ -1,4 +1,5 @@
 import type { GetRaceResponse, HorseView } from '@token-derby/shared';
+import { levelFromXp } from '@token-derby/shared';
 import { elapsedPct, horseXPct } from '../position.js';
 import { buildHorseSvg } from '../sprite-svg.js';
 
@@ -60,6 +61,11 @@ function createLane(doc: Document, horse: HorseView): HTMLElement {
   nameLabel.className = 'horse-label';
   nameLabel.textContent = horse.name;
   info.appendChild(nameLabel);
+
+  const levelChip = doc.createElement('span');
+  levelChip.className = 'horse-level';
+  levelChip.textContent = `Lvl. ${levelFromXp(horse.xp)}`;
+  info.appendChild(levelChip);
 
   if (horse.user_name) {
     const userLabel = doc.createElement('span');

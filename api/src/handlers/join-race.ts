@@ -104,6 +104,7 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
       joined_at: now,
       user_id: auth.user_id,
       user_name: auth.display_name,
+      xp: stable_horse.xp,
     },
     heartbeat_token,
   );
