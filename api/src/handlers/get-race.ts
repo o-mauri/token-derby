@@ -1,28 +1,29 @@
 import type { APIGatewayProxyHandlerV2 } from 'aws-lambda';
 import type { GetRaceResponse, Horse, HorseView, RaceStatus } from '@token-derby/shared';
-import { getRaceByJoinCode, setRaceEnded } from '../db/races.js';
+import { getRaceByJoinCode } from '../db/races.js';
 import { listHorses } from '../db/horses.js';
 import { computeStatus, timeLeftSeconds } from '../lib/status.js';
+import { finaliseRace } from '../lib/finalise-race.js';
 import { ok, err } from '../lib/http.js';
 
 export const handler: APIGatewayProxyHandlerV2 = async (event) => {
   const join_code = event.pathParameters?.join_code;
   if (!join_code) return err('BAD_REQUEST', 'join_code required');
 
-  const race = await getRaceByJoinCode(join_code);
+  let race = await getRaceByJoinCode(join_code);
   if (!race) return err('RACE_NOT_FOUND', `No race with join code ${join_code}`);
 
   const now = new Date();
-  let status: RaceStatus = computeStatus(race, now);
+  const status: RaceStatus = computeStatus(race, now);
 
+  let horses: Horse[];
   if (status === 'finished' && !race.ended_at) {
-    const iso = now.toISOString();
-    await setRaceEnded(race.race_id, iso);
-    race.ended_at = iso;
+    const result = await finaliseRace(race, now);
+    race = result.race;
+    horses = result.horses;
+  } else {
+    horses = await listHorses(race.race_id);
   }
-
-  const horses = await listHorses(race.race_id);
-  const ranked = rankHorses(horses);
 
   const response: GetRaceResponse = {
     race_id: race.race_id,
@@ -35,7 +36,7 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
     created_at: race.created_at,
     ended_at: race.ended_at,
     status,
-    horses: ranked,
+    horses: rankHorses(horses),
     server_time: now.toISOString(),
     time_left_seconds: timeLeftSeconds(race, now),
   };

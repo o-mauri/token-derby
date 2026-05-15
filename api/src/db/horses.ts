@@ -50,12 +50,17 @@ export async function setHorseFinalTokens(
   horse_id: string,
   final_tokens: number,
 ): Promise<void> {
-  await ddb.send(new UpdateCommand({
-    TableName: TABLE,
-    Key: horseKey(race_id, horse_id),
-    UpdateExpression: 'SET final_tokens = :f',
-    ExpressionAttributeValues: { ':f': final_tokens },
-  }));
+  try {
+    await ddb.send(new UpdateCommand({
+      TableName: TABLE,
+      Key: horseKey(race_id, horse_id),
+      UpdateExpression: 'SET final_tokens = :f',
+      ConditionExpression: 'attribute_not_exists(final_tokens)',
+      ExpressionAttributeValues: { ':f': final_tokens },
+    }));
+  } catch (e: any) {
+    if (e?.name !== 'ConditionalCheckFailedException') throw e;
+  }
 }
 
 export type HorseHeartbeatRecord = {

@@ -57,6 +57,28 @@ export async function setRaceEnded(race_id: string, ended_at: string): Promise<v
   }));
 }
 
+// Conditional finalisation lock — only the first caller persists ended_at and
+// wins the right to do downstream side-effects (final_tokens, future gold).
+// Returns the persisted ended_at: either the value we just wrote, or the value
+// the winning caller wrote if we lost the race.
+export async function setRaceEndedIfAbsent(race_id: string, ended_at: string): Promise<string> {
+  try {
+    const res = await ddb.send(new UpdateCommand({
+      TableName: TABLE,
+      Key: raceMetaKey(race_id),
+      UpdateExpression: 'SET ended_at = :e',
+      ConditionExpression: 'attribute_not_exists(ended_at)',
+      ExpressionAttributeValues: { ':e': ended_at },
+      ReturnValues: 'ALL_NEW',
+    }));
+    return String(res.Attributes?.ended_at ?? ended_at);
+  } catch (e: any) {
+    if (e?.name !== 'ConditionalCheckFailedException') throw e;
+    const existing = await getRaceById(race_id);
+    return existing?.ended_at ?? ended_at;
+  }
+}
+
 function pickRace(item: Record<string, any>): Race {
   const { pk: _pk, sk: _sk, admin_code: _admin, ...rest } = item;
   return rest as Race;
