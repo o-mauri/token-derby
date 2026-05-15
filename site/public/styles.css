@@ -116,10 +116,10 @@ html, body {
 .lane {
   position: relative;
   height: var(--horse-height);
-  background: var(--lane);
+  background: var(--lane) url('img/track-1.png') repeat-x center / auto 100%;
+  image-rendering: pixelated;
   border-radius: 4px;
 }
-.lane:nth-child(even) { background: var(--lane-alt); }
 .lane::after {
   content: "";
   position: absolute;
