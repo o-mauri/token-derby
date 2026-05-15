@@ -53,26 +53,30 @@ function createLane(doc: Document, horse: HorseView): HTMLElement {
   wrap.style.setProperty('--tail', horse.colors.tail);
   wrap.style.setProperty('--saddle', horse.colors.saddle);
 
+  const info = doc.createElement('div');
+  info.className = 'horse-info';
+
   const nameLabel = doc.createElement('span');
   nameLabel.className = 'horse-label';
   nameLabel.textContent = horse.name;
-  wrap.appendChild(nameLabel);
+  info.appendChild(nameLabel);
 
   if (horse.user_name) {
     const userLabel = doc.createElement('span');
     userLabel.className = 'user-label';
     userLabel.textContent = `(${horse.user_name})`;
-    wrap.appendChild(userLabel);
+    info.appendChild(userLabel);
   }
 
   const tokens = doc.createElement('span');
   tokens.className = 'horse-tokens';
-  wrap.appendChild(tokens);
+  info.appendChild(tokens);
 
   const pace = doc.createElement('span');
   pace.className = 'horse-pace';
-  wrap.appendChild(pace);
+  info.appendChild(pace);
 
+  wrap.appendChild(info);
   wrap.appendChild(buildHorseSvg(doc));
   lane.appendChild(wrap);
   return lane;
@@ -90,6 +94,8 @@ function updateLane(
   wrap.style.left = `${x}%`;
   wrap.classList.toggle('live', pct > 0 && pct < 1);
   wrap.classList.toggle('pending', pct === 0);
+  wrap.classList.toggle('info-front', x < 25);
+  wrap.classList.toggle('info-back', x >= 25);
 
   const tokensEl = wrap.querySelector<HTMLElement>('.horse-tokens')!;
   tokensEl.textContent = `${tokenFmt.format(horse.current_tokens)} tok`;
