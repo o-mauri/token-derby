@@ -1,6 +1,6 @@
 import { apiBase } from '../config.js';
 import { CLI_VERSION } from '../version.js';
-import { CLI_VERSION_HEADER, USER_ID_HEADER, USER_NAME_HEADER } from '@token-derby/shared';
+import { CLI_VERSION_HEADER, USER_ID_HEADER, USER_TOKEN_HEADER } from '@token-derby/shared';
 import { loadIdentity, type Identity } from '../identity/identity.js';
 
 export type ApiErrorCode =
@@ -13,6 +13,12 @@ export type ApiErrorCode =
   | 'VERSION_MISMATCH'
   | 'IDENTITY_REQUIRED'
   | 'DUPLICATE_HORSE'
+  | 'ORG_NAME_TAKEN'
+  | 'ORG_NOT_FOUND'
+  | 'NOT_ORG_MEMBER'
+  | 'UNAUTHENTICATED'
+  | 'STABLE_HORSE_NOT_FOUND'
+  | 'STABLE_HORSE_NAME_TAKEN'
   | 'NETWORK_ERROR';
 
 export class ApiError extends Error {
@@ -43,18 +49,19 @@ export async function request<T>(
   method: string,
   path: string,
   body: unknown,
-  authToken: string | undefined,
+  horseAuthToken: string | undefined,
   fetchImpl: FetchFn = fetch,
 ): Promise<T> {
   const url = path.startsWith('http') ? path : `${apiBase()}${path}`;
   const headers: Record<string, string> = {};
   headers[CLI_VERSION_HEADER] = CLI_VERSION;
+  headers['user-agent'] = `token-derby/${CLI_VERSION}`;
   const identity = await getIdentity();
   if (identity) {
     headers[USER_ID_HEADER] = identity.user_id;
-    headers[USER_NAME_HEADER] = identity.display_name;
+    headers[USER_TOKEN_HEADER] = identity.secret_token;
   }
-  if (authToken) headers['authorization'] = `Bearer ${authToken}`;
+  if (horseAuthToken) headers['authorization'] = `Bearer ${horseAuthToken}`;
   if (body !== undefined) headers['content-type'] = 'application/json';
 
   let res: Awaited<ReturnType<FetchFn>>;

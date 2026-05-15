@@ -5,7 +5,7 @@ import * as path from 'node:path';
 import {
   loadIdentity,
   saveIdentity,
-  generateUserId,
+  deleteIdentity,
   validateDisplayName,
   type Identity,
 } from '../../src/identity/identity.js';
@@ -28,10 +28,11 @@ describe('identity', () => {
     expect(id).toBeNull();
   });
 
-  it('saveIdentity then loadIdentity round-trips', async () => {
+  it('saveIdentity then loadIdentity round-trips, including secret_token', async () => {
     const id: Identity = {
       user_id: '550e8400-e29b-41d4-a716-446655440000',
       display_name: 'Alice',
+      secret_token: 'abc123_secret_token_xyz',
       created_at: '2026-05-14T10:00:00Z',
     };
     await saveIdentity(id);
@@ -49,9 +50,28 @@ describe('identity', () => {
     expect(await loadIdentity()).toBeNull();
   });
 
-  it('generateUserId returns a v4-shaped UUID', () => {
-    const id = generateUserId();
-    expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+  it('loadIdentity rejects files missing secret_token', async () => {
+    await fs.writeFile(path.join(tmp, 'identity.json'), JSON.stringify({
+      user_id: '550e8400-e29b-41d4-a716-446655440000',
+      display_name: 'Alice',
+      created_at: '2026-05-14T10:00:00Z',
+    }), 'utf8');
+    expect(await loadIdentity()).toBeNull();
+  });
+
+  it('deleteIdentity removes the file', async () => {
+    await saveIdentity({
+      user_id: '550e8400-e29b-41d4-a716-446655440000',
+      display_name: 'Alice',
+      secret_token: 'secret',
+      created_at: '2026-05-14T10:00:00Z',
+    });
+    await deleteIdentity();
+    expect(await loadIdentity()).toBeNull();
+  });
+
+  it('deleteIdentity is a no-op when no file exists', async () => {
+    await expect(deleteIdentity()).resolves.toBeUndefined();
   });
 });
 

@@ -24,6 +24,9 @@ beforeAll(async () => {
       { AttributeName: 'sk', AttributeType: 'S' },
       { AttributeName: 'join_code', AttributeType: 'S' },
       { AttributeName: 'admin_code', AttributeType: 'S' },
+      { AttributeName: 'org_name', AttributeType: 'S' },
+      { AttributeName: 'org_join_token', AttributeType: 'S' },
+      { AttributeName: 'member_user_id', AttributeType: 'S' },
     ],
     KeySchema: [
       { AttributeName: 'pk', KeyType: 'HASH' },
@@ -38,6 +41,21 @@ beforeAll(async () => {
       {
         IndexName: 'AdminCodeIndex',
         KeySchema: [{ AttributeName: 'admin_code', KeyType: 'HASH' }],
+        Projection: { ProjectionType: 'ALL' },
+      },
+      {
+        IndexName: 'OrgNameIndex',
+        KeySchema: [{ AttributeName: 'org_name', KeyType: 'HASH' }],
+        Projection: { ProjectionType: 'ALL' },
+      },
+      {
+        IndexName: 'OrgJoinTokenIndex',
+        KeySchema: [{ AttributeName: 'org_join_token', KeyType: 'HASH' }],
+        Projection: { ProjectionType: 'ALL' },
+      },
+      {
+        IndexName: 'OrgMembershipIndex',
+        KeySchema: [{ AttributeName: 'member_user_id', KeyType: 'HASH' }],
         Projection: { ProjectionType: 'ALL' },
       },
     ],

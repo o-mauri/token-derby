@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { HorseSprite } from './HorseSprite.js';
 import { MINI_SPRITE } from './sprite.js';
-import type { StableHorse } from '../stable/stable.js';
+import type { StableHorse } from '@token-derby/shared';
 
 type Props = {
   horses: StableHorse[];
@@ -34,7 +34,7 @@ export function HorsePicker({ horses, onPick, onCancel }: Props) {
     <Box flexDirection="column">
       <Text>Pick a horse to race:</Text>
       {horses.map((h, i) => (
-        <Box key={h.name} flexDirection="column">
+        <Box key={h.stable_horse_id} flexDirection="column">
           <Box flexDirection="row">
             <Text>{i === idx ? '►' : ' '} {h.name}</Text>
           </Box>

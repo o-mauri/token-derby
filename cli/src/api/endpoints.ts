@@ -2,6 +2,13 @@ import type {
   CreateRaceRequest, CreateRaceResponse,
   GetRaceResponse, JoinRaceRequest, JoinRaceResponse,
   HeartbeatRequest, HeartbeatResponse, EndRaceResponse,
+  CreateOrganisationRequest, CreateOrganisationResponse,
+  JoinOrganisationRequest, JoinOrganisationResponse,
+  ListOrganisationsResponse, GetOrganisationResponse,
+  InitJockeyRequest, InitJockeyResponse,
+  GetJockeyResponse, UpdateJockeyRequest, UpdateJockeyResponse,
+  ListStableResponse, CreateStableHorseRequest, CreateStableHorseResponse,
+  UpdateStableHorseRequest, UpdateStableHorseResponse, DeleteStableHorseResponse,
 } from '@token-derby/shared';
 import { request } from './client.js';
 
@@ -28,4 +35,58 @@ export function heartbeat(joinCode: string, horseId: string, token: string, body
 
 export function endRace(adminCode: string) {
   return request<EndRaceResponse>('DELETE', `/races/admin/${encodeURIComponent(adminCode)}`, undefined, undefined);
+}
+
+export function createOrganisation(body: CreateOrganisationRequest) {
+  return request<CreateOrganisationResponse>('POST', '/organisations', body, undefined);
+}
+
+export function joinOrganisation(body: JoinOrganisationRequest) {
+  return request<JoinOrganisationResponse>('POST', '/organisations/join', body, undefined);
+}
+
+export function listOrganisations() {
+  return request<ListOrganisationsResponse>('GET', '/organisations', undefined, undefined);
+}
+
+export function getOrganisation(name: string) {
+  return request<GetOrganisationResponse>('GET', `/organisations/${encodeURIComponent(name)}`, undefined, undefined);
+}
+
+export function initJockey(body: InitJockeyRequest) {
+  return request<InitJockeyResponse>('POST', '/jockey/init', body, undefined);
+}
+
+export function getJockey() {
+  return request<GetJockeyResponse>('GET', '/jockey/me', undefined, undefined);
+}
+
+export function updateJockey(body: UpdateJockeyRequest) {
+  return request<UpdateJockeyResponse>('PUT', '/jockey/me', body, undefined);
+}
+
+export function listStable() {
+  return request<ListStableResponse>('GET', '/jockey/me/horses', undefined, undefined);
+}
+
+export function createStableHorse(body: CreateStableHorseRequest) {
+  return request<CreateStableHorseResponse>('POST', '/jockey/me/horses', body, undefined);
+}
+
+export function updateStableHorse(stableHorseId: string, body: UpdateStableHorseRequest) {
+  return request<UpdateStableHorseResponse>(
+    'PUT',
+    `/jockey/me/horses/${encodeURIComponent(stableHorseId)}`,
+    body,
+    undefined,
+  );
+}
+
+export function deleteStableHorse(stableHorseId: string) {
+  return request<DeleteStableHorseResponse>(
+    'DELETE',
+    `/jockey/me/horses/${encodeURIComponent(stableHorseId)}`,
+    undefined,
+    undefined,
+  );
 }

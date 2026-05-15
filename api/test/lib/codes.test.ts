@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { generateJoinCode, generateRaceId, generateHorseId, generateAdminCode, generateHeartbeatToken } from '../../src/lib/codes.js';
+import { generateJoinCode, generateRaceId, generateHorseId, generateAdminCode, generateHeartbeatToken, generateOrgId, generateOrgJoinToken } from '../../src/lib/codes.js';
 import { JOIN_CODE_ALPHABET, JOIN_CODE_LENGTH } from '@token-derby/shared';
 
 describe('codes', () => {
@@ -22,5 +22,7 @@ describe('codes', () => {
     expect(generateHorseId()).toMatch(uuid);
     expect(generateAdminCode()).toMatch(uuid);
     expect(generateHeartbeatToken()).toMatch(uuid);
+    expect(generateOrgId()).toMatch(uuid);
+    expect(generateOrgJoinToken()).toMatch(uuid);
   });
 });

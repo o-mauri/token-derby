@@ -1,14 +1,12 @@
 import React from 'react';
 import { render } from 'ink';
-import type { HorseColors, HorseView } from '@token-derby/shared';
-import { loadStable } from '../stable/stable.js';
+import type { HorseColors, StableHorse } from '@token-derby/shared';
 import { HorsePicker } from '../ui/HorsePicker.js';
-import { joinRace, getRace } from '../api/endpoints.js';
+import { joinRace, getRace, listStable } from '../api/endpoints.js';
 import { ApiError } from '../api/client.js';
 import { saveActiveRace, loadActiveRace, type ActiveRace } from '../stable/active-race.js';
 import { RunRace, buildInitialState } from '../runtime/run-race.js';
 import { loadIdentity } from '../identity/identity.js';
-import type { StableHorse } from '../stable/stable.js';
 
 export async function joinCommand(joinCode: string | undefined): Promise<number> {
   if (!joinCode) {
@@ -55,12 +53,21 @@ export async function joinCommand(joinCode: string | undefined): Promise<number>
     chosenColors = ownHorse.colors;
     isResume = true;
   } else {
-    const stable = await loadStable();
-    if (stable.horses.length === 0) {
+    let horses: StableHorse[];
+    try {
+      horses = (await listStable()).horses;
+    } catch (e) {
+      if (e instanceof ApiError) {
+        console.error(`Error: ${e.code} ${e.message}`);
+        return 1;
+      }
+      throw e;
+    }
+    if (horses.length === 0) {
       console.error('Your stable is empty. Run `token-derby stable create` first.');
       return 1;
     }
-    const picked = await pickHorse(stable.horses);
+    const picked = await pickHorse(horses);
     if (!picked) { console.log('Cancelled.'); return 1; }
     chosenStableHorseId = picked.stable_horse_id;
     chosenName = picked.name;
@@ -70,9 +77,7 @@ export async function joinCommand(joinCode: string | undefined): Promise<number>
 
   let joinResp;
   try {
-    joinResp = await joinRace(code, {
-      horse: { stable_horse_id: chosenStableHorseId, name: chosenName, colors: chosenColors },
-    });
+    joinResp = await joinRace(code, { stable_horse_id: chosenStableHorseId });
   } catch (e) {
     if (e instanceof ApiError) {
       if (e.code === 'RACE_FULL') console.error('This race is full.');
@@ -80,7 +85,10 @@ export async function joinCommand(joinCode: string | undefined): Promise<number>
       else if (e.code === 'RACE_NOT_FOUND') console.error(`No race with join code ${code}.`);
       else if (e.code === 'VERSION_MISMATCH') console.error(e.message);
       else if (e.code === 'DUPLICATE_HORSE') console.error(e.message);
-      else if (e.code === 'IDENTITY_REQUIRED') console.error(`Error: ${e.message}`);
+      else if (e.code === 'STABLE_HORSE_NOT_FOUND') {
+        console.error('That horse no longer exists in your stable. Try again.');
+      }
+      else if (e.code === 'NOT_ORG_MEMBER') console.error(e.message);
       else console.error(`Error: ${e.code} ${e.message}`);
       return 1;
     }

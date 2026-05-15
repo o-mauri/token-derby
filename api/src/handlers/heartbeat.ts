@@ -7,7 +7,6 @@ import { computeStatus, timeLeftSeconds } from '../lib/status.js';
 import { clampHeartbeat } from '../lib/rate-cap.js';
 import { ok, err, parseJson } from '../lib/http.js';
 import { readCliVersion, meetsMinimumCliVersion, minCliVersion } from '../lib/version.js';
-import { readIdentity } from '../lib/identity.js';
 
 export const handler: APIGatewayProxyHandlerV2 = async (event) => {
   const join_code = event.pathParameters?.join_code;
@@ -22,9 +21,6 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
         `Upgrade: npm i -g @mauricode/token-derby@latest`,
     );
   }
-
-  const identity = readIdentity(event);
-  if ('error' in identity) return err('IDENTITY_REQUIRED', identity.error);
 
   const auth = event.headers?.authorization ?? event.headers?.Authorization;
   const token = auth?.startsWith('Bearer ') ? auth.slice(7) : null;

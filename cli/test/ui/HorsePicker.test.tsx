@@ -2,7 +2,7 @@ import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render } from 'ink-testing-library';
 import { HorsePicker } from '../../src/ui/HorsePicker.js';
-import type { StableHorse } from '../../src/stable/stable.js';
+import type { StableHorse } from '@token-derby/shared';
 
 // Flush React effects and state updates (effects register via setTimeout in Ink's reconciler)
 function tick() { return new Promise<void>(resolve => setTimeout(resolve, 0)); }

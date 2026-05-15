@@ -39,6 +39,8 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
     horses: rankHorses(horses),
     server_time: now.toISOString(),
     time_left_seconds: timeLeftSeconds(race, now),
+    ...(race.org_id ? { org_id: race.org_id } : {}),
+    ...(race.organisation_name ? { organisation_name: race.organisation_name } : {}),
   };
   return ok(response);
 };

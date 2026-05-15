@@ -1,15 +1,18 @@
 import React from 'react';
 import { render } from 'ink';
 import { HorseCreator } from '../ui/HorseCreator.js';
-import { upsertHorse, loadStable, findHorse } from '../stable/stable.js';
+import { listStable, updateStableHorse } from '../api/endpoints.js';
+import { ApiError } from '../api/client.js';
 
 export async function stableEditCommand(name: string | undefined): Promise<number> {
   if (!name) {
     console.error('Usage: token-derby stable edit <name>');
     return 2;
   }
-  const stable = await loadStable();
-  const existing = findHorse(stable, name);
+
+  const horses = await fetchStable();
+  if (!horses) return 1;
+  const existing = horses.find(h => h.name === name);
   if (!existing) {
     console.error(`No horse named "${name}" in your stable.`);
     return 1;
@@ -22,14 +25,19 @@ export async function stableEditCommand(name: string | undefined): Promise<numbe
       initialName: existing.name,
       lockName: true,
       onSubmit: async (_name, colors) => {
-        await upsertHorse({
-          stable_horse_id: existing.stable_horse_id,
-          name: existing.name,
-          colors,
-          created_at: existing.created_at,
-        });
-        app.unmount();
-        console.log(`✓ Updated "${existing.name}".`);
+        try {
+          await updateStableHorse(existing.stable_horse_id, { colors });
+          app.unmount();
+          console.log(`✓ Updated "${existing.name}".`);
+        } catch (e) {
+          app.unmount();
+          if (e instanceof ApiError) {
+            console.error(`Error: ${e.code} ${e.message}`);
+            exitCode = 1;
+            return;
+          }
+          throw e;
+        }
       },
       onCancel: () => {
         app.unmount();
@@ -40,4 +48,17 @@ export async function stableEditCommand(name: string | undefined): Promise<numbe
   );
   await app.waitUntilExit();
   return exitCode;
+}
+
+async function fetchStable() {
+  try {
+    const resp = await listStable();
+    return resp.horses;
+  } catch (e) {
+    if (e instanceof ApiError) {
+      console.error(`Error: ${e.code} ${e.message}`);
+      return null;
+    }
+    throw e;
+  }
 }

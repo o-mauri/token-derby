@@ -6,6 +6,10 @@ import { createRaceCommand } from './commands/create.js';
 import { joinCommand } from './commands/join.js';
 import { endCommand } from './commands/end.js';
 import { initCommand } from './commands/init.js';
+import { orgCreateCommand } from './commands/org-create.js';
+import { orgJoinCommand } from './commands/org-join.js';
+import { orgListCommand } from './commands/org-list.js';
+import { orgInfoCommand } from './commands/org-info.js';
 import { CLI_VERSION } from './version.js';
 import { loadIdentity } from './identity/identity.js';
 
@@ -13,6 +17,9 @@ const HELP = `token-derby v${CLI_VERSION}
 
 Identity:
   token-derby init                        Set up your jockey identity (run this first)
+                                          Re-running renames you on the server.
+  token-derby init --reset                Wipe local identity and create a fresh account.
+                                          Your previous stable is abandoned on the server.
 
 Stable management:
   token-derby stable create               Make a new horse (interactive)
@@ -20,8 +27,17 @@ Stable management:
   token-derby stable edit <name>          Edit an existing horse's colors
   token-derby stable delete <name>        Remove a horse from your stable
 
+Organisations:
+  token-derby organisation create         Create a new organisation (interactive)
+  token-derby organisation join <token>   Join an organisation with a join token
+  token-derby organisation info <name>    Show an org's join token (members only)
+  token-derby organisation list           Show organisations you're a member of
+
 Races:
-  token-derby create                      Create a new race (interactive)
+  token-derby create [--organisation <name>]
+                                          Create a new race (interactive). When
+                                          --organisation is set, only members of
+                                          that org can join.
   token-derby join <join-code>            Join (or resume) a race
   token-derby end <admin-code>            End a race early
 
@@ -37,7 +53,10 @@ async function main(): Promise<number> {
   if (!cmd || cmd === '--help' || cmd === '-h') { console.log(HELP); return 0; }
   if (cmd === '--version' || cmd === '-v') { console.log(CLI_VERSION); return 0; }
 
-  if (cmd === 'init') return initCommand();
+  if (cmd === 'init') {
+    const reset = argv.slice(1).includes('--reset');
+    return initCommand(reset);
+  }
 
   // Every other command requires an identity. `init` is the only escape hatch.
   const identity = await loadIdentity();
@@ -57,13 +76,36 @@ async function main(): Promise<number> {
     return 2;
   }
 
-  if (cmd === 'create') return createRaceCommand();
+  if (cmd === 'organisation' || cmd === 'org') {
+    const sub = argv[1];
+    if (sub === 'create') return orgCreateCommand();
+    if (sub === 'join')   return orgJoinCommand(argv[2]);
+    if (sub === 'info')   return orgInfoCommand(argv[2]);
+    if (sub === 'list')   return orgListCommand();
+    console.error(`Unknown organisation subcommand: ${sub ?? '(none)'}`);
+    console.error('Try: organisation create | organisation join <token> | organisation info <name> | organisation list');
+    return 2;
+  }
+
+  if (cmd === 'create') {
+    const orgName = parseFlag(argv.slice(1), '--organisation');
+    return createRaceCommand(orgName);
+  }
   if (cmd === 'join')   return joinCommand(argv[1]);
   if (cmd === 'end')    return endCommand(argv[1]);
 
   console.error(`Unknown command: ${cmd}`);
   console.error(HELP);
   return 2;
+}
+
+function parseFlag(args: string[], flag: string): string | undefined {
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === flag) return args[i + 1];
+    const eq = `${flag}=`;
+    if (args[i]?.startsWith(eq)) return args[i]!.slice(eq.length);
+  }
+  return undefined;
 }
 
 main().then(
