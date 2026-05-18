@@ -47,7 +47,12 @@ async function listJsonlFiles(root: string): Promise<string[]> {
       continue;
     }
     if (!stat.isDirectory()) continue;
-    const entries = await fs.readdir(projectDir);
+    let entries: string[];
+    try {
+      entries = await fs.readdir(projectDir);
+    } catch {
+      continue;
+    }
     for (const entry of entries) {
       if (entry.endsWith('.jsonl')) out.push(path.join(projectDir, entry));
     }

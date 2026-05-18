@@ -57,15 +57,20 @@ function createLane(doc: Document, horse: HorseView): HTMLElement {
   const info = doc.createElement('div');
   info.className = 'horse-info';
 
+  const nameRow = doc.createElement('div');
+  nameRow.className = 'horse-name-row';
+
   const nameLabel = doc.createElement('span');
   nameLabel.className = 'horse-label';
   nameLabel.textContent = horse.name;
-  info.appendChild(nameLabel);
+  nameRow.appendChild(nameLabel);
 
   const levelChip = doc.createElement('span');
   levelChip.className = 'horse-level';
-  levelChip.textContent = `Lvl. ${levelFromXp(horse.xp)}`;
-  info.appendChild(levelChip);
+  levelChip.textContent = `Lvl.${levelFromXp(horse.xp)}`;
+  nameRow.appendChild(levelChip);
+
+  info.appendChild(nameRow);
 
   if (horse.user_name) {
     const userLabel = doc.createElement('span');

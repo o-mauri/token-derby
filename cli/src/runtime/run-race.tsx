@@ -89,10 +89,14 @@ export function RunRace({ active, startingBaseline, pendingMode, ownUserName }: 
     const sampler = setInterval(async () => {
       try {
         lastTokenSampleRef.current = await sumOutputTokens();
-      } catch {/* keep last sample */}
+      } catch (e) {
+        console.error('[token-derby] token sampler failed:', e);
+      }
     }, 5_000);
     // Prime it once at startup.
-    sumOutputTokens().then(t => { lastTokenSampleRef.current = t; }).catch(() => {});
+    sumOutputTokens()
+      .then(t => { lastTokenSampleRef.current = t; })
+      .catch(e => console.error('[token-derby] token sampler prime failed:', e));
 
     const controller = ctrl.current;
     return () => {
