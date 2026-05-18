@@ -9,22 +9,42 @@ export function renderHome(root: HTMLElement): void {
       <input id="race-code" name="code" placeholder="ABC123" maxlength="6" pattern="[A-Za-z0-9]{6}" required>
       <button type="submit">Watch</button>
     </form>
+    <p class="home-divider">— or visit your organisation —</p>
+    <form id="org-form" autocomplete="off">
+      <input id="org-name" name="org" placeholder="myteam" maxlength="12" pattern="[A-Za-z0-9]{1,12}" required>
+      <button type="submit">Go</button>
+    </form>
     <p>Don't have a code? Create one with <code>token-derby create</code>.</p>
   `;
   root.appendChild(section);
 
-  const form = section.querySelector<HTMLFormElement>('#race-form')!;
-  const input = section.querySelector<HTMLInputElement>('#race-code')!;
-  form.addEventListener('submit', (e) => {
+  const raceForm = section.querySelector<HTMLFormElement>('#race-form')!;
+  const raceInput = section.querySelector<HTMLInputElement>('#race-code')!;
+  raceForm.addEventListener('submit', (e) => {
     e.preventDefault();
-    const code = input.value.trim().toUpperCase();
+    const code = raceInput.value.trim().toUpperCase();
     if (!/^[A-Z0-9]{6}$/.test(code)) {
-      input.setCustomValidity('Race codes are exactly 6 letters/digits.');
-      input.reportValidity();
+      raceInput.setCustomValidity('Race codes are exactly 6 letters/digits.');
+      raceInput.reportValidity();
       return;
     }
     window.location.assign(`/race/${code}`);
   });
-  input.addEventListener('input', () => input.setCustomValidity(''));
-  input.focus();
+  raceInput.addEventListener('input', () => raceInput.setCustomValidity(''));
+
+  const orgForm = section.querySelector<HTMLFormElement>('#org-form')!;
+  const orgInput = section.querySelector<HTMLInputElement>('#org-name')!;
+  orgForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const name = orgInput.value.trim();
+    if (!/^[A-Za-z0-9]{1,12}$/.test(name)) {
+      orgInput.setCustomValidity('Org names are 1–12 letters/digits.');
+      orgInput.reportValidity();
+      return;
+    }
+    window.location.assign(`/org/${name}`);
+  });
+  orgInput.addEventListener('input', () => orgInput.setCustomValidity(''));
+
+  raceInput.focus();
 }

@@ -1,7 +1,11 @@
 import { defineConfig } from 'tsup';
 
 export default defineConfig({
-  entry: { main: 'src/main.ts', 'preview-finished': 'src/preview-finished.ts' },
+  entry: {
+    main: 'src/main.ts',
+    'preview-finished': 'src/preview-finished.ts',
+    'preview-org': 'src/preview-org.ts',
+  },
   format: ['esm'],
   target: 'es2022',
   outDir: 'dist',

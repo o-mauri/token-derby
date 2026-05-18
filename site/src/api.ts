@@ -1,4 +1,4 @@
-import type { GetRaceResponse } from '@token-derby/shared';
+import type { GetRaceResponse, ListOrgRacesResponse } from '@token-derby/shared';
 
 export type ApiErrorCode =
   | 'RACE_NOT_FOUND'
@@ -6,7 +6,8 @@ export type ApiErrorCode =
   | 'RACE_FINISHED'
   | 'BAD_REQUEST'
   | 'RATE_LIMITED'
-  | 'NETWORK_ERROR';
+  | 'NETWORK_ERROR'
+  | 'ORG_NOT_FOUND';
 
 export class ApiError extends Error {
   constructor(
@@ -21,11 +22,7 @@ export class ApiError extends Error {
 
 type FetchFn = typeof fetch;
 
-export async function fetchRace(
-  joinCode: string,
-  fetchImpl: FetchFn = fetch,
-): Promise<GetRaceResponse> {
-  const url = `/api/races/${encodeURIComponent(joinCode)}`;
+async function getJson<T>(url: string, fetchImpl: FetchFn): Promise<T> {
   let res: Awaited<ReturnType<FetchFn>>;
   try {
     res = await fetchImpl(url);
@@ -44,5 +41,22 @@ export async function fetchRace(
     }
     throw new ApiError('NETWORK_ERROR', `HTTP ${res.status}`, res.status);
   }
-  return parsed as GetRaceResponse;
+  return parsed as T;
+}
+
+export function fetchRace(
+  joinCode: string,
+  fetchImpl: FetchFn = fetch,
+): Promise<GetRaceResponse> {
+  return getJson<GetRaceResponse>(`/api/races/${encodeURIComponent(joinCode)}`, fetchImpl);
+}
+
+export function fetchOrgRaces(
+  orgName: string,
+  fetchImpl: FetchFn = fetch,
+): Promise<ListOrgRacesResponse> {
+  return getJson<ListOrgRacesResponse>(
+    `/api/organisations/${encodeURIComponent(orgName)}/races`,
+    fetchImpl,
+  );
 }

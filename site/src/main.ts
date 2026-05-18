@@ -1,6 +1,7 @@
 import { parseRoute } from './route.js';
 import { renderHome } from './render/home.js';
 import { renderRace } from './render/race.js';
+import { renderOrg } from './render/org.js';
 
 let activeCleanup: (() => void) | null = null;
 
@@ -15,6 +16,8 @@ function route() {
     renderHome(root);
   } else if (r.type === 'race') {
     activeCleanup = renderRace(root, r.joinCode);
+  } else if (r.type === 'org') {
+    activeCleanup = renderOrg(root, r.orgName);
   } else {
     root.innerHTML = `
       <section class="error">

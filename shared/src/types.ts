@@ -43,6 +43,16 @@ export type HorseView = Horse & {
   rank: number;
 };
 
+export type RaceSummary = {
+  race_id: string;
+  name: string;
+  join_code: string;
+  start_time: string;
+  end_time: string;
+  status: RaceStatus;
+  ended_at?: string;
+};
+
 export type RaceView = Race & {
   status: RaceStatus;
   horses: HorseView[];

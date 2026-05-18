@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { fetchRace, ApiError } from '../src/api.js';
+import { fetchRace, fetchOrgRaces, ApiError } from '../src/api.js';
 
 function fakeFetch(status: number, body: unknown) {
   return vi.fn().mockResolvedValue({
@@ -37,6 +37,30 @@ describe('fetchRace', () => {
     const fetch = vi.fn().mockRejectedValue(new Error('boom'));
     await expect(fetchRace('ABC', fetch as any)).rejects.toMatchObject({
       code: 'NETWORK_ERROR',
+    });
+  });
+});
+
+describe('fetchOrgRaces', () => {
+  it('GETs /api/organisations/<name>/races and returns parsed JSON', async () => {
+    const body = { org_name: 'team', races: [] };
+    const fetch = fakeFetch(200, body);
+    const res = await fetchOrgRaces('team', fetch as any);
+    expect(res.org_name).toBe('team');
+    expect(fetch.mock.calls[0]?.[0]).toBe('/api/organisations/team/races');
+  });
+
+  it('URL-encodes the org name', async () => {
+    const fetch = fakeFetch(200, { org_name: 'team', races: [] });
+    await fetchOrgRaces('a b', fetch as any);
+    expect(fetch.mock.calls[0]?.[0]).toBe('/api/organisations/a%20b/races');
+  });
+
+  it('throws ApiError with ORG_NOT_FOUND on error envelope', async () => {
+    const fetch = fakeFetch(404, { code: 'ORG_NOT_FOUND', message: 'nope' });
+    await expect(fetchOrgRaces('nope', fetch as any)).rejects.toMatchObject({
+      code: 'ORG_NOT_FOUND',
+      status: 404,
     });
   });
 });

@@ -79,6 +79,17 @@ export async function setRaceEndedIfAbsent(race_id: string, ended_at: string): P
   }
 }
 
+export async function listRacesByOrgId(org_id: string): Promise<Race[]> {
+  const { Items = [] } = await ddb.send(new QueryCommand({
+    TableName: TABLE,
+    IndexName: 'OrgRacesIndex',
+    KeyConditionExpression: 'org_id = :o',
+    ExpressionAttributeValues: { ':o': org_id },
+    ScanIndexForward: false,
+  }));
+  return Items.map(pickRace);
+}
+
 function pickRace(item: Record<string, any>): Race {
   const { pk: _pk, sk: _sk, admin_code: _admin, ...rest } = item;
   return rest as Race;

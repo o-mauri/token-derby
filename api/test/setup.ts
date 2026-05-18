@@ -27,6 +27,8 @@ beforeAll(async () => {
       { AttributeName: 'org_name', AttributeType: 'S' },
       { AttributeName: 'org_join_token', AttributeType: 'S' },
       { AttributeName: 'member_user_id', AttributeType: 'S' },
+      { AttributeName: 'org_id', AttributeType: 'S' },
+      { AttributeName: 'start_time', AttributeType: 'S' },
     ],
     KeySchema: [
       { AttributeName: 'pk', KeyType: 'HASH' },
@@ -56,6 +58,14 @@ beforeAll(async () => {
       {
         IndexName: 'OrgMembershipIndex',
         KeySchema: [{ AttributeName: 'member_user_id', KeyType: 'HASH' }],
+        Projection: { ProjectionType: 'ALL' },
+      },
+      {
+        IndexName: 'OrgRacesIndex',
+        KeySchema: [
+          { AttributeName: 'org_id', KeyType: 'HASH' },
+          { AttributeName: 'start_time', KeyType: 'RANGE' },
+        ],
         Projection: { ProjectionType: 'ALL' },
       },
     ],

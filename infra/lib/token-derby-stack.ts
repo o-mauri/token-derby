@@ -68,6 +68,12 @@ export class TokenDerbyStack extends cdk.Stack {
       partitionKey: { name: 'member_user_id', type: dynamodb.AttributeType.STRING },
     });
 
+    table.addGlobalSecondaryIndex({
+      indexName: 'OrgRacesIndex',
+      partitionKey: { name: 'org_id', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'start_time', type: dynamodb.AttributeType.STRING },
+    });
+
     // ── Lambda factory ─────────────────────────────────────────────────
     const apiDir = path.resolve(__dirname, '..', '..', 'api', 'src', 'handlers');
     const commonEnv = { TABLE_NAME, NODE_OPTIONS: '--enable-source-maps' };
@@ -99,6 +105,7 @@ export class TokenDerbyStack extends cdk.Stack {
     const joinOrgFn = makeFn('JoinOrgFn', 'join-organisation');
     const listOrgsFn = makeFn('ListOrgsFn', 'list-organisations');
     const getOrgFn = makeFn('GetOrgFn', 'get-organisation');
+    const listOrgRacesFn = makeFn('ListOrgRacesFn', 'list-org-races');
     const initJockeyFn = makeFn('InitJockeyFn', 'init-jockey');
     const getJockeyFn = makeFn('GetJockeyFn', 'get-jockey');
     const updateJockeyFn = makeFn('UpdateJockeyFn', 'update-jockey');
@@ -126,6 +133,7 @@ export class TokenDerbyStack extends cdk.Stack {
     httpApi.addRoutes({ path: '/api/organisations', methods: [HttpMethod.GET], integration: new HttpLambdaIntegration('ListOrgsInt', listOrgsFn) });
     httpApi.addRoutes({ path: '/api/organisations/join', methods: [HttpMethod.POST], integration: new HttpLambdaIntegration('JoinOrgInt', joinOrgFn) });
     httpApi.addRoutes({ path: '/api/organisations/{org_name}', methods: [HttpMethod.GET], integration: new HttpLambdaIntegration('GetOrgInt', getOrgFn) });
+    httpApi.addRoutes({ path: '/api/organisations/{org_name}/races', methods: [HttpMethod.GET], integration: new HttpLambdaIntegration('ListOrgRacesInt', listOrgRacesFn) });
     httpApi.addRoutes({ path: '/api/jockey/init', methods: [HttpMethod.POST], integration: new HttpLambdaIntegration('InitJockeyInt', initJockeyFn) });
     httpApi.addRoutes({ path: '/api/jockey/me', methods: [HttpMethod.GET], integration: new HttpLambdaIntegration('GetJockeyInt', getJockeyFn) });
     httpApi.addRoutes({ path: '/api/jockey/me', methods: [HttpMethod.PUT], integration: new HttpLambdaIntegration('UpdateJockeyInt', updateJockeyFn) });
