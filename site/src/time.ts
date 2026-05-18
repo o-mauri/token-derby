@@ -6,6 +6,13 @@ export function formatDuration(seconds: number): string {
   return `${pad(h)}:${pad(m)}:${pad(ss)}`;
 }
 
+export type CountdownAnchor = { atMs: number; timeLeftSeconds: number };
+
+export function predictTimeLeftSeconds(anchor: CountdownAnchor, nowMs: number): number {
+  const elapsedSeconds = Math.floor((nowMs - anchor.atMs) / 1000);
+  return Math.max(0, anchor.timeLeftSeconds - elapsedSeconds);
+}
+
 export function countdownSeconds(start_time: string, now: Date): number {
   const delta = Math.floor((new Date(start_time).getTime() - now.getTime()) / 1000);
   return Math.max(0, delta);

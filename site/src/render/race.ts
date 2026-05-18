@@ -4,11 +4,12 @@ import { runPollLoop } from '../poll.js';
 import { reconcileHorses } from './reconcile.js';
 import { updatePendingBanner, removePendingBanner } from './pending.js';
 import { renderFinishedOverlay } from './finished.js';
-import { formatDuration } from '../time.js';
+import { formatDuration, predictTimeLeftSeconds, type CountdownAnchor } from '../time.js';
 import { appendSample, trimWindow, computePace, type Sample } from './pace.js';
 import { startAutoScroll } from './autoscroll.js';
 
-const POLL_INTERVAL_MS = 3_000;
+const POLL_INTERVAL_MS = 60_000;
+const TIMER_TICK_MS = 1_000;
 
 export function renderRace(root: HTMLElement, joinCode: string): () => void {
   root.innerHTML = '';
@@ -43,12 +44,21 @@ export function renderRace(root: HTMLElement, joinCode: string): () => void {
   const buffers = new Map<string, Sample[]>();
   startAutoScroll({ signal: ctrl.signal, target: track });
 
+  let countdownAnchor: CountdownAnchor | null = null;
+  const tickTimer = setInterval(() => {
+    if (countdownAnchor) {
+      timeLeftEl.textContent = formatDuration(predictTimeLeftSeconds(countdownAnchor, Date.now()));
+    }
+  }, TIMER_TICK_MS);
+  ctrl.signal.addEventListener('abort', () => clearInterval(tickTimer), { once: true });
+
   const onSnapshot = (race: GetRaceResponse) => {
     const now = new Date();
     const nowMs = now.getTime();
     nameEl.textContent = race.name;
     statusEl.textContent = race.status;
     statusEl.className = `race-status race-status--${race.status}`;
+    countdownAnchor = { atMs: nowMs, timeLeftSeconds: race.time_left_seconds };
     timeLeftEl.textContent = formatDuration(race.time_left_seconds);
 
     const paceByHorseId = new Map<string, number | null>();

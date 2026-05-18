@@ -1,4 +1,4 @@
-import type { HorseColors, RaceStatus, RaceView, OrganisationSummary, StableHorse } from './types.js';
+import type { HorseColors, HorseView, Race, RaceStatus, RaceView, OrganisationSummary, StableHorse } from './types.js';
 
 export type CreateRaceRequest = {
   name: string;
@@ -34,6 +34,8 @@ export type HeartbeatResponse = {
   race_status: RaceStatus;
   server_time: string;
   time_left_seconds: number;
+  horses: HorseView[];
+  race: Race;
 };
 
 export type EndRaceResponse = {

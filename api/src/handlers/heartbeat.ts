@@ -2,9 +2,11 @@ import type { APIGatewayProxyHandlerV2 } from 'aws-lambda';
 import type { HeartbeatRequest, HeartbeatResponse } from '@token-derby/shared';
 import { minorMatches } from '@token-derby/shared';
 import { getRaceByJoinCode } from '../db/races.js';
-import { getHorseForHeartbeat, updateHorseTokens } from '../db/horses.js';
+import { getHorseForHeartbeat, updateHorseTokens, listHorses } from '../db/horses.js';
 import { computeStatus, timeLeftSeconds } from '../lib/status.js';
 import { clampHeartbeat } from '../lib/rate-cap.js';
+import { rankHorses } from '../lib/rank-horses.js';
+import { finaliseRace } from '../lib/finalise-race.js';
 import { ok, err, parseJson } from '../lib/http.js';
 import { readCliVersion, meetsMinimumCliVersion, minCliVersion } from '../lib/version.js';
 
@@ -31,7 +33,7 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
     return err('BAD_REQUEST', 'current_tokens (non-negative number) required');
   }
 
-  const race = await getRaceByJoinCode(join_code);
+  let race = await getRaceByJoinCode(join_code);
   if (!race) return err('RACE_NOT_FOUND', `No race with join code ${join_code}`);
 
   if (race.cli_version) {
@@ -61,10 +63,21 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
     await updateHorseTokens(race.race_id, horse_id, accepted, now.toISOString());
   }
 
+  let horses;
+  if (race_status === 'finished' && !race.ended_at) {
+    const result = await finaliseRace(race, now);
+    race = result.race;
+    horses = result.horses;
+  } else {
+    horses = await listHorses(race.race_id);
+  }
+
   const response: HeartbeatResponse = {
     race_status,
     server_time: now.toISOString(),
     time_left_seconds: timeLeftSeconds(race, now),
+    horses: rankHorses(horses),
+    race,
   };
   return ok(response);
 };

@@ -4,7 +4,7 @@ import { handler as createHandler } from '../../src/handlers/create-race.js';
 import { handler as joinHandler } from '../../src/handlers/join-race.js';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { listHorses } from '../../src/db/horses.js';
-import { makeUser, makeHorse } from '../helpers/auth-helper.js';
+import { makeUser, makeHorse, type TestUser } from '../helpers/auth-helper.js';
 
 const COLORS = { body: '#8B4513', mane: '#000', tail: '#000', saddle: '#C0392B' };
 
@@ -121,6 +121,94 @@ describe('heartbeat handler', () => {
     const body = JSON.parse(res.body);
     expect(body.code).toBe('VERSION_MISMATCH');
     expect(body.message).toMatch(/2\.0\.0/);
+  });
+
+  it('returns ranked horses in the response so the CLI can render the leaderboard', async () => {
+    const creator = await makeUser('HB_Creator');
+    const createRes: any = await createHandler({
+      version: '2.0', routeKey: 'POST /races', rawPath: '/races', rawQueryString: '',
+      headers: { 'content-type': 'application/json', 'x-cli-version': '2.0.0', 'x-user-id': creator.user_id, 'x-user-token': creator.secret_token },
+      requestContext: {} as any, isBase64Encoded: false,
+      body: JSON.stringify({
+        name: 'HB Multi',
+        start_time: new Date(Date.now() - 60_000).toISOString(),
+        end_time: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+        tz: 'UTC',
+      }),
+    });
+    const { join_code } = JSON.parse(createRes.body);
+
+    const joinOne = async (user: TestUser, name: string) => {
+      const h = await makeHorse(user, name, COLORS);
+      const jr: any = await joinHandler({
+        version: '2.0', routeKey: 'POST /races/{join_code}/join', rawPath: `/races/${join_code}/join`, rawQueryString: '',
+        pathParameters: { join_code },
+        headers: { 'content-type': 'application/json', 'x-cli-version': '2.0.0', 'x-user-id': user.user_id, 'x-user-token': user.secret_token },
+        requestContext: {} as any, isBase64Encoded: false,
+        body: JSON.stringify({ stable_horse_id: h.stable_horse_id }),
+      });
+      return JSON.parse(jr.body) as { horse_id: string; heartbeat_token: string };
+    };
+
+    const a = await joinOne(await makeUser('HB_Alpha'), 'Alpha');
+    const b = await joinOne(await makeUser('HB_Beta'), 'Beta');
+    const c = await joinOne(await makeUser('HB_Gamma'), 'Gamma');
+
+    await hbHandler(hbEvent(join_code, a.horse_id, a.heartbeat_token, { current_tokens: 100 }));
+    await hbHandler(hbEvent(join_code, b.horse_id, b.heartbeat_token, { current_tokens: 500 }));
+    const res: any = await hbHandler(hbEvent(join_code, c.horse_id, c.heartbeat_token, { current_tokens: 300 }));
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.horses).toHaveLength(3);
+    const byName = (n: string) => body.horses.find((h: any) => h.name === n);
+    expect(byName('Beta').rank).toBe(1);
+    expect(byName('Gamma').rank).toBe(2);
+    expect(byName('Alpha').rank).toBe(3);
+    expect(byName('Gamma').current_tokens).toBe(300);
+    expect(body.race.name).toBe('HB Multi');
+    expect(typeof body.race.start_time).toBe('string');
+    expect(typeof body.race.end_time).toBe('string');
+  });
+
+  it('finalises a stale-live race when no one has called getRace yet', async () => {
+    const user = await makeUser('HB_FinaliseUser');
+    const horse = await makeHorse(user, 'HB_FinaliseGary', COLORS);
+    const createRes: any = await createHandler({
+      version: '2.0', routeKey: 'POST /races', rawPath: '/races', rawQueryString: '',
+      headers: { 'content-type': 'application/json', 'x-cli-version': '2.0.0', 'x-user-id': user.user_id, 'x-user-token': user.secret_token },
+      requestContext: {} as any, isBase64Encoded: false,
+      body: JSON.stringify({
+        name: 'HB Finalise',
+        start_time: new Date(Date.now() - 60_000).toISOString(),
+        end_time: new Date(Date.now() + 250).toISOString(),
+        tz: 'UTC',
+      }),
+    });
+    const { join_code, race_id } = JSON.parse(createRes.body);
+    const joinRes: any = await joinHandler({
+      version: '2.0', routeKey: 'POST /races/{join_code}/join', rawPath: `/races/${join_code}/join`, rawQueryString: '',
+      pathParameters: { join_code },
+      headers: { 'content-type': 'application/json', 'x-cli-version': '2.0.0', 'x-user-id': user.user_id, 'x-user-token': user.secret_token },
+      requestContext: {} as any, isBase64Encoded: false,
+      body: JSON.stringify({ stable_horse_id: horse.stable_horse_id }),
+    });
+    const { horse_id, heartbeat_token } = JSON.parse(joinRes.body);
+    await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { current_tokens: 4242 }));
+
+    await new Promise(r => setTimeout(r, 400));
+
+    const res: any = await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { current_tokens: 9999 }));
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.race_status).toBe('finished');
+
+    const { getRaceByJoinCode } = await import('../../src/db/races.js');
+    const race = await getRaceByJoinCode(join_code);
+    expect(race?.ended_at).toBeTruthy();
+
+    const horses = await listHorses(race_id);
+    expect(horses[0]?.final_tokens).toBe(4242);
   });
 
   it('returns finished status without writing when race has ended', async () => {

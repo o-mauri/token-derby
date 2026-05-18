@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatDuration, countdownSeconds } from '../src/time.js';
+import { formatDuration, countdownSeconds, predictTimeLeftSeconds } from '../src/time.js';
 
 describe('formatDuration', () => {
   it('zero seconds', () => {
@@ -20,6 +20,29 @@ describe('formatDuration', () => {
 
   it('clamps negative durations to zero', () => {
     expect(formatDuration(-30)).toBe('00:00:00');
+  });
+});
+
+describe('predictTimeLeftSeconds', () => {
+  it('returns the anchor value at the moment of anchoring', () => {
+    const anchor = { atMs: 1_000_000, timeLeftSeconds: 300 };
+    expect(predictTimeLeftSeconds(anchor, 1_000_000)).toBe(300);
+  });
+
+  it('counts down by elapsed seconds between polls', () => {
+    const anchor = { atMs: 1_000_000, timeLeftSeconds: 300 };
+    expect(predictTimeLeftSeconds(anchor, 1_000_000 + 25_000)).toBe(275);
+  });
+
+  it('floors fractional seconds so the display ticks once per real second', () => {
+    const anchor = { atMs: 1_000_000, timeLeftSeconds: 300 };
+    expect(predictTimeLeftSeconds(anchor, 1_000_000 + 1_999)).toBe(299);
+    expect(predictTimeLeftSeconds(anchor, 1_000_000 + 2_000)).toBe(298);
+  });
+
+  it('clamps to zero once predicted time runs out', () => {
+    const anchor = { atMs: 1_000_000, timeLeftSeconds: 5 };
+    expect(predictTimeLeftSeconds(anchor, 1_000_000 + 60_000)).toBe(0);
   });
 });
 
