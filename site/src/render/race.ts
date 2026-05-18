@@ -7,6 +7,7 @@ import { renderFinishedOverlay } from './finished.js';
 import { formatDuration, predictTimeLeftSeconds, type CountdownAnchor } from '../time.js';
 import { appendSample, trimWindow, computePace, type Sample } from './pace.js';
 import { startAutoScroll } from './autoscroll.js';
+import { horseFaceSvg } from '../horse-face.js';
 
 const POLL_INTERVAL_MS = 60_000;
 const TIMER_TICK_MS = 1_000;
@@ -18,7 +19,7 @@ export function renderRace(root: HTMLElement, joinCode: string): () => void {
   frame.className = 'race';
   frame.innerHTML = `
     <header class="race-header">
-      <h1>🏇 <span class="race-name">Loading…</span></h1>
+      <h1>${horseFaceSvg()} <span class="race-name">Loading…</span></h1>
       <div class="meta">
         <span>Status: <b class="race-status">—</b></span>
         <span>Time left: <b class="race-time-left">—</b></span>

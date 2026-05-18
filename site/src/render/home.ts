@@ -1,9 +1,11 @@
+import { horseFaceSvg } from '../horse-face.js';
+
 export function renderHome(root: HTMLElement): void {
   root.innerHTML = '';
   const section = root.ownerDocument.createElement('section');
   section.className = 'home';
   section.innerHTML = `
-    <h1>🏇 TOKEN DERBY</h1>
+    <h1>${horseFaceSvg()} TOKEN DERBY <span class="horse-face-flip">${horseFaceSvg()}</span></h1>
     <p>Enter a race code to watch.</p>
     <form id="race-form" autocomplete="off">
       <input id="race-code" name="code" placeholder="ABC123" maxlength="6" pattern="[A-Za-z0-9]{6}" required>
@@ -14,7 +16,11 @@ export function renderHome(root: HTMLElement): void {
       <input id="org-name" name="org" placeholder="myteam" maxlength="12" pattern="[A-Za-z0-9]{1,12}" required>
       <button type="submit">Go</button>
     </form>
-    <p>Don't have a code? Create one with <code>token-derby create</code>.</p>
+    <div class="install-line terminal" role="note" aria-label="Install command">
+      <span class="terminal-prompt">$</span>
+      <span class="terminal-cmd">npm i -g @mauricode/token-derby</span>
+      <span class="terminal-cursor" aria-hidden="true">&#9608;</span>
+    </div>
   `;
   root.appendChild(section);
 

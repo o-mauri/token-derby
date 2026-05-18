@@ -1,5 +1,6 @@
 import type { RaceSummary } from '@token-derby/shared';
 import { fetchOrgRaces, ApiError } from '../api.js';
+import { horseFaceSvg } from '../horse-face.js';
 
 export function renderOrg(root: HTMLElement, orgName: string): () => void {
   root.innerHTML = '';
@@ -7,7 +8,7 @@ export function renderOrg(root: HTMLElement, orgName: string): () => void {
   section.className = 'org';
   section.innerHTML = `
     <header class="org-header">
-      <h1>🏇 <span class="org-name">${escapeHtml(orgName)}</span></h1>
+      <h1>${horseFaceSvg()} <span class="org-name">${escapeHtml(orgName)}</span></h1>
       <div class="meta"><button type="button" class="btn home-btn">← Home</button></div>
     </header>
     <div class="org-body"><p class="org-status">Loading…</p></div>

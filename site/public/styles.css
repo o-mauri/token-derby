@@ -1,14 +1,16 @@
 :root {
-  --bg: #1a1229;
-  --panel: #2d1d42;
+  --bg: #000000;
+  --panel: #1a1a1a;
   --text: #f5e9d3;
-  --muted: #a68bd8;
-  --accent: #ffd166;
+  --muted: #9ca3af;
+  --accent: #d1d5db;
+  --border: #3a3a3a;
   --lane: #3d2856;
   --lane-alt: #362248;
   --track-gap: 4px;
   --horse-height: 60px;
   --sprite-scale: 2;
+  --pixel-font: "VT323", "Courier New", ui-monospace, monospace;
 }
 
 * { box-sizing: border-box; }
@@ -18,8 +20,13 @@ html, body {
   padding: 0;
   background: var(--bg);
   color: var(--text);
-  font-family: "Courier New", ui-monospace, Menlo, Monaco, monospace;
+  font-family: var(--pixel-font);
+  font-size: 20px;
+  line-height: 1.25;
   min-height: 100vh;
+  image-rendering: pixelated;
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 #app { min-height: 100vh; display: flex; flex-direction: column; }
@@ -41,13 +48,27 @@ html, body {
   color: var(--accent);
   letter-spacing: 0.08em;
   margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+}
+.horse-face {
+  height: 1em;
+  width: auto;
+  image-rendering: pixelated;
+  shape-rendering: crispEdges;
+  flex-shrink: 0;
+}
+.horse-face-flip {
+  display: inline-flex;
+  transform: scaleX(-1);
 }
 .home p { color: var(--muted); margin: 0; max-width: 36ch; }
 .home form { display: flex; gap: 8px; }
 .home input {
   background: var(--panel);
   color: var(--text);
-  border: 2px solid var(--lane);
+  border: 2px solid var(--border);
   padding: 12px 16px;
   font: inherit;
   font-size: 1.25rem;
@@ -89,6 +110,30 @@ html, body {
   font-size: 0.75rem;
   margin: -8px 0 -8px;
 }
+.install-line.terminal {
+  margin-top: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: #050a05;
+  border: 2px solid #1f5a1f;
+  box-shadow: 0 0 12px rgba(74, 222, 128, 0.18) inset, 0 0 0 1px #000;
+  color: #4ade80;
+  font-size: 1rem;
+  letter-spacing: 0.05em;
+  text-shadow: 0 0 6px rgba(74, 222, 128, 0.55);
+}
+.terminal-prompt { color: #4ade80; opacity: 0.7; }
+.terminal-cmd { color: #4ade80; }
+.terminal-cursor {
+  display: inline-block;
+  color: #4ade80;
+  animation: terminal-blink 1s steps(2, start) infinite;
+}
+@keyframes terminal-blink {
+  to { visibility: hidden; }
+}
 
 /* ── Org view ──────────────────────────────────────── */
 
@@ -111,6 +156,9 @@ html, body {
   color: var(--accent);
   font-size: 1.5rem;
   letter-spacing: 0.05em;
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
 }
 .org-body {
   padding: 24px;
@@ -140,7 +188,7 @@ html, body {
   gap: 6px;
   padding: 14px 16px;
   background: var(--panel);
-  border: 2px solid var(--lane);
+  border: 2px solid var(--border);
   border-radius: 6px;
   color: var(--text);
   text-decoration: none;
@@ -173,13 +221,13 @@ html, body {
   flex-wrap: wrap;
   gap: 16px;
 }
-.race-header h1 { margin: 0; color: var(--accent); font-size: 1.5rem; letter-spacing: 0.05em; }
+.race-header h1 { margin: 0; color: var(--accent); font-size: 1.5rem; letter-spacing: 0.05em; display: flex; align-items: center; gap: 0.4em; }
 .race-header .meta { color: var(--muted); display: flex; gap: 24px; flex-wrap: wrap; }
 .race-header .meta b { color: var(--text); font-weight: normal; }
 .race-status { text-transform: uppercase; letter-spacing: 0.1em; }
 .race-status--pending { color: var(--accent); }
 .race-status--live { color: #7bed9f; }
-.race-status--finished { color: #a68bd8; }
+.race-status--finished { color: var(--muted); }
 
 .track {
   padding: 24px;
@@ -199,12 +247,10 @@ html, body {
   content: "";
   position: absolute;
   right: 0; top: 0; bottom: 0;
-  width: 3px;
-  background: repeating-linear-gradient(
-    45deg,
-    var(--accent) 0 6px,
-    transparent 6px 12px
-  );
+  width: 20px;
+  background:
+    conic-gradient(#fff 25%, #000 25% 50%, #fff 50% 75%, #000 75%) 0 0 / 10px 10px;
+  background-color: #fff;
 }
 .horse {
   position: absolute;
@@ -227,8 +273,8 @@ html, body {
   pointer-events: none;
   letter-spacing: 0.04em;
   line-height: 1.25;
-  background: rgba(26, 18, 41, 0.82);
-  border: 1px solid var(--lane);
+  background: rgba(0, 0, 0, 0.82);
+  border: 1px solid var(--border);
   border-radius: 6px;
   padding: 4px 6px;
 }
@@ -304,7 +350,7 @@ html, body {
 .podium {
   position: fixed;
   inset: 0;
-  background: rgba(26, 18, 41, 0.85);
+  background: rgba(0, 0, 0, 0.85);
   display: flex;
   flex-direction: column;
   align-items: center;
