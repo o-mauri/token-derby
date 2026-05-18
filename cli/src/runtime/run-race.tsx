@@ -3,13 +3,12 @@ import { Box, Text, useApp } from 'ink';
 import type { GetRaceResponse, HeartbeatResponse } from '@token-derby/shared';
 import { StatusScreen } from '../ui/StatusScreen.js';
 import { runHeartbeatLoop } from './heartbeat-loop.js';
-import { runPollLoop } from './poll-loop.js';
 import { sumOutputTokens } from '../tokens/transcripts.js';
 import { initialBaseline } from '../tokens/baseline.js';
 import * as endpoints from '../api/endpoints.js';
 import { ApiError } from '../api/client.js';
 import { saveActiveRace, type ActiveRace } from '../stable/active-race.js';
-import { HEARTBEAT_INTERVAL_MS, POLL_INTERVAL_MS, HEARTBEAT_RETRY_DELAYS_MS } from '../config.js';
+import { HEARTBEAT_INTERVAL_MS, HEARTBEAT_RETRY_DELAYS_MS } from '../config.js';
 
 export type RunRaceProps = {
   active: ActiveRace;
@@ -48,14 +47,6 @@ export function RunRace({ active, startingBaseline, pendingMode, ownUserName }: 
   }, [race?.status]);
 
   useEffect(() => {
-    runPollLoop({
-      fetchRace: () => endpoints.getRace(active.join_code),
-      intervalMs: POLL_INTERVAL_MS,
-      onSnapshot: (r) => setRace(r),
-      onError: () => {/* silently keep last-known state */},
-      abortSignal: ctrl.current.signal,
-    });
-
     runHeartbeatLoop({
       sendHeartbeat: async (currentTokens) => {
         const resp = await endpoints.heartbeat(
@@ -78,6 +69,7 @@ export function RunRace({ active, startingBaseline, pendingMode, ownUserName }: 
       onSuccess: (resp: HeartbeatResponse) => {
         setLastHbAt(new Date());
         setLastHbOk(true);
+        setRace(raceViewFrom(resp));
         if (resp.race_status === 'finished') exit();
       },
       onError: (err) => {
@@ -134,6 +126,16 @@ export function RunRace({ active, startingBaseline, pendingMode, ownUserName }: 
       lastHeartbeatOk={lastHbOk}
     />
   );
+}
+
+function raceViewFrom(resp: HeartbeatResponse): GetRaceResponse {
+  return {
+    ...resp.race,
+    status: resp.race_status,
+    horses: resp.horses,
+    server_time: resp.server_time,
+    time_left_seconds: resp.time_left_seconds,
+  };
 }
 
 export async function buildInitialState(args: {

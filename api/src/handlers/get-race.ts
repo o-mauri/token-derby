@@ -1,9 +1,10 @@
 import type { APIGatewayProxyHandlerV2 } from 'aws-lambda';
-import type { GetRaceResponse, Horse, HorseView, RaceStatus } from '@token-derby/shared';
+import type { GetRaceResponse, Horse, RaceStatus } from '@token-derby/shared';
 import { getRaceByJoinCode } from '../db/races.js';
 import { listHorses } from '../db/horses.js';
 import { computeStatus, timeLeftSeconds } from '../lib/status.js';
 import { finaliseRace } from '../lib/finalise-race.js';
+import { rankHorses } from '../lib/rank-horses.js';
 import { ok, err } from '../lib/http.js';
 
 export const handler: APIGatewayProxyHandlerV2 = async (event) => {
@@ -39,14 +40,8 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
     horses: rankHorses(horses),
     server_time: now.toISOString(),
     time_left_seconds: timeLeftSeconds(race, now),
+    ...(race.org_id ? { org_id: race.org_id } : {}),
+    ...(race.organisation_name ? { organisation_name: race.organisation_name } : {}),
   };
   return ok(response);
 };
-
-function rankHorses(horses: Horse[]): HorseView[] {
-  const sorted = [...horses].sort((a, b) => {
-    if (b.current_tokens !== a.current_tokens) return b.current_tokens - a.current_tokens;
-    return new Date(a.joined_at).getTime() - new Date(b.joined_at).getTime();
-  });
-  return sorted.map((h, i) => ({ ...h, rank: i + 1 }));
-}

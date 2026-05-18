@@ -1,6 +1,7 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import type { GetRaceResponse, HorseColors, HorseView } from '@token-derby/shared';
+import { levelInfo } from '@token-derby/shared';
 import { HorseSprite } from './HorseSprite.js';
 import { MINI_SPRITE } from './sprite.js';
 
@@ -29,6 +30,7 @@ export function StatusScreen(props: Props) {
   const leader: HorseView | undefined = race.horses[0];
   const elapsedPct = elapsed(race);
   const timeLeft = formatDuration(race.time_left_seconds);
+  const lvl = levelInfo(own?.xp ?? 0);
 
   return (
     <Box flexDirection="column" borderStyle="round" paddingX={1}>
@@ -39,7 +41,7 @@ export function StatusScreen(props: Props) {
       <Box marginTop={1} flexDirection="row">
         <HorseSprite sprite={MINI_SPRITE} colors={ownColors} />
         <Box flexDirection="column">
-          <Text>  {ownHorseName}</Text>
+          <Text>  {ownHorseName} <Text color="cyan">[Lvl. {lvl.level}]</Text></Text>
           <Text>  <Text dimColor>({ownUserName})</Text></Text>
         </Box>
       </Box>
@@ -52,6 +54,11 @@ export function StatusScreen(props: Props) {
         </Text>
         <Text>Race elapsed:   {(elapsedPct * 100).toFixed(0)}%  {bar(elapsedPct, 20)}</Text>
         <Text>Time left:      {timeLeft}</Text>
+        <Text>
+          XP:             {lvl.next_level_xp === null
+            ? `${lvl.xp} (max level)  ${bar(1, 20)}`
+            : `${lvl.xp_into_level}/${lvl.xp_for_level} → Lvl. ${lvl.level + 1}  ${bar(lvl.progress, 20)}`}
+        </Text>
         <Text>
           Last heartbeat: {lastHeartbeatAgoSec === null ? '—' : `${lastHeartbeatAgoSec}s ago`}
           {' '}

@@ -16,6 +16,7 @@ function makeHorse(overrides: Partial<Horse> = {}): Horse {
     joined_at: new Date().toISOString(),
     user_id: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
     user_name: 'Test User',
+    xp: 0,
     ...overrides,
   };
 }

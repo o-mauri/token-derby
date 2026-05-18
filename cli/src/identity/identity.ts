@@ -1,12 +1,12 @@
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
-import * as crypto from 'node:crypto';
 import { USER_NAME_MAX_LENGTH } from '@token-derby/shared';
 import { identityFile, homeDir } from '../paths.js';
 
 export type Identity = {
   user_id: string;
   display_name: string;
+  secret_token: string;
   created_at: string;
 };
 
@@ -17,6 +17,7 @@ export async function loadIdentity(): Promise<Identity | null> {
     if (
       typeof parsed.user_id === 'string' &&
       typeof parsed.display_name === 'string' &&
+      typeof parsed.secret_token === 'string' &&
       typeof parsed.created_at === 'string'
     ) {
       return parsed as Identity;
@@ -33,8 +34,12 @@ export async function saveIdentity(identity: Identity): Promise<void> {
   await fs.writeFile(identityFile(), JSON.stringify(identity, null, 2) + '\n', 'utf8');
 }
 
-export function generateUserId(): string {
-  return crypto.randomUUID();
+export async function deleteIdentity(): Promise<void> {
+  try {
+    await fs.unlink(identityFile());
+  } catch (e: any) {
+    if (e?.code !== 'ENOENT') throw e;
+  }
 }
 
 export function validateDisplayName(name: string): { ok: true; name: string } | { ok: false; error: string } {

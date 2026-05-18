@@ -12,9 +12,10 @@ type Props = {
   initialColors?: HorseColors;
   initialName?: string;
   lockName?: boolean;
+  initialLevel?: number;
 };
 
-export function HorseCreator({ onSubmit, onCancel, initialColors, initialName, lockName }: Props) {
+export function HorseCreator({ onSubmit, onCancel, initialColors, initialName, lockName, initialLevel }: Props) {
   const [colors, setColors] = useState<HorseColors>(initialColors ?? defaultColors());
   const [slotIdx, setSlotIdx] = useState(0);
   const [namingMode, setNamingMode] = useState(false);
@@ -47,6 +48,15 @@ export function HorseCreator({ onSubmit, onCancel, initialColors, initialName, l
 
   return (
     <Box flexDirection="column">
+      {lockName && initialName && (
+        <Box marginBottom={1}>
+          <Text bold>{initialName}</Text>
+          {typeof initialLevel === 'number' && (
+            <Text color="cyan"> [Lvl. {initialLevel}]</Text>
+          )}
+        </Box>
+      )}
+
       <Box marginBottom={1}>
         <HorseSprite sprite={MAIN_SPRITE} colors={colors} />
       </Box>

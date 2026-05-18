@@ -35,6 +35,7 @@ function makeHorse(name: string, current_tokens: number, overrides: Partial<Hors
     joined_at: new Date().toISOString(),
     user_id: `u-${Math.random().toString(36).slice(2)}`,
     user_name: `User ${name}`,
+    xp: 0,
     ...overrides,
   };
 }

@@ -174,6 +174,16 @@ html, body {
   padding: 2px 6px;
   border-radius: 3px;
 }
+.horse-level {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 0 4px;
+  font-size: 0.85em;
+  color: #67e8f9;
+  border: 1px solid #67e8f9;
+  border-radius: 3px;
+  letter-spacing: 0.04em;
+}
 .user-label {
   color: var(--text);
   opacity: 0.55;
@@ -237,14 +247,90 @@ html, body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  min-width: 180px;
 }
 .podium li:nth-child(1) { border: 2px solid gold; transform: translateY(-16px); }
 .podium li:nth-child(2) { border: 2px solid silver; }
 .podium li:nth-child(3) { border: 2px solid #cd7f32; }
 .podium .place { font-size: 2rem; }
 .podium .name { font-weight: bold; }
+.podium .podium-user { color: var(--muted); font-size: 0.7em; }
 .podium .tokens { color: var(--muted); }
+.podium .xp-line {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  margin-top: 4px;
+}
+.podium .level-chip {
+  display: inline-block;
+  padding: 2px 6px;
+  font-size: 0.7em;
+  color: #67e8f9;
+  border: 1px solid #67e8f9;
+  border-radius: 3px;
+  letter-spacing: 0.04em;
+}
+.podium .xp-gained { color: #67e8f9; font-weight: bold; font-size: 0.85em; }
+.podium .xp-bar {
+  width: 160px;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.podium .xp-bar-fill {
+  height: 100%;
+  background: #67e8f9;
+  transition: width 1.5s ease-out;
+}
+.podium .xp-bar-text { color: var(--muted); font-size: 0.7em; }
+.podium .level-up-banner {
+  margin-top: 6px;
+  color: gold;
+  font-weight: bold;
+  font-size: 1rem;
+  letter-spacing: 0.18em;
+  text-shadow: 0 0 12px rgba(255, 215, 0, 0.6);
+  animation: level-up-pulse 0.8s ease-in-out 0.3s infinite alternate;
+}
+@keyframes level-up-pulse {
+  from { transform: scale(1); }
+  to { transform: scale(1.12); }
+}
+
+.podium .standings-table {
+  border-collapse: collapse;
+  color: var(--text);
+  background: var(--panel);
+  border-radius: 6px;
+  overflow: hidden;
+  max-width: 90vw;
+}
+.podium .standings-table th,
+.podium .standings-table td {
+  padding: 6px 14px;
+  font-size: 0.85em;
+  text-align: left;
+}
+.podium .standings-table th {
+  font-size: 0.75em;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+.podium .standings-table tbody tr:nth-child(even) { background: rgba(255, 255, 255, 0.03); }
+.podium .standings-table .rank { color: var(--muted); }
+.podium .standings-table .horse-name { font-weight: bold; }
+.podium .standings-table .horse-name .jockey {
+  color: var(--muted);
+  font-weight: normal;
+  font-size: 0.9em;
+}
+.podium .standings-table .levelled-up { color: gold; font-weight: bold; }
 
 .podium .dismiss {
   background: var(--accent);

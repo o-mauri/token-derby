@@ -49,3 +49,4 @@ The CLI sums `message.usage.output_tokens` across every `*.jsonl` under `~/.clau
 - `TOKEN_DERBY_API_BASE` — override the API base URL (default: `https://token-derby.mauricode.co.uk/api`)
 - `TOKEN_DERBY_HOME` — override the data directory (default: `~/.token-derby`)
 - `TOKEN_DERBY_CLAUDE_DIR` — override the transcripts directory (default: `~/.claude/projects`)
+- `TOKEN_DERBY_COUNT_INPUT_TOKENS` — set to `1` to count input tokens (including cache reads/creations) toward your race total. Default is output tokens only.

@@ -1,0 +1,37 @@
+import type { APIGatewayProxyHandlerV2 } from 'aws-lambda';
+import type { JoinOrganisationRequest, JoinOrganisationResponse } from '@token-derby/shared';
+import { getOrganisationByJoinToken, addMember, isMember } from '../db/organisations.js';
+import { ok, err, parseJson } from '../lib/http.js';
+import { readCliVersion, meetsMinimumCliVersion, minCliVersion } from '../lib/version.js';
+import { authenticate } from '../lib/auth.js';
+
+export const handler: APIGatewayProxyHandlerV2 = async (event) => {
+  const caller_version = readCliVersion(event);
+  if (caller_version && !meetsMinimumCliVersion(caller_version)) {
+    return err(
+      'VERSION_MISMATCH',
+      `This API requires token-derby v${minCliVersion()} or newer. ` +
+        `Upgrade: npm i -g @mauricode/token-derby@latest`,
+    );
+  }
+
+  const auth = await authenticate(event);
+  if ('error' in auth) return err('UNAUTHENTICATED', auth.error);
+
+  const body = parseJson<JoinOrganisationRequest>(event.body);
+  if (!body || typeof body.join_token !== 'string' || !body.join_token) {
+    return err('BAD_REQUEST', 'join_token is required');
+  }
+
+  const org = await getOrganisationByJoinToken(body.join_token.trim());
+  if (!org) return err('ORG_NOT_FOUND', 'No organisation matches that join token');
+
+  // Idempotent — re-joining is a no-op that still returns the org info so the CLI
+  // can tell the user which org they're in.
+  if (!(await isMember(org.org_id, auth.user_id))) {
+    await addMember(org.org_id, auth.user_id, auth.display_name, new Date().toISOString());
+  }
+
+  const response: JoinOrganisationResponse = { org_id: org.org_id, org_name: org.org_name };
+  return ok(response);
+};

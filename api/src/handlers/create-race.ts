@@ -1,11 +1,12 @@
 import type { APIGatewayProxyHandlerV2 } from 'aws-lambda';
 import type { CreateRaceRequest, CreateRaceResponse } from '@token-derby/shared';
-import { DEFAULT_MAX_PARTICIPANTS, parseSemver } from '@token-derby/shared';
+import { DEFAULT_MAX_PARTICIPANTS, ORG_NAME_PATTERN, parseSemver } from '@token-derby/shared';
 import { generateRaceId, generateJoinCode, generateAdminCode } from '../lib/codes.js';
 import { putRace, getRaceByJoinCode } from '../db/races.js';
+import { getOrganisationByName, isMember } from '../db/organisations.js';
 import { ok, err, parseJson } from '../lib/http.js';
 import { readCliVersion, meetsMinimumCliVersion, minCliVersion } from '../lib/version.js';
-import { readIdentity } from '../lib/identity.js';
+import { authenticate } from '../lib/auth.js';
 
 export const handler: APIGatewayProxyHandlerV2 = async (event) => {
   const cli_version = readCliVersion(event);
@@ -23,8 +24,8 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
     );
   }
 
-  const identity = readIdentity(event);
-  if ('error' in identity) return err('IDENTITY_REQUIRED', identity.error);
+  const auth = await authenticate(event);
+  if ('error' in auth) return err('UNAUTHENTICATED', auth.error);
 
   const body = parseJson<CreateRaceRequest>(event.body);
   if (!body) return err('BAD_REQUEST', 'JSON body required');
@@ -52,6 +53,21 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
     return err('BAD_REQUEST', 'end_time must be after start_time');
   }
 
+  let org_id: string | undefined;
+  let organisation_name: string | undefined;
+  if (body.organisation_name !== undefined && body.organisation_name !== '') {
+    if (typeof body.organisation_name !== 'string' || !ORG_NAME_PATTERN.test(body.organisation_name)) {
+      return err('BAD_REQUEST', 'organisation_name must be 1–12 alphanumeric characters');
+    }
+    const org = await getOrganisationByName(body.organisation_name);
+    if (!org) return err('ORG_NOT_FOUND', `No organisation named "${body.organisation_name}"`);
+    if (!(await isMember(org.org_id, auth.user_id))) {
+      return err('NOT_ORG_MEMBER', `You are not a member of "${org.org_name}"`);
+    }
+    org_id = org.org_id;
+    organisation_name = org.org_name;
+  }
+
   const join_code = await findUniqueJoinCode();
   const race_id = generateRaceId();
   const admin_code = generateAdminCode();
@@ -67,8 +83,9 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
       join_code,
       created_at: new Date().toISOString(),
       cli_version,
-      creator_user_id: identity.user_id,
-      creator_user_name: identity.user_name,
+      creator_user_id: auth.user_id,
+      creator_user_name: auth.display_name,
+      ...(org_id ? { org_id, organisation_name } : {}),
     },
     admin_code,
   );

@@ -4,10 +4,12 @@ import { minorMatches } from '@token-derby/shared';
 import { generateHorseId, generateHeartbeatToken } from '../lib/codes.js';
 import { getRaceByJoinCode } from '../db/races.js';
 import { putHorse, countHorses, findHorseByUser, rotateHeartbeatToken } from '../db/horses.js';
+import { isMember } from '../db/organisations.js';
+import { getStableHorse } from '../db/stable.js';
 import { computeStatus } from '../lib/status.js';
 import { ok, err, parseJson } from '../lib/http.js';
 import { readCliVersion, meetsMinimumCliVersion, minCliVersion } from '../lib/version.js';
-import { readIdentity } from '../lib/identity.js';
+import { authenticate } from '../lib/auth.js';
 
 export const handler: APIGatewayProxyHandlerV2 = async (event) => {
   const join_code = event.pathParameters?.join_code;
@@ -22,25 +24,30 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
     );
   }
 
-  const identity = readIdentity(event);
-  if ('error' in identity) return err('IDENTITY_REQUIRED', identity.error);
+  const auth = await authenticate(event);
+  if ('error' in auth) return err('UNAUTHENTICATED', auth.error);
 
   const body = parseJson<JoinRaceRequest>(event.body);
-  if (!body?.horse?.name || !body.horse.colors || !body.horse.stable_horse_id) {
-    return err('BAD_REQUEST', 'horse.stable_horse_id, horse.name and horse.colors required');
+  if (!body || typeof body.stable_horse_id !== 'string' || !body.stable_horse_id) {
+    return err('BAD_REQUEST', 'stable_horse_id is required');
   }
-  if (typeof body.horse.stable_horse_id !== 'string') {
-    return err('BAD_REQUEST', 'horse.stable_horse_id must be a string');
-  }
-  const c = body.horse.colors;
-  if (!c.body || !c.mane || !c.tail || !c.saddle) {
-    return err('BAD_REQUEST', 'horse.colors.body/mane/tail/saddle required');
+
+  const stable_horse = await getStableHorse(auth.user_id, body.stable_horse_id);
+  if (!stable_horse) {
+    return err('STABLE_HORSE_NOT_FOUND', 'No such horse in your stable');
   }
 
   const race = await getRaceByJoinCode(join_code);
   if (!race) return err('RACE_NOT_FOUND', `No race with join code ${join_code}`);
   if (computeStatus(race, new Date()) === 'finished') {
     return err('RACE_FINISHED', 'This race has ended');
+  }
+
+  // Gate org-restricted races on membership before any horse-state lookup so
+  // non-members can't probe existing horses via repeated joins.
+  if (race.org_id && !(await isMember(race.org_id, auth.user_id))) {
+    const org_label = race.organisation_name ?? race.org_id;
+    return err('NOT_ORG_MEMBER', `This race is restricted to members of "${org_label}"`);
   }
 
   // Races created before version pinning shipped have no cli_version — they predate the feature.
@@ -58,9 +65,9 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
 
   // Identity-aware resume: if this user already has a horse in this race, either
   // resume it (same name) or reject (different name).
-  const existing_horse = await findHorseByUser(race.race_id, identity.user_id);
+  const existing_horse = await findHorseByUser(race.race_id, auth.user_id);
   if (existing_horse) {
-    if (existing_horse.name === body.horse.name) {
+    if (existing_horse.name === stable_horse.name) {
       const new_token = generateHeartbeatToken();
       await rotateHeartbeatToken(race.race_id, existing_horse.horse_id, new_token);
       const resume: JoinRaceResponse = {
@@ -89,14 +96,15 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
     race.race_id,
     {
       horse_id,
-      stable_horse_id: body.horse.stable_horse_id,
-      name: body.horse.name,
-      colors: body.horse.colors,
+      stable_horse_id: stable_horse.stable_horse_id,
+      name: stable_horse.name,
+      colors: stable_horse.colors,
       current_tokens: 0,
       last_heartbeat: now,
       joined_at: now,
-      user_id: identity.user_id,
-      user_name: identity.user_name,
+      user_id: auth.user_id,
+      user_name: auth.display_name,
+      xp: stable_horse.xp,
     },
     heartbeat_token,
   );

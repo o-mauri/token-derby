@@ -53,6 +53,21 @@ export class TokenDerbyStack extends cdk.Stack {
       partitionKey: { name: 'admin_code', type: dynamodb.AttributeType.STRING },
     });
 
+    table.addGlobalSecondaryIndex({
+      indexName: 'OrgNameIndex',
+      partitionKey: { name: 'org_name', type: dynamodb.AttributeType.STRING },
+    });
+
+    table.addGlobalSecondaryIndex({
+      indexName: 'OrgJoinTokenIndex',
+      partitionKey: { name: 'org_join_token', type: dynamodb.AttributeType.STRING },
+    });
+
+    table.addGlobalSecondaryIndex({
+      indexName: 'OrgMembershipIndex',
+      partitionKey: { name: 'member_user_id', type: dynamodb.AttributeType.STRING },
+    });
+
     // ── Lambda factory ─────────────────────────────────────────────────
     const apiDir = path.resolve(__dirname, '..', '..', 'api', 'src', 'handlers');
     const commonEnv = { TABLE_NAME, NODE_OPTIONS: '--enable-source-maps' };
@@ -80,14 +95,25 @@ export class TokenDerbyStack extends cdk.Stack {
     const joinRaceFn = makeFn('JoinRaceFn', 'join-race');
     const heartbeatFn = makeFn('HeartbeatFn', 'heartbeat');
     const endRaceFn = makeFn('EndRaceFn', 'end-race');
+    const createOrgFn = makeFn('CreateOrgFn', 'create-organisation');
+    const joinOrgFn = makeFn('JoinOrgFn', 'join-organisation');
+    const listOrgsFn = makeFn('ListOrgsFn', 'list-organisations');
+    const getOrgFn = makeFn('GetOrgFn', 'get-organisation');
+    const initJockeyFn = makeFn('InitJockeyFn', 'init-jockey');
+    const getJockeyFn = makeFn('GetJockeyFn', 'get-jockey');
+    const updateJockeyFn = makeFn('UpdateJockeyFn', 'update-jockey');
+    const listStableFn = makeFn('ListStableFn', 'list-stable');
+    const createStableHorseFn = makeFn('CreateStableHorseFn', 'create-stable-horse');
+    const updateStableHorseFn = makeFn('UpdateStableHorseFn', 'update-stable-horse');
+    const deleteStableHorseFn = makeFn('DeleteStableHorseFn', 'delete-stable-horse');
 
     // ── HTTP API Gateway ───────────────────────────────────────────────
     const httpApi = new HttpApi(this, 'TokenDerbyApi', {
       apiName: 'token-derby-api',
       corsPreflight: {
         allowOrigins: [`https://${DOMAIN_NAME}`, 'http://localhost:5173'],
-        allowMethods: [CorsHttpMethod.GET, CorsHttpMethod.POST, CorsHttpMethod.DELETE, CorsHttpMethod.OPTIONS],
-        allowHeaders: ['content-type', 'authorization'],
+        allowMethods: [CorsHttpMethod.GET, CorsHttpMethod.POST, CorsHttpMethod.PUT, CorsHttpMethod.DELETE, CorsHttpMethod.OPTIONS],
+        allowHeaders: ['content-type', 'authorization', 'x-user-id', 'x-user-token', 'x-cli-version'],
       },
     });
 
@@ -96,6 +122,17 @@ export class TokenDerbyStack extends cdk.Stack {
     httpApi.addRoutes({ path: '/api/races/{join_code}/join', methods: [HttpMethod.POST], integration: new HttpLambdaIntegration('JoinRaceInt', joinRaceFn) });
     httpApi.addRoutes({ path: '/api/races/{join_code}/horses/{horse_id}/heartbeat', methods: [HttpMethod.POST], integration: new HttpLambdaIntegration('HeartbeatInt', heartbeatFn) });
     httpApi.addRoutes({ path: '/api/races/admin/{admin_code}', methods: [HttpMethod.DELETE], integration: new HttpLambdaIntegration('EndRaceInt', endRaceFn) });
+    httpApi.addRoutes({ path: '/api/organisations', methods: [HttpMethod.POST], integration: new HttpLambdaIntegration('CreateOrgInt', createOrgFn) });
+    httpApi.addRoutes({ path: '/api/organisations', methods: [HttpMethod.GET], integration: new HttpLambdaIntegration('ListOrgsInt', listOrgsFn) });
+    httpApi.addRoutes({ path: '/api/organisations/join', methods: [HttpMethod.POST], integration: new HttpLambdaIntegration('JoinOrgInt', joinOrgFn) });
+    httpApi.addRoutes({ path: '/api/organisations/{org_name}', methods: [HttpMethod.GET], integration: new HttpLambdaIntegration('GetOrgInt', getOrgFn) });
+    httpApi.addRoutes({ path: '/api/jockey/init', methods: [HttpMethod.POST], integration: new HttpLambdaIntegration('InitJockeyInt', initJockeyFn) });
+    httpApi.addRoutes({ path: '/api/jockey/me', methods: [HttpMethod.GET], integration: new HttpLambdaIntegration('GetJockeyInt', getJockeyFn) });
+    httpApi.addRoutes({ path: '/api/jockey/me', methods: [HttpMethod.PUT], integration: new HttpLambdaIntegration('UpdateJockeyInt', updateJockeyFn) });
+    httpApi.addRoutes({ path: '/api/jockey/me/horses', methods: [HttpMethod.GET], integration: new HttpLambdaIntegration('ListStableInt', listStableFn) });
+    httpApi.addRoutes({ path: '/api/jockey/me/horses', methods: [HttpMethod.POST], integration: new HttpLambdaIntegration('CreateStableHorseInt', createStableHorseFn) });
+    httpApi.addRoutes({ path: '/api/jockey/me/horses/{stable_horse_id}', methods: [HttpMethod.PUT], integration: new HttpLambdaIntegration('UpdateStableHorseInt', updateStableHorseFn) });
+    httpApi.addRoutes({ path: '/api/jockey/me/horses/{stable_horse_id}', methods: [HttpMethod.DELETE], integration: new HttpLambdaIntegration('DeleteStableHorseInt', deleteStableHorseFn) });
 
     // API throttling (rate-limit guardrails, not hard security)
     const defaultStage = httpApi.defaultStage!.node.defaultChild as apigatewayv2.CfnStage;

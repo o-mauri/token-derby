@@ -63,6 +63,28 @@ export async function setHorseFinalTokens(
   }
 }
 
+// Conditional XP-award marker. Only the first caller succeeds; subsequent
+// callers return false so the stable-horse XP increment is not repeated.
+export async function setHorseXpAwarded(
+  race_id: string,
+  horse_id: string,
+  xp_awarded: number,
+): Promise<boolean> {
+  try {
+    await ddb.send(new UpdateCommand({
+      TableName: TABLE,
+      Key: horseKey(race_id, horse_id),
+      UpdateExpression: 'SET xp_awarded = :x',
+      ConditionExpression: 'attribute_not_exists(xp_awarded)',
+      ExpressionAttributeValues: { ':x': xp_awarded },
+    }));
+    return true;
+  } catch (e: any) {
+    if (e?.name === 'ConditionalCheckFailedException') return false;
+    throw e;
+  }
+}
+
 export type HorseHeartbeatRecord = {
   current_tokens: number;
   last_heartbeat: string;

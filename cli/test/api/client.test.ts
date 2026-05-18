@@ -108,10 +108,11 @@ describe('request', () => {
       .rejects.toMatchObject({ code: 'VERSION_MISMATCH', status: 426 });
   });
 
-  it('attaches X-User-Id and X-User-Name when identity is set', async () => {
+  it('attaches X-User-Id and X-User-Token when identity is set', async () => {
     await saveIdentity({
       user_id: '12345678-1234-1234-1234-123456789012',
       display_name: 'Alice',
+      secret_token: 'super_secret_xyz',
       created_at: '2026-05-14T10:00:00Z',
     });
     const fetch = fakeFetch(200, {});
@@ -119,7 +120,17 @@ describe('request', () => {
     const init = fetch.mock.calls[0]?.[1] as RequestInit;
     const headers = init.headers as Record<string, string>;
     expect(headers['x-user-id']).toBe('12345678-1234-1234-1234-123456789012');
-    expect(headers['x-user-name']).toBe('Alice');
+    expect(headers['x-user-token']).toBe('super_secret_xyz');
+    // Display name is NOT sent (server has it stored).
+    expect(headers['x-user-name']).toBeUndefined();
+  });
+
+  it('attaches a User-Agent header on every request', async () => {
+    const fetch = fakeFetch(200, {});
+    await request('GET', '/foo', undefined, undefined, fetch as any);
+    const init = fetch.mock.calls[0]?.[1] as RequestInit;
+    const headers = init.headers as Record<string, string>;
+    expect(headers['user-agent']).toMatch(/^token-derby\//);
   });
 
   it('omits identity headers when no identity is saved', async () => {
@@ -128,17 +139,17 @@ describe('request', () => {
     const init = fetch.mock.calls[0]?.[1] as RequestInit;
     const headers = init.headers as Record<string, string>;
     expect(headers['x-user-id']).toBeUndefined();
-    expect(headers['x-user-name']).toBeUndefined();
+    expect(headers['x-user-token']).toBeUndefined();
   });
 
-  it('surfaces IDENTITY_REQUIRED and DUPLICATE_HORSE error envelopes', async () => {
-    const fIdent = fakeFetch(400, { code: 'IDENTITY_REQUIRED', message: 'need uid' });
-    await expect(request('POST', '/x', {}, undefined, fIdent as any))
-      .rejects.toMatchObject({ code: 'IDENTITY_REQUIRED', status: 400 });
+  it('surfaces UNAUTHENTICATED and STABLE_HORSE_NOT_FOUND error envelopes', async () => {
+    const fUnauth = fakeFetch(401, { code: 'UNAUTHENTICATED', message: 'bad token' });
+    await expect(request('POST', '/x', {}, undefined, fUnauth as any))
+      .rejects.toMatchObject({ code: 'UNAUTHENTICATED', status: 401 });
 
-    const fDup = fakeFetch(409, { code: 'DUPLICATE_HORSE', message: "you're as Gary" });
-    await expect(request('POST', '/x', {}, undefined, fDup as any))
-      .rejects.toMatchObject({ code: 'DUPLICATE_HORSE', status: 409 });
+    const fStable = fakeFetch(404, { code: 'STABLE_HORSE_NOT_FOUND', message: "no horse" });
+    await expect(request('POST', '/x', {}, undefined, fStable as any))
+      .rejects.toMatchObject({ code: 'STABLE_HORSE_NOT_FOUND', status: 404 });
   });
 });
 

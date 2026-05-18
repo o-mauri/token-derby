@@ -5,10 +5,6 @@ export function homeDir(): string {
   return process.env.TOKEN_DERBY_HOME ?? path.join(os.homedir(), '.token-derby');
 }
 
-export function stableFile(): string {
-  return path.join(homeDir(), 'stable.json');
-}
-
 export function identityFile(): string {
   return path.join(homeDir(), 'identity.json');
 }
