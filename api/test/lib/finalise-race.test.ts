@@ -130,6 +130,25 @@ describe('finaliseRace', () => {
     expect(findHorse(stored, 'Alpha').final_tokens).toBe(100);
     expect(findHorse(stored, 'Beta').final_tokens).toBe(250);
   });
+
+  it('adds live_xp to the awarded XP at finalisation', async () => {
+    const horseWithLive = makeHorse('Alpha', 100);
+    horseWithLive.live_xp = 12;  // mid-race XP accrued during the race
+    const horses = [horseWithLive, makeHorse('Beta', 250)];
+    const race = await setupRace(horses);
+
+    const result = await finaliseRace(race, new Date());
+
+    const stored = await listHorses(race.race_id);
+    const alpha = findHorse(stored, 'Alpha');
+    // Alpha came 2nd in a 2-horse race.
+    // xpForRaceResult(2): compete(25) + podium(25) + runner_up(15) = 65
+    // token_bonus: round(100/250 * 15) = 6
+    // live_xp: 12
+    // Total: 65 + 6 + 12 = 83
+    expect(alpha.xp_awarded).toBe(83);
+    expect(result.newly_finalised).toBe(true);
+  });
 });
 
 describe('setRaceEndedIfAbsent', () => {

@@ -46,7 +46,7 @@ export async function finaliseRace(race: Race, now: Date): Promise<FinaliseResul
   const winner_tokens = ranked[0]?.final_tokens ?? 0;
   await Promise.all(ranked.map(async (h, i) => {
     const rank = i + 1;
-    const xp = xpForRaceResult(rank) + xpForTokenBonus(rank, h.final_tokens, winner_tokens);
+    const xp = xpForRaceResult(rank) + xpForTokenBonus(rank, h.final_tokens, winner_tokens) + (h.live_xp ?? 0);
     const isFirstAward = await setHorseXpAwarded(race.race_id, h.horse_id, xp);
     if (isFirstAward && h.user_id && h.stable_horse_id) {
       await awardHorseXp(h.user_id, h.stable_horse_id, xp);
