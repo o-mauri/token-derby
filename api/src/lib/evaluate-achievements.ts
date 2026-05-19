@@ -1,5 +1,5 @@
-import type { AchievementName, RecentEvent } from '@token-derby/shared';
-import { MIDRACE_XP, MIDRACE_CAPS, MIDRACE_THRESHOLDS, overtakeDescription } from '@token-derby/shared';
+import type { RecentEvent } from '@token-derby/shared';
+import { MIDRACE_XP, MIDRACE_CAPS, MIDRACE_THRESHOLDS } from '@token-derby/shared';
 
 export type AchievementState = {
   live_xp: number;

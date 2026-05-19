@@ -249,14 +249,24 @@ describe('evaluateAchievements — Stampede!', () => {
     expect(result.next.last_stampede_at).toBe(1_000_000);
   });
 
-  it('does not fire below the 7000 threshold', () => {
+  it('does not fire when token gain is exactly 6999', () => {
     const prev = emptyState();
     const result = evaluateAchievements(input({
       prev,
-      current_tokens: 7_000,
-      prev_current_tokens: 1_000,
+      current_tokens: 7_999,
+      prev_current_tokens: 1_000,  // gain = 6999
     }));
     expect(result.events_this_tick.find(e => e.name === 'Stampede!')).toBeUndefined();
+  });
+
+  it('fires when token gain is exactly 7000', () => {
+    const prev = emptyState();
+    const result = evaluateAchievements(input({
+      prev,
+      current_tokens: 8_000,
+      prev_current_tokens: 1_000,  // gain = 7000 exactly
+    }));
+    expect(result.events_this_tick.find(e => e.name === 'Stampede!')).toBeDefined();
   });
 
   it('respects 2-hour cooldown', () => {
