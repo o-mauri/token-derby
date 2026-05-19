@@ -40,6 +40,26 @@ export function evaluateAchievements(inp: EvaluateInput): EvaluateOutput {
   if (inp.warm_up_active) {
     return { next: inp.prev, xp_delta: 0, events_this_tick: [] };
   }
-  // To be implemented in later steps.
-  return { next: inp.prev, xp_delta: 0, events_this_tick: [] };
+
+  const next: AchievementState = { ...inp.prev, recent_events: [...inp.prev.recent_events] };
+  const events: RecentEvent[] = [];
+  let xpDelta = 0;
+
+  const dt = Math.max(0, inp.now_ms - inp.last_heartbeat_at_ms);
+
+  // Racer!
+  next.racer_streak_ms = inp.prev.racer_streak_ms + Math.min(dt, MIDRACE_THRESHOLDS.racer_dt_cap_ms);
+  if (next.racer_streak_ms >= MIDRACE_THRESHOLDS.streak_hour_ms) {
+    if (next.racer_awards < MIDRACE_CAPS.racer_awards) {
+      const event: RecentEvent = { at: inp.now_ms, name: 'Racer!', xp: MIDRACE_XP.racer };
+      events.push(event);
+      next.recent_events.push(event);
+      xpDelta += MIDRACE_XP.racer;
+      next.racer_awards += 1;
+    }
+    next.racer_streak_ms = 0;
+  }
+
+  next.live_xp = inp.prev.live_xp + xpDelta;
+  return { next, xp_delta: xpDelta, events_this_tick: events };
 }
