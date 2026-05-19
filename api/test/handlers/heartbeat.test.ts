@@ -225,4 +225,70 @@ describe('heartbeat handler', () => {
     const horses = await listHorses(race_id);
     expect(horses[0]?.current_tokens).toBe(777);
   });
+
+  it('accrues live_xp and recent_events across multiple heartbeats', async () => {
+    // Use a race that started well before the warm-up window (>8% of total duration ago).
+    const user = await makeUser('XP_User');
+    const horse = await makeHorse(user, 'XP_Gary', COLORS);
+    // Start 1 hour ago, end 1 hour from now — warm-up is 8% of 2h = ~9.6 min, well past it.
+    const createRes: any = await createHandler({
+      version: '2.0', routeKey: 'POST /races', rawPath: '/races', rawQueryString: '',
+      headers: { 'content-type': 'application/json', 'x-cli-version': '2.0.0', 'x-user-id': user.user_id, 'x-user-token': user.secret_token },
+      requestContext: {} as any, isBase64Encoded: false,
+      body: JSON.stringify({
+        name: 'XP Test',
+        start_time: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+        end_time: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+        tz: 'UTC',
+      }),
+    });
+    const { join_code } = JSON.parse(createRes.body);
+    const joinRes: any = await joinHandler({
+      version: '2.0', routeKey: 'POST /races/{join_code}/join', rawPath: `/races/${join_code}/join`, rawQueryString: '',
+      pathParameters: { join_code },
+      headers: { 'content-type': 'application/json', 'x-cli-version': '2.0.0', 'x-user-id': user.user_id, 'x-user-token': user.secret_token },
+      requestContext: {} as any, isBase64Encoded: false,
+      body: JSON.stringify({ stable_horse_id: horse.stable_horse_id }),
+    });
+    const { horse_id, heartbeat_token } = JSON.parse(joinRes.body);
+    // First heartbeat — initializes state.
+    await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { current_tokens: 100 }));
+    // Second heartbeat with a big token jump should trigger Stampede! (delta >= 7000).
+    const res: any = await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { current_tokens: 10_000 }));
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    const own = body.horses.find((h: any) => h.horse_id === horse_id);
+    expect(own.live_xp).toBe(2);
+    expect(own.recent_events?.some((e: any) => e.name === 'Stampede!')).toBe(true);
+  });
+
+  it('does not accrue XP during the warm-up window', async () => {
+    // Set up a race with start_time = now (so warm-up just began).
+    const user = await makeUser('WU_User');
+    const horse = await makeHorse(user, 'WU_Gary', COLORS);
+    const startIso = new Date().toISOString();
+    const endIso = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    const createRes: any = await createHandler({
+      version: '2.0', routeKey: 'POST /races', rawPath: '/races', rawQueryString: '',
+      headers: { 'content-type': 'application/json', 'x-cli-version': '2.0.0', 'x-user-id': user.user_id, 'x-user-token': user.secret_token },
+      requestContext: {} as any, isBase64Encoded: false,
+      body: JSON.stringify({ name: 'WU Test', start_time: startIso, end_time: endIso, tz: 'UTC' }),
+    });
+    const { join_code } = JSON.parse(createRes.body);
+    const joinRes: any = await joinHandler({
+      version: '2.0', routeKey: 'POST /races/{join_code}/join', rawPath: `/races/${join_code}/join`, rawQueryString: '',
+      pathParameters: { join_code },
+      headers: { 'content-type': 'application/json', 'x-cli-version': '2.0.0', 'x-user-id': user.user_id, 'x-user-token': user.secret_token },
+      requestContext: {} as any, isBase64Encoded: false,
+      body: JSON.stringify({ stable_horse_id: horse.stable_horse_id }),
+    });
+    const { horse_id: hid, heartbeat_token: hbt } = JSON.parse(joinRes.body);
+    // Big token jump that would normally trigger Stampede!
+    await hbHandler(hbEvent(join_code, hid, hbt, { current_tokens: 100 }));
+    const res: any = await hbHandler(hbEvent(join_code, hid, hbt, { current_tokens: 10_000 }));
+    const body = JSON.parse(res.body);
+    const own = body.horses.find((h: any) => h.horse_id === hid);
+    expect(own.live_xp ?? 0).toBe(0);
+    expect(own.recent_events ?? []).toEqual([]);
+  });
 });

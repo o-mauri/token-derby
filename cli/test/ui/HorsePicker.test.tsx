@@ -56,10 +56,10 @@ describe('HorsePicker', () => {
     const { lastFrame } = render(<HorsePicker horses={stable} onPick={() => {}} onCancel={() => {}} />);
     await tick();
     const frame = lastFrame() ?? '';
-    // Gary has 0 XP → Lvl. 1; Pony has 150 → Lvl. 2 (≥ 50); Dash has 1500 → Lvl. 6 (≥ 1040)
+    // Gary has 0 XP → Lvl. 1; Pony has 150 → Lvl. 2 (≥ 50); Dash has 1500 → Lvl. 7 (≥ 1317)
     expect(frame).toMatch(/Gary\s+\[Lvl\. 1\]/);
     expect(frame).toMatch(/Pony\s+\[Lvl\. 2\]/);
-    expect(frame).toMatch(/Dash\s+\[Lvl\. 6\]/);
+    expect(frame).toMatch(/Dash\s+\[Lvl\. 7\]/);
   });
 
   it('renders empty-state message when stable is empty', async () => {

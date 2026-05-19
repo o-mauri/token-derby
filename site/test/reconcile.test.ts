@@ -96,8 +96,8 @@ describe('reconcileHorses', () => {
     ] });
     reconcileHorses(track, r, new Date('2026-04-22T13:00:00Z'));
     const chips = Array.from(track.querySelectorAll('.horse-level')).map(el => el.textContent);
-    // Alpha at 0 xp → Lvl. 1; Bravo at 1500 → Lvl. 6 (threshold for Lvl 6 is 1040)
-    expect(chips).toEqual(['Lvl. 1', 'Lvl. 6']);
+    // Alpha at 0 xp → Lvl. 1; Bravo at 1500 → Lvl. 7 (threshold for Lvl 7 is 1317)
+    expect(chips).toEqual(['Lvl. 1', 'Lvl. 7']);
   });
 
   it('renders the user_name in a .user-label under the horse name', () => {

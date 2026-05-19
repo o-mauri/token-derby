@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Box, Text, useApp } from 'ink';
 import type { GetRaceResponse, HeartbeatResponse } from '@token-derby/shared';
 import { StatusScreen } from '../ui/StatusScreen.js';
+import { AchievementToast } from '../ui/AchievementToast.js';
+import { ACHIEVEMENT_DESCRIPTIONS, overtakeDescription, type RecentEvent } from '@token-derby/shared';
 import { runHeartbeatLoop } from './heartbeat-loop.js';
 import { sumOutputTokens } from '../tokens/transcripts.js';
 import { initialBaseline } from '../tokens/baseline.js';
@@ -24,6 +26,8 @@ export function RunRace({ active, startingBaseline, pendingMode, ownUserName }: 
   const [lastHbOk, setLastHbOk] = useState<boolean>(true);
   const [tickNow, setTickNow] = useState<Date>(new Date());
   const [fatalError, setFatalError] = useState<string | null>(null);
+  const [toasts, setToasts] = useState<Array<{ key: string; event: RecentEvent }>>([]);
+  const shownToastAtRef = useRef<number>(0);
 
   const baselineRef = useRef(startingBaseline);
   const pendingRef = useRef(pendingMode);
@@ -70,6 +74,16 @@ export function RunRace({ active, startingBaseline, pendingMode, ownUserName }: 
         setLastHbAt(new Date());
         setLastHbOk(true);
         setRace(raceViewFrom(resp));
+        const own = resp.horses.find(h => h.horse_id === active.horse_id);
+        const candidates = (own?.recent_events ?? []).filter(e => e.at > shownToastAtRef.current);
+        if (candidates.length > 0) {
+          shownToastAtRef.current = Math.max(...candidates.map(e => e.at));
+          const fresh = candidates.map(e => ({ key: `${e.at}-${e.name}`, event: e }));
+          setToasts(prev => [...prev, ...fresh]);
+          for (const { key } of fresh) {
+            setTimeout(() => setToasts(prev => prev.filter(t => t.key !== key)), 10_000);
+          }
+        }
         if (resp.race_status === 'finished') exit();
       },
       onError: (err) => {
@@ -120,15 +134,28 @@ export function RunRace({ active, startingBaseline, pendingMode, ownUserName }: 
   }
 
   return (
-    <StatusScreen
-      race={race}
-      ownHorseId={active.horse_id}
-      ownHorseName={active.horse_name}
-      ownColors={active.horse_colors}
-      ownUserName={ownUserName}
-      lastHeartbeatAgoSec={lastHeartbeatAgoSec}
-      lastHeartbeatOk={lastHbOk}
-    />
+    <Box flexDirection="column">
+      <StatusScreen
+        race={race}
+        ownHorseId={active.horse_id}
+        ownHorseName={active.horse_name}
+        ownColors={active.horse_colors}
+        ownUserName={ownUserName}
+        lastHeartbeatAgoSec={lastHeartbeatAgoSec}
+        lastHeartbeatOk={lastHbOk}
+      />
+      {toasts.slice(0, 3).map(({ key, event }) => (
+        <AchievementToast
+          key={key}
+          horseName={active.horse_name}
+          name={event.name}
+          description={event.name === 'Overtake!'
+            ? overtakeDescription(Math.floor(event.xp / 3))
+            : ACHIEVEMENT_DESCRIPTIONS[event.name]}
+          xp={event.xp}
+        />
+      ))}
+    </Box>
   );
 }
 

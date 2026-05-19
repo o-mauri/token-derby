@@ -2,11 +2,11 @@ import { describe, it, expect } from 'vitest';
 import { XP_THRESHOLDS, MAX_LEVEL, levelFromXp, levelInfo, thresholdForLevel, xpForLevel, xpForRaceResult, xpForTokenBonus, XP_AWARDS } from '@token-derby/shared';
 
 describe('xpForLevel formula', () => {
-  it('matches the documented values from 2.5n³ + 20n² + 50n − 22.5', () => {
+  it('matches the documented values from 1.8n³ + 18n² + 50n − 19.8', () => {
     expect(xpForLevel(1)).toBe(50);
-    expect(xpForLevel(2)).toBe(177.5);
-    expect(xpForLevel(3)).toBe(375);
-    expect(xpForLevel(4)).toBe(657.5);
+    expect(xpForLevel(2)).toBeCloseTo(166.6, 4);
+    expect(xpForLevel(3)).toBeCloseTo(340.8, 4);
+    expect(xpForLevel(4)).toBeCloseTo(583.4, 4);
   });
 });
 
@@ -17,9 +17,9 @@ describe('thresholdForLevel', () => {
 
   it('level n (n>1) rounds xpForLevel(n-1) to an integer', () => {
     expect(thresholdForLevel(2)).toBe(50);
-    expect(thresholdForLevel(3)).toBe(178); // 177.5 rounded
-    expect(thresholdForLevel(4)).toBe(375);
-    expect(thresholdForLevel(5)).toBe(658); // 657.5 rounded
+    expect(thresholdForLevel(3)).toBe(167); // 166.6 rounded
+    expect(thresholdForLevel(4)).toBe(341); // 340.8 rounded
+    expect(thresholdForLevel(5)).toBe(583); // 583.4 rounded
   });
 });
 
@@ -31,8 +31,8 @@ describe('levelFromXp', () => {
   it('returns the highest level whose threshold is met', () => {
     expect(levelFromXp(49)).toBe(1);
     expect(levelFromXp(50)).toBe(2);
-    expect(levelFromXp(177)).toBe(2);
-    expect(levelFromXp(178)).toBe(3);
+    expect(levelFromXp(166)).toBe(2);
+    expect(levelFromXp(167)).toBe(3);
   });
 
   it('caps at MAX_LEVEL', () => {

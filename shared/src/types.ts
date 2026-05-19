@@ -1,3 +1,5 @@
+import type { RecentEvent } from './midrace.js';
+
 export type HorseColors = {
   body: string;
   mane: string;
@@ -18,6 +20,21 @@ export type Horse = {
   user_name: string;
   xp: number;
   xp_awarded?: number;
+  // Mid-race XP state — all optional for backwards compat with existing race-horse rows.
+  live_xp?: number;
+  last_rank?: number;
+  racer_streak_ms?: number;
+  racer_awards?: number;
+  pacesetter_streak_ms?: number;
+  pacesetter_awards?: number;
+  overtake_awards?: number;
+  lead_take_awards?: number;
+  last_stampede_at?: number;
+  was_in_last?: boolean;
+  comeback_awarded?: boolean;
+  last_gap_in_1st?: number;
+  last_pulled_away_at?: number;
+  recent_events?: RecentEvent[];
 };
 
 export type RaceStatus = 'pending' | 'live' | 'finished';
@@ -92,4 +109,11 @@ export type StableHorse = {
   colors: HorseColors;
   created_at: string;
   xp: number;
+  // Lifetime race stats. All optional for backwards compat — pre-existing
+  // stable horses without these fields read as 0.
+  races_entered?: number;
+  wins?: number;                     // count of rank-1 finishes
+  podiums?: number;                  // count of rank ≤ 3 finishes
+  total_tokens?: number;             // sum of final_tokens across all races
+  total_finishing_position?: number; // sum of ranks; avg = sum / races_entered
 };

@@ -635,3 +635,35 @@ html, body {
   .podium .name { font-size: 1.25rem; }
   .podium .tokens { font-size: 1.1rem; }
 }
+
+/* ── Achievement toasts ─────────────────────────────── */
+
+.achievement-toast {
+  display: flex;
+  position: fixed;
+  right: 1rem;
+  align-items: stretch;
+  background: rgba(20, 20, 20, 0.92);
+  color: #fff;
+  border: 1px solid #ffd166;
+  border-radius: 8px;
+  padding: 0.5rem 0.75rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  z-index: 9999;
+  animation: achievementToastIn 0.25s ease-out;
+}
+.achievement-toast-xp {
+  font-size: 1.4rem;
+  font-weight: bold;
+  color: #ffd166;
+  align-self: center;
+  padding-right: 0.75rem;
+  border-right: 1px solid rgba(255, 255, 255, 0.2);
+  margin-right: 0.75rem;
+}
+.achievement-toast-title { font-weight: bold; }
+.achievement-toast-desc { color: #ccc; font-size: 0.9rem; }
+@keyframes achievementToastIn {
+  from { opacity: 0; transform: translateX(20px); }
+  to   { opacity: 1; transform: translateX(0); }
+}

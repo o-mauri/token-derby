@@ -30,7 +30,7 @@ export function StatusScreen(props: Props) {
   const leader: HorseView | undefined = race.horses[0];
   const elapsedPct = elapsed(race);
   const timeLeft = formatDuration(race.time_left_seconds);
-  const lvl = levelInfo(own?.xp ?? 0);
+  const lvl = levelInfo((own?.xp ?? 0) + (own?.live_xp ?? 0));
 
   return (
     <Box flexDirection="column" borderStyle="round" paddingX={1}>
