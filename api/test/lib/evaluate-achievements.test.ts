@@ -283,3 +283,64 @@ describe('evaluateAchievements — Stampede!', () => {
     expect(result.events_this_tick.find(e => e.name === 'Stampede!')).toBeDefined();
   });
 });
+
+describe('evaluateAchievements — Comeback!', () => {
+  it('records was_in_last when the horse is at rank == total_horses', () => {
+    const prev = emptyState();
+    const result = evaluateAchievements(input({
+      prev,
+      new_rank: 4,
+      total_horses: 4,
+    }));
+    expect(result.next.was_in_last).toBe(true);
+  });
+
+  it('fires when was_in_last and new_rank is in the top half (4-horse race: top half = ranks 1-2)', () => {
+    const prev = emptyState();
+    prev.was_in_last = true;
+    const result = evaluateAchievements(input({
+      prev,
+      new_rank: 2,
+      total_horses: 4,
+    }));
+    expect(result.events_this_tick).toContainEqual({
+      at: expect.any(Number), name: 'Comeback!', xp: 5,
+    });
+    expect(result.next.comeback_awarded).toBe(true);
+  });
+
+  it('does not fire twice in the same race', () => {
+    const prev = emptyState();
+    prev.was_in_last = true;
+    prev.comeback_awarded = true;
+    const result = evaluateAchievements(input({
+      prev,
+      new_rank: 1,
+      total_horses: 4,
+    }));
+    expect(result.events_this_tick.find(e => e.name === 'Comeback!')).toBeUndefined();
+  });
+
+  it('does not fire in solo races (total_horses < 2)', () => {
+    const prev = emptyState();
+    const result = evaluateAchievements(input({
+      prev,
+      new_rank: 1,
+      total_horses: 1,
+    }));
+    expect(result.events_this_tick.find(e => e.name === 'Comeback!')).toBeUndefined();
+    // was_in_last is also not set in a solo race
+    expect(result.next.was_in_last).toBe(false);
+  });
+
+  it('does not fire when never having been in last', () => {
+    const prev = emptyState();
+    prev.was_in_last = false;
+    const result = evaluateAchievements(input({
+      prev,
+      new_rank: 1,
+      total_horses: 4,
+    }));
+    expect(result.events_this_tick.find(e => e.name === 'Comeback!')).toBeUndefined();
+  });
+});

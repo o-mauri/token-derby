@@ -125,6 +125,19 @@ export function evaluateAchievements(inp: EvaluateInput): EvaluateOutput {
     next.last_stampede_at = inp.now_ms;
   }
 
+  // Comeback! — was-in-last + currently in top half. Solo race excluded.
+  if (inp.total_horses >= 2) {
+    if (inp.new_rank === inp.total_horses) next.was_in_last = true;
+    const topHalf = Math.ceil(inp.total_horses / 2);
+    if (next.was_in_last && !next.comeback_awarded && inp.new_rank <= topHalf) {
+      const event: RecentEvent = { at: inp.now_ms, name: 'Comeback!', xp: MIDRACE_XP.comeback };
+      events.push(event);
+      next.recent_events.push(event);
+      xpDelta += MIDRACE_XP.comeback;
+      next.comeback_awarded = true;
+    }
+  }
+
   next.live_xp = inp.prev.live_xp + xpDelta;
   return { next, xp_delta: xpDelta, events_this_tick: events };
 }
