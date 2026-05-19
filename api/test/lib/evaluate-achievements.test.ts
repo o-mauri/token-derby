@@ -344,3 +344,88 @@ describe('evaluateAchievements — Comeback!', () => {
     expect(result.events_this_tick.find(e => e.name === 'Comeback!')).toBeUndefined();
   });
 });
+
+describe('evaluateAchievements — Pulled Away!', () => {
+  it('records last_gap_in_1st while in 1st', () => {
+    const prev = emptyState();
+    prev.last_rank = 1;
+    const result = evaluateAchievements(input({
+      prev,
+      new_rank: 1,
+      current_tokens: 50_000,
+      second_place_tokens: 45_000,
+    }));
+    expect(result.next.last_gap_in_1st).toBe(5_000);
+  });
+
+  it('clears last_gap_in_1st when not in 1st', () => {
+    const prev = emptyState();
+    prev.last_rank = 1;
+    prev.last_gap_in_1st = 5_000;
+    const result = evaluateAchievements(input({
+      prev,
+      new_rank: 2,
+    }));
+    expect(result.next.last_gap_in_1st).toBeUndefined();
+  });
+
+  it('fires when gap grows by 5000+ since previous tick', () => {
+    const prev = emptyState();
+    prev.last_rank = 1;
+    prev.last_gap_in_1st = 1_000;
+    const result = evaluateAchievements(input({
+      prev,
+      new_rank: 1,
+      current_tokens: 100_000,
+      second_place_tokens: 90_000,  // gap now 10_000, growth 9_000
+      now_ms: 1_000_000,
+    }));
+    expect(result.events_this_tick).toContainEqual({
+      at: 1_000_000, name: 'Pulled Away!', xp: 3,
+    });
+    expect(result.next.last_pulled_away_at).toBe(1_000_000);
+    expect(result.next.last_gap_in_1st).toBe(10_000);
+  });
+
+  it('does not fire below the 5000 growth threshold', () => {
+    const prev = emptyState();
+    prev.last_rank = 1;
+    prev.last_gap_in_1st = 1_000;
+    const result = evaluateAchievements(input({
+      prev,
+      new_rank: 1,
+      current_tokens: 100_000,
+      second_place_tokens: 95_500,  // gap 4_500, growth 3_500
+    }));
+    expect(result.events_this_tick.find(e => e.name === 'Pulled Away!')).toBeUndefined();
+  });
+
+  it('respects 2-hour cooldown', () => {
+    const prev = emptyState();
+    prev.last_rank = 1;
+    prev.last_gap_in_1st = 1_000;
+    prev.last_pulled_away_at = 1_000_000;
+    const result = evaluateAchievements(input({
+      prev,
+      new_rank: 1,
+      current_tokens: 100_000,
+      second_place_tokens: 80_000,
+      now_ms: 1_000_000 + 60 * 60 * 1000,
+    }));
+    expect(result.events_this_tick.find(e => e.name === 'Pulled Away!')).toBeUndefined();
+  });
+
+  it('does not fire on first heartbeat in 1st (no prev gap to compare)', () => {
+    const prev = emptyState();
+    prev.last_rank = 1;
+    prev.last_gap_in_1st = undefined;
+    const result = evaluateAchievements(input({
+      prev,
+      new_rank: 1,
+      current_tokens: 100_000,
+      second_place_tokens: 50_000,
+    }));
+    expect(result.events_this_tick.find(e => e.name === 'Pulled Away!')).toBeUndefined();
+    expect(result.next.last_gap_in_1st).toBe(50_000);
+  });
+});

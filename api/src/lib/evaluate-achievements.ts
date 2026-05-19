@@ -138,6 +138,28 @@ export function evaluateAchievements(inp: EvaluateInput): EvaluateOutput {
     }
   }
 
+  // Pulled Away! — gap-over-2nd growth >= 5000 since previous tick in 1st + 2h cooldown.
+  if (inp.new_rank === 1) {
+    const second = inp.second_place_tokens ?? inp.current_tokens;
+    const gap = inp.current_tokens - second;
+    if (inp.prev.last_gap_in_1st !== undefined) {
+      const growth = gap - inp.prev.last_gap_in_1st;
+      const cooldownOk =
+        inp.prev.last_pulled_away_at === undefined ||
+        inp.now_ms - inp.prev.last_pulled_away_at >= MIDRACE_THRESHOLDS.pulled_away_cooldown_ms;
+      if (growth >= MIDRACE_THRESHOLDS.pulled_away_gap && cooldownOk) {
+        const event: RecentEvent = { at: inp.now_ms, name: 'Pulled Away!', xp: MIDRACE_XP.pulled_away };
+        events.push(event);
+        next.recent_events.push(event);
+        xpDelta += MIDRACE_XP.pulled_away;
+        next.last_pulled_away_at = inp.now_ms;
+      }
+    }
+    next.last_gap_in_1st = gap;
+  } else {
+    next.last_gap_in_1st = undefined;
+  }
+
   next.live_xp = inp.prev.live_xp + xpDelta;
   return { next, xp_delta: xpDelta, events_this_tick: events };
 }
