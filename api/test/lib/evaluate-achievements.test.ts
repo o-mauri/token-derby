@@ -429,3 +429,41 @@ describe('evaluateAchievements — Pulled Away!', () => {
     expect(result.next.last_gap_in_1st).toBe(50_000);
   });
 });
+
+describe('evaluateAchievements — bookkeeping', () => {
+  it('updates last_rank to new_rank on every (non-warm-up) tick', () => {
+    const prev = emptyState();
+    prev.last_rank = 5;
+    const result = evaluateAchievements(input({ prev, new_rank: 3 }));
+    expect(result.next.last_rank).toBe(3);
+  });
+
+  it('accumulates live_xp across multiple events in one tick', () => {
+    const prev = emptyState();
+    prev.last_rank = 4;
+    prev.racer_streak_ms = HOUR_MS - 30_000;
+    const result = evaluateAchievements(input({
+      prev,
+      new_rank: 1,  // triggers Took the lead! (+5) + Overtake! 2 positions (+6)
+      now_ms: 1_000_000,
+      last_heartbeat_at_ms: 1_000_000 - 60_000,  // also pushes Racer! over (+1)
+    }));
+    expect(result.xp_delta).toBe(5 + 6 + 1);
+    expect(result.next.live_xp).toBe(prev.live_xp + 5 + 6 + 1);
+  });
+
+  it('prunes recent_events entries older than 90 seconds', () => {
+    const prev = emptyState();
+    prev.recent_events = [
+      { at: 1_000_000 - 100_000, name: 'Racer!', xp: 1 },         // older than 90s, should be pruned
+      { at: 1_000_000 - 80_000, name: 'Overtake!', xp: 3 },       // within 90s, keep
+    ];
+    const result = evaluateAchievements(input({
+      prev,
+      now_ms: 1_000_000,
+    }));
+    expect(result.next.recent_events).toEqual([
+      { at: 1_000_000 - 80_000, name: 'Overtake!', xp: 3 },
+    ]);
+  });
+});

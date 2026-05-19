@@ -160,6 +160,10 @@ export function evaluateAchievements(inp: EvaluateInput): EvaluateOutput {
     next.last_gap_in_1st = undefined;
   }
 
+  next.last_rank = inp.new_rank;
   next.live_xp = inp.prev.live_xp + xpDelta;
+  next.recent_events = next.recent_events.filter(
+    e => inp.now_ms - e.at <= MIDRACE_THRESHOLDS.recent_events_retention_ms,
+  );
   return { next, xp_delta: xpDelta, events_this_tick: events };
 }
