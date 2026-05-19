@@ -6,6 +6,7 @@ export default defineConfig({
     'preview-finished': 'src/preview-finished.ts',
     'preview-org': 'src/preview-org.ts',
     'preview-race': 'src/preview-race.ts',
+    'preview-toasts': 'src/preview-toasts.ts',
   },
   format: ['esm'],
   target: 'es2022',
