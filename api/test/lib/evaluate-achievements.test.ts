@@ -169,3 +169,66 @@ describe('evaluateAchievements — Overtake!', () => {
     expect(result.events_this_tick.find(e => e.name === 'Took the lead!')).toBeUndefined();
   });
 });
+
+describe('evaluateAchievements — Pacesetter!', () => {
+  it('accumulates streak while in 1st', () => {
+    const prev = emptyState();
+    prev.last_rank = 1;
+    prev.pacesetter_streak_ms = 30_000;
+    const result = evaluateAchievements(input({
+      prev,
+      new_rank: 1,
+      now_ms: 1_000_000,
+      last_heartbeat_at_ms: 1_000_000 - 60_000,
+    }));
+    expect(result.next.pacesetter_streak_ms).toBe(30_000 + 60_000);
+  });
+
+  it('resets streak to 0 when dropping from 1st', () => {
+    const prev = emptyState();
+    prev.last_rank = 1;
+    prev.pacesetter_streak_ms = 600_000;
+    const result = evaluateAchievements(input({ prev, new_rank: 2 }));
+    expect(result.next.pacesetter_streak_ms).toBe(0);
+  });
+
+  it('starts streak fresh at dt when Took the lead! just fired', () => {
+    const prev = emptyState();
+    prev.last_rank = 3;
+    prev.pacesetter_streak_ms = 0;  // wasn't in 1st before
+    const result = evaluateAchievements(input({
+      prev,
+      new_rank: 1,
+      now_ms: 1_000_000,
+      last_heartbeat_at_ms: 1_000_000 - 60_000,
+    }));
+    expect(result.next.pacesetter_streak_ms).toBe(60_000);
+  });
+
+  it('awards Pacesetter! at 1 hour streak and resets streak', () => {
+    const prev = emptyState();
+    prev.last_rank = 1;
+    prev.pacesetter_streak_ms = HOUR_MS - 30_000;
+    const result = evaluateAchievements(input({
+      prev,
+      new_rank: 1,
+      now_ms: 2_000_000,
+      last_heartbeat_at_ms: 2_000_000 - 60_000,
+    }));
+    expect(result.next.pacesetter_streak_ms).toBe(0);
+    expect(result.next.pacesetter_awards).toBe(1);
+    expect(result.events_this_tick).toContainEqual({
+      at: 2_000_000, name: 'Pacesetter!', xp: 3,
+    });
+  });
+
+  it('respects pacesetter_awards cap of 3', () => {
+    const prev = emptyState();
+    prev.last_rank = 1;
+    prev.pacesetter_streak_ms = HOUR_MS;
+    prev.pacesetter_awards = 3;
+    const result = evaluateAchievements(input({ prev, new_rank: 1 }));
+    expect(result.events_this_tick.find(e => e.name === 'Pacesetter!')).toBeUndefined();
+    expect(result.next.pacesetter_awards).toBe(3);
+  });
+});

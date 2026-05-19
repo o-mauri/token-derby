@@ -93,6 +93,25 @@ export function evaluateAchievements(inp: EvaluateInput): EvaluateOutput {
     }
   }
 
+  // Pacesetter! — continuous time in 1st.
+  if (inp.new_rank === 1) {
+    next.pacesetter_streak_ms = leadTook
+      ? dt
+      : inp.prev.pacesetter_streak_ms + dt;
+    if (next.pacesetter_streak_ms >= MIDRACE_THRESHOLDS.streak_hour_ms) {
+      if (next.pacesetter_awards < MIDRACE_CAPS.pacesetter_awards) {
+        const event: RecentEvent = { at: inp.now_ms, name: 'Pacesetter!', xp: MIDRACE_XP.pacesetter };
+        events.push(event);
+        next.recent_events.push(event);
+        xpDelta += MIDRACE_XP.pacesetter;
+        next.pacesetter_awards += 1;
+      }
+      next.pacesetter_streak_ms = 0;
+    }
+  } else {
+    next.pacesetter_streak_ms = 0;
+  }
+
   next.live_xp = inp.prev.live_xp + xpDelta;
   return { next, xp_delta: xpDelta, events_this_tick: events };
 }
