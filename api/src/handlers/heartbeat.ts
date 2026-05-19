@@ -54,7 +54,12 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
   const now = new Date();
   const race_status = computeStatus(race, now);
 
-  if (race_status !== 'finished') {
+  let horses;
+  if (race_status === 'finished' && !race.ended_at) {
+    const result = await finaliseRace(race, now);
+    race = result.race;
+    horses = result.horses;
+  } else if (race_status !== 'finished') {
     const accepted = clampHeartbeat({
       previous_tokens: horse.current_tokens,
       previous_heartbeat_iso: horse.last_heartbeat,
@@ -68,7 +73,8 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
     const ranked = rankHorses(updatedHorses);
     const ownRanked = ranked.find(h => h.horse_id === horse_id)!;
     const second = ranked.find(h => h.rank === 2);
-    const lastHeartbeatMs = horse.last_heartbeat ? new Date(horse.last_heartbeat).getTime() : now.getTime();
+    const lastHeartbeatRaw = horse.last_heartbeat ? new Date(horse.last_heartbeat).getTime() : NaN;
+    const lastHeartbeatMs = Number.isNaN(lastHeartbeatRaw) ? now.getTime() : lastHeartbeatRaw;
     const startMs = new Date(race.start_time).getTime();
     const endMs = new Date(race.end_time).getTime();
     const warmUpEnd = startMs + (endMs - startMs) * MIDRACE_THRESHOLDS.warm_up_fraction;
@@ -99,14 +105,31 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
       warm_up_active: now.getTime() < warmUpEnd,
     });
     await updateHorseHeartbeat(race.race_id, horse_id, accepted, now.toISOString(), evalResult.next);
-  }
-
-  let horses;
-  if (race_status === 'finished' && !race.ended_at) {
-    const result = await finaliseRace(race, now);
-    race = result.race;
-    horses = result.horses;
+    // Reuse the pre-built horse list, patching the calling horse with fresh evaluator output.
+    horses = updatedHorses.map(h =>
+      h.horse_id === horse_id
+        ? {
+            ...h,
+            current_tokens: accepted,
+            live_xp: evalResult.next.live_xp,
+            last_rank: evalResult.next.last_rank,
+            racer_streak_ms: evalResult.next.racer_streak_ms,
+            racer_awards: evalResult.next.racer_awards,
+            pacesetter_streak_ms: evalResult.next.pacesetter_streak_ms,
+            pacesetter_awards: evalResult.next.pacesetter_awards,
+            overtake_awards: evalResult.next.overtake_awards,
+            lead_take_awards: evalResult.next.lead_take_awards,
+            last_stampede_at: evalResult.next.last_stampede_at,
+            was_in_last: evalResult.next.was_in_last,
+            comeback_awarded: evalResult.next.comeback_awarded,
+            last_gap_in_1st: evalResult.next.last_gap_in_1st,
+            last_pulled_away_at: evalResult.next.last_pulled_away_at,
+            recent_events: evalResult.next.recent_events,
+          }
+        : h,
+    );
   } else {
+    // Race was already finished before this call — no live update happened.
     horses = await listHorses(race.race_id);
   }
 

@@ -258,7 +258,7 @@ describe('heartbeat handler', () => {
     expect(res.statusCode).toBe(200);
     const body = JSON.parse(res.body);
     const own = body.horses.find((h: any) => h.horse_id === horse_id);
-    expect(own.live_xp).toBeGreaterThanOrEqual(2);
+    expect(own.live_xp).toBe(2);
     expect(own.recent_events?.some((e: any) => e.name === 'Stampede!')).toBe(true);
   });
 
