@@ -109,4 +109,11 @@ export type StableHorse = {
   colors: HorseColors;
   created_at: string;
   xp: number;
+  // Lifetime race stats. All optional for backwards compat — pre-existing
+  // stable horses without these fields read as 0.
+  races_entered?: number;
+  wins?: number;                     // count of rank-1 finishes
+  podiums?: number;                  // count of rank ≤ 3 finishes
+  total_tokens?: number;             // sum of final_tokens across all races
+  total_finishing_position?: number; // sum of ranks; avg = sum / races_entered
 };

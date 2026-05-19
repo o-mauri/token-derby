@@ -166,3 +166,35 @@ export async function awardHorseXp(
     throw e;
   }
 }
+
+/**
+ * Atomically increment lifetime race stats. Called once per (horse, race)
+ * at finalisation, gated by the per-race xp_awarded marker. If the horse
+ * has been deleted, the conditional check fails and the call is a no-op.
+ */
+export async function recordHorseRaceResult(
+  user_id: string,
+  stable_horse_id: string,
+  result: { final_tokens: number; rank: number },
+): Promise<void> {
+  try {
+    await ddb.send(new UpdateCommand({
+      TableName: TABLE,
+      Key: stableHorseKey(user_id, stable_horse_id),
+      UpdateExpression:
+        'ADD races_entered :one, wins :w, podiums :p, ' +
+        'total_tokens :t, total_finishing_position :r',
+      ConditionExpression: 'attribute_exists(pk)',
+      ExpressionAttributeValues: {
+        ':one': 1,
+        ':w': result.rank === 1 ? 1 : 0,
+        ':p': result.rank <= 3 ? 1 : 0,
+        ':t': Math.max(0, result.final_tokens),
+        ':r': result.rank,
+      },
+    }));
+  } catch (e: any) {
+    if (e?.name === 'ConditionalCheckFailedException') return;
+    throw e;
+  }
+}

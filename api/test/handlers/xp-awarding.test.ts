@@ -84,6 +84,11 @@ async function getStableXp(user: TestUser): Promise<number> {
   return horses[0]?.xp ?? 0;
 }
 
+async function getStableHorse(user: TestUser): Promise<any> {
+  const res: any = await listStable(authedEvent(user, 'GET', '/jockey/me/horses'));
+  return JSON.parse(res.body).horses[0];
+}
+
 describe('XP awarding on race end', () => {
   // tokensByPlace = [1000, 800, 500, 100], winner = 1000
   // Position XP + token bonus:
@@ -155,6 +160,62 @@ describe('XP awarding on race end', () => {
     const raceHorses = await listHorses(race_id);
     const winnerRaceHorse = raceHorses.find(h => h.horse_id === winner.horse_id)!;
     expect((winnerRaceHorse as any).xp_awarded).toBe(95);
+  });
+
+  it('records lifetime race stats on each stable horse', async () => {
+    const { admin_code, horses } = await setupRaceWithRanks();
+
+    await endHandler(authedEvent(null, 'DELETE', `/races/admin/${admin_code}`,
+      undefined, { admin_code }));
+
+    // Winner (rank 1, 1000 tokens)
+    const winner = await getStableHorse(horses[0]!.user);
+    expect(winner.races_entered).toBe(1);
+    expect(winner.wins).toBe(1);
+    expect(winner.podiums).toBe(1);
+    expect(winner.total_tokens).toBe(1000);
+    expect(winner.total_finishing_position).toBe(1);
+
+    // Rank 2 (800 tokens) — podium, not a win
+    const second = await getStableHorse(horses[1]!.user);
+    expect(second.races_entered).toBe(1);
+    expect(second.wins).toBe(0);
+    expect(second.podiums).toBe(1);
+    expect(second.total_tokens).toBe(800);
+    expect(second.total_finishing_position).toBe(2);
+
+    // Rank 3 (500 tokens) — podium
+    const third = await getStableHorse(horses[2]!.user);
+    expect(third.podiums).toBe(1);
+    expect(third.total_finishing_position).toBe(3);
+
+    // Rank 4 (100 tokens) — no podium
+    const fourth = await getStableHorse(horses[3]!.user);
+    expect(fourth.wins).toBe(0);
+    expect(fourth.podiums).toBe(0);
+    expect(fourth.total_tokens).toBe(100);
+    expect(fourth.total_finishing_position).toBe(4);
+  });
+
+  it('stats are idempotent — re-running finaliseRace does not double-count', async () => {
+    const { horses, race_id } = await setupRaceWithRanks();
+    const race = await getRaceById(race_id);
+    await finaliseRace(race!, new Date());
+
+    const statsAfterFirst = await Promise.all(horses.map(h => getStableHorse(h.user)));
+
+    // Force re-entry with a pre-end snapshot — the per-horse xp_awarded marker
+    // is what gates both the XP and stats writes.
+    await finaliseRace({ ...race!, ended_at: undefined }, new Date());
+
+    const statsAfterSecond = await Promise.all(horses.map(h => getStableHorse(h.user)));
+    for (let i = 0; i < statsAfterFirst.length; i++) {
+      expect(statsAfterSecond[i].races_entered).toBe(statsAfterFirst[i].races_entered);
+      expect(statsAfterSecond[i].wins).toBe(statsAfterFirst[i].wins);
+      expect(statsAfterSecond[i].podiums).toBe(statsAfterFirst[i].podiums);
+      expect(statsAfterSecond[i].total_tokens).toBe(statsAfterFirst[i].total_tokens);
+      expect(statsAfterSecond[i].total_finishing_position).toBe(statsAfterFirst[i].total_finishing_position);
+    }
   });
 
   it('single-participant race: that horse is rank 1 and gets 95 XP (80 position + 15 winner bonus)', async () => {
