@@ -67,7 +67,7 @@ function createLane(doc: Document, horse: HorseView): HTMLElement {
 
   const levelChip = doc.createElement('span');
   levelChip.className = 'horse-level';
-  levelChip.textContent = `Lvl.${levelFromXp(horse.xp)}`;
+  levelChip.textContent = `Lvl. ${levelFromXp(horse.xp + (horse.live_xp ?? 0))}`;
   nameRow.appendChild(levelChip);
 
   info.appendChild(nameRow);
@@ -113,4 +113,9 @@ function updateLane(
 
   const paceEl = wrap.querySelector<HTMLElement>('.horse-pace')!;
   paceEl.textContent = pace === null ? '—' : `+${tokenFmt.format(pace)}/min`;
+
+  const levelEl = wrap.querySelector<HTMLElement>('.horse-level');
+  if (levelEl) {
+    levelEl.textContent = `Lvl. ${levelFromXp(horse.xp + (horse.live_xp ?? 0))}`;
+  }
 }
