@@ -60,6 +60,39 @@ export function evaluateAchievements(inp: EvaluateInput): EvaluateOutput {
     next.racer_streak_ms = 0;
   }
 
+  // Took the lead! — must run before Overtake!; consumes the 2->1 step.
+  const prevRank = inp.prev.last_rank;
+  let leadTook = false;
+  if (
+    prevRank !== undefined &&
+    prevRank > 1 &&
+    inp.new_rank === 1 &&
+    next.lead_take_awards < MIDRACE_CAPS.lead_take_awards
+  ) {
+    const event: RecentEvent = { at: inp.now_ms, name: 'Took the lead!', xp: MIDRACE_XP.took_lead };
+    events.push(event);
+    next.recent_events.push(event);
+    xpDelta += MIDRACE_XP.took_lead;
+    next.lead_take_awards += 1;
+    leadTook = true;
+  }
+
+  // Overtake! — positions climbed since last tick, minus the 2->1 step if leadTook.
+  if (prevRank !== undefined) {
+    const positionsClimbed = Math.max(0, prevRank - inp.new_rank);
+    const countable = Math.max(0, positionsClimbed - (leadTook ? 1 : 0));
+    const slots = MIDRACE_CAPS.overtake_awards - next.overtake_awards;
+    const overtakes = Math.min(countable, slots);
+    if (overtakes > 0) {
+      const xp = MIDRACE_XP.overtake * overtakes;
+      const event: RecentEvent = { at: inp.now_ms, name: 'Overtake!', xp };
+      events.push(event);
+      next.recent_events.push(event);
+      xpDelta += xp;
+      next.overtake_awards += overtakes;
+    }
+  }
+
   next.live_xp = inp.prev.live_xp + xpDelta;
   return { next, xp_delta: xpDelta, events_this_tick: events };
 }

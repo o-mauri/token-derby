@@ -99,3 +99,73 @@ describe('evaluateAchievements — Racer!', () => {
     expect(result.next.racer_streak_ms).toBe(0);
   });
 });
+
+describe('evaluateAchievements — Took the lead!', () => {
+  it('fires +5 XP when prev rank > 1 and new rank is 1', () => {
+    const prev = emptyState();
+    prev.last_rank = 2;
+    const result = evaluateAchievements(input({ prev, new_rank: 1 }));
+    expect(result.xp_delta).toBe(5);
+    expect(result.events_this_tick).toContainEqual({
+      at: expect.any(Number), name: 'Took the lead!', xp: 5,
+    });
+    expect(result.next.lead_take_awards).toBe(1);
+  });
+
+  it('does not fire when staying in 1st (prev rank already 1)', () => {
+    const prev = emptyState();
+    prev.last_rank = 1;
+    const result = evaluateAchievements(input({ prev, new_rank: 1 }));
+    expect(result.events_this_tick.find(e => e.name === 'Took the lead!')).toBeUndefined();
+  });
+
+  it('respects cap of 3 lead-takes per race', () => {
+    const prev = emptyState();
+    prev.last_rank = 2;
+    prev.lead_take_awards = 3;
+    const result = evaluateAchievements(input({ prev, new_rank: 1 }));
+    expect(result.events_this_tick.find(e => e.name === 'Took the lead!')).toBeUndefined();
+  });
+});
+
+describe('evaluateAchievements — Overtake!', () => {
+  it('awards +3 per position climbed when not taking the lead', () => {
+    const prev = emptyState();
+    prev.last_rank = 5;
+    const result = evaluateAchievements(input({ prev, new_rank: 3 }));
+    // 5 -> 3 = 2 positions
+    expect(result.xp_delta).toBe(6);
+    expect(result.events_this_tick).toContainEqual({
+      at: expect.any(Number), name: 'Overtake!', xp: 6,
+    });
+    expect(result.next.overtake_awards).toBe(2);
+  });
+
+  it('subtracts the 2->1 climb when Took the lead! also fires (5->1 = +5 lead + 9 overtake)', () => {
+    const prev = emptyState();
+    prev.last_rank = 5;
+    const result = evaluateAchievements(input({ prev, new_rank: 1 }));
+    // Lead-take consumes the 2->1 step. Remaining 3 positions = +9 overtake.
+    expect(result.xp_delta).toBe(5 + 9);
+    expect(result.events_this_tick.find(e => e.name === 'Took the lead!')?.xp).toBe(5);
+    expect(result.events_this_tick.find(e => e.name === 'Overtake!')?.xp).toBe(9);
+  });
+
+  it('respects overtake_awards cap of 5', () => {
+    const prev = emptyState();
+    prev.last_rank = 10;
+    prev.overtake_awards = 4;
+    const result = evaluateAchievements(input({ prev, new_rank: 3, total_horses: 10 }));
+    // 10 -> 3 = 7 positions, but only 1 slot remaining -> +3 XP.
+    expect(result.events_this_tick.find(e => e.name === 'Overtake!')?.xp).toBe(3);
+    expect(result.next.overtake_awards).toBe(5);
+  });
+
+  it('does not fire on first heartbeat (last_rank undefined)', () => {
+    const prev = emptyState();
+    prev.last_rank = undefined;
+    const result = evaluateAchievements(input({ prev, new_rank: 1 }));
+    expect(result.events_this_tick.find(e => e.name === 'Overtake!')).toBeUndefined();
+    expect(result.events_this_tick.find(e => e.name === 'Took the lead!')).toBeUndefined();
+  });
+});
