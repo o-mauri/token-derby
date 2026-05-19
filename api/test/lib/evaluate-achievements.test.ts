@@ -232,3 +232,54 @@ describe('evaluateAchievements — Pacesetter!', () => {
     expect(result.next.pacesetter_awards).toBe(3);
   });
 });
+
+describe('evaluateAchievements — Stampede!', () => {
+  it('fires when current_tokens grows by 7000+ since prev tick', () => {
+    const prev = emptyState();
+    const result = evaluateAchievements(input({
+      prev,
+      current_tokens: 10_000,
+      prev_current_tokens: 2_500,
+      now_ms: 1_000_000,
+    }));
+    expect(result.xp_delta).toBeGreaterThanOrEqual(2);
+    expect(result.events_this_tick).toContainEqual({
+      at: 1_000_000, name: 'Stampede!', xp: 2,
+    });
+    expect(result.next.last_stampede_at).toBe(1_000_000);
+  });
+
+  it('does not fire below the 7000 threshold', () => {
+    const prev = emptyState();
+    const result = evaluateAchievements(input({
+      prev,
+      current_tokens: 7_000,
+      prev_current_tokens: 1_000,
+    }));
+    expect(result.events_this_tick.find(e => e.name === 'Stampede!')).toBeUndefined();
+  });
+
+  it('respects 2-hour cooldown', () => {
+    const prev = emptyState();
+    prev.last_stampede_at = 1_000_000;
+    const result = evaluateAchievements(input({
+      prev,
+      now_ms: 1_000_000 + 60 * 60 * 1000,  // 1 hour later
+      current_tokens: 20_000,
+      prev_current_tokens: 10_000,
+    }));
+    expect(result.events_this_tick.find(e => e.name === 'Stampede!')).toBeUndefined();
+  });
+
+  it('fires again after cooldown elapses', () => {
+    const prev = emptyState();
+    prev.last_stampede_at = 1_000_000;
+    const result = evaluateAchievements(input({
+      prev,
+      now_ms: 1_000_000 + 2 * 60 * 60 * 1000 + 1,
+      current_tokens: 20_000,
+      prev_current_tokens: 10_000,
+    }));
+    expect(result.events_this_tick.find(e => e.name === 'Stampede!')).toBeDefined();
+  });
+});

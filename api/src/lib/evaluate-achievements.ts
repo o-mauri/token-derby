@@ -112,6 +112,19 @@ export function evaluateAchievements(inp: EvaluateInput): EvaluateOutput {
     next.pacesetter_streak_ms = 0;
   }
 
+  // Stampede! — token gain >= 7000 since previous tick + 2h cooldown.
+  const tokenGain = inp.current_tokens - inp.prev_current_tokens;
+  const stampedeOk =
+    inp.prev.last_stampede_at === undefined ||
+    inp.now_ms - inp.prev.last_stampede_at >= MIDRACE_THRESHOLDS.stampede_cooldown_ms;
+  if (tokenGain >= MIDRACE_THRESHOLDS.stampede_tokens && stampedeOk) {
+    const event: RecentEvent = { at: inp.now_ms, name: 'Stampede!', xp: MIDRACE_XP.stampede };
+    events.push(event);
+    next.recent_events.push(event);
+    xpDelta += MIDRACE_XP.stampede;
+    next.last_stampede_at = inp.now_ms;
+  }
+
   next.live_xp = inp.prev.live_xp + xpDelta;
   return { next, xp_delta: xpDelta, events_this_tick: events };
 }
