@@ -124,3 +124,8 @@ export type UpdateStableHorseResponse = StableHorse;
 export type DeleteStableHorseResponse = {
   ok: true;
 };
+
+export type SetOrgWebhookRequest = { url: string };
+export type SetOrgWebhookResponse = { webhook_url: string; webhook_secret: string };
+export type GetOrgWebhookResponse = { webhook_url: string | null };
+export type DeleteOrgWebhookResponse = { ok: true };
