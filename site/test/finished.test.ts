@@ -103,15 +103,15 @@ describe('renderFinishedOverlay', () => {
   });
 
   it('initial xp bar width starts at 0 when the horse levelled up (new level)', () => {
-    // 40 XP (level 1, 40/50) → +80 → 120 XP (level 2, 70/128)
+    // 40 XP (level 1, 40/50) → +80 → 120 XP (level 2, 70/117)
     renderFinishedOverlay(track, race([
       horse('a', 1, 'Alpha', 1000, 40, 80),
     ]));
     const fill = track.querySelector<HTMLElement>('.xp-bar-fill')!;
     // Levelled up → start at 0% of new level.
     expect(fill.style.width).toBe('0.00%');
-    // Target: 70/128 ≈ 54.69%
-    expect(parseFloat(fill.dataset.targetPct ?? '0')).toBeCloseTo(54.69, 1);
+    // Target: 70/117 ≈ 59.83%
+    expect(parseFloat(fill.dataset.targetPct ?? '0')).toBeCloseTo(59.83, 1);
   });
 
   it('shows the level chip with the post-race level', () => {

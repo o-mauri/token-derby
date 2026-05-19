@@ -3,15 +3,16 @@
  *
  * The cost (in XP) to advance from level `n` to level `n+1` is given by:
  *
- *     xpForLevel(n) = 2.5 n^3 + 20 n^2 + 50 n − 22.5
+ *     xpForLevel(n) = 1.8 n^3 + 18 n^2 + 50 n − 19.8
  *
  * So the cumulative XP at which a horse becomes each level is:
  *
- *     Level 1 → 0          (every new horse starts here at 0 XP)
- *     Level 2 → xpForLevel(1)  = 50
- *     Level 3 → xpForLevel(2)  = 177.5
- *     Level 4 → xpForLevel(3)  = 375
+ *     Level 1  → 0           (every new horse starts here at 0 XP)
+ *     Level 2  → xpForLevel(1)  = 50
+ *     Level 3  → xpForLevel(2)  = 166.6
+ *     Level 4  → xpForLevel(3)  = 340.8
  *     ...
+ *     Level 30 → xpForLevel(29) = 60,468.4
  *
  * To redesign the curve, edit `xpForLevel` below or bump `MAX_LEVEL`.
  * Levels are derived from XP — they are not stored on the horse, so changing
@@ -21,7 +22,7 @@
 export const MAX_LEVEL = 30;
 
 export function xpForLevel(n: number): number {
-  return 2.5 * n ** 3 + 20 * n ** 2 + 50 * n - 22.5;
+  return 1.8 * n ** 3 + 18 * n ** 2 + 50 * n - 19.8;
 }
 
 /**
