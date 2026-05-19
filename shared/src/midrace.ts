@@ -1,4 +1,3 @@
-// shared/src/midrace.ts
 export const ACHIEVEMENT_NAMES = [
   'Racer!',
   'Overtake!',
@@ -32,32 +31,33 @@ export const MIDRACE_XP = {
   overtake: 3,
   pacesetter: 3,
   stampede: 2,
-  tookLead: 5,
+  took_lead: 5,
   comeback: 5,
-  pulledAway: 3,
+  pulled_away: 3,
 } as const;
 
 export const MIDRACE_CAPS = {
-  racerAwards: 5,
-  overtakeAwards: 5,
-  pacesetterAwards: 3,
-  leadTakeAwards: 3,
+  racer_awards: 5,
+  overtake_awards: 5,
+  pacesetter_awards: 3,
+  lead_take_awards: 3,
   // Stampede! and Pulled Away! are cooldown-based, not per-race-capped.
+  // Comeback! is tracked as a boolean (comeback_awarded) — not a counter.
 } as const;
 
 export const MIDRACE_THRESHOLDS = {
-  warmUpFraction: 0.08,            // first 8% of race time
-  streakHourMs: 3_600_000,         // 1 hour for Racer!/Pacesetter!
-  racerDtCapMs: 90_000,            // single-tick credit cap for Racer!
-  stampedeTokens: 7_000,           // tokens-in-a-minute threshold
-  stampedeCooldownMs: 7_200_000,   // 2 hours
-  pulledAwayGap: 5_000,            // gap-growth threshold per minute
-  pulledAwayCooldownMs: 7_200_000, // 2 hours
-  recentEventsRetentionMs: 90_000, // sliding window for recent_events
+  warm_up_fraction: 0.08,              // first 8% of race time
+  streak_hour_ms: 3_600_000,           // 1 hour for Racer!/Pacesetter!
+  racer_dt_cap_ms: 90_000,             // single-tick credit cap for Racer!
+  stampede_tokens: 7_000,              // tokens-in-a-minute threshold
+  stampede_cooldown_ms: 7_200_000,     // 2 hours
+  pulled_away_gap: 5_000,              // gap-growth threshold per minute
+  pulled_away_cooldown_ms: 7_200_000,  // 2 hours
+  recent_events_retention_ms: 90_000,  // sliding window for recent_events
 } as const;
 
 export type RecentEvent = {
-  at: number;          // ms-since-epoch
+  at: number;
   name: AchievementName;
   xp: number;
 };
