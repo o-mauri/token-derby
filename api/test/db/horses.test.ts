@@ -94,6 +94,30 @@ describe('horses db', () => {
     expect(await findHorseByUser(race_id, 'ffffffff-ffff-ffff-ffff-ffffffffffff')).toBeNull();
   });
 
+  it('clears last_gap_in_1st via DDB REMOVE when set to undefined', async () => {
+    const race_id = `r-${Math.random().toString(36).slice(2)}`;
+    const h = makeHorse();
+    await putHorse(race_id, h, 'hb-gap');
+    const now = new Date().toISOString();
+
+    // Step 1: write with last_gap_in_1st = 5000
+    await updateHorseHeartbeat(race_id, h.horse_id, 100, now, {
+      ...emptyState,
+      last_gap_in_1st: 5000,
+    });
+    const got1 = await getHorseForHeartbeat(race_id, h.horse_id, 'hb-gap');
+    expect(got1?.last_gap_in_1st).toBe(5000);
+
+    // Step 2: write with last_gap_in_1st = undefined (horse drops from 1st)
+    await updateHorseHeartbeat(race_id, h.horse_id, 100, now, {
+      ...emptyState,
+      last_gap_in_1st: undefined,
+    });
+    const got2 = await getHorseForHeartbeat(race_id, h.horse_id, 'hb-gap');
+    // Must be undefined, not the stale 5000
+    expect(got2?.last_gap_in_1st).toBeUndefined();
+  });
+
   it('rotates heartbeat token while leaving other fields alone', async () => {
     const race_id = `r-${Math.random().toString(36).slice(2)}`;
     const h = makeHorse({ current_tokens: 42 });

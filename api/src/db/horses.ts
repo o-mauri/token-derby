@@ -35,47 +35,56 @@ export async function updateHorseHeartbeat(
   last_heartbeat: string,
   state: AchievementState,
 ): Promise<void> {
+  const eav: Record<string, unknown> = {
+    ':t': current_tokens,
+    ':h': last_heartbeat,
+    ':lx': state.live_xp,
+    ':lr': state.last_rank ?? null,
+    ':rs': state.racer_streak_ms,
+    ':ra': state.racer_awards,
+    ':ps': state.pacesetter_streak_ms,
+    ':pa': state.pacesetter_awards,
+    ':oa': state.overtake_awards,
+    ':lta': state.lead_take_awards,
+    ':wil': state.was_in_last,
+    ':ca': state.comeback_awarded,
+    ':re': state.recent_events,
+  };
+  const setParts = [
+    'current_tokens = :t', 'last_heartbeat = :h', 'live_xp = :lx',
+    'last_rank = :lr', 'racer_streak_ms = :rs', 'racer_awards = :ra',
+    'pacesetter_streak_ms = :ps', 'pacesetter_awards = :pa',
+    'overtake_awards = :oa', 'lead_take_awards = :lta',
+    'was_in_last = :wil', 'comeback_awarded = :ca',
+    'recent_events = :re',
+  ];
+  const removeParts: string[] = [];
+
+  if (state.last_stampede_at !== undefined) {
+    setParts.push('last_stampede_at = :sa');
+    eav[':sa'] = state.last_stampede_at;
+  }
+  if (state.last_pulled_away_at !== undefined) {
+    setParts.push('last_pulled_away_at = :pwa');
+    eav[':pwa'] = state.last_pulled_away_at;
+  }
+  if (state.last_gap_in_1st !== undefined) {
+    setParts.push('last_gap_in_1st = :g');
+    eav[':g'] = state.last_gap_in_1st;
+  } else {
+    removeParts.push('last_gap_in_1st');
+  }
+
+  const updateExpression = 'SET ' + setParts.join(', ')
+    + (removeParts.length > 0 ? ' REMOVE ' + removeParts.join(', ') : '');
+
   await ddb.send(new UpdateCommand({
     TableName: TABLE,
     Key: horseKey(race_id, horse_id),
-    UpdateExpression:
-      'SET current_tokens = :t, last_heartbeat = :h, live_xp = :lx, ' +
-      'last_rank = :lr, racer_streak_ms = :rs, racer_awards = :ra, ' +
-      'pacesetter_streak_ms = :ps, pacesetter_awards = :pa, ' +
-      'overtake_awards = :oa, lead_take_awards = :lta, ' +
-      'was_in_last = :wil, comeback_awarded = :ca, ' +
-      'recent_events = :re' +
-      stampedeFragment(state) + pulledAwayFragment(state) + gapFragment(state),
-    ExpressionAttributeValues: {
-      ':t': current_tokens,
-      ':h': last_heartbeat,
-      ':lx': state.live_xp,
-      ':lr': state.last_rank ?? null,
-      ':rs': state.racer_streak_ms,
-      ':ra': state.racer_awards,
-      ':ps': state.pacesetter_streak_ms,
-      ':pa': state.pacesetter_awards,
-      ':oa': state.overtake_awards,
-      ':lta': state.lead_take_awards,
-      ':wil': state.was_in_last,
-      ':ca': state.comeback_awarded,
-      ':re': state.recent_events,
-      ...(state.last_stampede_at !== undefined ? { ':sa': state.last_stampede_at } : {}),
-      ...(state.last_pulled_away_at !== undefined ? { ':pwa': state.last_pulled_away_at } : {}),
-      ...(state.last_gap_in_1st !== undefined ? { ':g': state.last_gap_in_1st } : {}),
-    },
+    UpdateExpression: updateExpression,
+    ExpressionAttributeValues: eav,
     ConditionExpression: 'attribute_exists(pk)',
   }));
-}
-
-function stampedeFragment(s: AchievementState): string {
-  return s.last_stampede_at !== undefined ? ', last_stampede_at = :sa' : '';
-}
-function pulledAwayFragment(s: AchievementState): string {
-  return s.last_pulled_away_at !== undefined ? ', last_pulled_away_at = :pwa' : '';
-}
-function gapFragment(s: AchievementState): string {
-  return s.last_gap_in_1st !== undefined ? ', last_gap_in_1st = :g' : '';
 }
 
 export async function setHorseFinalTokens(
