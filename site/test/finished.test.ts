@@ -181,4 +181,13 @@ describe('renderFinishedOverlay', () => {
     // No xp-gained span rendered when award is 0/undefined.
     expect(track.querySelector('.xp-gained')).toBeNull();
   });
+
+  it('shows xp from achievements alongside total xp awarded', () => {
+    renderFinishedOverlay(track, race([
+      horse('a', 1, 'Alpha', 1000, 0, 50, { live_xp: 12 }),
+      horse('d', 4, 'Delta', 200, 0, 25, { live_xp: 8 }),
+    ]));
+    expect(track.textContent).toContain('+12 from achievements');
+    expect(track.textContent).toContain('+8 from achievements');
+  });
 });

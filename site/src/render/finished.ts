@@ -110,6 +110,13 @@ function buildPodiumCard(doc: Document, horse: HorseView, idx: number): HTMLElem
     gained.className = 'xp-gained';
     gained.textContent = `+${xpAwarded} XP`;
     xpLine.appendChild(gained);
+    const liveXp = horse.live_xp ?? 0;
+    if (liveXp > 0) {
+      const fromAch = doc.createElement('span');
+      fromAch.className = 'xp-from-achievements';
+      fromAch.textContent = ` (+${liveXp} from achievements)`;
+      xpLine.appendChild(fromAch);
+    }
   }
   li.appendChild(xpLine);
 
@@ -162,7 +169,9 @@ function buildStandingsTable(doc: Document, horses: HorseView[]): HTMLElement {
     appendCell(doc, tr, String(h.rank ?? '—'), 'rank');
     tr.appendChild(buildHorseCell(doc, h));
     appendCell(doc, tr, (h.final_tokens ?? h.current_tokens).toLocaleString());
-    appendCell(doc, tr, xpAwarded > 0 ? `+${xpAwarded}` : '0');
+    const liveXp = h.live_xp ?? 0;
+    const xpText = xpAwarded > 0 ? `+${xpAwarded}${liveXp > 0 ? ` (+${liveXp} from achievements)` : ''}` : '0';
+    appendCell(doc, tr, xpText);
     appendCell(
       doc, tr,
       levelledUp ? `Lvl. ${lvlBefore} → ${lvlAfter}` : `Lvl. ${lvlAfter}`,
