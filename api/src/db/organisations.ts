@@ -1,9 +1,13 @@
-import { PutCommand, GetCommand, QueryCommand, BatchGetCommand } from '@aws-sdk/lib-dynamodb';
+import { PutCommand, GetCommand, QueryCommand, BatchGetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { ddb, TABLE } from './client.js';
 import { orgMetaKey, orgMemberKey, ORG_PK_PREFIX, MEMBER_SK_PREFIX, parseOrgId } from './keys.js';
 import type { Organisation, OrganisationSummary } from '@token-derby/shared';
 
-type OrgRecord = Organisation & { org_join_token: string };
+type OrgRecord = Organisation & {
+  org_join_token: string;
+  webhook_url?: string;
+  webhook_secret?: string;
+};
 
 export async function putOrganisation(org: Organisation, org_join_token: string): Promise<void> {
   await ddb.send(new PutCommand({
@@ -121,6 +125,32 @@ export async function listMembersForOrg(org_id: string): Promise<string[]> {
     },
   }));
   return Items.map(it => String(it.member_user_id ?? ''));
+}
+
+export async function setOrgWebhook(
+  org_id: string,
+  webhook_url: string,
+  webhook_secret: string,
+): Promise<void> {
+  await ddb.send(new UpdateCommand({
+    TableName: TABLE,
+    Key: orgMetaKey(org_id),
+    UpdateExpression: 'SET webhook_url = :u, webhook_secret = :s',
+    ConditionExpression: 'attribute_exists(pk)',
+    ExpressionAttributeValues: {
+      ':u': webhook_url,
+      ':s': webhook_secret,
+    },
+  }));
+}
+
+export async function clearOrgWebhook(org_id: string): Promise<void> {
+  await ddb.send(new UpdateCommand({
+    TableName: TABLE,
+    Key: orgMetaKey(org_id),
+    UpdateExpression: 'REMOVE webhook_url, webhook_secret',
+    ConditionExpression: 'attribute_exists(pk)',
+  }));
 }
 
 function pickOrgRecord(item: Record<string, any>): OrgRecord {
