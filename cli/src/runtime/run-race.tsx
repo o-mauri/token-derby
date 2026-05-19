@@ -134,15 +134,28 @@ export function RunRace({ active, startingBaseline, pendingMode, ownUserName }: 
   }
 
   return (
-    <StatusScreen
-      race={race}
-      ownHorseId={active.horse_id}
-      ownHorseName={active.horse_name}
-      ownColors={active.horse_colors}
-      ownUserName={ownUserName}
-      lastHeartbeatAgoSec={lastHeartbeatAgoSec}
-      lastHeartbeatOk={lastHbOk}
-    />
+    <Box flexDirection="column">
+      <StatusScreen
+        race={race}
+        ownHorseId={active.horse_id}
+        ownHorseName={active.horse_name}
+        ownColors={active.horse_colors}
+        ownUserName={ownUserName}
+        lastHeartbeatAgoSec={lastHeartbeatAgoSec}
+        lastHeartbeatOk={lastHbOk}
+      />
+      {toasts.slice(0, 3).map(({ key, event }) => (
+        <AchievementToast
+          key={key}
+          horseName={active.horse_name}
+          name={event.name}
+          description={event.name === 'Overtake!'
+            ? overtakeDescription(Math.floor(event.xp / 3))
+            : ACHIEVEMENT_DESCRIPTIONS[event.name]}
+          xp={event.xp}
+        />
+      ))}
+    </Box>
   );
 }
 
