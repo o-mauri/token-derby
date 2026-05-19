@@ -1,8 +1,9 @@
 import type { APIGatewayProxyHandlerV2 } from 'aws-lambda';
 import type { HeartbeatRequest, HeartbeatResponse } from '@token-derby/shared';
-import { minorMatches } from '@token-derby/shared';
+import { minorMatches, MIDRACE_THRESHOLDS } from '@token-derby/shared';
 import { getRaceByJoinCode } from '../db/races.js';
-import { getHorseForHeartbeat, updateHorseTokens, listHorses } from '../db/horses.js';
+import { getHorseForHeartbeat, updateHorseHeartbeat, listHorses } from '../db/horses.js';
+import { evaluateAchievements } from '../lib/evaluate-achievements.js';
 import { computeStatus, timeLeftSeconds } from '../lib/status.js';
 import { clampHeartbeat } from '../lib/rate-cap.js';
 import { rankHorses } from '../lib/rank-horses.js';
@@ -60,7 +61,44 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
       proposed_tokens: body.current_tokens,
       now,
     });
-    await updateHorseTokens(race.race_id, horse_id, accepted, now.toISOString());
+    const allHorsesBefore = await listHorses(race.race_id);
+    const updatedHorses = allHorsesBefore.map(h =>
+      h.horse_id === horse_id ? { ...h, current_tokens: accepted } : h,
+    );
+    const ranked = rankHorses(updatedHorses);
+    const ownRanked = ranked.find(h => h.horse_id === horse_id)!;
+    const second = ranked.find(h => h.rank === 2);
+    const lastHeartbeatMs = horse.last_heartbeat ? new Date(horse.last_heartbeat).getTime() : now.getTime();
+    const startMs = new Date(race.start_time).getTime();
+    const endMs = new Date(race.end_time).getTime();
+    const warmUpEnd = startMs + (endMs - startMs) * MIDRACE_THRESHOLDS.warm_up_fraction;
+    const evalResult = evaluateAchievements({
+      prev: {
+        live_xp: horse.live_xp,
+        last_rank: horse.last_rank,
+        racer_streak_ms: horse.racer_streak_ms,
+        racer_awards: horse.racer_awards,
+        pacesetter_streak_ms: horse.pacesetter_streak_ms,
+        pacesetter_awards: horse.pacesetter_awards,
+        overtake_awards: horse.overtake_awards,
+        lead_take_awards: horse.lead_take_awards,
+        last_stampede_at: horse.last_stampede_at,
+        was_in_last: horse.was_in_last,
+        comeback_awarded: horse.comeback_awarded,
+        last_gap_in_1st: horse.last_gap_in_1st,
+        last_pulled_away_at: horse.last_pulled_away_at,
+        recent_events: horse.recent_events,
+      },
+      now_ms: now.getTime(),
+      last_heartbeat_at_ms: lastHeartbeatMs,
+      current_tokens: accepted,
+      prev_current_tokens: horse.current_tokens,
+      new_rank: ownRanked.rank,
+      total_horses: ranked.length,
+      second_place_tokens: second?.current_tokens ?? null,
+      warm_up_active: now.getTime() < warmUpEnd,
+    });
+    await updateHorseHeartbeat(race.race_id, horse_id, accepted, now.toISOString(), evalResult.next);
   }
 
   let horses;

@@ -118,8 +118,16 @@ describe('getRace handler', () => {
     const a = await joinH(join_code, userA, 'StaleAlpha');
     await hb(join_code, a.horse_id, a.heartbeat_token, 100);
 
-    const { updateHorseTokens } = await import('../../src/db/horses.js');
-    await updateHorseTokens(race_id, a.horse_id, 100, new Date(Date.now() - 180_000).toISOString());
+    const { updateHorseHeartbeat } = await import('../../src/db/horses.js');
+    await updateHorseHeartbeat(race_id, a.horse_id, 100, new Date(Date.now() - 180_000).toISOString(), {
+      live_xp: 0, last_rank: undefined,
+      racer_streak_ms: 0, racer_awards: 0,
+      pacesetter_streak_ms: 0, pacesetter_awards: 0,
+      overtake_awards: 0, lead_take_awards: 0,
+      last_stampede_at: undefined, was_in_last: false, comeback_awarded: false,
+      last_gap_in_1st: undefined, last_pulled_away_at: undefined,
+      recent_events: [],
+    });
 
     const res: any = await getRaceHandler(evt(null, `/races/${join_code}`, 'GET /races/{join_code}', { join_code }));
     const body = JSON.parse(res.body);

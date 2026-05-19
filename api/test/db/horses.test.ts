@@ -1,9 +1,20 @@
 import { describe, it, expect } from 'vitest';
 import {
-  putHorse, listHorses, updateHorseTokens, setHorseFinalTokens,
+  putHorse, listHorses, updateHorseHeartbeat, setHorseFinalTokens,
   getHorseForHeartbeat, findHorseByUser, rotateHeartbeatToken,
 } from '../../src/db/horses.js';
 import type { Horse } from '@token-derby/shared';
+import type { AchievementState } from '../../src/lib/evaluate-achievements.js';
+
+const emptyState: AchievementState = {
+  live_xp: 0, last_rank: undefined,
+  racer_streak_ms: 0, racer_awards: 0,
+  pacesetter_streak_ms: 0, pacesetter_awards: 0,
+  overtake_awards: 0, lead_take_awards: 0,
+  last_stampede_at: undefined, was_in_last: false, comeback_awarded: false,
+  last_gap_in_1st: undefined, last_pulled_away_at: undefined,
+  recent_events: [],
+};
 
 function makeHorse(overrides: Partial<Horse> = {}): Horse {
   return {
@@ -38,7 +49,7 @@ describe('horses db', () => {
     const h = makeHorse();
     await putHorse(race_id, h, 'tok');
     const now = new Date().toISOString();
-    await updateHorseTokens(race_id, h.horse_id, 500, now);
+    await updateHorseHeartbeat(race_id, h.horse_id, 500, now, emptyState);
     const [updated] = await listHorses(race_id);
     expect(updated?.current_tokens).toBe(500);
     expect(updated?.last_heartbeat).toBe(now);
