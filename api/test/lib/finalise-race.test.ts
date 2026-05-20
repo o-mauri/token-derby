@@ -3,6 +3,14 @@ import { putRace, getRaceById, setRaceEndedIfAbsent } from '../../src/db/races.j
 import { putHorse, listHorses } from '../../src/db/horses.js';
 import { finaliseRace } from '../../src/lib/finalise-race.js';
 import type { Horse, Race } from '@token-derby/shared';
+import { createServer, type Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import { createHmac } from 'node:crypto';
+import { setOrgWebhook, getOrganisationByName } from '../../src/db/organisations.js';
+import { handler as createOrgHandler } from '../../src/handlers/create-organisation.js';
+import { handler as createRaceHandler } from '../../src/handlers/create-race.js';
+import { getRaceByJoinCode } from '../../src/db/races.js';
+import { makeUser } from '../helpers/auth-helper.js';
 
 function findHorse(horses: Horse[], name: string): Horse {
   const h = horses.find(h => h.name === name);
@@ -171,5 +179,74 @@ describe('setRaceEndedIfAbsent', () => {
     expect(r1).toBe(first);
     expect(r2).toBe(first);
     expect((await getRaceById(race.race_id))?.ended_at).toBe(first);
+  });
+});
+
+describe('finaliseRace webhook delivery', () => {
+  it('fires race.ended exactly once even when called multiple times', async () => {
+    const owner = await makeUser('FrOwner');
+    const orgName = 'FrOrg1';
+    await createOrgHandler({
+      version: '2.0', routeKey: 'POST /organisations', rawPath: '/organisations', rawQueryString: '',
+      headers: { 'content-type': 'application/json', 'x-cli-version': '2.0.0', 'x-user-id': owner.user_id, 'x-user-token': owner.secret_token },
+      requestContext: {} as any,
+      body: JSON.stringify({ name: orgName }),
+      isBase64Encoded: false,
+    });
+    const persisted = await getOrganisationByName(orgName);
+
+    const calls: { body: string; headers: Record<string, string> }[] = [];
+    const server: Server = await new Promise(resolve => {
+      const s = createServer((req, res) => {
+        let body = '';
+        req.on('data', c => { body += c; });
+        req.on('end', () => {
+          calls.push({ body, headers: req.headers as any });
+          res.statusCode = 200;
+          res.end();
+        });
+      });
+      s.listen(0, '127.0.0.1', () => resolve(s));
+    });
+    const port = (server.address() as AddressInfo).port;
+    await setOrgWebhook(persisted!.org_id, `http://127.0.0.1:${port}/h`, 'finalsecret');
+
+    const createRes: any = await createRaceHandler({
+      version: '2.0', routeKey: 'POST /races', rawPath: '/races', rawQueryString: '',
+      headers: { 'content-type': 'application/json', 'x-cli-version': '2.0.0', 'x-user-id': owner.user_id, 'x-user-token': owner.secret_token },
+      requestContext: {} as any,
+      body: JSON.stringify({
+        name: 'FrRace1',
+        start_time: new Date(Date.now() - 600_000).toISOString(),
+        end_time:   new Date(Date.now() - 60_000).toISOString(),
+        tz: 'UTC',
+        organisation_name: orgName,
+      }),
+      isBase64Encoded: false,
+    });
+    expect(createRes.statusCode).toBe(200);
+    const joinCode = JSON.parse(createRes.body).join_code;
+    const race = await getRaceByJoinCode(joinCode);
+    expect(race).toBeTruthy();
+    // Filter the "race.created" delivery out so we count race.ended only.
+    await new Promise(r => setTimeout(r, 50));
+    calls.length = 0;
+
+    await finaliseRace(race!, new Date());
+    await finaliseRace(race!, new Date()); // second call must not re-fire
+    await new Promise(r => setTimeout(r, 50));
+
+    const ended = calls.filter(c => c.headers['x-token-derby-event'] === 'race.ended');
+    expect(ended).toHaveLength(1);
+    expect(ended[0]!.headers['x-token-derby-signature']).toBe(
+      'sha256=' + createHmac('sha256', 'finalsecret').update(ended[0]!.body).digest('hex'),
+    );
+    const payload = JSON.parse(ended[0]!.body);
+    expect(payload.event).toBe('race.ended');
+    expect(payload.race.name).toBe('FrRace1');
+    expect(payload.organisation.org_name).toBe(orgName);
+    expect(Array.isArray(payload.results)).toBe(true);
+
+    await new Promise(r => server.close(() => r(null)));
   });
 });

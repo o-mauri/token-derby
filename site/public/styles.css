@@ -641,7 +641,7 @@ html, body {
 .achievement-toast {
   display: flex;
   position: fixed;
-  right: 1rem;
+  left: 50%;
   align-items: stretch;
   background: rgba(20, 20, 20, 0.92);
   color: #fff;
@@ -650,6 +650,7 @@ html, body {
   padding: 0.5rem 0.75rem;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
   z-index: 9999;
+  transform: translateX(-50%);
   animation: achievementToastIn 0.25s ease-out;
 }
 .achievement-toast-xp {
@@ -664,6 +665,6 @@ html, body {
 .achievement-toast-title { font-weight: bold; }
 .achievement-toast-desc { color: #ccc; font-size: 0.9rem; }
 @keyframes achievementToastIn {
-  from { opacity: 0; transform: translateX(20px); }
-  to   { opacity: 1; transform: translateX(0); }
+  from { opacity: 0; transform: translate(-50%, 20px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
 }
