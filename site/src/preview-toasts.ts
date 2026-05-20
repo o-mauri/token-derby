@@ -114,7 +114,7 @@ requestAnimationFrame(() => {
       description: describe(ex.name, ex.xp),
       xp: ex.xp,
     });
-    node.style.top = `${1 + i * 5}rem`;
+    node.style.bottom = `${1 + i * 5}rem`;
     container.appendChild(node);
   });
 });

@@ -145,7 +145,7 @@ function showToast(doc: Document, container: HTMLElement, horseName: string, eve
     xp: event.xp,
   });
   const offset = container.querySelectorAll<HTMLElement>('.achievement-toast').length;
-  node.style.top = `${1 + offset * 5}rem`;
+  node.style.bottom = `${1 + offset * 5}rem`;
   container.appendChild(node);
   setTimeout(() => {
     if (node.parentNode === container) container.removeChild(node);
