@@ -1,9 +1,12 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { handler } from '../../src/handlers/create-race.js';
 import { handler as createOrgHandler } from '../../src/handlers/create-organisation.js';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { getRaceByJoinCode, getRaceByAdminCode } from '../../src/db/races.js';
 import { makeUser, type TestUser } from '../helpers/auth-helper.js';
+import { createServer, type Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import { createHmac } from 'node:crypto';
 
 function event(
   body: unknown,
@@ -248,5 +251,88 @@ describe('createRace handler', () => {
     }, other));
     expect(res.statusCode).toBe(403);
     expect(JSON.parse(res.body).code).toBe('NOT_ORG_MEMBER');
+  });
+
+  it('fires the race.created webhook for org-linked races when configured', async () => {
+    const owner = await makeUser('OwnerWh');
+    const orgName = 'WebhookOrg1';
+    const orgRes: any = await createOrgHandler({
+      version: '2.0', routeKey: 'POST /organisations', rawPath: '/organisations', rawQueryString: '',
+      headers: { 'content-type': 'application/json', 'x-cli-version': '2.0.0', 'x-user-id': owner.user_id, 'x-user-token': owner.secret_token },
+      requestContext: {} as any,
+      body: JSON.stringify({ name: orgName }),
+      isBase64Encoded: false,
+    });
+    expect(orgRes.statusCode).toBe(200);
+
+    let received: { headers: Record<string, string>; body: string } | undefined;
+    const server: Server = await new Promise(resolve => {
+      const s = createServer((req, res) => {
+        let body = '';
+        req.on('data', c => { body += c; });
+        req.on('end', () => {
+          received = { headers: req.headers as any, body };
+          res.statusCode = 200;
+          res.end();
+        });
+      });
+      s.listen(0, '127.0.0.1', () => resolve(s));
+    });
+    const port = (server.address() as AddressInfo).port;
+
+    const { setOrgWebhook, getOrganisationByName } = await import('../../src/db/organisations.js');
+    const persistedOrg = await getOrganisationByName(orgName);
+    expect(persistedOrg).toBeTruthy();
+    const localUrl = `http://127.0.0.1:${port}/h`;
+    await setOrgWebhook(persistedOrg!.org_id, localUrl, 'testsecret');
+
+    const createRaceRes: any = await handler({
+      version: '2.0', routeKey: 'POST /races', rawPath: '/races', rawQueryString: '',
+      headers: { 'content-type': 'application/json', 'x-cli-version': '2.0.0', 'x-user-id': owner.user_id, 'x-user-token': owner.secret_token },
+      requestContext: {} as any,
+      body: JSON.stringify({
+        name: 'WhRace1',
+        start_time: new Date(Date.now() + 60_000).toISOString(),
+        end_time:   new Date(Date.now() + 600_000).toISOString(),
+        tz: 'UTC',
+        organisation_name: orgName,
+      }),
+      isBase64Encoded: false,
+    });
+    expect(createRaceRes.statusCode).toBe(200);
+
+    await new Promise(r => setTimeout(r, 50));
+
+    expect(received).toBeDefined();
+    expect(received!.headers['x-token-derby-event']).toBe('race.created');
+    expect(received!.headers['x-token-derby-signature']).toBe(
+      'sha256=' + createHmac('sha256', 'testsecret').update(received!.body).digest('hex'),
+    );
+    const payload = JSON.parse(received!.body);
+    expect(payload.event).toBe('race.created');
+    expect(payload.race.name).toBe('WhRace1');
+    expect(payload.organisation.org_name).toBe(orgName);
+
+    await new Promise(r => server.close(() => r(null)));
+  });
+
+  it('does not fire a webhook for races without an organisation', async () => {
+    const user = await makeUser('NoWhUser');
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const res: any = await handler({
+      version: '2.0', routeKey: 'POST /races', rawPath: '/races', rawQueryString: '',
+      headers: { 'content-type': 'application/json', 'x-cli-version': '2.0.0', 'x-user-id': user.user_id, 'x-user-token': user.secret_token },
+      requestContext: {} as any,
+      body: JSON.stringify({
+        name: 'NoOrgRace',
+        start_time: new Date(Date.now() + 60_000).toISOString(),
+        end_time:   new Date(Date.now() + 600_000).toISOString(),
+        tz: 'UTC',
+      }),
+      isBase64Encoded: false,
+    });
+    expect(res.statusCode).toBe(200);
+    expect(warnSpy).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
   });
 });

@@ -1,5 +1,5 @@
 import type { APIGatewayProxyHandlerV2 } from 'aws-lambda';
-import type { CreateRaceRequest, CreateRaceResponse } from '@token-derby/shared';
+import type { CreateRaceRequest, CreateRaceResponse, RaceCreatedEvent } from '@token-derby/shared';
 import { DEFAULT_MAX_PARTICIPANTS, ORG_NAME_PATTERN, parseSemver } from '@token-derby/shared';
 import { generateRaceId, generateJoinCode, generateAdminCode } from '../lib/codes.js';
 import { putRace, getRaceByJoinCode } from '../db/races.js';
@@ -7,6 +7,8 @@ import { getOrganisationByName, isMember } from '../db/organisations.js';
 import { ok, err, parseJson } from '../lib/http.js';
 import { readCliVersion, meetsMinimumCliVersion, minCliVersion } from '../lib/version.js';
 import { authenticate } from '../lib/auth.js';
+import { sendOrgWebhook } from '../lib/webhook.js';
+import { randomUUID } from 'node:crypto';
 
 export const handler: APIGatewayProxyHandlerV2 = async (event) => {
   const cli_version = readCliVersion(event);
@@ -89,6 +91,31 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
     },
     admin_code,
   );
+
+  if (org_id && organisation_name) {
+    const orgWithHook = await getOrganisationByName(organisation_name);
+    if (orgWithHook) {
+      const payload: RaceCreatedEvent = {
+        event: 'race.created',
+        delivery_id: randomUUID(),
+        sent_at: new Date().toISOString(),
+        organisation: { org_id: orgWithHook.org_id, org_name: orgWithHook.org_name },
+        race: {
+          race_id,
+          name: body.name,
+          join_code,
+          start_time: body.start_time,
+          end_time: body.end_time,
+          tz: body.tz,
+          max_participants: body.max_participants ?? DEFAULT_MAX_PARTICIPANTS,
+          created_at: new Date().toISOString(),
+          creator_user_id: auth.user_id,
+          creator_user_name: auth.display_name,
+        },
+      };
+      await sendOrgWebhook(orgWithHook, 'race.created', payload);
+    }
+  }
 
   const response: CreateRaceResponse = { race_id, join_code, admin_code };
   return ok(response);
