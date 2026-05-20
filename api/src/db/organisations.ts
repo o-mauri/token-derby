@@ -3,6 +3,8 @@ import { ddb, TABLE } from './client.js';
 import { orgMetaKey, orgMemberKey, ORG_PK_PREFIX, MEMBER_SK_PREFIX, parseOrgId } from './keys.js';
 import type { Organisation, OrganisationSummary } from '@token-derby/shared';
 
+// `org_join_token` and `webhook_secret` are secrets. Never include this record
+// directly in an HTTP response — handlers must cherry-pick the safe fields.
 type OrgRecord = Organisation & {
   org_join_token: string;
   webhook_url?: string;

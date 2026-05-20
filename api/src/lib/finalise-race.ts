@@ -1,5 +1,5 @@
 import type { Horse, Race, RaceEndedEvent } from '@token-derby/shared';
-import { xpForRaceResult, xpForTokenBonus } from '@token-derby/shared';
+import { xpForRaceFinish } from '@token-derby/shared';
 import { listHorses, setHorseFinalTokens, setHorseXpAwarded } from '../db/horses.js';
 import { awardHorseXp, recordHorseRaceResult } from '../db/stable.js';
 import { setRaceEndedIfAbsent } from '../db/races.js';
@@ -49,7 +49,7 @@ export async function finaliseRace(race: Race, now: Date): Promise<FinaliseResul
   const winner_tokens = ranked[0]?.final_tokens ?? 0;
   await Promise.all(ranked.map(async (h, i) => {
     const rank = i + 1;
-    const xp = xpForRaceResult(rank) + xpForTokenBonus(rank, h.final_tokens, winner_tokens) + (h.live_xp ?? 0);
+    const xp = xpForRaceFinish(rank, h.final_tokens, winner_tokens, h.live_xp);
     const isFirstAward = await setHorseXpAwarded(race.race_id, h.horse_id, xp);
     if (isFirstAward && h.user_id && h.stable_horse_id) {
       await Promise.all([
@@ -68,7 +68,6 @@ export async function finaliseRace(race: Race, now: Date): Promise<FinaliseResul
   if (newly_finalised && race.org_id) {
     const org = await getOrganisationById(race.org_id);
     if (org && org.webhook_url) {
-      const finalisedRace = { ...race, ended_at };
       const results = ranked.map((h, i) => ({
         rank: i + 1,
         horse_id: h.horse_id,
@@ -76,24 +75,24 @@ export async function finaliseRace(race: Race, now: Date): Promise<FinaliseResul
         name: h.name,
         colors: h.colors,
         final_tokens: h.final_tokens,
-        xp_awarded: xpForRaceResult(i + 1) + xpForTokenBonus(i + 1, h.final_tokens, winner_tokens) + (h.live_xp ?? 0),
+        xp_awarded: xpForRaceFinish(i + 1, h.final_tokens, winner_tokens, h.live_xp),
         user_id: h.user_id,
         user_name: h.user_name,
       }));
       const payload: RaceEndedEvent = {
         event: 'race.ended',
         delivery_id: randomUUID(),
-        sent_at: new Date().toISOString(),
+        sent_at: now.toISOString(),
         organisation: { org_id: org.org_id, org_name: org.org_name },
         race: {
-          race_id: finalisedRace.race_id,
-          name: finalisedRace.name,
-          join_code: finalisedRace.join_code,
-          start_time: finalisedRace.start_time,
-          end_time: finalisedRace.end_time,
-          tz: finalisedRace.tz,
-          created_at: finalisedRace.created_at,
-          ended_at: ended_at,
+          race_id: race.race_id,
+          name: race.name,
+          join_code: race.join_code,
+          start_time: race.start_time,
+          end_time: race.end_time,
+          tz: race.tz,
+          created_at: race.created_at,
+          ended_at,
         },
         results,
       };

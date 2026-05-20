@@ -88,6 +88,22 @@ describe('setOrgWebhook handler', () => {
     expect(res.statusCode).toBe(400);
   });
 
+  const BLOCKED_CASES: Array<[string, string, string]> = [
+    ['WhLb127',  'WhLb127Org', 'https://127.0.0.1/h'],
+    ['WhLb0000', 'WhLb000Org', 'https://0.0.0.0/h'],
+    ['WhLbV6',   'WhLbV6Org',  'https://[::1]/h'],
+    ['WhImds',   'WhImdsOrg',  'https://169.254.169.254/latest/meta-data/'],
+  ];
+  for (const [userName, orgName, url] of BLOCKED_CASES) {
+    it(`rejects blocked hostname ${url}`, async () => {
+      const user = await makeUser(userName);
+      await createOrg(user, orgName);
+      const res: any = await handler(event(orgName, { url }, user));
+      expect(res.statusCode).toBe(400);
+      expect(JSON.parse(res.body).code).toBe('BAD_REQUEST');
+    });
+  }
+
   it('rejects malformed URLs', async () => {
     const user = await makeUser('WhBad');
     await createOrg(user, 'WhBad1');

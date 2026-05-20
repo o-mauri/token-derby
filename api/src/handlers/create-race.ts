@@ -55,24 +55,23 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
     return err('BAD_REQUEST', 'end_time must be after start_time');
   }
 
-  let org_id: string | undefined;
-  let organisation_name: string | undefined;
+  let org: Awaited<ReturnType<typeof getOrganisationByName>> = null;
   if (body.organisation_name !== undefined && body.organisation_name !== '') {
     if (typeof body.organisation_name !== 'string' || !ORG_NAME_PATTERN.test(body.organisation_name)) {
       return err('BAD_REQUEST', 'organisation_name must be 1–12 alphanumeric characters');
     }
-    const org = await getOrganisationByName(body.organisation_name);
+    org = await getOrganisationByName(body.organisation_name);
     if (!org) return err('ORG_NOT_FOUND', `No organisation named "${body.organisation_name}"`);
     if (!(await isMember(org.org_id, auth.user_id))) {
       return err('NOT_ORG_MEMBER', `You are not a member of "${org.org_name}"`);
     }
-    org_id = org.org_id;
-    organisation_name = org.org_name;
   }
 
   const join_code = await findUniqueJoinCode();
   const race_id = generateRaceId();
   const admin_code = generateAdminCode();
+  const created_at = new Date().toISOString();
+  const max_participants = body.max_participants ?? DEFAULT_MAX_PARTICIPANTS;
 
   await putRace(
     {
@@ -81,40 +80,37 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
       start_time: body.start_time,
       end_time: body.end_time,
       tz: body.tz,
-      max_participants: body.max_participants ?? DEFAULT_MAX_PARTICIPANTS,
+      max_participants,
       join_code,
-      created_at: new Date().toISOString(),
+      created_at,
       cli_version,
       creator_user_id: auth.user_id,
       creator_user_name: auth.display_name,
-      ...(org_id ? { org_id, organisation_name } : {}),
+      ...(org ? { org_id: org.org_id, organisation_name: org.org_name } : {}),
     },
     admin_code,
   );
 
-  if (org_id && organisation_name) {
-    const orgWithHook = await getOrganisationByName(organisation_name);
-    if (orgWithHook) {
-      const payload: RaceCreatedEvent = {
-        event: 'race.created',
-        delivery_id: randomUUID(),
-        sent_at: new Date().toISOString(),
-        organisation: { org_id: orgWithHook.org_id, org_name: orgWithHook.org_name },
-        race: {
-          race_id,
-          name: body.name,
-          join_code,
-          start_time: body.start_time,
-          end_time: body.end_time,
-          tz: body.tz,
-          max_participants: body.max_participants ?? DEFAULT_MAX_PARTICIPANTS,
-          created_at: new Date().toISOString(),
-          creator_user_id: auth.user_id,
-          creator_user_name: auth.display_name,
-        },
-      };
-      await sendOrgWebhook(orgWithHook, 'race.created', payload);
-    }
+  if (org) {
+    const payload: RaceCreatedEvent = {
+      event: 'race.created',
+      delivery_id: randomUUID(),
+      sent_at: created_at,
+      organisation: { org_id: org.org_id, org_name: org.org_name },
+      race: {
+        race_id,
+        name: body.name,
+        join_code,
+        start_time: body.start_time,
+        end_time: body.end_time,
+        tz: body.tz,
+        max_participants,
+        created_at,
+        creator_user_id: auth.user_id,
+        creator_user_name: auth.display_name,
+      },
+    };
+    await sendOrgWebhook(org, 'race.created', payload);
   }
 
   const response: CreateRaceResponse = { race_id, join_code, admin_code };

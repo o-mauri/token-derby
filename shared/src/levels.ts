@@ -112,3 +112,14 @@ export function xpForTokenBonus(rank: number, tokens: number, winner_tokens: num
   const ratio = Math.max(0, tokens) / winner_tokens;
   return Math.round(Math.min(1, ratio) * XP_AWARDS.token_bonus_max);
 }
+
+// Total XP a horse earns from a finished race: rank bonus + token bonus + any
+// live XP it already banked during the race.
+export function xpForRaceFinish(
+  rank: number,
+  tokens: number,
+  winner_tokens: number,
+  live_xp: number | undefined = 0,
+): number {
+  return xpForRaceResult(rank) + xpForTokenBonus(rank, tokens, winner_tokens) + (live_xp ?? 0);
+}

@@ -7,6 +7,15 @@ import { ok, err, parseJson } from '../lib/http.js';
 import { readCliVersion, meetsMinimumCliVersion, minCliVersion } from '../lib/version.js';
 import { authenticate } from '../lib/auth.js';
 
+const BLOCKED_HOSTNAMES = new Set([
+  'localhost',
+  '127.0.0.1',
+  '0.0.0.0',
+  '::1',
+  '[::1]',
+  '169.254.169.254',
+]);
+
 export const handler: APIGatewayProxyHandlerV2 = async (event) => {
   const cli_version = readCliVersion(event);
   if (!cli_version) return err('BAD_REQUEST', 'X-Cli-Version header required — upgrade your CLI');
@@ -33,8 +42,12 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
     return err('BAD_REQUEST', 'url must be a valid URL');
   }
   if (parsed.protocol !== 'https:') return err('BAD_REQUEST', 'webhook url must use https://');
-  if (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') {
-    return err('BAD_REQUEST', 'webhook url must not point at localhost');
+  // Reject obviously-wrong hostnames up front. This is a foot-gun guard, not a
+  // real SSRF defense — DNS rebinding and other resolutions can still resolve
+  // to internal IPs at fetch time. The real protection is that sendOrgWebhook
+  // is fire-and-forget and never returns the response body to anyone.
+  if (BLOCKED_HOSTNAMES.has(parsed.hostname.toLowerCase())) {
+    return err('BAD_REQUEST', 'webhook url must not point at loopback or instance metadata');
   }
 
   const org = await getOrganisationByName(org_name);
