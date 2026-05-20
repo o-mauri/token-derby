@@ -9,6 +9,8 @@ import type {
   GetJockeyResponse, UpdateJockeyRequest, UpdateJockeyResponse,
   ListStableResponse, CreateStableHorseRequest, CreateStableHorseResponse,
   UpdateStableHorseRequest, UpdateStableHorseResponse, DeleteStableHorseResponse,
+  SetOrgWebhookRequest, SetOrgWebhookResponse,
+  GetOrgWebhookResponse, DeleteOrgWebhookResponse,
 } from '@token-derby/shared';
 import { request } from './client.js';
 
@@ -86,6 +88,33 @@ export function deleteStableHorse(stableHorseId: string) {
   return request<DeleteStableHorseResponse>(
     'DELETE',
     `/jockey/me/horses/${encodeURIComponent(stableHorseId)}`,
+    undefined,
+    undefined,
+  );
+}
+
+export function setOrgWebhook(orgName: string, body: SetOrgWebhookRequest) {
+  return request<SetOrgWebhookResponse>(
+    'PUT',
+    `/organisations/${encodeURIComponent(orgName)}/webhook`,
+    body,
+    undefined,
+  );
+}
+
+export function getOrgWebhook(orgName: string) {
+  return request<GetOrgWebhookResponse>(
+    'GET',
+    `/organisations/${encodeURIComponent(orgName)}/webhook`,
+    undefined,
+    undefined,
+  );
+}
+
+export function deleteOrgWebhook(orgName: string) {
+  return request<DeleteOrgWebhookResponse>(
+    'DELETE',
+    `/organisations/${encodeURIComponent(orgName)}/webhook`,
     undefined,
     undefined,
   );
