@@ -4,7 +4,7 @@ import { ORG_NAME_PATTERN, ORG_NAME_MAX_LENGTH, parseSemver } from '@token-derby
 import { generateOrgId, generateOrgJoinToken } from '../lib/codes.js';
 import { putOrganisation, getOrganisationByName, addMember } from '../db/organisations.js';
 import { ok, err, parseJson } from '../lib/http.js';
-import { readCliVersion, meetsMinimumCliVersion, minCliVersion } from '../lib/version.js';
+import { readCliVersion, meetsMinimumCliVersion, versionMismatchMessage } from '../lib/version.js';
 import { authenticate } from '../lib/auth.js';
 
 export const handler: APIGatewayProxyHandlerV2 = async (event) => {
@@ -16,11 +16,7 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
     return err('BAD_REQUEST', `X-Cli-Version must be MAJOR.MINOR.PATCH (got "${cli_version}")`);
   }
   if (!meetsMinimumCliVersion(cli_version)) {
-    return err(
-      'VERSION_MISMATCH',
-      `This API requires token-derby v${minCliVersion()} or newer. ` +
-        `Upgrade: npm i -g @mauricode/token-derby@latest`,
-    );
+    return err('VERSION_MISMATCH', versionMismatchMessage());
   }
 
   const auth = await authenticate(event);

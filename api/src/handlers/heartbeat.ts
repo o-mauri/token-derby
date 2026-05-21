@@ -9,7 +9,7 @@ import { clampHeartbeat } from '../lib/rate-cap.js';
 import { rankHorses } from '../lib/rank-horses.js';
 import { finaliseRace } from '../lib/finalise-race.js';
 import { ok, err, parseJson } from '../lib/http.js';
-import { readCliVersion, meetsMinimumCliVersion, minCliVersion } from '../lib/version.js';
+import { readCliVersion, meetsMinimumCliVersion, versionMismatchMessage } from '../lib/version.js';
 
 export const handler: APIGatewayProxyHandlerV2 = async (event) => {
   const join_code = event.pathParameters?.join_code;
@@ -18,11 +18,7 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
 
   const caller_version = readCliVersion(event);
   if (caller_version && !meetsMinimumCliVersion(caller_version)) {
-    return err(
-      'VERSION_MISMATCH',
-      `This API requires token-derby v${minCliVersion()} or newer. ` +
-        `Upgrade: npm i -g @mauricode/token-derby@latest`,
-    );
+    return err('VERSION_MISMATCH', versionMismatchMessage());
   }
 
   const auth = event.headers?.authorization ?? event.headers?.Authorization;

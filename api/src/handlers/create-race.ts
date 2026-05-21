@@ -5,7 +5,7 @@ import { generateRaceId, generateJoinCode, generateAdminCode } from '../lib/code
 import { putRace, getRaceByJoinCode } from '../db/races.js';
 import { getOrganisationByName, isMember } from '../db/organisations.js';
 import { ok, err, parseJson } from '../lib/http.js';
-import { readCliVersion, meetsMinimumCliVersion, minCliVersion } from '../lib/version.js';
+import { readCliVersion, meetsMinimumCliVersion, versionMismatchMessage } from '../lib/version.js';
 import { authenticate } from '../lib/auth.js';
 import { sendOrgWebhook } from '../lib/webhook.js';
 import { randomUUID } from 'node:crypto';
@@ -19,11 +19,7 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
     return err('BAD_REQUEST', `X-Cli-Version must be MAJOR.MINOR.PATCH (got "${cli_version}")`);
   }
   if (!meetsMinimumCliVersion(cli_version)) {
-    return err(
-      'VERSION_MISMATCH',
-      `This API requires token-derby v${minCliVersion()} or newer. ` +
-        `Upgrade: npm i -g @mauricode/token-derby@latest`,
-    );
+    return err('VERSION_MISMATCH', versionMismatchMessage());
   }
 
   const auth = await authenticate(event);

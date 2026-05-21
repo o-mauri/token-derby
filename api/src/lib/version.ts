@@ -23,3 +23,13 @@ export function minCliVersion(): string {
 export function meetsMinimumCliVersion(cli_version: string): boolean {
   return gteSemver(cli_version, minCliVersion());
 }
+
+// Single source of truth for the "your CLI is too old" message. Always
+// suggests `token-derby update` (added in 2.4.0) so users can fix it with
+// one keystroke instead of remembering the npm incantation.
+export function versionMismatchMessage(): string {
+  return (
+    `This API requires token-derby v${minCliVersion()} or newer. ` +
+    'Run `token-derby update` to install the latest.'
+  );
+}
