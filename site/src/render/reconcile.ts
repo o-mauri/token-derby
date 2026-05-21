@@ -87,6 +87,10 @@ function createLane(doc: Document, horse: HorseView): HTMLElement {
   pace.className = 'horse-pace';
   info.appendChild(pace);
 
+  const dust = doc.createElement('span');
+  dust.className = 'horse-dust';
+  wrap.appendChild(dust);
+
   wrap.appendChild(info);
   wrap.appendChild(buildHorseSvg(doc));
   lane.appendChild(wrap);

@@ -28,6 +28,11 @@ export function renderRace(root: HTMLElement, joinCode: string): () => void {
         <span>Join code: <b>${joinCode}</b></span>
       </div>
     </header>
+    <div class="crowd" aria-hidden="true">
+      <div class="crowd-cap crowd-cap-left"></div>
+      <div class="crowd-body"></div>
+      <div class="crowd-cap crowd-cap-right"></div>
+    </div>
     <div class="track"></div>
     <footer class="race-header"><div class="meta"><button type="button" class="btn home-btn">← Home</button></div></footer>
   `;
@@ -51,6 +56,20 @@ export function renderRace(root: HTMLElement, joinCode: string): () => void {
   const ctrl = new AbortController();
   const buffers = new Map<string, Sample[]>();
   startAutoScroll({ signal: ctrl.signal, target: track });
+
+  const crowd = frame.querySelector<HTMLElement>('.crowd');
+  if (crowd) {
+    const fitCrowd = () => {
+      const scale = parseFloat(getComputedStyle(crowd).getPropertyValue('--sprite-scale')) || 2;
+      const tile = scale * 32;
+      const w = Math.floor(frame.clientWidth / tile) * tile;
+      crowd.style.width = `${w}px`;
+    };
+    fitCrowd();
+    const ro = new ResizeObserver(fitCrowd);
+    ro.observe(frame);
+    ctrl.signal.addEventListener('abort', () => ro.disconnect(), { once: true });
+  }
 
   let countdownAnchor: CountdownAnchor | null = null;
   const tickTimer = setInterval(() => {

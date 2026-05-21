@@ -7,7 +7,7 @@
   --border: #3a3a3a;
   --lane: #3d2856;
   --lane-alt: #362248;
-  --track-gap: 4px;
+  --track-gap: 0px;
   --horse-height: 60px;
   --sprite-scale: 2;
   --pixel-font: "VT323", "Courier New", ui-monospace, monospace;
@@ -209,7 +209,7 @@ html, body {
 
 .race {
   display: grid;
-  grid-template-rows: auto 1fr auto;
+  grid-template-rows: auto auto 1fr auto;
   min-height: 100vh;
 }
 .race-header {
@@ -229,8 +229,40 @@ html, body {
 .race-status--live { color: #7bed9f; }
 .race-status--finished { color: var(--muted); }
 
+.crowd {
+  width: 100%;
+  justify-self: center;
+  height: calc(var(--sprite-scale) * 32px);
+  display: flex;
+  image-rendering: pixelated;
+}
+.crowd-cap, .crowd-body {
+  height: 100%;
+  background-size: calc(var(--sprite-scale) * 32px) calc(var(--sprite-scale) * 128px);
+  background-position: 0 0;
+  image-rendering: pixelated;
+  animation: crowd-cheer 1s steps(4) infinite;
+}
+.crowd-cap {
+  flex: 0 0 calc(var(--sprite-scale) * 32px);
+  background-repeat: no-repeat;
+}
+.crowd-cap-left  { background-image: url('img/crowd-1-left.png'); }
+.crowd-cap-right { background-image: url('img/crowd-1-right.png'); }
+.crowd-body {
+  flex: 1 1 auto;
+  background-image: url('img/crowd-1.png');
+  background-repeat: repeat-x;
+}
+.race.finished .crowd-cap,
+.race.finished .crowd-body { animation-play-state: paused; }
+@keyframes crowd-cheer {
+  from { background-position-y: 0; }
+  to   { background-position-y: calc(var(--sprite-scale) * -128px); }
+}
+
 .track {
-  padding: 24px;
+  padding: 0 24px 24px 24px;
   display: flex;
   flex-direction: column;
   gap: var(--track-gap);
@@ -254,7 +286,7 @@ html, body {
 }
 .horse {
   position: absolute;
-  top: 30%;
+  top: 20%;
   transform: translate(-50%, -50%);
   transition: left 3s linear;
   width: calc(var(--sprite-scale) * 32px);
@@ -262,6 +294,54 @@ html, body {
   z-index: 1;
 }
 .horse-sprite { width: 100%; height: 100%; display: block; }
+
+/* Soft ground shadow under each horse — body + head ovals rendered as a single
+   SVG group with one opacity so overlap doesn't darken (the group composites
+   into a private buffer first, then applies the group opacity). */
+.horse::after {
+  content: "";
+  position: absolute;
+  left: -5px;
+  right: 5px;
+  top: calc(100% - 4px);
+  height: 8px;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 10' preserveAspectRatio='none'><g opacity='0.45'><ellipse cx='50' cy='5' rx='30' ry='3.5' fill='black'/><ellipse cx='85' cy='5' rx='12' ry='2.5' fill='black'/></g></svg>");
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* Dust trail kicked up by the back hoof (bottom-left of sprite) */
+.horse-dust {
+  position: absolute;
+  left: 8%;
+  bottom: -1px;
+  width: 7px;
+  height: 5px;
+  background: rgba(75, 55, 45, 0.85);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0;
+}
+.horse-dust::before,
+.horse-dust::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: inherit;
+  border-radius: inherit;
+}
+.horse.live .horse-dust          { animation: dust-puff 0.7s ease-out infinite; }
+.horse.live .horse-dust::before  { animation: dust-puff 0.7s ease-out infinite; animation-delay: 0.23s; }
+.horse.live .horse-dust::after   { animation: dust-puff 0.7s ease-out infinite; animation-delay: 0.46s; }
+@keyframes dust-puff {
+  0%   { opacity: 0;    transform: translate(0, 0)        scale(0.4); }
+  20%  { opacity: 0.75;                                              }
+  100% { opacity: 0;    transform: translate(-16px, -5px) scale(1.6); }
+}
+
 
 .horse-info {
   position: absolute;
@@ -581,7 +661,7 @@ html, body {
   :root {
     --sprite-scale: 3;
     --horse-height: 90px;
-    --track-gap: 4px;
+    --track-gap: 0px;
   }
 
   html { font-size: 18px; }
