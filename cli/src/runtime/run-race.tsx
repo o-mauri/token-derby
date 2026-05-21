@@ -2,10 +2,9 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Box, Text, useApp } from 'ink';
 import type { GetRaceResponse, HeartbeatResponse } from '@token-derby/shared';
 import { StatusScreen } from '../ui/StatusScreen.js';
-import { AchievementToast } from '../ui/AchievementToast.js';
-import { ACHIEVEMENT_DESCRIPTIONS, overtakeDescription, type RecentEvent } from '@token-derby/shared';
+import { describeAchievement, type RecentEvent } from '@token-derby/shared';
 import { runHeartbeatLoop } from './heartbeat-loop.js';
-import { sumOutputTokens } from '../tokens/transcripts.js';
+import { sumTokensForRace } from '../tokens/transcripts.js';
 import { initialBaseline } from '../tokens/baseline.js';
 import * as endpoints from '../api/endpoints.js';
 import { ApiError } from '../api/client.js';
@@ -26,8 +25,8 @@ export function RunRace({ active, startingBaseline, pendingMode, ownUserName }: 
   const [lastHbOk, setLastHbOk] = useState<boolean>(true);
   const [tickNow, setTickNow] = useState<Date>(new Date());
   const [fatalError, setFatalError] = useState<string | null>(null);
-  const [toasts, setToasts] = useState<Array<{ key: string; event: RecentEvent }>>([]);
-  const shownToastAtRef = useRef<number>(0);
+  const [achievements, setAchievements] = useState<Array<{ key: string; event: RecentEvent }>>([]);
+  const shownAchievementAtRef = useRef<number>(0);
 
   const baselineRef = useRef(startingBaseline);
   const pendingRef = useRef(pendingMode);
@@ -43,7 +42,7 @@ export function RunRace({ active, startingBaseline, pendingMode, ownUserName }: 
   // Re-snapshot baseline when race transitions pending → live.
   useEffect(() => {
     if (pendingRef.current && race?.status === 'live') {
-      sumOutputTokens().then(total => {
+      sumTokensForRace(active).then(total => {
         baselineRef.current = total;
         pendingRef.current = false;
       });
@@ -75,14 +74,11 @@ export function RunRace({ active, startingBaseline, pendingMode, ownUserName }: 
         setLastHbOk(true);
         setRace(raceViewFrom(resp));
         const own = resp.horses.find(h => h.horse_id === active.horse_id);
-        const candidates = (own?.recent_events ?? []).filter(e => e.at > shownToastAtRef.current);
+        const candidates = (own?.recent_events ?? []).filter(e => e.at > shownAchievementAtRef.current);
         if (candidates.length > 0) {
-          shownToastAtRef.current = Math.max(...candidates.map(e => e.at));
+          shownAchievementAtRef.current = Math.max(...candidates.map(e => e.at));
           const fresh = candidates.map(e => ({ key: `${e.at}-${e.name}`, event: e }));
-          setToasts(prev => [...prev, ...fresh]);
-          for (const { key } of fresh) {
-            setTimeout(() => setToasts(prev => prev.filter(t => t.key !== key)), 10_000);
-          }
+          setAchievements(prev => [...prev, ...fresh]);
         }
         if (resp.race_status === 'finished') exit();
       },
@@ -102,13 +98,13 @@ export function RunRace({ active, startingBaseline, pendingMode, ownUserName }: 
     // Token sampler — refresh the running token total every 5s so the heartbeat sees fresh data.
     const sampler = setInterval(async () => {
       try {
-        lastTokenSampleRef.current = await sumOutputTokens();
+        lastTokenSampleRef.current = await sumTokensForRace(active);
       } catch (e) {
         console.error('[token-derby] token sampler failed:', e);
       }
     }, 5_000);
     // Prime it once at startup.
-    sumOutputTokens()
+    sumTokensForRace(active)
       .then(t => { lastTokenSampleRef.current = t; })
       .catch(e => console.error('[token-derby] token sampler prime failed:', e));
 
@@ -144,19 +140,32 @@ export function RunRace({ active, startingBaseline, pendingMode, ownUserName }: 
         lastHeartbeatAgoSec={lastHeartbeatAgoSec}
         lastHeartbeatOk={lastHbOk}
       />
-      {toasts.slice(0, 3).map(({ key, event }) => (
-        <AchievementToast
-          key={key}
-          horseName={active.horse_name}
-          name={event.name}
-          description={event.name === 'Overtake!'
-            ? overtakeDescription(Math.floor(event.xp / 3))
-            : ACHIEVEMENT_DESCRIPTIONS[event.name]}
-          xp={event.xp}
-        />
-      ))}
+      {achievements.length > 0 && (
+        <Box flexDirection="column" marginTop={1}>
+          <Text bold>Achievements</Text>
+          {achievements.map(({ key, event }) => {
+            const description = describeAchievement(event, active);
+            return (
+              <Box key={key} flexDirection="row">
+                <Text dimColor>  {formatClockTime(event.at)}  </Text>
+                <Text color="yellow" bold>+{event.xp} XP  </Text>
+                <Text>{event.name}</Text>
+                <Text dimColor>  — {description}</Text>
+              </Box>
+            );
+          })}
+        </Box>
+      )}
     </Box>
   );
+}
+
+function formatClockTime(at: number): string {
+  const d = new Date(at);
+  const h = String(d.getHours()).padStart(2, '0');
+  const m = String(d.getMinutes()).padStart(2, '0');
+  const s = String(d.getSeconds()).padStart(2, '0');
+  return `${h}:${m}:${s}`;
 }
 
 function raceViewFrom(resp: HeartbeatResponse): GetRaceResponse {
@@ -174,7 +183,7 @@ export async function buildInitialState(args: {
   raceStatus: 'pending' | 'live';
   rejoin: boolean;
 }): Promise<{ startingBaseline: number; pendingMode: boolean }> {
-  const runningTotal = await sumOutputTokens();
+  const runningTotal = await sumTokensForRace(args.active);
   if (args.rejoin) {
     return {
       startingBaseline: Math.max(0, runningTotal - args.active.last_race_tokens),

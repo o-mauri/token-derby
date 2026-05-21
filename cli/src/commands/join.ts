@@ -2,7 +2,7 @@ import React from 'react';
 import { render } from 'ink';
 import type { HorseColors, StableHorse } from '@token-derby/shared';
 import { HorsePicker } from '../ui/HorsePicker.js';
-import { joinRace, getRace, listStable } from '../api/endpoints.js';
+import { joinRace, getRace, listStable, listOrganisations } from '../api/endpoints.js';
 import { ApiError } from '../api/client.js';
 import { saveActiveRace, loadActiveRace, type ActiveRace } from '../stable/active-race.js';
 import { RunRace, buildInitialState } from '../runtime/run-race.js';
@@ -53,6 +53,24 @@ export async function joinCommand(joinCode: string | undefined): Promise<number>
     chosenColors = ownHorse.colors;
     isResume = true;
   } else {
+    // For org-restricted races, surface NOT_ORG_MEMBER before walking the user
+    // through stable/picker flows — otherwise the first thing they see is
+    // "Your stable is empty" or a horse picker, hiding the real reason the
+    // join will fail. The server still enforces this on POST /join.
+    if (race.org_id) {
+      try {
+        const { organisations } = await listOrganisations();
+        if (!organisations.some(o => o.org_id === race.org_id)) {
+          const label = race.organisation_name ?? race.org_id;
+          console.error(`This race is restricted to members of "${label}".`);
+          return 1;
+        }
+      } catch {
+        // If we can't reach the orgs endpoint, fall through and let the
+        // join API enforce membership — server is source of truth.
+      }
+    }
+
     let horses: StableHorse[];
     try {
       horses = (await listStable()).horses;
@@ -110,6 +128,7 @@ export async function joinCommand(joinCode: string | undefined): Promise<number>
     joined_at: ownHorse?.joined_at ?? new Date().toISOString(),
     last_race_tokens: lastTokens,
     last_heartbeat_at: new Date(0).toISOString(),
+    ...(race.counts_input ? { counts_input: true } : {}),
   };
   await saveActiveRace(active);
 

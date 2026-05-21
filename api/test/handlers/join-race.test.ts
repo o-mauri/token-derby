@@ -16,7 +16,7 @@ function authedEvent(
   path: string,
   body?: unknown,
   pathParameters?: Record<string, string>,
-  cliVersion: string | null = '2.0.0',
+  cliVersion: string | null = '2.4.0',
 ): APIGatewayProxyEventV2 {
   const headers: Record<string, string> = {};
   if (cliVersion) headers['x-cli-version'] = cliVersion;
@@ -38,7 +38,7 @@ function authedEvent(
   };
 }
 
-async function createTestRace(creator: TestUser, overrides: Record<string, any> = {}, cliVersion = '2.0.0') {
+async function createTestRace(creator: TestUser, overrides: Record<string, any> = {}, cliVersion = '2.4.0') {
   const res: any = await createHandler(authedEvent(creator, 'POST', '/races', {
     name: 'Join Test',
     start_time: new Date(Date.now() - 60_000).toISOString(),
@@ -50,7 +50,7 @@ async function createTestRace(creator: TestUser, overrides: Record<string, any> 
   return JSON.parse(res.body);
 }
 
-function joinEvent(joinCode: string, user: TestUser | null, body: unknown, cliVersion: string | null = '2.0.0') {
+function joinEvent(joinCode: string, user: TestUser | null, body: unknown, cliVersion: string | null = '2.4.0') {
   return authedEvent(user, 'POST', `/races/${joinCode}/join`, body, { join_code: joinCode }, cliVersion);
 }
 

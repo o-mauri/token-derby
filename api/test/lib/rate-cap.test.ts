@@ -98,6 +98,32 @@ describe('clampHeartbeat', () => {
     expect(out).toBe(1_000);
   });
 
+  it('scales the rate ceiling by TOKEN_INPUT_MULTIPLIER when counts_input is true', () => {
+    const out = clampHeartbeat({
+      previous_tokens: 0,
+      previous_heartbeat_iso: ISO(0),
+      proposed_tokens: 200_000,
+      now: new Date(60_000), // 60s
+      max_rate_per_second: RATE,
+      counts_input: true,
+    });
+    // ceiling = 0 + 500*60*10 = 300_000; proposed 200_000 < ceiling → accepted as-is
+    expect(out).toBe(200_000);
+  });
+
+  it('still clamps when input+output proposed exceeds the scaled ceiling', () => {
+    const out = clampHeartbeat({
+      previous_tokens: 0,
+      previous_heartbeat_iso: ISO(0),
+      proposed_tokens: 5_000_000,
+      now: new Date(60_000),
+      max_rate_per_second: RATE,
+      counts_input: true,
+    });
+    // ceiling = 500*60*10 = 300_000
+    expect(out).toBe(300_000);
+  });
+
   it('uses the env var TOKEN_DERBY_MAX_RATE when no override is passed', () => {
     const prev = process.env.TOKEN_DERBY_MAX_RATE;
     process.env.TOKEN_DERBY_MAX_RATE = '50';

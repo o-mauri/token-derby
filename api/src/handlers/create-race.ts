@@ -87,6 +87,7 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
       creator_user_id: auth.user_id,
       creator_user_name: auth.display_name,
       ...(org ? { org_id: org.org_id, organisation_name: org.org_name } : {}),
+      ...(body.counts_input ? { counts_input: true } : {}),
     },
     admin_code,
   );

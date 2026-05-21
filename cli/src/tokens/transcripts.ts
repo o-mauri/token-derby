@@ -2,6 +2,10 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { claudeProjectsDir } from '../paths.js';
 
+// `input` here is "fresh-input" tokens only: input_tokens (this turn's new
+// content) + cache_creation_input_tokens (tokens written into the cache this
+// turn). cache_read_input_tokens is intentionally excluded — those are
+// passive context that don't represent work done in the race.
 export type TokenTotals = { input: number; output: number };
 
 export async function sumTokens(): Promise<TokenTotals> {
@@ -17,16 +21,12 @@ export async function sumTokens(): Promise<TokenTotals> {
   return { input, output };
 }
 
-export async function sumOutputTokens(): Promise<number> {
+// Total tokens for a race in the race's chosen mode. When race.counts_input
+// is true, the race counts fresh-input + cache-creation + output; otherwise
+// it counts output only. cache_read is never included.
+export async function sumTokensForRace(race: { counts_input?: boolean }): Promise<number> {
   const { input, output } = await sumTokens();
-  return countInputTokens() ? input + output : output;
-}
-
-function countInputTokens(): boolean {
-  const v = process.env.TOKEN_DERBY_COUNT_INPUT_TOKENS;
-  if (!v) return false;
-  const s = v.toLowerCase();
-  return s === '1' || s === 'true' || s === 'yes' || s === 'on';
+  return race.counts_input ? input + output : output;
 }
 
 async function listJsonlFiles(root: string): Promise<string[]> {
@@ -83,9 +83,7 @@ async function sumFile(file: string): Promise<TokenTotals> {
     }
     const usage = parsed?.message?.usage;
     if (!usage) continue;
-    input += addNum(usage.input_tokens)
-           + addNum(usage.cache_creation_input_tokens)
-           + addNum(usage.cache_read_input_tokens);
+    input += addNum(usage.input_tokens) + addNum(usage.cache_creation_input_tokens);
     output += addNum(usage.output_tokens);
   }
   return { input, output };

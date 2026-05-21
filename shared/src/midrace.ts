@@ -26,6 +26,37 @@ export function overtakeDescription(positionsClimbed: number): string {
   return `Overtook ${positionsClimbed} horses`;
 }
 
+// Multiplier applied to token thresholds (Stampede!, Pulled Away!, rate cap)
+// when a race counts input+output. Calibrated against real Claude Code
+// transcripts: with cache_read_input_tokens excluded (they're passive,
+// reflect context size rather than work), the aggregate ratio of
+// (fresh_input + cache_creation + output) / output is ~8x. Set to 10 so the
+// rate cap clears all but the busiest peak minutes (~p90).
+export const TOKEN_INPUT_MULTIPLIER = 10;
+
+export function tokenMultiplier(race: { counts_input?: boolean }): number {
+  return race.counts_input ? TOKEN_INPUT_MULTIPLIER : 1;
+}
+
+// Race-aware description for an event. Stampede!/Pulled Away! report their
+// scaled thresholds for input+output races; everything else is static.
+export function describeAchievement(
+  event: { name: AchievementName; xp: number },
+  race: { counts_input?: boolean },
+): string {
+  if (event.name === 'Overtake!') {
+    return overtakeDescription(Math.floor(event.xp / 3));
+  }
+  const m = tokenMultiplier(race);
+  if (event.name === 'Stampede!') {
+    return `Gained ${(MIDRACE_THRESHOLDS.stampede_tokens * m).toLocaleString('en-US')}+ tokens in a single minute`;
+  }
+  if (event.name === 'Pulled Away!') {
+    return `Grew the lead by ${(MIDRACE_THRESHOLDS.pulled_away_gap * m).toLocaleString('en-US')}+ tokens in a minute`;
+  }
+  return ACHIEVEMENT_DESCRIPTIONS[event.name];
+}
+
 export const MIDRACE_XP = {
   racer: 1,
   overtake: 3,

@@ -33,6 +33,7 @@ function input(overrides: Partial<EvaluateInput>): EvaluateInput {
     total_horses: 4,
     second_place_tokens: null,
     warm_up_active: false,
+    counts_input: false,
     ...overrides,
   };
 }
@@ -292,6 +293,28 @@ describe('evaluateAchievements — Stampede!', () => {
     }));
     expect(result.events_this_tick.find(e => e.name === 'Stampede!')).toBeDefined();
   });
+
+  it('does NOT fire at 7,000 gain when counts_input is true (threshold scales 10x → 70,000)', () => {
+    const prev = emptyState();
+    const result = evaluateAchievements(input({
+      prev,
+      current_tokens: 8_000,
+      prev_current_tokens: 1_000,  // gain = 7000
+      counts_input: true,
+    }));
+    expect(result.events_this_tick.find(e => e.name === 'Stampede!')).toBeUndefined();
+  });
+
+  it('fires at 70,000 gain when counts_input is true', () => {
+    const prev = emptyState();
+    const result = evaluateAchievements(input({
+      prev,
+      current_tokens: 80_000,
+      prev_current_tokens: 10_000,  // gain = 70_000
+      counts_input: true,
+    }));
+    expect(result.events_this_tick.find(e => e.name === 'Stampede!')).toBeDefined();
+  });
 });
 
 describe('evaluateAchievements — Comeback!', () => {
@@ -437,6 +460,34 @@ describe('evaluateAchievements — Pulled Away!', () => {
     }));
     expect(result.events_this_tick.find(e => e.name === 'Pulled Away!')).toBeUndefined();
     expect(result.next.last_gap_in_1st).toBe(50_000);
+  });
+
+  it('does NOT fire at 5,000 growth when counts_input is true (threshold scales 10x → 50,000)', () => {
+    const prev = emptyState();
+    prev.last_rank = 1;
+    prev.last_gap_in_1st = 1_000;
+    const result = evaluateAchievements(input({
+      prev,
+      new_rank: 1,
+      current_tokens: 100_000,
+      second_place_tokens: 94_000,  // gap 6_000, growth 5_000
+      counts_input: true,
+    }));
+    expect(result.events_this_tick.find(e => e.name === 'Pulled Away!')).toBeUndefined();
+  });
+
+  it('fires at 50,000 growth when counts_input is true', () => {
+    const prev = emptyState();
+    prev.last_rank = 1;
+    prev.last_gap_in_1st = 1_000;
+    const result = evaluateAchievements(input({
+      prev,
+      new_rank: 1,
+      current_tokens: 200_000,
+      second_place_tokens: 149_000,  // gap 51_000, growth 50_000
+      counts_input: true,
+    }));
+    expect(result.events_this_tick.find(e => e.name === 'Pulled Away!')).toBeDefined();
   });
 });
 

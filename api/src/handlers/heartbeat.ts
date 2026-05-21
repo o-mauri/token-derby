@@ -65,6 +65,7 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
       previous_heartbeat_iso: horse.last_heartbeat,
       proposed_tokens: body.current_tokens,
       now,
+      counts_input: race.counts_input,
     });
     const allHorsesBefore = await listHorses(race.race_id);
     const updatedHorses = allHorsesBefore.map(h =>
@@ -103,6 +104,7 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
       total_horses: ranked.length,
       second_place_tokens: second?.current_tokens ?? null,
       warm_up_active: now.getTime() < warmUpEnd,
+      counts_input: race.counts_input ?? false,
     });
     await updateHorseHeartbeat(race.race_id, horse_id, accepted, now.toISOString(), evalResult.next);
     // Reuse the pre-built horse list, patching the calling horse with fresh evaluator output.

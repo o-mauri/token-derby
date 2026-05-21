@@ -7,7 +7,7 @@ export type TestUser = { user_id: string; display_name: string; secret_token: st
 
 const DEFAULT_COLORS: HorseColors = { body: '#8B4513', mane: '#000', tail: '#000', saddle: '#C0392B' };
 
-export async function makeUser(display_name: string, cliVersion = '2.0.0'): Promise<TestUser> {
+export async function makeUser(display_name: string, cliVersion = '2.4.0'): Promise<TestUser> {
   const event: APIGatewayProxyEventV2 = {
     version: '2.0',
     routeKey: 'POST /jockey/init',
@@ -37,7 +37,7 @@ export async function makeHorse(
     rawQueryString: '',
     headers: {
       'content-type': 'application/json',
-      'x-cli-version': '2.0.0',
+      'x-cli-version': '2.4.0',
       'x-user-id': user.user_id,
       'x-user-token': user.secret_token,
     },

@@ -13,6 +13,7 @@ export type ActiveRace = {
   joined_at: string;
   last_race_tokens: number;
   last_heartbeat_at: string;
+  counts_input?: boolean;
 };
 
 export async function loadActiveRace(joinCode: string): Promise<ActiveRace | null> {

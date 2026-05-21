@@ -7,6 +7,7 @@ export type CreateRaceRequest = {
   tz: string;
   max_participants?: number;
   organisation_name?: string;
+  counts_input?: boolean;
 };
 
 export type CreateRaceResponse = {

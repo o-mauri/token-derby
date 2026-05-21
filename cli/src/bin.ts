@@ -6,6 +6,7 @@ import { createRaceCommand } from './commands/create.js';
 import { joinCommand } from './commands/join.js';
 import { endCommand } from './commands/end.js';
 import { initCommand } from './commands/init.js';
+import { updateCommand } from './commands/update.js';
 import { orgCreateCommand } from './commands/org-create.js';
 import { orgJoinCommand } from './commands/org-join.js';
 import { orgListCommand } from './commands/org-list.js';
@@ -23,6 +24,9 @@ Identity:
                                           Re-running renames you on the server.
   token-derby init --reset                Wipe local identity and create a fresh account.
                                           Your previous stable is abandoned on the server.
+
+Maintenance:
+  token-derby update                      Check for and install the latest CLI version
 
 Stable management:
   token-derby stable create               Make a new horse (interactive)
@@ -68,8 +72,10 @@ async function main(): Promise<number> {
     const reset = argv.slice(1).includes('--reset');
     return initCommand(reset);
   }
+  // `update` runs before the identity gate so a broken or stale install can fix itself.
+  if (cmd === 'update') return updateCommand();
 
-  // Every other command requires an identity. `init` is the only escape hatch.
+  // Every other command requires an identity. `init` and `update` are the only escape hatches.
   const identity = await loadIdentity();
   if (!identity) {
     console.error('Run `token-derby init` to set up your identity before using any other command.');

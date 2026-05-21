@@ -1,5 +1,5 @@
 import type { RecentEvent } from '@token-derby/shared';
-import { MIDRACE_XP, MIDRACE_CAPS, MIDRACE_THRESHOLDS } from '@token-derby/shared';
+import { MIDRACE_XP, MIDRACE_CAPS, MIDRACE_THRESHOLDS, tokenMultiplier } from '@token-derby/shared';
 
 export type AchievementState = {
   live_xp: number;
@@ -28,6 +28,7 @@ export type EvaluateInput = {
   total_horses: number;
   second_place_tokens: number | null;
   warm_up_active: boolean;
+  counts_input: boolean;
 };
 
 export type EvaluateOutput = {
@@ -46,6 +47,9 @@ export function evaluateAchievements(inp: EvaluateInput): EvaluateOutput {
   let xpDelta = 0;
 
   const dt = Math.max(0, inp.now_ms - inp.last_heartbeat_at_ms);
+  const m = tokenMultiplier({ counts_input: inp.counts_input });
+  const stampedeThreshold = MIDRACE_THRESHOLDS.stampede_tokens * m;
+  const pulledAwayThreshold = MIDRACE_THRESHOLDS.pulled_away_gap * m;
 
   // Racer!
   next.racer_streak_ms = inp.prev.racer_streak_ms + Math.min(dt, MIDRACE_THRESHOLDS.racer_dt_cap_ms);
@@ -117,7 +121,7 @@ export function evaluateAchievements(inp: EvaluateInput): EvaluateOutput {
   const stampedeOk =
     inp.prev.last_stampede_at === undefined ||
     inp.now_ms - inp.prev.last_stampede_at >= MIDRACE_THRESHOLDS.stampede_cooldown_ms;
-  if (tokenGain >= MIDRACE_THRESHOLDS.stampede_tokens && stampedeOk) {
+  if (tokenGain >= stampedeThreshold && stampedeOk) {
     const event: RecentEvent = { at: inp.now_ms, name: 'Stampede!', xp: MIDRACE_XP.stampede };
     events.push(event);
     next.recent_events.push(event);
@@ -147,7 +151,7 @@ export function evaluateAchievements(inp: EvaluateInput): EvaluateOutput {
       const cooldownOk =
         inp.prev.last_pulled_away_at === undefined ||
         inp.now_ms - inp.prev.last_pulled_away_at >= MIDRACE_THRESHOLDS.pulled_away_cooldown_ms;
-      if (growth >= MIDRACE_THRESHOLDS.pulled_away_gap && cooldownOk) {
+      if (growth >= pulledAwayThreshold && cooldownOk) {
         const event: RecentEvent = { at: inp.now_ms, name: 'Pulled Away!', xp: MIDRACE_XP.pulled_away };
         events.push(event);
         next.recent_events.push(event);

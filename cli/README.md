@@ -39,6 +39,8 @@ token-derby end <admin-code>
 
 The CLI sums `message.usage.output_tokens` across every `*.jsonl` under `~/.claude/projects/`. Your "race tokens" are everything generated since the moment you joined. Tokens generated while disconnected are skipped — that window is your crash penalty.
 
+Races can optionally also count *fresh input tokens* — i.e. `input_tokens + cache_creation_input_tokens` (your new context this turn) in addition to output. `cache_read_input_tokens` is never counted, since those reflect passive context size rather than work. The race creator opts in at `token-derby create` time; thresholds for Stampede!, Pulled Away!, and the heartbeat rate cap scale 10× in these races so the achievement cadence stays comparable.
+
 ## Files
 
 - `~/.token-derby/stable.json` — saved horses
@@ -49,4 +51,3 @@ The CLI sums `message.usage.output_tokens` across every `*.jsonl` under `~/.clau
 - `TOKEN_DERBY_API_BASE` — override the API base URL (default: `https://token-derby.mauricode.co.uk/api`)
 - `TOKEN_DERBY_HOME` — override the data directory (default: `~/.token-derby`)
 - `TOKEN_DERBY_CLAUDE_DIR` — override the transcripts directory (default: `~/.claude/projects`)
-- `TOKEN_DERBY_COUNT_INPUT_TOKENS` — set to `1` to count input tokens (including cache reads/creations) toward your race total. Default is output tokens only.

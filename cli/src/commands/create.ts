@@ -40,10 +40,14 @@ export async function createRaceCommand(organisationName?: string): Promise<numb
       return 1;
     }
 
+    const countInputRaw = (await rl.question('Count input tokens (fresh input + cache creation) toward race totals? [y/N]: ')).trim().toLowerCase();
+    const counts_input = countInputRaw === 'y' || countInputRaw === 'yes';
+
     const resp = await createRace({
       name, start_time: start, end_time: end, tz,
       ...(max !== undefined ? { max_participants: max } : {}),
       ...(org ? { organisation_name: org } : {}),
+      ...(counts_input ? { counts_input: true } : {}),
     });
 
     console.log('');
@@ -56,6 +60,9 @@ export async function createRaceCommand(organisationName?: string): Promise<numb
     console.log('');
     if (org) {
       console.log(`  Restricted to organisation: ${org}`);
+    }
+    if (counts_input) {
+      console.log('  Counting input + output tokens (excluding cache reads).');
     }
     console.log(`  Share with participants:  token-derby join ${resp.join_code}`);
     return 0;

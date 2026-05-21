@@ -54,6 +54,10 @@ export type Race = {
   creator_user_name?: string;
   org_id?: string;
   organisation_name?: string;
+  // When true, races count input+output tokens (incl. cache reads/creations)
+  // instead of just output. Server-side achievement and rate-cap thresholds
+  // scale by TOKEN_INPUT_MULTIPLIER for these races.
+  counts_input?: boolean;
 };
 
 export type HorseView = Horse & {
