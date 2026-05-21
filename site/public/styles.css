@@ -209,7 +209,7 @@ html, body {
 
 .race {
   display: grid;
-  grid-template-rows: auto 1fr auto;
+  grid-template-rows: auto auto 1fr auto;
   min-height: 100vh;
 }
 .race-header {
@@ -229,8 +229,40 @@ html, body {
 .race-status--live { color: #7bed9f; }
 .race-status--finished { color: var(--muted); }
 
+.crowd {
+  width: 100%;
+  justify-self: center;
+  height: calc(var(--sprite-scale) * 32px);
+  display: flex;
+  image-rendering: pixelated;
+}
+.crowd-cap, .crowd-body {
+  height: 100%;
+  background-size: calc(var(--sprite-scale) * 32px) calc(var(--sprite-scale) * 128px);
+  background-position: 0 0;
+  image-rendering: pixelated;
+  animation: crowd-cheer 1s steps(4) infinite;
+}
+.crowd-cap {
+  flex: 0 0 calc(var(--sprite-scale) * 32px);
+  background-repeat: no-repeat;
+}
+.crowd-cap-left  { background-image: url('img/crowd-1-left.png'); }
+.crowd-cap-right { background-image: url('img/crowd-1-right.png'); }
+.crowd-body {
+  flex: 1 1 auto;
+  background-image: url('img/crowd-1.png');
+  background-repeat: repeat-x;
+}
+.race.finished .crowd-cap,
+.race.finished .crowd-body { animation-play-state: paused; }
+@keyframes crowd-cheer {
+  from { background-position-y: 0; }
+  to   { background-position-y: calc(var(--sprite-scale) * -128px); }
+}
+
 .track {
-  padding: 24px;
+  padding: 0 24px 24px 24px;
   display: flex;
   flex-direction: column;
   gap: var(--track-gap);
