@@ -4,6 +4,11 @@ dist/
 build/
 *.tsbuildinfo
 
+# Shared workspace emits next to its sources rather than into dist/ — ignore the build artifacts.
+shared/src/**/*.js
+shared/src/**/*.d.ts
+shared/src/**/*.js.map
+
 # Test / coverage
 coverage/
 .nyc_output/
