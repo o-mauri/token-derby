@@ -227,10 +227,13 @@ export async function applyRollResult(
   const eav: Record<string, unknown> = {
     ':new_lvl': input.expected_last_rolled_level + 1,
     ':expected_lvl': input.expected_last_rolled_level,
-    ':zero': 0,
   };
+  // Allow the write when:
+  //   • The attribute is absent AND expected is 0 (normal first roll at level 1), OR
+  //   • The attribute is absent AND expected > 0 (lazy-migration first roll for a levelled horse), OR
+  //   • The stored value equals expected (subsequent rolls, optimistic lock).
   const conditionExpr =
-    '(attribute_not_exists(last_rolled_level) AND :expected_lvl = :zero) OR last_rolled_level = :expected_lvl';
+    'attribute_not_exists(last_rolled_level) OR last_rolled_level = :expected_lvl';
 
   if (input.append_hat) {
     sets.push('hats = list_append(if_not_exists(hats, :empty), :new_hat)');
