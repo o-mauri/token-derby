@@ -1,9 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Box, Text } from 'ink';
-import type { Hat, HorseColors } from '@token-derby/shared';
-import type { SlotTag } from './sprite.js';
-import { HorseSprite } from './HorseSprite.js';
-import { AnimatedHorseSprite } from './AnimatedHorseSprite.js';
+import type { Hat } from '@token-derby/shared';
+import { HatSprite, AnimatedHatSprite } from './HatSprite.js';
 import { ansiFg } from './half-blocks.js';
 
 const RESET = '\x1b[0m';
@@ -145,14 +143,12 @@ function ConfettiBurst({ tier }: { tier: Hat['rarity'] }) {
 // ─── Main RollReveal ─────────────────────────────────────────────────
 
 type Props = {
-  sprite: readonly (readonly SlotTag[])[];
-  colors: HorseColors;
   hat: Hat;
   variant?: number;
   onDone: () => void;
 };
 
-export function RollReveal({ sprite, colors, hat, variant, onDone }: Props) {
+export function RollReveal({ hat, variant, onDone }: Props) {
   const [phase, setPhase] = useState<'closed' | 'open1' | 'open2' | 'burst' | 'reveal'>('closed');
 
   useEffect(() => {
@@ -173,7 +169,8 @@ export function RollReveal({ sprite, colors, hat, variant, onDone }: Props) {
   if (phase === 'open2')  return <GiftBox frame={BOX_OPENING_2}  color={primaryColor} />;
   if (phase === 'burst')  return <ConfettiBurst tier={hat.rarity} />;
 
+  // reveal: show the hat itself, centered in the same scene canvas.
   return hat.rarity === 'legendary'
-    ? <AnimatedHorseSprite sprite={sprite} colors={colors} hat={hat} />
-    : <HorseSprite sprite={sprite} colors={colors} hat={{ hat, variant: variant ?? 0 }} />;
+    ? <AnimatedHatSprite hat={hat} centerIn={{ w: SCENE_W, h: SCENE_H }} />
+    : <HatSprite hat={hat} variant={variant} centerIn={{ w: SCENE_W, h: SCENE_H }} />;
 }

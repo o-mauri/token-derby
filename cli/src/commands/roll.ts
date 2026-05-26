@@ -5,7 +5,6 @@ import type { StableHorse } from '@token-derby/shared';
 import { ApiError } from '../api/client.js';
 import { listStable, rollHat, equipHat } from '../api/endpoints.js';
 import { RollReveal } from '../ui/RollReveal.js';
-import { MAIN_SPRITE } from '../ui/sprite.js';
 import { RollHorsePicker } from '../ui/RollHorsePicker.js';
 
 function pendingFor(horse: StableHorse): number {
@@ -78,8 +77,6 @@ export async function rollCommand(): Promise<number> {
       // RollReveal calls its onDone callback when the full sequence finishes.
       await new Promise<void>(resolve => {
         const app = render(React.createElement(RollReveal, {
-          sprite: MAIN_SPRITE,
-          colors: chosen.colors,
           hat,
           variant: result.collected.variant,
           onDone: () => { app.unmount(); resolve(); },

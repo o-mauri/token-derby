@@ -1,16 +1,8 @@
 import React from 'react';
 import { render } from 'ink';
 import { hatById, HATS } from '@token-derby/shared';
-import type { Hat, HorseColors } from '@token-derby/shared';
+import type { Hat } from '@token-derby/shared';
 import { RollReveal } from '../ui/RollReveal.js';
-import { MAIN_SPRITE } from '../ui/sprite.js';
-
-const DEMO_COLORS: HorseColors = {
-  body: '#A0522D',
-  mane: '#2F1B0C',
-  tail: '#2F1B0C',
-  saddle: '#8B4513',
-};
 
 type Demo =
   | { kind: 'no_hat' }
@@ -51,8 +43,6 @@ async function showHat(hat: Hat, variant: number | undefined): Promise<void> {
 
   await new Promise<void>(resolve => {
     const app = render(React.createElement(RollReveal, {
-      sprite: MAIN_SPRITE,
-      colors: DEMO_COLORS,
       hat,
       variant,
       onDone: () => { app.unmount(); resolve(); },
