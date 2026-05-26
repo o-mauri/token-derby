@@ -2,6 +2,12 @@ import { parseRoute } from './route.js';
 import { renderHome } from './render/home.js';
 import { renderRace } from './render/race.js';
 import { renderOrg } from './render/org.js';
+import { buildLegendaryKeyframes } from './hat-svg.js';
+
+// Inject legendary hat keyframes once at startup
+const hatStyle = document.createElement('style');
+hatStyle.textContent = buildLegendaryKeyframes();
+document.head.appendChild(hatStyle);
 
 let activeCleanup: (() => void) | null = null;
 

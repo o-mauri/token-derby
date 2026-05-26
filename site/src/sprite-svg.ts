@@ -24,7 +24,10 @@ function g(doc: Document, cls: string): SVGGElement {
 
 export function buildHorseSvg(doc: Document): SVGSVGElement {
   const svg = doc.createElementNS(SVG_NS, 'svg') as SVGSVGElement;
-  svg.setAttribute('viewBox', `0 0 ${SPRITE_WIDTH} ${SPRITE_HEIGHT}`);
+  // viewBox extended to fit hat overhang: 6 rows above the horse origin
+  // for tall hats, and 2 cols past the right edge for hats anchored at x=23
+  // with width 11 (the standard 11×10 production format).
+  svg.setAttribute('viewBox', `0 -6 ${SPRITE_WIDTH + 2} ${SPRITE_HEIGHT + 6}`);
   svg.setAttribute('class', 'horse-sprite');
   svg.setAttribute('shape-rendering', 'crispEdges');
   svg.setAttribute('aria-hidden', 'true');
