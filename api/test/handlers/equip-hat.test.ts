@@ -38,6 +38,13 @@ describe('equip-hat handler', () => {
     expect(res.statusCode).toBe(400);
   });
 
+  it('rejects non-integer floats as hat_index', async () => {
+    const user = await makeUser('EquipUser_Float');
+    const horse = await makeHorse(user, 'Floathat');
+    const res = await equipHandler(equipEvent(user, horse.stable_horse_id, { hat_index: 1.5 }));
+    expect(res.statusCode).toBe(400);
+  });
+
   it('equips a valid index when the horse has a hat in inventory', async () => {
     const user = await makeUser('EquipUser_OK');
     const horse = await makeHorse(user, 'HatHaver');

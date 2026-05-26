@@ -12,8 +12,8 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
   if (!stable_horse_id) return err('BAD_REQUEST', 'stable_horse_id path parameter required');
 
   const body = parseJson<EquipHatRequest>(event.body);
-  if (!body || (body.hat_index !== null && typeof body.hat_index !== 'number')) {
-    return err('BAD_REQUEST', 'hat_index must be a number or null');
+  if (!body || (body.hat_index !== null && !Number.isInteger(body.hat_index))) {
+    return err('BAD_REQUEST', 'hat_index must be a non-negative integer or null');
   }
 
   const horse = await getStableHorse(auth.user_id, stable_horse_id);
