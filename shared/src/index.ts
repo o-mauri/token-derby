@@ -6,3 +6,4 @@ export * from './version-match.js';
 export * from './levels.js';
 export * from './midrace.js';
 export * from './webhooks.js';
+export * from './hats.js';
