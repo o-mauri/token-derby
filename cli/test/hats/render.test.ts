@@ -52,23 +52,36 @@ describe('composeHatGrid', () => {
     expect(grid.length).toBeGreaterThan(0);
   });
 
-  it('places horse pixels below the extension rows', () => {
+  it('hat overlays the horse — mane pixels covered by hat in the overlap zone', () => {
+    // flat_cap row 8 is `..AAAAAAA..` (all A from x=2..8), which lands at horse cols 25..31
+    // when anchor_x=23. Horse row 2 has mane `MMM` at cols 26..28. After compositing,
+    // those mane cells should be hat color (not mane color) because the hat overlays.
+    const hat = hatById('flat_cap')!;
+    if (hat.rarity === 'legendary') throw new Error('test misconfigured');
+    const v0 = hat.variants[0]!;
+    const { grid, offsetX } = composeHatGrid(MAIN_SPRITE, hat, 0, HORSE_COLORS);
+    const ext = Math.max(0, hat.rows.length - 4);
+    // Horse row 2 = grid row (2 + ext); col 26 (mane M).
+    const gridY = 2 + ext;
+    const gridX = 26 - offsetX;
+    expect(grid[gridY]![gridX]).toBe(v0.A);
+  });
+
+  it('horse pixels are visible outside the overlap zone (e.g. the body proper)', () => {
+    // Horse row 10 has body pixels far below the hat overlap zone.
     const hat = hatById('flat_cap')!;
     const { grid, offsetX } = composeHatGrid(MAIN_SPRITE, hat, 0, HORSE_COLORS);
     const ext = Math.max(0, hat.rows.length - 4);
-    // The horse row 0 should map to grid row `ext`.
-    // Horse rows 0–1 are blank; first non-blank horse row is y=2.
-    // After offset, horse col 26 (one of the mane MMM) at grid row 2+ext should be the mane color.
-    const horseRow = 2;
+    const horseRow = 10;
     for (let x = 0; x < 32; x++) {
       const tag = MAIN_SPRITE[horseRow]![x];
-      if (tag === 'M') {
+      if (tag === 'B') {
         const gridY = horseRow + ext;
         const gridX = x - offsetX;
-        expect(grid[gridY]![gridX]).toBe(HORSE_COLORS.mane);
+        expect(grid[gridY]![gridX]).toBe(HORSE_COLORS.body);
         return;
       }
     }
-    throw new Error('no mane pixel found at horse row 2');
+    throw new Error('no body pixel found at horse row 10');
   });
 });

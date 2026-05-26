@@ -41,10 +41,19 @@ export function composeHatGrid(
     () => Array(canvasW).fill(null),
   );
 
-  // Paint hat first: hat row y → grid row y. Hat col x → anchor_x + x + horseOffsetX.
-  // The horse is painted second so that horse pixels take priority in the 4-row
-  // overlap zone (grid rows ext..ext+3 = horse rows 0..3). Hat pixels survive only
-  // in the pure extension rows (0..ext-1) where there is no horse above.
+  // Paint horse first, hat second. The hat overlays the horse in the 4-row
+  // overlap zone (grid rows ext..ext+3 = horse rows 0..3) — this is exactly
+  // the point of the overlap rule: the hat covers the top of the mane and
+  // sits visibly on the flat head. Above the horse (grid rows 0..ext-1) only
+  // the hat is painted; below (the rest of the body) only the horse is.
+  for (let y = 0; y < horseH; y++) {
+    for (let x = 0; x < horseW; x++) {
+      const tag = baseSprite[y]![x];
+      if (tag === null) continue;
+      grid[y + ext]![x + horseOffsetX] = tagToColor(tag, horseColors);
+    }
+  }
+
   const hatColors = hatColorsFor(hat, variantIdx);
   for (let y = 0; y < hatH; y++) {
     const row = hat.rows[y]!;
@@ -55,15 +64,6 @@ export function composeHatGrid(
       if (gx < 0 || gx >= canvasW) continue;
       const color = ch === 'A' ? hatColors.A : (hatColors.Q ?? hatColors.A);
       grid[y]![gx] = color;
-    }
-  }
-
-  // Paint horse: horse row y → grid row (y + ext), horse col x → x + horseOffsetX.
-  for (let y = 0; y < horseH; y++) {
-    for (let x = 0; x < horseW; x++) {
-      const tag = baseSprite[y]![x];
-      if (tag === null) continue;
-      grid[y + ext]![x + horseOffsetX] = tagToColor(tag, horseColors);
     }
   }
 
