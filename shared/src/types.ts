@@ -118,14 +118,22 @@ export type HatAnimation = { type: 'cycle'; frames: string[]; fps: number };
 
 export type Hat =
   | {
-      id: HatId; name: string; rarity: 'common' | 'rare' | 'epic';
-      width: number; anchor_x: number; rows: string[];
+      id: HatId;
+      name: string;
+      rarity: 'common' | 'rare' | 'epic';
+      width: number;
+      anchor_x: number;
+      rows: string[];
       variants: HatVariant[];
     }
   | {
-      id: HatId; name: string; rarity: 'legendary';
-      width: number; anchor_x: number; rows: string[];
-      colors: { A: string; Q?: string };
+      id: HatId;
+      name: string;
+      rarity: 'legendary';
+      width: number;
+      anchor_x: number;
+      rows: string[];
+      colors: HatVariant;
       animation: HatAnimation;
     };
 
@@ -149,6 +157,6 @@ export type StableHorse = {
   total_tokens?: number;             // sum of final_tokens across all races
   total_finishing_position?: number; // sum of ranks; avg = sum / races_entered
   hats?: CollectedHat[];
-  equipped_hat?: number | null;       // index into hats[]; null = explicitly unequipped
+  equipped_hat?: number | null;   // number = equipped index into hats[]; null = explicitly unequipped; undefined = pre-feature stable horses
   last_rolled_level?: number;         // high-water mark for pending rolls
 };
