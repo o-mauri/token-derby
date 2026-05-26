@@ -21,6 +21,7 @@ export async function stableEditCommand(name: string | undefined): Promise<numbe
   }
 
   let exitCode = 0;
+  let liveColors = existing.colors;
   const app = render(
     React.createElement(HorseCreator, {
       initialColors: existing.colors,
@@ -30,6 +31,7 @@ export async function stableEditCommand(name: string | undefined): Promise<numbe
       onSubmit: async (_name, colors) => {
         try {
           await updateStableHorse(existing.stable_horse_id, { colors });
+          liveColors = colors;
           app.unmount();
           console.log(`✓ Updated "${existing.name}".`);
         } catch (e) {
@@ -57,7 +59,7 @@ export async function stableEditCommand(name: string | undefined): Promise<numbe
         React.createElement(HatPicker, {
           hats: existing.hats!,
           equipped: existing.equipped_hat ?? null,
-          colors: existing.colors,
+          colors: liveColors,
           onPick: (idx) => { app2.unmount(); resolve({ done: true, idx }); },
           onCancel: () => { app2.unmount(); resolve({ done: false, idx: null }); },
         }),
