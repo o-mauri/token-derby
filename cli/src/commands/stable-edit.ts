@@ -2,7 +2,8 @@ import React from 'react';
 import { render } from 'ink';
 import { levelFromXp } from '@token-derby/shared';
 import { HorseCreator } from '../ui/HorseCreator.js';
-import { listStable, updateStableHorse } from '../api/endpoints.js';
+import { HatPicker } from '../ui/HatPicker.js';
+import { listStable, updateStableHorse, equipHat } from '../api/endpoints.js';
 import { ApiError } from '../api/client.js';
 
 export async function stableEditCommand(name: string | undefined): Promise<number> {
@@ -49,6 +50,30 @@ export async function stableEditCommand(name: string | undefined): Promise<numbe
     }),
   );
   await app.waitUntilExit();
+
+  if (exitCode === 0 && existing.hats && existing.hats.length > 0) {
+    const equipResult = await new Promise<{ done: boolean; idx: number | null }>(resolve => {
+      const app2 = render(
+        React.createElement(HatPicker, {
+          hats: existing.hats!,
+          equipped: existing.equipped_hat ?? null,
+          colors: existing.colors,
+          onPick: (idx) => { app2.unmount(); resolve({ done: true, idx }); },
+          onCancel: () => { app2.unmount(); resolve({ done: false, idx: null }); },
+        }),
+      );
+    });
+    if (equipResult.done) {
+      try {
+        await equipHat(existing.stable_horse_id, { hat_index: equipResult.idx });
+        console.log(equipResult.idx === null ? 'Hat unequipped.' : 'Hat equipped.');
+      } catch (e) {
+        if (e instanceof ApiError) console.error(`Equip failed: ${e.code} ${e.message}`);
+        else throw e;
+      }
+    }
+  }
+
   return exitCode;
 }
 

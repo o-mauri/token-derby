@@ -7,6 +7,7 @@ import { joinCommand } from './commands/join.js';
 import { endCommand } from './commands/end.js';
 import { initCommand } from './commands/init.js';
 import { updateCommand } from './commands/update.js';
+import { rollCommand } from './commands/roll.js';
 import { orgCreateCommand } from './commands/org-create.js';
 import { orgJoinCommand } from './commands/org-join.js';
 import { orgListCommand } from './commands/org-list.js';
@@ -55,6 +56,10 @@ Races:
                                           that org can join.
   token-derby join <join-code>            Join (or resume) a race
   token-derby end <admin-code>            End a race early
+
+Cosmetics:
+  token-derby roll                        Spend a pending roll to try for a hat.
+                                          Earn rolls by leveling up horses.
 
 Environment:
   TOKEN_DERBY_API_BASE                    Override API base URL (default: production)
@@ -119,6 +124,7 @@ async function main(): Promise<number> {
   }
   if (cmd === 'join')   return joinCommand(argv[1]);
   if (cmd === 'end')    return endCommand(argv[1]);
+  if (cmd === 'roll')   return rollCommand();
 
   console.error(`Unknown command: ${cmd}`);
   console.error(HELP);
