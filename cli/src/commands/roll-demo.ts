@@ -2,8 +2,7 @@ import React from 'react';
 import { render } from 'ink';
 import { hatById, HATS } from '@token-derby/shared';
 import type { Hat, HorseColors } from '@token-derby/shared';
-import { HorseSprite } from '../ui/HorseSprite.js';
-import { AnimatedHorseSprite } from '../ui/AnimatedHorseSprite.js';
+import { RollReveal } from '../ui/RollReveal.js';
 import { MAIN_SPRITE } from '../ui/sprite.js';
 
 const DEMO_COLORS: HorseColors = {
@@ -48,15 +47,18 @@ async function showDuplicate(hat: Hat, variant: number | undefined, xp: number):
 
 async function showHat(hat: Hat, variant: number | undefined): Promise<void> {
   const rarityTag = `[${hat.rarity.toUpperCase()}]`;
-  console.log(`\n\x1b[1m── Fresh hat (${hat.rarity}) ─────────────────────────────\x1b[0m`);
-  console.log(`\n✨ ${hat.name}${variantLabel(hat, variant)} ${rarityTag}\n`);
+  console.log(`\n\x1b[1m── Fresh hat (${hat.rarity}) ─────────────────────────────\x1b[0m\n`);
 
-  const isLegendary = hat.rarity === 'legendary';
-  const app = isLegendary
-    ? render(React.createElement(AnimatedHorseSprite, { sprite: MAIN_SPRITE, colors: DEMO_COLORS, hat }))
-    : render(React.createElement(HorseSprite, { sprite: MAIN_SPRITE, colors: DEMO_COLORS, hat: { hat, variant: variant ?? 0 } }));
-  await new Promise(r => setTimeout(r, isLegendary ? 3000 : 800));
-  app.unmount();
+  await new Promise<void>(resolve => {
+    const app = render(React.createElement(RollReveal, {
+      sprite: MAIN_SPRITE,
+      colors: DEMO_COLORS,
+      hat,
+      variant,
+      onDone: () => { app.unmount(); resolve(); },
+    }));
+  });
+  console.log(`\n✨ ${hat.name}${variantLabel(hat, variant)} ${rarityTag}\n`);
 }
 
 /**
