@@ -8,6 +8,7 @@ import { endCommand } from './commands/end.js';
 import { initCommand } from './commands/init.js';
 import { updateCommand } from './commands/update.js';
 import { rollCommand } from './commands/roll.js';
+import { rollDemoCommand } from './commands/roll-demo.js';
 import { orgCreateCommand } from './commands/org-create.js';
 import { orgJoinCommand } from './commands/org-join.js';
 import { orgListCommand } from './commands/org-list.js';
@@ -60,6 +61,8 @@ Races:
 Cosmetics:
   token-derby roll                        Spend a pending roll to try for a hat.
                                           Earn rolls by leveling up horses.
+  token-derby roll-demo                   Walk through every reveal type (no API).
+                                          Useful for tweaking the reveal UX.
 
 Environment:
   TOKEN_DERBY_API_BASE                    Override API base URL (default: production)
@@ -79,6 +82,8 @@ async function main(): Promise<number> {
   }
   // `update` runs before the identity gate so a broken or stale install can fix itself.
   if (cmd === 'update') return updateCommand();
+  // `roll-demo` is a local UI tour — no API, no identity needed.
+  if (cmd === 'roll-demo') return rollDemoCommand();
 
   // Every other command requires an identity. `init` and `update` are the only escape hatches.
   const identity = await loadIdentity();
@@ -124,7 +129,7 @@ async function main(): Promise<number> {
   }
   if (cmd === 'join')   return joinCommand(argv[1]);
   if (cmd === 'end')    return endCommand(argv[1]);
-  if (cmd === 'roll')   return rollCommand();
+  if (cmd === 'roll')      return rollCommand();
 
   console.error(`Unknown command: ${cmd}`);
   console.error(HELP);
