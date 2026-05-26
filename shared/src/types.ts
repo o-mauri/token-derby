@@ -35,6 +35,7 @@ export type Horse = {
   last_gap_in_1st?: number;
   last_pulled_away_at?: number;
   recent_events?: RecentEvent[];
+  equipped_hat?: CollectedHat;        // snapshot from stable horse at join time
 };
 
 export type RaceStatus = 'pending' | 'live' | 'finished';
@@ -107,6 +108,33 @@ export type User = {
   created_at: string;
 };
 
+export type HatRarity = 'common' | 'rare' | 'epic' | 'legendary';
+
+export type HatId = string;
+
+export type HatVariant = { A: string; Q?: string };
+
+export type HatAnimation = { type: 'cycle'; frames: string[]; fps: number };
+
+export type Hat =
+  | {
+      id: HatId; name: string; rarity: 'common' | 'rare' | 'epic';
+      width: number; anchor_x: number; rows: string[];
+      variants: HatVariant[];
+    }
+  | {
+      id: HatId; name: string; rarity: 'legendary';
+      width: number; anchor_x: number; rows: string[];
+      colors: { A: string; Q?: string };
+      animation: HatAnimation;
+    };
+
+export type CollectedHat = {
+  id: HatId;
+  variant?: number;       // index into hat.variants[]; omitted for legendary
+  obtained_at: string;    // ISO timestamp
+};
+
 export type StableHorse = {
   stable_horse_id: string;
   name: string;
@@ -120,4 +148,7 @@ export type StableHorse = {
   podiums?: number;                  // count of rank ≤ 3 finishes
   total_tokens?: number;             // sum of final_tokens across all races
   total_finishing_position?: number; // sum of ranks; avg = sum / races_entered
+  hats?: CollectedHat[];
+  equipped_hat?: number | null;       // index into hats[]; null = explicitly unequipped
+  last_rolled_level?: number;         // high-water mark for pending rolls
 };
