@@ -6,6 +6,10 @@
 
 import type { Hat, HatId } from './types.js';
 
+export function hatById(id: HatId): Hat | undefined {
+  return HATS.find(h => h.id === id);
+}
+
 export const HATS: Hat[] = [
   // ── COMMON (18) ────────────────────────────────────────────────────────
   { id: 'flat_cap', name: "Flat Cap", rarity: 'common', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','...........','...........','...........','....AAAA...','...AAAAAA..','..AAAAAAA..'], variants: [{ A: '#8B6914' }, { A: '#12301b' }, { A: '#aab5cb' }, { A: '#bdcbaa' }] },
@@ -38,12 +42,12 @@ export const HATS: Hat[] = [
   { id: 'headdress', name: "Headdress", rarity: 'rare', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','...........','...........','..AQAQAQA..','..AQAQAQA..','..AAAAAAA..','...QQQQQ...'], variants: [{ A: '#FF8F00', Q: '#1565C0' }] },
   { id: 'sombrero', name: "Sombrero", rarity: 'rare', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','...........','.....A.....','....AAA....','...AAAAA...','...AQAQA...','AAAAAAAAAAA'], variants: [{ A: '#F57F17', Q: '#BF360C' }, { A: '#f8b377', Q: '#3e1204' }, { A: '#d6f877', Q: '#04133e' }, { A: '#d6f877', Q: '#04133e' }] },
   // ── EPIC (6) ───────────────────────────────────────────────────────────
-  { id: 'papal_tiara', name: "Papal Tiara", rarity: 'epic', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','....QQ.....','...QQQQQ...','...QAAQQ...','...QQQQQ...','..AAAAAAA..','..AQQQQQA..'], variants: [{ A: '#FFFFFF', Q: '#FFD700' }] },
-  { id: 'samurai_kabuto', name: "Samurai Kabuto", rarity: 'epic', width: 11, anchor_x: 23, rows: ['....Q...Q..','....QQ.QQ..','.....QQQ...','.......Q...','...AAAAQ...','..AAAAAQQ..','..AAAAAQQ..','.AAAAAAAQ..','AAAAAAAAQ..','AAAAAAAAQ..'], variants: [{ A: '#B0BEC5', Q: '#C62828' }] },
-  { id: 'gladiator_galea', name: "Gladiator Galea", rarity: 'epic', width: 11, anchor_x: 23, rows: ['...........','...........','...........','....QQQQQQ.','...QQQQQ...','...QQQQQ...','...QAAA....','..AAAAAAA..','..AAAAAAA..','..AQQQQQA..'], variants: [{ A: '#B0BEC5', Q: '#C62828' }] },
-  { id: 'pharaoh_nemes', name: "Pharaoh Nemes", rarity: 'epic', width: 11, anchor_x: 23, rows: ['...........','...........','...........','..AAAAAAA..','..AAQAQAA..','..QAQAQAQ..','..QAQAQAQ..','..QQAAAQQ..','..QQAAAAA..','...QAQA....'], variants: [{ A: '#FFD700', Q: '#1565C0' }] },
-  { id: 'spartan_helmet', name: "Spartan Helmet", rarity: 'epic', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','....QQQ....','...QQQQQ...','.QQQAAQQ...','.QAAAAAAA..','QQAAAAAAA..','QQAQQQQQA..'], variants: [{ A: '#B0BEC5', Q: '#B71C1C' }] },
-  { id: 'conquistador_full', name: "Conquistador Helm", rarity: 'epic', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','.....A.....','....AAA....','...AAAAA...','..AAAAAAA..','...AQQQA...','...AQQQA...'], variants: [{ A: '#B0BEC5', Q: '#FFD700' }] },
+  { id: 'papal_tiara', name: "Papal Tiara", rarity: 'epic', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','....QQ.....','...QQQQQ...','...QAAQQ...','...QQQQQ...','..AAAAAAA..','..AQQQQQA..'], variants: [{ A: '#FFFFFF', Q: '#FFD700' }, { A: '#b18e10', Q: '#f3f3f1' }] },
+  { id: 'samurai_kabuto', name: "Samurai Kabuto", rarity: 'epic', width: 11, anchor_x: 23, rows: ['....Q...Q..','....QQ.QQ..','.....QQQ...','.......Q...','...AAAAQ...','..AAAAAQQ..','..AAAAAQQ..','.AAAAAAAQ..','AAAAAAAAQ..','AAAAAAAAQ..'], variants: [{ A: '#B0BEC5', Q: '#C62828' }, { A: '#050505', Q: '#C62828' }, { A: '#675f5f', Q: '#c4c729' }] },
+  { id: 'gladiator_galea', name: "Gladiator Galea", rarity: 'epic', width: 11, anchor_x: 23, rows: ['...........','...........','...........','....QQQQQQ.','...QQQQQ...','...QQQQQ...','...QAAA....','..AAAAAAA..','..AAAAAAA..','..AQQQQQA..'], variants: [{ A: '#B0BEC5', Q: '#C62828' }, { A: '#ffe907', Q: '#C62828' }] },
+  { id: 'pharaoh_nemes', name: "Pharaoh Nemes", rarity: 'epic', width: 11, anchor_x: 23, rows: ['...........','...........','...........','..AAAAAAA..','..AAQAQAA..','..QAQAQAQ..','..QAQAQAQ..','..QQAAAQQ..','..QQAAAAA..','...QAQA....'], variants: [{ A: '#FFD700', Q: '#1565C0' }, { A: '#8d342a', Q: '#63686e' }] },
+  { id: 'spartan_helmet', name: "Spartan Helmet", rarity: 'epic', width: 11, anchor_x: 23, rows: ['...........','........Q..','.......QQ..','.....QQQQ..','....QQQQQ..','..QQQQQQ...','.QQQAA.....','QQAAAAAAA..','Q.AAAAAAA..','..AQQQQQA..'], variants: [{ A: '#B0BEC5', Q: '#B71C1C' }, { A: '#B0BEC5', Q: '#b2b51c' }, { A: '#B0BEC5', Q: '#b5611c' }] },
+  { id: 'conquistador_full', name: "Conquistador Helm", rarity: 'epic', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','.....A.....','....AAA....','...AAAAA...','..AAAAAAA..','...AQQQA...','...AQQQA...'], variants: [{ A: '#B0BEC5', Q: '#FFD700' }, { A: '#B0BEC5', Q: '#0040ff' }, { A: '#B0BEC5', Q: '#36123b' }] },
   // ── LEGENDARY (5) ──────────────────────────────────────────────────────
   { id: 'rainbow_crown', name: "Rainbow Crown", rarity: 'legendary', width: 11, anchor_x: 23, rows: ['...........','...........','.....A.....','....AQA....','....AQA....','....AQA....','...AAQAA...','...AQQQA...','..AAQQQAA..','..AAAAAAA..'], colors: { A: '#FFD700', Q: '#553f3f' }, animation: { type: 'cycle', frames: ['#FF0000','#FF7F00','#FFFF00','#00FF00','#0000FF','#8B00FF'], fps: 8 } },
   { id: 'inferno_cap', name: "Inferno Cap", rarity: 'legendary', width: 11, anchor_x: 23, rows: ['...........','....AAA....','...AAAAA...','....AAA....','.....Q.....','A....Q....A','A...QQQ...A','.A..QQQ..A.','..AAAAAAA..','..AAAAAAA..'], colors: { A: '#FF4500', Q: '#FFD700' }, animation: { type: 'cycle', frames: ['#FF0000','#FF2200','#FF4500','#FF6600','#FF8C00','#FFA500'], fps: 12 } },
@@ -51,7 +55,3 @@ export const HATS: Hat[] = [
   { id: 'prismatic_jester', name: "Prismatic Jester", rarity: 'legendary', width: 11, anchor_x: 23, rows: ['...........','..Q.Q.Q.Q..','Q..A.A.A..Q','.Q.A.A.A.Q.','..AQAQAQA..','..AQAQAQA..','..AAAAAAA..','..AAAAAAA..','..AAAAAAA..','..AAAAAAA..'], colors: { A: '#FF0000', Q: '#0000FF' }, animation: { type: 'cycle', frames: ['#FF0000','#FF7F00','#FFFF00','#00FF00','#0000FF','#8B00FF','#FF00FF','#00FFFF'], fps: 15 } },
   { id: 'aurora_helm', name: "Aurora Helm", rarity: 'legendary', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','...QQQQQ...','...QQQQQ...','..AAAAAAA..','..AAAAAAA..','..AQAAAQA..','..AQAAAQA..'], colors: { A: '#00CED1', Q: '#00FF7F' }, animation: { type: 'cycle', frames: ['#0000FF','#0066FF','#00BFFF','#00CED1','#00FF7F','#7CFC00','#00FF7F','#00CED1'], fps: 4 } },
 ];
-
-export function hatById(id: HatId): Hat | undefined {
-  return HATS.find(h => h.id === id);
-}
