@@ -6,7 +6,7 @@ import {
   USER_PK_PREFIX,
   STABLE_HORSE_SK_PREFIX,
 } from './keys.js';
-import type { StableHorse } from '@token-derby/shared';
+import type { CollectedHat, StableHorse } from '@token-derby/shared';
 
 /**
  * Create a stable horse, atomically reserving the name within the user's
@@ -197,4 +197,87 @@ export async function recordHorseRaceResult(
     if (e?.name === 'ConditionalCheckFailedException') return;
     throw e;
   }
+}
+
+export type ApplyRollInput = {
+  /** What we expect last_rolled_level to be at the moment of write. */
+  expected_last_rolled_level: number;
+  /** When set, this CollectedHat gets appended to hats[]. Omit for no_hat / duplicate. */
+  append_hat?: CollectedHat;
+  /** Atomic XP delta (for no_hat or duplicate outcomes that pay consolation XP). */
+  xp_delta?: number;
+};
+
+/**
+ * Atomic update that:
+ *  - bumps last_rolled_level by 1, conditional on its current value matching
+ *    expected_last_rolled_level (or being absent if expected is 0)
+ *  - optionally appends a CollectedHat to hats[]
+ *  - optionally adds xp_delta to xp
+ *
+ * Throws if the conditional check fails (caller should treat as a retry signal).
+ */
+export async function applyRollResult(
+  user_id: string,
+  stable_horse_id: string,
+  input: ApplyRollInput,
+): Promise<void> {
+  const sets: string[] = ['last_rolled_level = :new_lvl'];
+  const adds: string[] = [];
+  const eav: Record<string, unknown> = {
+    ':new_lvl': input.expected_last_rolled_level + 1,
+    ':expected_lvl': input.expected_last_rolled_level,
+    ':zero': 0,
+  };
+  const conditionExpr =
+    '(attribute_not_exists(last_rolled_level) AND :expected_lvl = :zero) OR last_rolled_level = :expected_lvl';
+
+  if (input.append_hat) {
+    sets.push('hats = list_append(if_not_exists(hats, :empty), :new_hat)');
+    eav[':empty'] = [];
+    eav[':new_hat'] = [input.append_hat];
+  }
+  if (input.xp_delta && input.xp_delta > 0) {
+    adds.push('xp :xp_delta');
+    eav[':xp_delta'] = input.xp_delta;
+  }
+
+  const updateExpression =
+    'SET ' + sets.join(', ') +
+    (adds.length ? ' ADD ' + adds.join(', ') : '');
+
+  await ddb.send(new UpdateCommand({
+    TableName: TABLE,
+    Key: stableHorseKey(user_id, stable_horse_id),
+    UpdateExpression: updateExpression,
+    ConditionExpression: 'attribute_exists(pk) AND (' + conditionExpr + ')',
+    ExpressionAttributeValues: eav,
+  }));
+}
+
+/**
+ * Set or clear the equipped_hat index on a stable horse.
+ * Passing null clears the attribute entirely (reads back as undefined).
+ */
+export async function equipHat(
+  user_id: string,
+  stable_horse_id: string,
+  hat_index: number | null,
+): Promise<void> {
+  if (hat_index === null) {
+    await ddb.send(new UpdateCommand({
+      TableName: TABLE,
+      Key: stableHorseKey(user_id, stable_horse_id),
+      UpdateExpression: 'REMOVE equipped_hat',
+      ConditionExpression: 'attribute_exists(pk)',
+    }));
+    return;
+  }
+  await ddb.send(new UpdateCommand({
+    TableName: TABLE,
+    Key: stableHorseKey(user_id, stable_horse_id),
+    UpdateExpression: 'SET equipped_hat = :idx',
+    ConditionExpression: 'attribute_exists(pk)',
+    ExpressionAttributeValues: { ':idx': hat_index },
+  }));
 }
