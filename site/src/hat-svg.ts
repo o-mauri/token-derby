@@ -11,8 +11,13 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
  *
  * Pixels at x >= 32 represent hat overhang past the 32-wide horse sprite.
  * The horse SVG viewBox must be wide enough to show these (see sprite-svg.ts).
+ *
+ * On first call against a Document, installs the legendary animation
+ * keyframes into <head> automatically, so every entry point (main.ts,
+ * preview-race.ts, etc.) gets animated legendaries for free.
  */
 export function buildHatGroup(doc: Document, hat: Hat, variantIdx: number): SVGGElement {
+  ensureLegendaryStylesInstalled(doc);
   const g = doc.createElementNS(SVG_NS, 'g') as SVGGElement;
   g.setAttribute('class', `horse-hat horse-hat-${hat.id}`);
 
@@ -64,4 +69,18 @@ export function buildLegendaryKeyframes(): string {
     blocks.push(`@keyframes anim-${hat.id} { ${stops} } .horse-hat-${hat.id} .hat-a { animation: anim-${hat.id} ${dur}s linear infinite; }`);
   }
   return blocks.join('\n');
+}
+
+const STYLE_MARKER_ID = 'td-hat-legendary-keyframes';
+
+/**
+ * Install the legendary keyframes into the document <head> if not already
+ * present. Idempotent: safe to call from buildHatGroup on every invocation.
+ */
+export function ensureLegendaryStylesInstalled(doc: Document): void {
+  if (doc.getElementById(STYLE_MARKER_ID)) return;
+  const style = doc.createElement('style');
+  style.id = STYLE_MARKER_ID;
+  style.textContent = buildLegendaryKeyframes();
+  doc.head.appendChild(style);
 }
