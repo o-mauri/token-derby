@@ -49,13 +49,18 @@ describe('roll-hat handler', () => {
   it('still grants only 1 starter roll for a high-level horse (lazy migration is forward-only)', async () => {
     const user = await makeUser('RollUser_HighLevel');
     const horse = await makeHorse(user, 'Pegasus');
+    // Boost the horse to exactly level 5 (no XP to spare).
     await awardHorseXp(user.user_id, horse.stable_horse_id, thresholdForLevel(5));
     const first = await rollHandler(rollEvent(user, horse.stable_horse_id));
     expect(first.statusCode).toBe(200);
-    // After this, the horse is at level 5 with last_rolled_level=1+ (any consolation XP doesn't help here)
-    // Second roll should fail unless the consolation XP pushed them over another level boundary
+    // Lazy migration started the horse at last_rolled_level=4, the roll bumped it to 5.
+    // Any consolation XP awarded was less than what's needed to reach level 6,
+    // so this should be exactly 5 (no cascade).
     const after = await getStableHorse(user.user_id, horse.stable_horse_id);
-    expect(after?.last_rolled_level).toBeGreaterThanOrEqual(5);
+    expect(after?.last_rolled_level).toBe(5);
+    // A second roll attempt should fail with INSUFFICIENT_ROLLS.
+    const second = await rollHandler(rollEvent(user, horse.stable_horse_id));
+    expect(second.statusCode).toBe(402);
   });
 
   it('returns STABLE_HORSE_NOT_FOUND for an unknown horse', async () => {
