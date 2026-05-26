@@ -1,0 +1,365 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Token Derby — hat catalog preview</title>
+<style>
+  :root {
+    --bg: #1a1d24;
+    --fg: #e8e8ef;
+    --muted: #8a8f9c;
+    --card: #232730;
+    --card-border: #2f343e;
+    --common: #9e9e9e;
+    --rare: #42a5f5;
+    --epic: #ab47bc;
+    --legendary: #ffb300;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 2rem;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  }
+  h1 { margin: 0 0 0.25rem; font-size: 1.5rem; }
+  .intro { color: var(--muted); margin: 0 0 2rem; max-width: 60ch; font-size: 0.9rem; line-height: 1.5; }
+  .controls-group { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem; flex-wrap: wrap; }
+  .control-label { color: var(--muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; min-width: 6rem; }
+  .palette-controls { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+  .palette-controls button {
+    background: var(--card);
+    color: var(--fg);
+    border: 1px solid var(--card-border);
+    padding: 0.5rem 0.9rem;
+    border-radius: 0.4rem;
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.85rem;
+  }
+  .palette-controls button.active { border-color: var(--fg); }
+  main { margin-top: 1.5rem; }
+  h2 {
+    margin: 2rem 0 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--card-border);
+    font-size: 1.1rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+  h2 .badge { font-size: 0.75rem; color: var(--muted); margin-left: 0.5rem; letter-spacing: 0; }
+  /* Hat row — one row per hat, variants laid out side-by-side */
+  .hat-row {
+    display: flex;
+    gap: 1rem;
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.75rem;
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 0.5rem;
+    align-items: stretch;
+  }
+  .hat-meta {
+    width: 14rem; flex-shrink: 0;
+    display: flex; flex-direction: column; justify-content: center;
+    gap: 0.25rem;
+  }
+  .hat-meta .hat-name { font-weight: 600; font-size: 1rem; }
+  .hat-meta .hat-id { color: var(--muted); font-size: 0.7rem; font-family: ui-monospace, SFMono-Regular, monospace; }
+  .hat-meta .hat-count { color: var(--muted); font-size: 0.75rem; }
+  .rarity-badge {
+    display: inline-block;
+    font-size: 0.65rem; font-weight: 700; letter-spacing: 0.05em;
+    padding: 0.15em 0.5em; border-radius: 0.25em; color: #000;
+    text-transform: uppercase;
+  }
+  .rarity-badge.common    { background: var(--common); }
+  .rarity-badge.rare      { background: var(--rare); color: #fff; }
+  .rarity-badge.epic      { background: var(--epic); color: #fff; }
+  .rarity-badge.legendary { background: var(--legendary); }
+  .variants-strip {
+    flex: 1;
+    display: flex; gap: 0.6rem; flex-wrap: wrap;
+    align-items: flex-end;
+  }
+  .variant-card {
+    width: 7.5rem;
+    background: var(--bg);
+    border: 1px solid var(--card-border);
+    border-radius: 0.3rem;
+    padding: 0.4rem;
+    display: flex; flex-direction: column; align-items: center;
+    gap: 0.25rem;
+  }
+  .variant-card svg { width: 100%; height: auto; image-rendering: pixelated; image-rendering: crisp-edges; }
+  .variant-card .variant-name { font-size: 0.75rem; color: var(--fg); }
+  .footer { color: var(--muted); font-size: 0.8rem; margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--card-border); }
+</style>
+</head>
+<body>
+
+<h1>Token Derby — hat catalog preview</h1>
+<p class="intro">
+  Every hat in the catalog, one row per hat with all its variants laid out side-by-side. Non-legendary variants are named "<em>Hat Name #N</em>" — each is a distinct collectible. Legendary hats have a single design and animate in real time.
+</p>
+
+<div class="controls-group">
+  <div class="control-label">Horse</div>
+  <div class="palette-controls" id="palette-controls"></div>
+</div>
+
+<main id="root"></main>
+
+<p class="footer">
+  Roll model: pick rarity tier (37/15/7/1) → pick hat uniformly within tier → pick variant uniformly within hat. Hats with more variants are no more common overall, but each individual variant is rarer.
+</p>
+
+<script>
+// ── Data ────────────────────────────────────────────────────────────
+const HORSE_ROWS = [
+  '................................',
+  '................................',
+  '..........................MMM...',
+  '..........................MMM...',
+  '.........................MBBEBB.',
+  '.........................MBBEBB.',
+  '........................MBBBBBBB',
+  '........................MBBBBBBB',
+  '..................MMMMMMMBBB....',
+  '..................MMMMMMMBBB....',
+  '....BBBBBBBBSSSSSSMMBBBBBB......',
+  '...BBBBBBBBBSSSSSSMMBBBBBB......',
+  '.TTBBBBBBBBBSSSSSSBBBBBBBB......',
+  '.TTBBBBBBBBBSSSSSSBBBBBBBB......',
+  'TTTBBBBBBBBBBBBBBBBBBBBBBB......',
+  'TTTBBBBBBBBBBBBBBBBBBBBB........',
+  '...BBB.BBB.....BBB.BBB..........',
+  '...BBB.BBB.....BBB.BBB..........',
+  '....BB..BB......BB..BB..........',
+  '....BB..BB......BB..BB..........',
+  '....BB..BB......BB..BB..........',
+  '....BB..BB......BB..BB..........',
+  '....BB..BB......BB..BB..........',
+  '...HHH.HHH.....HHH.HHH..........',
+];
+
+const PALETTES = {
+  chestnut: { name: 'Chestnut', B: '#A0522D', M: '#2F1B0C', T: '#2F1B0C', S: '#8B4513', E: '#000000', H: '#1F1108' },
+  black:    { name: 'Black',    B: '#2C2C2C', M: '#0A0A0A', T: '#0A0A0A', S: '#5A3A1E', E: '#FFFFFF', H: '#0A0A0A' },
+  palomino: { name: 'Palomino', B: '#D4A14A', M: '#F4E5C2', T: '#F4E5C2', S: '#7A4F1E', E: '#000000', H: '#1F1108' },
+  grey:     { name: 'Grey',     B: '#B0B0B5', M: '#E8E8EC', T: '#E8E8EC', S: '#3F2A18', E: '#000000', H: '#1F1108' },
+  appaloosa:{ name: 'Roan',     B: '#7A5C4A', M: '#3A2620', T: '#3A2620', S: '#2D1810', E: '#000000', H: '#1F1108' },
+};
+
+const HATS = [
+  // ── COMMON (18) ────────────────────────────────────────────────────────
+  { id: 'flat_cap', name: "Flat Cap", rarity: 'common', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','...........','...........','...........','....AAAA...','...AAAAAA..','..AAAAAAA..'], variants: [{ A: '#8B6914' }] },
+  { id: 'bucket_hat', name: "Bucket Hat", rarity: 'common', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','...........','...........','...QQQQQ...','...AAAAA...','...AAAAA...','.AAAAAAAAA.'], variants: [{ A: '#CC2200', Q: '#FFFFFF' }] },
+  { id: 'beanie', name: "Beanie", rarity: 'common', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','...........','...........','....AAA....','...AAAAA...','...AAAAA...','..AAAAAAA..'], variants: [{ A: '#4A7C59' }] },
+  { id: 'stetson', name: "Stetson", rarity: 'common', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','...AA.AA...','...AAAAA...','...AAAAA...','A..AAAAA..A','AAAAAAAAAAA','AAAAAAAAAAA'], variants: [{ A: '#C49A00' }] },
+  { id: 'party_hat', name: "Party Hat", rarity: 'common', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','...........','.....A.....','....AAA....','....AQA....','...AQAQA...','...AAAAA...'], variants: [{ A: '#FF69B4', Q: '#FFD700' }] },
+  { id: 'fez', name: "Fez", rarity: 'common', width: 11, anchor_x: 22, rows: ['...........','...........','...........','...........','...........','...........','....Q......','....AAA....','....AAA....','....AAA....'], variants: [{ A: '#CC0000', Q: '#8B0000' }] },
+  { id: 'sailor_hat', name: "Sailor Hat", rarity: 'common', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','...........','...........','...QQQQQ...','..AAAAAAA..','..QQQQQQQ..','..AAAAAAA..'], variants: [{ A: '#FFFFFF', Q: '#000080' }] },
+  { id: 'newsboy_cap', name: "Newsboy Cap", rarity: 'common', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','...........','...........','...AAAAA...','..AAAQAAA..','..AAAAAAA..','..AAAAAA...'], variants: [{ A: '#5C4033', Q: '#3D2B1F' }] },
+  { id: 'tam_o_shanter', name: "Tam O'Shanter", rarity: 'common', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','...........','.....Q.....','....AAA....','..AAAAAAA..','..AAAAAAA..','...AAAAA...'], variants: [{ A: '#006400', Q: '#FF0000' }] },
+  { id: 'trucker_cap', name: "Trucker Cap", rarity: 'common', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','...........','...........','...AAQQ....','...AAQQ....','..AAQQQAA..','..AAQQQAA..'], variants: [{ A: '#2196F3', Q: '#FFFFFF' }] },
+  { id: 'hard_hat', name: "Hard Hat", rarity: 'common', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','...........','...........','....AAA....','...AAAAA...','..AAAAAAA..','..AAAAAAA..'], variants: [{ A: '#FFD600' }] },
+  { id: 'chef_toque', name: "Chef's Toque", rarity: 'common', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','...AAAAA...','..AAAAAAA..','...AAAAA...','...AAAAA...','...AAAAA...','...AAAAA...'], variants: [{ A: '#FFFFFF', Q: '#F0F0F0' }] },
+  { id: 'bobble_hat', name: "Bobble Hat", rarity: 'common', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','...........','...........','.....Q.....','...AAAAA...','...AAAAA...','..AAAAAAA..'], variants: [{ A: '#C62828', Q: '#FFFFFF' }] },
+  { id: 'cowboy_hat', name: "Cowboy Hat", rarity: 'common', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','...........','...........','...AAAAA...','...AAAAA...','A.AAAAAAA.A','.AAAAAAAAA.'], variants: [{ A: '#8B4513' }] },
+  { id: 'baseball_cap', name: "Baseball Cap", rarity: 'common', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','...........','...........','..AAAAAA...','..AAAAAA...','..AAAAAAA..','..AAAAAAAAA'], variants: [{ A: '#1565C0' }] },
+  { id: 'tinfoil_hat', name: "Tinfoil Hat", rarity: 'common', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','...........','...........','.....A.....','....AAA....','...AAAAA...','..AAAAAAA..'], variants: [{ A: '#B0BEC5' }] },
+  { id: 'dunce_cap', name: "Dunce Cap", rarity: 'common', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','.....Q.....','....QAQ....','...QAAAQ...','...QAAAQ...','..QAAAAAQ..','..AAAAAAA..'], variants: [{ A: '#F8F8F8', Q: '#F44336' }] },
+  { id: 'mini_top_hat', name: "Mini Top Hat", rarity: 'common', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','...........','...AAAAA...','...AAAAA...','...AAAAA...','..AAAAAAA..','..AAAAAAA..'], variants: [{ A: '#212121' }] },
+  // ── RARE (10) ──────────────────────────────────────────────────────────
+  { id: 'bicorne', name: "Bicorne", rarity: 'rare', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','...........','...........','..AAAQQQQ..','..AAAAAAA..','..AAAAAAA..','...QQQQQ...'], variants: [{ A: '#1A237E', Q: '#FFD700' }] },
+  { id: 'viking_helmet', name: "Viking Helmet", rarity: 'rare', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','...........','...........','..A.AAA.A..','..AAAAAAA..','..AAAAAAA..','..AQQQQQA..'], variants: [{ A: '#9E9E9E', Q: '#8D6E63' }] },
+  { id: 'jesters_cap', name: "Jester's Cap", rarity: 'rare', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','...........','...........','..AQAQAQA..','..AQAQAQA..','...AAAAA...','...AAAAA...'], variants: [{ A: '#E53935', Q: '#FFD600' }] },
+  { id: 'plague_doctor', name: "Plague Doctor Beak", rarity: 'rare', width: 11, anchor_x: 24, rows: ['...........','...........','...........','...........','....QQQ....','...QAAAQQ..','...QQQQQQQ.','..QQQQQ.QQQ','..QQQQ....Q','..QQQQ.....'], variants: [{ A: '#F5F5F5', Q: '#795548' }] },
+  { id: 'morion', name: "Conquistador Morion", rarity: 'rare', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','...........','.....Q.....','...QQQQQ...','...QAAAQ...','.A..AAA..A.','..AAQQQAA..'], variants: [{ A: '#B0BEC5', Q: '#FFD600' }] },
+  { id: 'shako', name: "Shako", rarity: 'rare', width: 11, anchor_x: 23, rows: ['...........','...........','........Q..','........Q..','........Q..','........Q..','..AAAAAAA..','..AAAAAAA..','..AAAAAAA..','..AQQQQQA..'], variants: [{ A: '#45464f', Q: '#00ff2a' }] },
+  { id: 'centurion_helm', name: "Centurion Helm", rarity: 'rare', width: 11, anchor_x: 23, rows: ['...........','...........','....QQQ....','...QQQQQQ..','..QQQQQQQQ.','.QQ..A...Q.','.Q..AAA....','...AAAAA...','..AAAAAAA..','..AAAAAAA..'], variants: [{ A: '#B0BEC5', Q: '#C62828' }] },
+  { id: 'papal_mitre', name: "Papal Mitre", rarity: 'rare', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','...........','...........','....QQQ....','...QQQQQ...','...QAAAQ...','..AAAAAAA..'], variants: [{ A: '#FFFFFF', Q: '#FFD700' }] },
+  { id: 'headdress', name: "Headdress", rarity: 'rare', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','...........','...........','..AQAQAQA..','..AQAQAQA..','..AAAAAAA..','...QQQQQ...'], variants: [{ A: '#FF8F00', Q: '#1565C0' }] },
+  { id: 'sombrero', name: "Sombrero", rarity: 'rare', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','...........','.....A.....','....AAA....','...AAAAA...','...AQAQA...','AAAAAAAAAAA'], variants: [{ A: '#F57F17', Q: '#BF360C' }] },
+  // ── EPIC (6) ───────────────────────────────────────────────────────────
+  { id: 'papal_tiara', name: "Papal Tiara", rarity: 'epic', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','....QQ.....','...QQQQQ...','...QAAQQ...','...QQQQQ...','..AAAAAAA..','..AQQQQQA..'], variants: [{ A: '#FFFFFF', Q: '#FFD700' }] },
+  { id: 'samurai_kabuto', name: "Samurai Kabuto", rarity: 'epic', width: 11, anchor_x: 23, rows: ['....Q...Q..','....QQ.QQ..','.....QQQ...','.......Q...','...AAAAQ...','..AAAAAQQ..','..AAAAAQQ..','.AAAAAAAQ..','AAAAAAAAQ..','AAAAAAAAQ..'], variants: [{ A: '#B0BEC5', Q: '#C62828' }] },
+  { id: 'gladiator_galea', name: "Gladiator Galea", rarity: 'epic', width: 11, anchor_x: 23, rows: ['...........','...........','...........','....QQQQQQ.','...QQQQQ...','...QQQQQ...','...QAAA....','..AAAAAAA..','..AAAAAAA..','..AQQQQQA..'], variants: [{ A: '#B0BEC5', Q: '#C62828' }] },
+  { id: 'pharaoh_nemes', name: "Pharaoh Nemes", rarity: 'epic', width: 11, anchor_x: 23, rows: ['...........','...........','...........','..AAAAAAA..','..AAQAQAA..','..QAQAQAQ..','..QAQAQAQ..','..QQAAAQQ..','..QQAAAAA..','...QAQA....'], variants: [{ A: '#FFD700', Q: '#1565C0' }] },
+  { id: 'spartan_helmet', name: "Spartan Helmet", rarity: 'epic', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','....QQQ....','...QQQQQ...','.QQQAAQQ...','.QAAAAAAA..','QQAAAAAAA..','QQAQQQQQA..'], variants: [{ A: '#B0BEC5', Q: '#B71C1C' }] },
+  { id: 'conquistador_full', name: "Conquistador Helm", rarity: 'epic', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','.....A.....','....AAA....','...AAAAA...','..AAAAAAA..','...AQQQA...','...AQQQA...'], variants: [{ A: '#B0BEC5', Q: '#FFD700' }] },
+  // ── LEGENDARY (5) — no variants ────────────────────────────────────────
+  { id: 'rainbow_crown', name: "Rainbow Crown", rarity: 'legendary', width: 11, anchor_x: 23, rows: ['...........','...........','.....A.....','....AQA....','....AQA....','....AQA....','...AAQAA...','...AQQQA...','..AAQQQAA..','..AAAAAAA..'], colors: { A: '#FFD700', Q: '#553f3f' }, animation: { type: 'cycle', frames: ['#FF0000','#FF7F00','#FFFF00','#00FF00','#0000FF','#8B00FF'], fps: 8 } },
+  { id: 'inferno_cap', name: "Inferno Cap", rarity: 'legendary', width: 11, anchor_x: 23, rows: ['...........','....AAA....','...AAAAA...','....AAA....','.....Q.....','A....Q....A','A...QQQ...A','.A..QQQ..A.','..AAAAAAA..','..AAAAAAA..'], colors: { A: '#FF4500', Q: '#FFD700' }, animation: { type: 'cycle', frames: ['#FF0000','#FF2200','#FF4500','#FF6600','#FF8C00','#FFA500'], fps: 12 } },
+  { id: 'void_hood', name: "Void Hood", rarity: 'legendary', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...AAA.....','..AAAAAA...','.AAAAAAA...','.AAAAAAAA..','AAAAAAAAA..','AAAAQQQAA..','AAAAQQQAA..'], colors: { A: '#1A0033', Q: '#d9cfe3' }, animation: { type: 'cycle', frames: ['#0D0019','#1A0033','#2D004D','#3D0066','#2D004D','#1A0033'], fps: 3 } },
+  { id: 'prismatic_jester', name: "Prismatic Jester", rarity: 'legendary', width: 11, anchor_x: 23, rows: ['...........','..Q.Q.Q.Q..','Q..A.A.A..Q','.Q.A.A.A.Q.','..AQAQAQA..','..AQAQAQA..','..AAAAAAA..','..AAAAAAA..','..AAAAAAA..','..AAAAAAA..'], colors: { A: '#FF0000', Q: '#0000FF' }, animation: { type: 'cycle', frames: ['#FF0000','#FF7F00','#FFFF00','#00FF00','#0000FF','#8B00FF','#FF00FF','#00FFFF'], fps: 15 } },
+  { id: 'aurora_helm', name: "Aurora Helm", rarity: 'legendary', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','...QQQQQ...','...QQQQQ...','..AAAAAAA..','..AAAAAAA..','..AQAAAQA..','..AQAAAQA..'], colors: { A: '#00CED1', Q: '#00FF7F' }, animation: { type: 'cycle', frames: ['#0000FF','#0066FF','#00BFFF','#00CED1','#00FF7F','#7CFC00','#00FF7F','#00CED1'], fps: 4 } },
+];
+
+// ── Rendering ───────────────────────────────────────────────────────
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+// Resolve a hat + variant index to its colors. Legendary: hat.colors.
+function variantColors(hat, idx = 0) {
+  if (hat.rarity === 'legendary') return hat.colors;
+  return hat.variants[idx] ?? hat.variants[0];
+}
+
+function variantCount(hat) {
+  return hat.rarity === 'legendary' ? 1 : (hat.variants?.length ?? 1);
+}
+
+function buildHatSvg(hat, palette, variantIdx, animTag) {
+  // Overlap rule: hat's bottom 4 rows overlap horse rows 0..3.
+  const colors = variantColors(hat, variantIdx);
+  const ext = Math.max(0, hat.rows.length - 4);
+  const totalH = 24 + ext;
+  const canvasLeft = Math.min(0, hat.anchor_x);
+  const canvasRight = Math.max(32, hat.anchor_x + (hat.rows[0]?.length ?? 0));
+  const canvasW = canvasRight - canvasLeft;
+
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('viewBox', `${canvasLeft} ${-ext} ${canvasW} ${totalH}`);
+  svg.setAttribute('shape-rendering', 'crispEdges');
+  svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+
+  for (let y = 0; y < HORSE_ROWS.length; y++) {
+    const row = HORSE_ROWS[y];
+    for (let x = 0; x < 32; x++) {
+      const ch = row[x];
+      if (ch === '.') continue;
+      const fill = palette[ch];
+      if (!fill) continue;
+      const r = document.createElementNS(SVG_NS, 'rect');
+      r.setAttribute('x', x); r.setAttribute('y', y);
+      r.setAttribute('width', 1); r.setAttribute('height', 1);
+      r.setAttribute('fill', fill);
+      svg.appendChild(r);
+    }
+  }
+
+  for (let i = 0; i < hat.rows.length; i++) {
+    const row = hat.rows[i];
+    for (let j = 0; j < row.length; j++) {
+      const ch = row[j];
+      if (ch === '.') continue;
+      const r = document.createElementNS(SVG_NS, 'rect');
+      r.setAttribute('x', hat.anchor_x + j);
+      r.setAttribute('y', i - ext);
+      r.setAttribute('width', 1); r.setAttribute('height', 1);
+      r.setAttribute('class', ch === 'A' ? 'hat-a' : 'hat-q');
+      r.setAttribute('fill', ch === 'A' ? colors.A : (colors.Q ?? colors.A));
+      svg.appendChild(r);
+    }
+  }
+
+  if (animTag) svg.classList.add(animTag);
+  return svg;
+}
+
+// CSS keyframes for legendary animation. Each frame held for its slice of
+// duration (discrete frame replacement) via start+end stops.
+function buildLegendaryStyles() {
+  const blocks = [];
+  for (const hat of HATS.filter(h => h.rarity === 'legendary' && h.animation)) {
+    const { frames, fps } = hat.animation;
+    const N = frames.length;
+    const dur = N / fps;
+    const epsilon = 0.001;
+    let stops = '';
+    for (let i = 0; i < N; i++) {
+      const startPct = (i / N) * 100;
+      const endPct = ((i + 1) / N) * 100 - epsilon;
+      stops += `${startPct.toFixed(4)}% { fill: ${frames[i]}; } ${endPct.toFixed(4)}% { fill: ${frames[i]}; } `;
+    }
+    blocks.push(`
+      @keyframes anim-${hat.id} { ${stops} }
+      .legendary-${hat.id} .hat-a { animation: anim-${hat.id} ${dur}s linear infinite; }
+    `);
+  }
+  const style = document.createElement('style');
+  style.textContent = blocks.join('\n');
+  document.head.appendChild(style);
+}
+
+// ── Layout ──────────────────────────────────────────────────────────
+const State = { palette: 'chestnut' };
+
+function render() {
+  const palette = PALETTES[State.palette];
+  const root = document.getElementById('root');
+  root.innerHTML = '';
+
+  for (const rarity of ['common', 'rare', 'epic', 'legendary']) {
+    const hats = HATS.filter(h => h.rarity === rarity);
+    if (hats.length === 0) continue;
+    const totalVariants = hats.reduce((s, h) => s + variantCount(h), 0);
+    const heading = document.createElement('h2');
+    heading.innerHTML = `${rarity} <span class="badge">${hats.length} ${hats.length === 1 ? 'hat' : 'hats'} · ${totalVariants} ${totalVariants === 1 ? 'collectible' : 'collectibles'}</span>`;
+    root.appendChild(heading);
+
+    for (const hat of hats) {
+      const row = document.createElement('div');
+      row.className = 'hat-row';
+
+      const meta = document.createElement('div');
+      meta.className = 'hat-meta';
+      const nameEl = document.createElement('div');
+      nameEl.className = 'hat-name';
+      nameEl.innerHTML = `${escapeHtml(hat.name)} <span class="rarity-badge ${rarity}">${rarity}</span>`;
+      meta.appendChild(nameEl);
+      const idEl = document.createElement('div');
+      idEl.className = 'hat-id';
+      idEl.textContent = hat.id;
+      meta.appendChild(idEl);
+      if (hat.rarity !== 'legendary') {
+        const countEl = document.createElement('div');
+        countEl.className = 'hat-count';
+        countEl.textContent = `${variantCount(hat)} ${variantCount(hat) === 1 ? 'variant' : 'variants'}`;
+        meta.appendChild(countEl);
+      }
+      row.appendChild(meta);
+
+      const strip = document.createElement('div');
+      strip.className = 'variants-strip';
+      const N = variantCount(hat);
+      for (let i = 0; i < N; i++) {
+        const card = document.createElement('div');
+        card.className = 'variant-card';
+        const animTag = (hat.rarity === 'legendary' && hat.animation) ? `legendary-${hat.id}` : undefined;
+        card.appendChild(buildHatSvg(hat, palette, i, animTag));
+        const label = document.createElement('div');
+        label.className = 'variant-name';
+        label.textContent = hat.rarity === 'legendary' ? hat.name : `${hat.name} #${i + 1}`;
+        card.appendChild(label);
+        strip.appendChild(card);
+      }
+      row.appendChild(strip);
+      root.appendChild(row);
+    }
+  }
+}
+
+function renderPaletteControls() {
+  const container = document.getElementById('palette-controls');
+  container.innerHTML = '';
+  for (const [key, palette] of Object.entries(PALETTES)) {
+    const btn = document.createElement('button');
+    btn.textContent = palette.name;
+    btn.className = key === State.palette ? 'active' : '';
+    btn.onclick = () => { State.palette = key; renderPaletteControls(); render(); };
+    container.appendChild(btn);
+  }
+}
+
+function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+
+buildLegendaryStyles();
+renderPaletteControls();
+render();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,1227 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Token Derby — hat editor</title>
+<style>
+  :root {
+    --bg: #1a1d24;
+    --bg-2: #232730;
+    --bg-3: #2f343e;
+    --fg: #e8e8ef;
+    --muted: #8a8f9c;
+    --accent: #4ea8ff;
+    --danger: #ff5c5c;
+    --common: #9e9e9e;
+    --rare: #42a5f5;
+    --epic: #ab47bc;
+    --legendary: #ffb300;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    display: grid;
+    grid-template-columns: 260px 1fr 360px;
+    grid-template-rows: auto 1fr;
+    grid-template-areas: "topbar topbar topbar" "sidebar editor preview";
+    height: 100vh;
+  }
+
+  /* Top bar */
+  .topbar {
+    grid-area: topbar;
+    background: var(--bg-2);
+    border-bottom: 1px solid var(--bg-3);
+    padding: 0.6rem 1rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+  .topbar h1 { margin: 0; font-size: 1rem; font-weight: 600; }
+  .topbar .spacer { flex: 1; }
+  .topbar button {
+    background: var(--bg-3);
+    color: var(--fg);
+    border: 1px solid var(--bg-3);
+    padding: 0.4rem 0.75rem;
+    border-radius: 0.3rem;
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.85rem;
+  }
+  .topbar button:hover { background: var(--accent); border-color: var(--accent); color: #000; }
+  .topbar button.danger:hover { background: var(--danger); border-color: var(--danger); color: #fff; }
+
+  /* Sidebar — hat list */
+  .sidebar {
+    grid-area: sidebar;
+    background: var(--bg-2);
+    border-right: 1px solid var(--bg-3);
+    overflow-y: auto;
+    padding: 0.5rem;
+  }
+  .sidebar .group { margin-bottom: 0.5rem; }
+  .sidebar .group-header {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    padding: 0.5rem 0.5rem 0.25rem;
+  }
+  .hat-row {
+    padding: 0.4rem 0.5rem;
+    border-radius: 0.25rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.85rem;
+  }
+  .hat-row:hover { background: var(--bg-3); }
+  .hat-row.active { background: var(--accent); color: #000; }
+  .hat-row .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .hat-row .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hat-row .modified { color: var(--accent); }
+  .hat-row.active .modified { color: #000; }
+  .hat-row .id { color: var(--muted); font-family: ui-monospace, monospace; font-size: 0.7rem; }
+  .hat-row.active .id { color: #000; opacity: 0.7; }
+  .hat-row.new-button {
+    background: transparent;
+    border: 1px dashed var(--bg-3);
+    color: var(--muted);
+    justify-content: center;
+    margin: 0.5rem 0.5rem 0;
+  }
+  .hat-row.new-button:hover { border-color: var(--accent); color: var(--accent); background: transparent; }
+
+  /* Editor */
+  .editor {
+    grid-area: editor;
+    padding: 1rem 1.5rem;
+    overflow-y: auto;
+  }
+  .editor h2 { margin: 0 0 0.5rem; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+  .editor section { margin-bottom: 1.5rem; }
+  .editor label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.75rem; color: var(--muted); }
+  .editor input[type="text"], .editor select {
+    background: var(--bg-2);
+    color: var(--fg);
+    border: 1px solid var(--bg-3);
+    padding: 0.4rem 0.5rem;
+    border-radius: 0.25rem;
+    font: inherit;
+    font-size: 0.9rem;
+  }
+  .editor input[type="number"] {
+    background: var(--bg-2);
+    color: var(--fg);
+    border: 1px solid var(--bg-3);
+    padding: 0.4rem 0.5rem;
+    border-radius: 0.25rem;
+    font: inherit;
+    width: 4rem;
+  }
+  .editor input[type="range"] { width: 100%; }
+  .metadata-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 0.75rem;
+  }
+  .metadata-grid label:nth-child(1), .metadata-grid label:nth-child(2) { grid-column: span 2; }
+
+  /* Tool palette */
+  .tools { display: flex; gap: 0.5rem; align-items: center; }
+  .tool {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.4rem 0.6rem;
+    background: var(--bg-2);
+    border: 1px solid var(--bg-3);
+    border-radius: 0.3rem;
+    cursor: pointer;
+    font-size: 0.85rem;
+  }
+  .tool.active { border-color: var(--accent); background: rgba(78, 168, 255, 0.1); }
+  .tool .swatch { width: 16px; height: 16px; border-radius: 2px; border: 1px solid var(--bg-3); }
+  .tool .swatch.transparent {
+    background-image: linear-gradient(45deg, var(--bg-3) 25%, transparent 25%),
+                      linear-gradient(-45deg, var(--bg-3) 25%, transparent 25%),
+                      linear-gradient(45deg, transparent 75%, var(--bg-3) 75%),
+                      linear-gradient(-45deg, transparent 75%, var(--bg-3) 75%);
+    background-size: 8px 8px;
+    background-position: 0 0, 0 4px, 4px -4px, -4px 0;
+    background-color: var(--bg);
+  }
+  .tools input[type="color"] {
+    width: 32px;
+    height: 28px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+  }
+
+  /* Pixel grid */
+  .pixel-grid {
+    display: grid;
+    gap: 1px;
+    background: var(--bg-3);
+    padding: 1px;
+    border-radius: 0.25rem;
+    width: fit-content;
+  }
+  .pixel-grid .cell {
+    width: 28px;
+    height: 28px;
+    cursor: pointer;
+    user-select: none;
+    position: relative;
+  }
+  .pixel-grid .cell.empty {
+    background-image: linear-gradient(45deg, var(--bg-3) 25%, transparent 25%),
+                      linear-gradient(-45deg, var(--bg-3) 25%, transparent 25%),
+                      linear-gradient(45deg, transparent 75%, var(--bg-3) 75%),
+                      linear-gradient(-45deg, transparent 75%, var(--bg-3) 75%);
+    background-size: 12px 12px;
+    background-position: 0 0, 0 6px, 6px -6px, -6px 0;
+    background-color: var(--bg);
+  }
+  .pixel-grid .cell:hover { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+  /* Animation editor */
+  .frames {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    margin-bottom: 0.75rem;
+  }
+  .frame {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem;
+    background: var(--bg-2);
+    border-radius: 0.25rem;
+  }
+  .frame .idx { color: var(--muted); font-family: ui-monospace, monospace; font-size: 0.8rem; width: 24px; }
+  .frame .swatch { width: 24px; height: 24px; border-radius: 0.2rem; border: 1px solid var(--bg-3); }
+  .frame input[type="color"] { width: 32px; height: 28px; padding: 0; border: none; background: transparent; cursor: pointer; }
+  .frame button {
+    background: transparent;
+    color: var(--muted);
+    border: none;
+    cursor: pointer;
+    padding: 0.25rem 0.5rem;
+    font-size: 1rem;
+  }
+  .frame button:hover { color: var(--danger); }
+
+  /* Preview */
+  .preview {
+    grid-area: preview;
+    background: var(--bg-2);
+    border-left: 1px solid var(--bg-3);
+    padding: 1rem;
+    overflow-y: auto;
+  }
+  .preview h2 { margin: 0 0 0.75rem; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+  .preview-stage {
+    background: var(--bg);
+    border-radius: 0.4rem;
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+    display: flex;
+    justify-content: center;
+  }
+  .preview-stage svg { width: 100%; max-width: 280px; image-rendering: pixelated; }
+  .palette-buttons { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-bottom: 0.75rem; }
+  .palette-buttons button {
+    background: var(--bg-3);
+    color: var(--fg);
+    border: 1px solid var(--bg-3);
+    padding: 0.3rem 0.6rem;
+    border-radius: 0.25rem;
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.8rem;
+  }
+  .palette-buttons button.active { border-color: var(--accent); background: rgba(78, 168, 255, 0.15); }
+  .preview-label { color: var(--muted); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.4rem; }
+
+  /* Variant strip */
+  .variant-strip { display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: center; margin-bottom: 0.5rem; }
+  .variant-thumb {
+    position: relative;
+    width: 44px; height: 44px;
+    border: 2px solid var(--bg-3);
+    border-radius: 0.3rem;
+    cursor: pointer;
+    background: var(--bg-2);
+    display: flex; align-items: center; justify-content: center;
+    padding: 0;
+    overflow: hidden;
+  }
+  .variant-thumb:hover { border-color: var(--accent); }
+  .variant-thumb.active { border-color: var(--accent); background: rgba(78,168,255,0.1); }
+  .variant-thumb .stack { display: flex; gap: 2px; }
+  .variant-thumb .stack > span { width: 14px; height: 22px; border-radius: 2px; }
+  .variant-thumb .label {
+    position: absolute; bottom: 1px; right: 3px;
+    font-size: 0.6rem; color: var(--fg); font-weight: 700;
+    text-shadow: 0 0 2px rgba(0,0,0,0.8);
+  }
+  .variant-thumb .delete {
+    position: absolute; top: -8px; right: -8px;
+    width: 18px; height: 18px;
+    background: var(--danger); color: #fff;
+    border: none; border-radius: 50%;
+    display: none;
+    cursor: pointer;
+    font-size: 0.7rem; line-height: 1;
+    padding: 0;
+  }
+  .variant-thumb.active .delete { display: block; }
+  .variant-thumb.active.solo .delete { display: none; }
+  .add-variant {
+    width: 44px; height: 44px;
+    border: 1px dashed var(--bg-3);
+    border-radius: 0.3rem;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 1.2rem;
+  }
+  .add-variant:hover { border-color: var(--accent); color: var(--accent); }
+  .sidebar .count {
+    color: var(--muted);
+    font-size: 0.7rem;
+    margin-left: 0.4rem;
+  }
+  .hat-row.active .count { color: rgba(0,0,0,0.6); }
+  .preview-note { font-size: 0.75rem; color: var(--muted); margin-top: 0.75rem; line-height: 1.5; }
+
+  /* Actions row */
+  .actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+  .actions button {
+    background: var(--bg-3);
+    color: var(--fg);
+    border: 1px solid var(--bg-3);
+    padding: 0.5rem 0.85rem;
+    border-radius: 0.3rem;
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.85rem;
+  }
+  .actions button:hover { background: var(--accent); border-color: var(--accent); color: #000; }
+  .actions button.danger:hover { background: var(--danger); border-color: var(--danger); color: #fff; }
+
+  /* Modal */
+  .modal-bg {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+    display: none; align-items: center; justify-content: center;
+    z-index: 100;
+  }
+  .modal-bg.open { display: flex; }
+  .modal {
+    background: var(--bg-2);
+    border: 1px solid var(--bg-3);
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+    max-width: 700px;
+    width: 90%;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  .modal h3 { margin: 0; }
+  .modal textarea {
+    flex: 1;
+    background: var(--bg);
+    color: var(--fg);
+    border: 1px solid var(--bg-3);
+    border-radius: 0.3rem;
+    padding: 0.75rem;
+    font: 0.8rem ui-monospace, SFMono-Regular, monospace;
+    resize: vertical;
+    min-height: 300px;
+    white-space: pre;
+  }
+  .modal-actions { display: flex; gap: 0.5rem; justify-content: flex-end; }
+
+  .empty-state { color: var(--muted); padding: 2rem; text-align: center; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>🎩 Hat editor</h1>
+  <span class="spacer"></span>
+  <button id="btn-export-all">Export catalog (TS)</button>
+  <button id="btn-import">Import</button>
+  <button class="danger" id="btn-reset-all">Reset all</button>
+</div>
+
+<aside class="sidebar" id="sidebar"></aside>
+
+<main class="editor" id="editor">
+  <div class="empty-state">Select a hat from the sidebar to edit, or click <strong>+ New hat</strong>.</div>
+</main>
+
+<aside class="preview" id="preview">
+  <h2>Preview</h2>
+  <div class="preview-stage" id="preview-stage"></div>
+  <div class="preview-label">Horse palette</div>
+  <div class="palette-buttons" id="palette-buttons"></div>
+  <p class="preview-note">Hat sits on top of the flat head (overlap rule). Non-legendary hats have multiple colour variants — each variant is its own collectible named "<em>Hat Name #N</em>". Legendaries have only one design.</p>
+</aside>
+
+<div class="modal-bg" id="modal-bg">
+  <div class="modal">
+    <h3 id="modal-title">Export</h3>
+    <textarea id="modal-textarea" spellcheck="false"></textarea>
+    <div class="modal-actions">
+      <button id="modal-cancel">Cancel</button>
+      <button id="modal-action">Copy to clipboard</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Original hat catalog (the source-of-truth defaults from PR #2) ──
+const HORSE_ROWS = [
+  '................................','................................',
+  '..........................MMM...','..........................MMM...',
+  '.........................MBBEBB.','.........................MBBEBB.',
+  '........................MBBBBBBB','........................MBBBBBBB',
+  '..................MMMMMMMBBB....','..................MMMMMMMBBB....',
+  '....BBBBBBBBSSSSSSMMBBBBBB......','...BBBBBBBBBSSSSSSMMBBBBBB......',
+  '.TTBBBBBBBBBSSSSSSBBBBBBBB......','.TTBBBBBBBBBSSSSSSBBBBBBBB......',
+  'TTTBBBBBBBBBBBBBBBBBBBBBBB......','TTTBBBBBBBBBBBBBBBBBBBBB........',
+  '...BBB.BBB.....BBB.BBB..........','...BBB.BBB.....BBB.BBB..........',
+  '....BB..BB......BB..BB..........','....BB..BB......BB..BB..........',
+  '....BB..BB......BB..BB..........','....BB..BB......BB..BB..........',
+  '....BB..BB......BB..BB..........','...HHH.HHH.....HHH.HHH..........',
+];
+
+const PALETTES = {
+  chestnut: { name: 'Chestnut', B: '#A0522D', M: '#2F1B0C', T: '#2F1B0C', S: '#8B4513', E: '#000000', H: '#1F1108' },
+  black:    { name: 'Black',    B: '#2C2C2C', M: '#0A0A0A', T: '#0A0A0A', S: '#5A3A1E', E: '#FFFFFF', H: '#0A0A0A' },
+  palomino: { name: 'Palomino', B: '#D4A14A', M: '#F4E5C2', T: '#F4E5C2', S: '#7A4F1E', E: '#000000', H: '#1F1108' },
+  grey:     { name: 'Grey',     B: '#B0B0B5', M: '#E8E8EC', T: '#E8E8EC', S: '#3F2A18', E: '#000000', H: '#1F1108' },
+  roan:     { name: 'Roan',     B: '#7A5C4A', M: '#3A2620', T: '#3A2620', S: '#2D1810', E: '#000000', H: '#1F1108' },
+};
+
+const ORIGINAL_HATS = [
+  // ── COMMON (18) ────────────────────────────────────────────────────────
+  { id: 'flat_cap', name: "Flat Cap", rarity: 'common', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','...........','...........','...........','....AAAA...','...AAAAAA..','..AAAAAAA..'], variants: [{ A: '#8B6914' }] },
+  { id: 'bucket_hat', name: "Bucket Hat", rarity: 'common', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','...........','...........','...QQQQQ...','...AAAAA...','...AAAAA...','.AAAAAAAAA.'], variants: [{ A: '#CC2200', Q: '#FFFFFF' }] },
+  { id: 'beanie', name: "Beanie", rarity: 'common', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','...........','...........','....AAA....','...AAAAA...','...AAAAA...','..AAAAAAA..'], variants: [{ A: '#4A7C59' }] },
+  { id: 'stetson', name: "Stetson", rarity: 'common', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','...AA.AA...','...AAAAA...','...AAAAA...','A..AAAAA..A','AAAAAAAAAAA','AAAAAAAAAAA'], variants: [{ A: '#C49A00' }] },
+  { id: 'party_hat', name: "Party Hat", rarity: 'common', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','...........','.....A.....','....AAA....','....AQA....','...AQAQA...','...AAAAA...'], variants: [{ A: '#FF69B4', Q: '#FFD700' }] },
+  { id: 'fez', name: "Fez", rarity: 'common', width: 11, anchor_x: 22, rows: ['...........','...........','...........','...........','...........','...........','....Q......','....AAA....','....AAA....','....AAA....'], variants: [{ A: '#CC0000', Q: '#8B0000' }] },
+  { id: 'sailor_hat', name: "Sailor Hat", rarity: 'common', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','...........','...........','...QQQQQ...','..AAAAAAA..','..QQQQQQQ..','..AAAAAAA..'], variants: [{ A: '#FFFFFF', Q: '#000080' }] },
+  { id: 'newsboy_cap', name: "Newsboy Cap", rarity: 'common', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','...........','...........','...AAAAA...','..AAAQAAA..','..AAAAAAA..','..AAAAAA...'], variants: [{ A: '#5C4033', Q: '#3D2B1F' }] },
+  { id: 'tam_o_shanter', name: "Tam O'Shanter", rarity: 'common', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','...........','.....Q.....','....AAA....','..AAAAAAA..','..AAAAAAA..','...AAAAA...'], variants: [{ A: '#006400', Q: '#FF0000' }] },
+  { id: 'trucker_cap', name: "Trucker Cap", rarity: 'common', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','...........','...........','...AAQQ....','...AAQQ....','..AAQQQAA..','..AAQQQAA..'], variants: [{ A: '#2196F3', Q: '#FFFFFF' }] },
+  { id: 'hard_hat', name: "Hard Hat", rarity: 'common', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','...........','...........','....AAA....','...AAAAA...','..AAAAAAA..','..AAAAAAA..'], variants: [{ A: '#FFD600' }] },
+  { id: 'chef_toque', name: "Chef's Toque", rarity: 'common', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','...AAAAA...','..AAAAAAA..','...AAAAA...','...AAAAA...','...AAAAA...','...AAAAA...'], variants: [{ A: '#FFFFFF', Q: '#F0F0F0' }] },
+  { id: 'bobble_hat', name: "Bobble Hat", rarity: 'common', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','...........','...........','.....Q.....','...AAAAA...','...AAAAA...','..AAAAAAA..'], variants: [{ A: '#C62828', Q: '#FFFFFF' }] },
+  { id: 'cowboy_hat', name: "Cowboy Hat", rarity: 'common', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','...........','...........','...AAAAA...','...AAAAA...','A.AAAAAAA.A','.AAAAAAAAA.'], variants: [{ A: '#8B4513' }] },
+  { id: 'baseball_cap', name: "Baseball Cap", rarity: 'common', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','...........','...........','..AAAAAA...','..AAAAAA...','..AAAAAAA..','..AAAAAAAAA'], variants: [{ A: '#1565C0' }] },
+  { id: 'tinfoil_hat', name: "Tinfoil Hat", rarity: 'common', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','...........','...........','.....A.....','....AAA....','...AAAAA...','..AAAAAAA..'], variants: [{ A: '#B0BEC5' }] },
+  { id: 'dunce_cap', name: "Dunce Cap", rarity: 'common', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','.....Q.....','....QAQ....','...QAAAQ...','...QAAAQ...','..QAAAAAQ..','..AAAAAAA..'], variants: [{ A: '#F8F8F8', Q: '#F44336' }] },
+  { id: 'mini_top_hat', name: "Mini Top Hat", rarity: 'common', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','...........','...AAAAA...','...AAAAA...','...AAAAA...','..AAAAAAA..','..AAAAAAA..'], variants: [{ A: '#212121' }] },
+  // ── RARE (10) ──────────────────────────────────────────────────────────
+  { id: 'bicorne', name: "Bicorne", rarity: 'rare', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','...........','...........','..AAAQQQQ..','..AAAAAAA..','..AAAAAAA..','...QQQQQ...'], variants: [{ A: '#1A237E', Q: '#FFD700' }] },
+  { id: 'viking_helmet', name: "Viking Helmet", rarity: 'rare', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','...........','...........','..A.AAA.A..','..AAAAAAA..','..AAAAAAA..','..AQQQQQA..'], variants: [{ A: '#9E9E9E', Q: '#8D6E63' }] },
+  { id: 'jesters_cap', name: "Jester's Cap", rarity: 'rare', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','...........','...........','..AQAQAQA..','..AQAQAQA..','...AAAAA...','...AAAAA...'], variants: [{ A: '#E53935', Q: '#FFD600' }] },
+  { id: 'plague_doctor', name: "Plague Doctor Beak", rarity: 'rare', width: 11, anchor_x: 24, rows: ['...........','...........','...........','...........','....QQQ....','...QAAAQQ..','...QQQQQQQ.','..QQQQQ.QQQ','..QQQQ....Q','..QQQQ.....'], variants: [{ A: '#F5F5F5', Q: '#795548' }] },
+  { id: 'morion', name: "Conquistador Morion", rarity: 'rare', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','...........','.....Q.....','...QQQQQ...','...QAAAQ...','.A..AAA..A.','..AAQQQAA..'], variants: [{ A: '#B0BEC5', Q: '#FFD600' }] },
+  { id: 'shako', name: "Shako", rarity: 'rare', width: 11, anchor_x: 23, rows: ['...........','...........','........Q..','........Q..','........Q..','........Q..','..AAAAAAA..','..AAAAAAA..','..AAAAAAA..','..AQQQQQA..'], variants: [{ A: '#45464f', Q: '#00ff2a' }] },
+  { id: 'centurion_helm', name: "Centurion Helm", rarity: 'rare', width: 11, anchor_x: 23, rows: ['...........','...........','....QQQ....','...QQQQQQ..','..QQQQQQQQ.','.QQ..A...Q.','.Q..AAA....','...AAAAA...','..AAAAAAA..','..AAAAAAA..'], variants: [{ A: '#B0BEC5', Q: '#C62828' }] },
+  { id: 'papal_mitre', name: "Papal Mitre", rarity: 'rare', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','...........','...........','....QQQ....','...QQQQQ...','...QAAAQ...','..AAAAAAA..'], variants: [{ A: '#FFFFFF', Q: '#FFD700' }] },
+  { id: 'headdress', name: "Headdress", rarity: 'rare', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','...........','...........','..AQAQAQA..','..AQAQAQA..','..AAAAAAA..','...QQQQQ...'], variants: [{ A: '#FF8F00', Q: '#1565C0' }] },
+  { id: 'sombrero', name: "Sombrero", rarity: 'rare', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','...........','.....A.....','....AAA....','...AAAAA...','...AQAQA...','AAAAAAAAAAA'], variants: [{ A: '#F57F17', Q: '#BF360C' }] },
+  // ── EPIC (6) ───────────────────────────────────────────────────────────
+  { id: 'papal_tiara', name: "Papal Tiara", rarity: 'epic', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','....QQ.....','...QQQQQ...','...QAAQQ...','...QQQQQ...','..AAAAAAA..','..AQQQQQA..'], variants: [{ A: '#FFFFFF', Q: '#FFD700' }] },
+  { id: 'samurai_kabuto', name: "Samurai Kabuto", rarity: 'epic', width: 11, anchor_x: 23, rows: ['....Q...Q..','....QQ.QQ..','.....QQQ...','.......Q...','...AAAAQ...','..AAAAAQQ..','..AAAAAQQ..','.AAAAAAAQ..','AAAAAAAAQ..','AAAAAAAAQ..'], variants: [{ A: '#B0BEC5', Q: '#C62828' }] },
+  { id: 'gladiator_galea', name: "Gladiator Galea", rarity: 'epic', width: 11, anchor_x: 23, rows: ['...........','...........','...........','....QQQQQQ.','...QQQQQ...','...QQQQQ...','...QAAA....','..AAAAAAA..','..AAAAAAA..','..AQQQQQA..'], variants: [{ A: '#B0BEC5', Q: '#C62828' }] },
+  { id: 'pharaoh_nemes', name: "Pharaoh Nemes", rarity: 'epic', width: 11, anchor_x: 23, rows: ['...........','...........','...........','..AAAAAAA..','..AAQAQAA..','..QAQAQAQ..','..QAQAQAQ..','..QQAAAQQ..','..QQAAAAA..','...QAQA....'], variants: [{ A: '#FFD700', Q: '#1565C0' }] },
+  { id: 'spartan_helmet', name: "Spartan Helmet", rarity: 'epic', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','....QQQ....','...QQQQQ...','.QQQAAQQ...','.QAAAAAAA..','QQAAAAAAA..','QQAQQQQQA..'], variants: [{ A: '#B0BEC5', Q: '#B71C1C' }] },
+  { id: 'conquistador_full', name: "Conquistador Helm", rarity: 'epic', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','.....A.....','....AAA....','...AAAAA...','..AAAAAAA..','...AQQQA...','...AQQQA...'], variants: [{ A: '#B0BEC5', Q: '#FFD700' }] },
+  // ── LEGENDARY (5) — no variants ────────────────────────────────────────
+  { id: 'rainbow_crown', name: "Rainbow Crown", rarity: 'legendary', width: 11, anchor_x: 23, rows: ['...........','...........','.....A.....','....AQA....','....AQA....','....AQA....','...AAQAA...','...AQQQA...','..AAQQQAA..','..AAAAAAA..'], colors: { A: '#FFD700', Q: '#553f3f' }, animation: { type: 'cycle', frames: ['#FF0000','#FF7F00','#FFFF00','#00FF00','#0000FF','#8B00FF'], fps: 8 } },
+  { id: 'inferno_cap', name: "Inferno Cap", rarity: 'legendary', width: 11, anchor_x: 23, rows: ['...........','....AAA....','...AAAAA...','....AAA....','.....Q.....','A....Q....A','A...QQQ...A','.A..QQQ..A.','..AAAAAAA..','..AAAAAAA..'], colors: { A: '#FF4500', Q: '#FFD700' }, animation: { type: 'cycle', frames: ['#FF0000','#FF2200','#FF4500','#FF6600','#FF8C00','#FFA500'], fps: 12 } },
+  { id: 'void_hood', name: "Void Hood", rarity: 'legendary', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...AAA.....','..AAAAAA...','.AAAAAAA...','.AAAAAAAA..','AAAAAAAAA..','AAAAQQQAA..','AAAAQQQAA..'], colors: { A: '#1A0033', Q: '#d9cfe3' }, animation: { type: 'cycle', frames: ['#0D0019','#1A0033','#2D004D','#3D0066','#2D004D','#1A0033'], fps: 3 } },
+  { id: 'prismatic_jester', name: "Prismatic Jester", rarity: 'legendary', width: 11, anchor_x: 23, rows: ['...........','..Q.Q.Q.Q..','Q..A.A.A..Q','.Q.A.A.A.Q.','..AQAQAQA..','..AQAQAQA..','..AAAAAAA..','..AAAAAAA..','..AAAAAAA..','..AAAAAAA..'], colors: { A: '#FF0000', Q: '#0000FF' }, animation: { type: 'cycle', frames: ['#FF0000','#FF7F00','#FFFF00','#00FF00','#0000FF','#8B00FF','#FF00FF','#00FFFF'], fps: 15 } },
+  { id: 'aurora_helm', name: "Aurora Helm", rarity: 'legendary', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','...QQQQQ...','...QQQQQ...','..AAAAAAA..','..AAAAAAA..','..AQAAAQA..','..AQAAAQA..'], colors: { A: '#00CED1', Q: '#00FF7F' }, animation: { type: 'cycle', frames: ['#0000FF','#0066FF','#00BFFF','#00CED1','#00FF7F','#7CFC00','#00FF7F','#00CED1'], fps: 4 } },
+];
+
+// ── App state ───────────────────────────────────────────────────────
+// Storage key versioned: v4 → 39-hat catalog with redesigned pixel art.
+// Legacy entries from older sessions auto-discarded on load.
+// v5: variants format — non-legendary hats use `variants: [{ A, Q? }]`,
+// legendaries keep `colors + animation` at hat level.
+const STORAGE_KEY = 'tdHatEditor.v5';
+const SVG_NS = 'http://www.w3.org/2000/svg';
+const HAT_WIDTH = 11;   // odd → exact horizontal midpoint at col 5
+const HAT_HEIGHT = 10;
+const RARITIES = ['common', 'rare', 'epic', 'legendary'];
+
+// Migrate to current shape:
+//   1. Pad to 11×10 grid (legacy 7×N data)
+//   2. Convert non-legendary `colors:{...}` → `variants:[{...}]`
+function migrateHat(h) {
+  let next = h;
+  // Grid migration (legacy <11×10 entries)
+  if (!(next.rows.length === HAT_HEIGHT && next.rows.every(r => r.length === HAT_WIDTH) && next.width === HAT_WIDTH)) {
+    const oldW = next.width ?? next.rows[0]?.length ?? 0;
+    const padLeft = Math.floor((HAT_WIDTH - oldW) / 2);
+    const padRight = HAT_WIDTH - oldW - padLeft;
+    const blanksAbove = HAT_HEIGHT - next.rows.length;
+    const newRows = [];
+    for (let i = 0; i < blanksAbove; i++) newRows.push('.'.repeat(HAT_WIDTH));
+    for (const r of next.rows) newRows.push('.'.repeat(padLeft) + r + '.'.repeat(padRight));
+    next = { ...next, width: HAT_WIDTH, anchor_x: (next.anchor_x ?? 25) - padLeft, rows: newRows };
+  }
+  // Variant migration (legacy `colors` on non-legendary hats)
+  if (next.rarity !== 'legendary' && !Array.isArray(next.variants)) {
+    const { colors, animation, ...rest } = next;
+    next = { ...rest, variants: [colors ? { A: colors.A, ...(colors.Q !== undefined ? { Q: colors.Q } : {}) } : { A: '#888888' }] };
+  }
+  return next;
+}
+
+// Look up the colours used by the currently-displayed slice of a hat.
+// For legendary: returns `hat.colors`. For non-legendary: returns
+// `hat.variants[variantIdx]` (or [0] if out of range).
+function hatColors(hat, variantIdx = 0) {
+  if (!hat) return { A: '#888888' };
+  if (hat.rarity === 'legendary') return hat.colors ?? { A: '#888888' };
+  const v = hat.variants?.[variantIdx] ?? hat.variants?.[0];
+  return v ?? { A: '#888888' };
+}
+
+function variantCount(hat) {
+  if (!hat) return 0;
+  return hat.rarity === 'legendary' ? 1 : (hat.variants?.length ?? 1);
+}
+
+const State = {
+  hats: [],
+  selectedId: null,
+  selectedVariantIdx: 0,    // resets to 0 on hat change
+  tool: 'A', // 'A' | 'Q' | null (null = transparent/eraser)
+  palette: 'chestnut',
+  legendaryStyleEl: null,
+};
+
+function deepClone(o) { return JSON.parse(JSON.stringify(o)); }
+
+function load() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed?.hats)) {
+        State.hats = parsed.hats.map(migrateHat);
+        State.selectedId = parsed.selectedId ?? null;
+        return;
+      }
+    }
+  } catch (e) { console.warn('localStorage read failed', e); }
+  State.hats = ORIGINAL_HATS.map(h => migrateHat(deepClone(h)));
+  State.selectedId = State.hats[0]?.id ?? null;
+}
+
+function save() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ hats: State.hats, selectedId: State.selectedId }));
+}
+
+function selected() {
+  return State.hats.find(h => h.id === State.selectedId) ?? null;
+}
+
+function originalById(id) {
+  const o = ORIGINAL_HATS.find(h => h.id === id);
+  return o ? migrateHat(deepClone(o)) : undefined;
+}
+
+function isModified(hat) {
+  const orig = originalById(hat.id);
+  if (!orig) return true;
+  return JSON.stringify(orig) !== JSON.stringify(hat);
+}
+
+// ── Sidebar rendering ───────────────────────────────────────────────
+function renderSidebar() {
+  const root = document.getElementById('sidebar');
+  root.innerHTML = '';
+
+  const newBtn = document.createElement('div');
+  newBtn.className = 'hat-row new-button';
+  newBtn.textContent = '+ New hat';
+  newBtn.onclick = createNewHat;
+  root.appendChild(newBtn);
+
+  for (const rarity of RARITIES) {
+    const hats = State.hats.filter(h => h.rarity === rarity);
+    if (hats.length === 0) continue;
+    const group = document.createElement('div');
+    group.className = 'group';
+    const header = document.createElement('div');
+    header.className = 'group-header';
+    header.textContent = `${rarity} (${hats.length})`;
+    group.appendChild(header);
+    for (const hat of hats) {
+      const row = document.createElement('div');
+      row.className = 'hat-row' + (hat.id === State.selectedId ? ' active' : '');
+      const dot = document.createElement('span');
+      dot.className = 'dot';
+      dot.style.background = `var(--${rarity})`;
+      row.appendChild(dot);
+      const name = document.createElement('span');
+      name.className = 'name';
+      name.textContent = hat.name;
+      if (isModified(hat)) {
+        const star = document.createElement('span');
+        star.className = 'modified';
+        star.textContent = ' ●';
+        name.appendChild(star);
+      }
+      row.appendChild(name);
+      // Variant count badge for non-legendary hats with more than 1 variant
+      if (hat.rarity !== 'legendary') {
+        const count = variantCount(hat);
+        if (count > 1) {
+          const c = document.createElement('span');
+          c.className = 'count';
+          c.textContent = `×${count}`;
+          row.appendChild(c);
+        }
+      }
+      row.onclick = () => { State.selectedId = hat.id; State.selectedVariantIdx = 0; save(); renderAll(); };
+      group.appendChild(row);
+    }
+    root.appendChild(group);
+  }
+}
+
+// ── Editor rendering ────────────────────────────────────────────────
+function renderEditor() {
+  const root = document.getElementById('editor');
+  const hat = selected();
+  if (!hat) {
+    root.innerHTML = '<div class="empty-state">Select a hat from the sidebar to edit, or click <strong>+ New hat</strong>.</div>';
+    return;
+  }
+  root.innerHTML = '';
+
+  // Metadata
+  const metaSection = document.createElement('section');
+  metaSection.innerHTML = `<h2>Metadata</h2>`;
+  const metaGrid = document.createElement('div');
+  metaGrid.className = 'metadata-grid';
+  metaGrid.innerHTML = `
+    <label>ID <input type="text" id="meta-id" value="${escapeHtml(hat.id)}" /></label>
+    <label>Name <input type="text" id="meta-name" value="${escapeHtml(hat.name)}" /></label>
+    <label>Rarity <select id="meta-rarity">${RARITIES.map(r => `<option value="${r}"${r === hat.rarity ? ' selected' : ''}>${r}</option>`).join('')}</select></label>
+    <label>Anchor X <input type="number" id="meta-anchor" min="-${HAT_WIDTH - 1}" max="${32 - 1}" value="${hat.anchor_x}" /></label>
+  `;
+  metaSection.appendChild(metaGrid);
+  const sizeRow = document.createElement('div');
+  sizeRow.style.cssText = 'margin-top: 0.5rem; color: var(--muted); font-size: 0.75rem;';
+  sizeRow.textContent = `Grid is fixed at ${HAT_WIDTH}×${HAT_HEIGHT}. Hat bottom row sits on top of the horse's flat head (overlap rule). Anchor X places the left edge of the 10-wide box on the horse sprite (32 wide).`;
+  metaSection.appendChild(sizeRow);
+  root.appendChild(metaSection);
+
+  // Variants strip (non-legendary only; legendaries show A/Q pickers directly)
+  const isLegendary = hat.rarity === 'legendary';
+  const currentColors = hatColors(hat, State.selectedVariantIdx);
+
+  if (!isLegendary) {
+    const variantSection = document.createElement('section');
+    const displayN = State.selectedVariantIdx + 1;
+    variantSection.innerHTML = `<h2>Variants — editing <strong style="color: var(--fg)">${escapeHtml(hat.name)} #${displayN}</strong> of ${hat.variants.length}</h2>`;
+    const strip = document.createElement('div');
+    strip.className = 'variant-strip';
+    hat.variants.forEach((v, i) => {
+      const t = document.createElement('button');
+      t.className = 'variant-thumb' + (i === State.selectedVariantIdx ? ' active' : '') + (hat.variants.length === 1 ? ' solo' : '');
+      const stack = document.createElement('span');
+      stack.className = 'stack';
+      const a = document.createElement('span'); a.style.background = v.A; stack.appendChild(a);
+      if (v.Q !== undefined) { const q = document.createElement('span'); q.style.background = v.Q; stack.appendChild(q); }
+      t.appendChild(stack);
+      const lbl = document.createElement('span'); lbl.className = 'label'; lbl.textContent = `#${i + 1}`; t.appendChild(lbl);
+      const del = document.createElement('button');
+      del.className = 'delete'; del.textContent = '×'; del.title = 'Delete this variant';
+      del.onclick = (e) => { e.stopPropagation(); onDeleteVariant(i); };
+      t.appendChild(del);
+      t.onclick = () => { State.selectedVariantIdx = i; renderEditor(); renderPreview(); };
+      strip.appendChild(t);
+    });
+    const add = document.createElement('button');
+    add.className = 'add-variant';
+    add.textContent = '+';
+    add.title = 'Add a new variant (duplicates the current one as a starting point)';
+    add.onclick = onAddVariant;
+    strip.appendChild(add);
+    variantSection.appendChild(strip);
+    root.appendChild(variantSection);
+  }
+
+  // Paint tool + colour pickers for the selected variant (or legendary colors)
+  const toolSection = document.createElement('section');
+  toolSection.innerHTML = `<h2>Paint tool &amp; colours</h2>`;
+  const tools = document.createElement('div');
+  tools.className = 'tools';
+  const hasQ = currentColors.Q !== undefined;
+  tools.innerHTML = `
+    <span class="tool ${State.tool === 'A' ? 'active' : ''}" data-tool="A">
+      <span class="swatch" style="background:${currentColors.A}"></span> A
+      <input type="color" id="color-a" value="${currentColors.A}" />
+    </span>
+    <span class="tool ${State.tool === 'Q' ? 'active' : ''}" data-tool="Q">
+      <span class="swatch" style="background:${hasQ ? currentColors.Q : '#888888'}"></span> Q
+      <input type="color" id="color-q" value="${hasQ ? currentColors.Q : '#888888'}" />
+      ${hasQ ? `<button id="remove-q" title="Remove Q (this hat only uses A)" style="background:transparent;border:none;color:var(--muted);cursor:pointer;padding:0 0.25rem;font-size:0.85rem;">remove</button>` : `<button id="add-q" title="Add a Q (secondary) color" style="background:transparent;border:none;color:var(--muted);cursor:pointer;padding:0 0.25rem;font-size:0.85rem;">+ Q</button>`}
+    </span>
+    <span class="tool ${State.tool === null ? 'active' : ''}" data-tool="null">
+      <span class="swatch transparent"></span> Erase
+    </span>
+  `;
+  toolSection.appendChild(tools);
+  root.appendChild(toolSection);
+
+  // Pixel grid (11×10)
+  const gridSection = document.createElement('section');
+  gridSection.innerHTML = `<h2>Pixels — ${HAT_WIDTH}×${HAT_HEIGHT}</h2>`;
+  const grid = document.createElement('div');
+  grid.className = 'pixel-grid';
+  grid.style.gridTemplateColumns = `repeat(${HAT_WIDTH}, 28px)`;
+  const midX = (HAT_WIDTH - 1) / 2;
+  for (let y = 0; y < HAT_HEIGHT; y++) {
+    for (let x = 0; x < HAT_WIDTH; x++) {
+      const ch = hat.rows[y][x];
+      const cell = document.createElement('div');
+      cell.className = 'cell' + (ch === '.' ? ' empty' : '');
+      const shadows = [];
+      if (y >= HAT_HEIGHT - 4) shadows.push('inset 0 0 0 1px rgba(255,255,255,0.05)');
+      if (x === midX) shadows.push('inset 1px 0 0 rgba(78,168,255,0.35), inset -1px 0 0 rgba(78,168,255,0.35)');
+      if (shadows.length) cell.style.boxShadow = shadows.join(', ');
+      if (ch === 'A') cell.style.background = currentColors.A;
+      else if (ch === 'Q') cell.style.background = currentColors.Q ?? '#888888';
+      cell.dataset.x = x;
+      cell.dataset.y = y;
+      cell.onclick = onPixelClick;
+      grid.appendChild(cell);
+    }
+  }
+  gridSection.appendChild(grid);
+  const gridHint = document.createElement('div');
+  gridHint.style.cssText = 'color: var(--muted); font-size: 0.75rem; margin-top: 0.5rem;';
+  gridHint.innerHTML = `Bottom 4 rows (faintly outlined) overlap the horse head. Column <strong>${midX}</strong> is the horizontal midpoint — symmetric designs should mirror around it. Pixel shape is shared across all variants of this hat; only the colours differ.`;
+  gridSection.appendChild(gridHint);
+  root.appendChild(gridSection);
+
+  // Animation editor (legendary only)
+  if (isLegendary) {
+    const animSection = document.createElement('section');
+    animSection.innerHTML = `<h2>Animation</h2>`;
+    const anim = hat.animation ?? { type: 'cycle', frames: [currentColors.A], fps: 6 };
+    const fpsRow = document.createElement('label');
+    fpsRow.style.cssText = 'flex-direction: row; align-items: center; gap: 0.5rem;';
+    fpsRow.innerHTML = `FPS <input type="number" id="anim-fps" min="1" max="30" value="${anim.fps}" /> <span style="color: var(--muted); font-size: 0.75rem;">cycles ${anim.frames.length} frames over ${(anim.frames.length / anim.fps).toFixed(2)}s</span>`;
+    animSection.appendChild(fpsRow);
+    const frames = document.createElement('div');
+    frames.className = 'frames';
+    anim.frames.forEach((color, i) => {
+      const f = document.createElement('div');
+      f.className = 'frame';
+      f.innerHTML = `
+        <span class="idx">#${i}</span>
+        <span class="swatch" style="background:${color}"></span>
+        <input type="color" data-frame-idx="${i}" value="${color}" />
+        <code style="color: var(--muted); font-size: 0.75rem;">${color}</code>
+        <span style="flex:1"></span>
+        <button data-remove-frame="${i}" title="Remove frame">×</button>
+      `;
+      frames.appendChild(f);
+    });
+    animSection.appendChild(frames);
+    const addBtn = document.createElement('button');
+    addBtn.textContent = '+ Add frame';
+    addBtn.style.cssText = 'background: var(--bg-2); color: var(--fg); border: 1px solid var(--bg-3); padding: 0.4rem 0.75rem; border-radius: 0.25rem; cursor: pointer; font: inherit; font-size: 0.85rem;';
+    addBtn.onclick = onAddFrame;
+    animSection.appendChild(addBtn);
+    root.appendChild(animSection);
+  }
+
+  // Actions
+  const actionsSection = document.createElement('section');
+  actionsSection.innerHTML = `<h2>Actions</h2>`;
+  const actions = document.createElement('div');
+  actions.className = 'actions';
+  const exportBtn = document.createElement('button');
+  exportBtn.textContent = 'Copy as TypeScript';
+  exportBtn.onclick = () => exportSingle(hat);
+  const resetBtn = document.createElement('button');
+  resetBtn.textContent = 'Reset to original';
+  resetBtn.onclick = onResetHat;
+  resetBtn.disabled = !originalById(hat.id);
+  if (resetBtn.disabled) resetBtn.style.opacity = '0.4';
+  const dupBtn = document.createElement('button');
+  dupBtn.textContent = 'Duplicate';
+  dupBtn.onclick = onDuplicateHat;
+  const deleteBtn = document.createElement('button');
+  deleteBtn.className = 'danger';
+  deleteBtn.textContent = 'Delete';
+  deleteBtn.onclick = onDeleteHat;
+  actions.append(exportBtn, dupBtn, resetBtn, deleteBtn);
+  actionsSection.appendChild(actions);
+  root.appendChild(actionsSection);
+
+  // Wire up listeners
+  attachEditorListeners();
+}
+
+function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+
+function attachEditorListeners() {
+  document.getElementById('meta-id').addEventListener('change', e => updateHat({ id: e.target.value.trim() }, true));
+  document.getElementById('meta-name').addEventListener('change', e => updateHat({ name: e.target.value }));
+  document.getElementById('meta-rarity').addEventListener('change', e => onRarityChange(e.target.value));
+  document.getElementById('meta-anchor').addEventListener('change', e => updateHat({ anchor_x: parseInt(e.target.value, 10) }));
+  document.getElementById('color-a').addEventListener('input', e => updateColor('A', e.target.value));
+  const qInput = document.getElementById('color-q');
+  if (qInput) qInput.addEventListener('input', e => updateColor('Q', e.target.value));
+  const addQ = document.getElementById('add-q');
+  if (addQ) addQ.addEventListener('click', () => updateColor('Q', '#FFFFFF'));
+  const removeQ = document.getElementById('remove-q');
+  if (removeQ) removeQ.addEventListener('click', () => removeQColor());
+  document.querySelectorAll('[data-tool]').forEach(el => {
+    el.addEventListener('click', e => {
+      if (e.target.tagName === 'INPUT') return;
+      const t = el.dataset.tool;
+      State.tool = t === 'null' ? null : t;
+      renderEditor();
+    });
+  });
+  document.querySelectorAll('[data-frame-idx]').forEach(input => {
+    input.addEventListener('input', e => onFrameColorChange(parseInt(e.target.dataset.frameIdx, 10), e.target.value));
+  });
+  document.querySelectorAll('[data-remove-frame]').forEach(btn => {
+    btn.addEventListener('click', e => onRemoveFrame(parseInt(btn.dataset.removeFrame, 10)));
+  });
+  const fps = document.getElementById('anim-fps');
+  if (fps) fps.addEventListener('change', e => onFpsChange(parseInt(e.target.value, 10)));
+}
+
+function updateHat(patch, rerenderAll = false) {
+  const hat = selected();
+  if (!hat) return;
+  Object.assign(hat, patch);
+  save();
+  if (rerenderAll) {
+    if (patch.id) State.selectedId = patch.id;
+    renderAll();
+  } else {
+    renderEditor();
+    renderPreview();
+    renderSidebar();
+  }
+}
+
+// Update A or Q on the currently selected variant (or hat.colors for legendary).
+function updateColor(key, hex) {
+  const hat = selected();
+  if (!hat) return;
+  if (hat.rarity === 'legendary') {
+    hat.colors = { ...hat.colors, [key]: hex };
+  } else {
+    const idx = State.selectedVariantIdx;
+    const cur = hat.variants[idx] ?? hat.variants[0];
+    hat.variants[idx] = { ...cur, [key]: hex };
+  }
+  save();
+  renderEditor();
+  renderPreview();
+}
+
+function removeQColor() {
+  const hat = selected();
+  if (!hat) return;
+  if (hat.rarity === 'legendary') {
+    if (hat.colors) { const { Q, ...rest } = hat.colors; hat.colors = rest; }
+  } else {
+    const idx = State.selectedVariantIdx;
+    const cur = hat.variants[idx] ?? hat.variants[0];
+    const { Q, ...rest } = cur;
+    hat.variants[idx] = rest;
+  }
+  // Also strip any Q pixels from the shared pixel grid? No — leave them; user
+  // can paint over them. Q pixels with no color will render with the default.
+  save();
+  renderEditor();
+  renderPreview();
+}
+
+function onAddVariant() {
+  const hat = selected();
+  if (!hat || hat.rarity === 'legendary') return;
+  const base = hat.variants[State.selectedVariantIdx] ?? hat.variants[0];
+  hat.variants.push({ ...base });
+  State.selectedVariantIdx = hat.variants.length - 1;
+  save();
+  renderEditor();
+  renderPreview();
+  renderSidebar();
+}
+
+function onDeleteVariant(idx) {
+  const hat = selected();
+  if (!hat || hat.rarity === 'legendary') return;
+  if (hat.variants.length <= 1) return;
+  if (!confirm(`Delete variant #${idx + 1} of "${hat.name}"?`)) return;
+  hat.variants.splice(idx, 1);
+  State.selectedVariantIdx = Math.min(State.selectedVariantIdx, hat.variants.length - 1);
+  save();
+  renderEditor();
+  renderPreview();
+  renderSidebar();
+}
+
+function onPixelClick(e) {
+  const x = parseInt(e.currentTarget.dataset.x, 10);
+  const y = parseInt(e.currentTarget.dataset.y, 10);
+  const hat = selected();
+  const ch = State.tool === null ? '.' : State.tool;
+  const row = hat.rows[y].split('');
+  row[x] = ch;
+  hat.rows[y] = row.join('');
+  save();
+  renderEditor();
+  renderPreview();
+  renderSidebar();
+}
+
+function onRarityChange(newRarity) {
+  const hat = selected();
+  const oldRarity = hat.rarity;
+  hat.rarity = newRarity;
+  // Schema swap on legendary↔non-legendary
+  if (oldRarity !== 'legendary' && newRarity === 'legendary') {
+    // Collapse variants → colors. Keep first variant; drop the rest.
+    const v0 = hat.variants?.[0] ?? { A: '#FFFFFF' };
+    hat.colors = { A: v0.A, ...(v0.Q !== undefined ? { Q: v0.Q } : {}) };
+    delete hat.variants;
+    hat.animation = hat.animation ?? { type: 'cycle', frames: [hat.colors.A, hat.colors.A], fps: 6 };
+    State.selectedVariantIdx = 0;
+  } else if (oldRarity === 'legendary' && newRarity !== 'legendary') {
+    // Promote colors → variants[0]. Drop animation.
+    const c = hat.colors ?? { A: '#FFFFFF' };
+    hat.variants = [{ A: c.A, ...(c.Q !== undefined ? { Q: c.Q } : {}) }];
+    delete hat.colors;
+    delete hat.animation;
+    State.selectedVariantIdx = 0;
+  }
+  save();
+  renderAll();
+}
+
+function onFrameColorChange(idx, color) {
+  const hat = selected();
+  hat.animation.frames[idx] = color;
+  save();
+  renderEditor();
+  renderPreview();
+}
+
+function onRemoveFrame(idx) {
+  const hat = selected();
+  if (hat.animation.frames.length <= 1) { alert('Need at least 1 frame.'); return; }
+  hat.animation.frames.splice(idx, 1);
+  save();
+  renderAll();
+}
+
+function onAddFrame() {
+  const hat = selected();
+  const last = hat.animation.frames.at(-1) ?? hat.colors?.A ?? '#FFFFFF';
+  hat.animation.frames.push(last);
+  save();
+  renderAll();
+}
+
+function onFpsChange(fps) {
+  const hat = selected();
+  hat.animation.fps = Math.max(1, Math.min(30, fps));
+  save();
+  renderAll();
+}
+
+function onResetHat() {
+  const hat = selected();
+  const orig = originalById(hat.id);
+  if (!orig) return;
+  if (!confirm(`Reset "${hat.name}" to its original definition? Unsaved edits will be lost.`)) return;
+  const idx = State.hats.findIndex(h => h.id === hat.id);
+  State.hats[idx] = deepClone(orig);
+  save();
+  renderAll();
+}
+
+function onDuplicateHat() {
+  const hat = selected();
+  const copy = deepClone(hat);
+  let n = 2;
+  while (State.hats.some(h => h.id === `${hat.id}_${n}`)) n++;
+  copy.id = `${hat.id}_${n}`;
+  copy.name = `${hat.name} ${n}`;
+  State.hats.push(copy);
+  State.selectedId = copy.id;
+  save();
+  renderAll();
+}
+
+function onDeleteHat() {
+  const hat = selected();
+  if (!confirm(`Delete "${hat.name}"? This only affects your local edits — original hats can be re-imported by clearing storage.`)) return;
+  State.hats = State.hats.filter(h => h.id !== hat.id);
+  State.selectedId = State.hats[0]?.id ?? null;
+  save();
+  renderAll();
+}
+
+function createNewHat() {
+  let n = 1;
+  while (State.hats.some(h => h.id === `new_hat_${n}`)) n++;
+  const blank = '.'.repeat(HAT_WIDTH);
+  const rows = [];
+  for (let i = 0; i < HAT_HEIGHT - 2; i++) rows.push(blank);
+  // 11-wide: 2 cols padding each side, 7 cols of content centered on midpoint col 5
+  rows.push('...AAAAA...');
+  rows.push('..AAAAAAA..');
+  const hat = {
+    id: `new_hat_${n}`,
+    name: `New Hat ${n}`,
+    rarity: 'common',
+    width: HAT_WIDTH,
+    anchor_x: 23,
+    rows,
+    variants: [{ A: '#FF6347' }],
+  };
+  State.hats.push(hat);
+  State.selectedId = hat.id;
+  State.selectedVariantIdx = 0;
+  save();
+  renderAll();
+}
+
+// ── Preview rendering ───────────────────────────────────────────────
+function renderPreview() {
+  const stage = document.getElementById('preview-stage');
+  stage.innerHTML = '';
+  const hat = selected();
+  if (!hat) return;
+
+  const palette = PALETTES[State.palette];
+  // Overlap rule: hat's bottom 4 rows of the 11×10 box overlap horse y=0..3
+  // so the hat sits flush on the flat head. extension = rows.length - 4 = 6.
+  const ext = Math.max(0, hat.rows.length - 4);
+  const totalH = 24 + ext;
+  // Canvas widens to fit hat overhang past the 32-wide horse sprite (e.g.
+  // beaks/visors extending in front of the head at horse cols 32+).
+  const canvasLeft = Math.min(0, hat.anchor_x);
+  const canvasRight = Math.max(32, hat.anchor_x + (hat.rows[0]?.length ?? 0));
+  const canvasW = canvasRight - canvasLeft;
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('viewBox', `${canvasLeft} ${-ext} ${canvasW} ${totalH}`);
+  svg.setAttribute('shape-rendering', 'crispEdges');
+  svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+
+  for (let y = 0; y < HORSE_ROWS.length; y++) {
+    const row = HORSE_ROWS[y];
+    for (let x = 0; x < 32; x++) {
+      const ch = row[x];
+      if (ch === '.') continue;
+      const fill = palette[ch];
+      if (!fill) continue;
+      const r = document.createElementNS(SVG_NS, 'rect');
+      r.setAttribute('x', x);
+      r.setAttribute('y', y);
+      r.setAttribute('width', 1);
+      r.setAttribute('height', 1);
+      r.setAttribute('fill', fill);
+      svg.appendChild(r);
+    }
+  }
+  // Render the currently-selected variant (or legendary colors).
+  const c = hatColors(hat, State.selectedVariantIdx);
+  for (let i = 0; i < hat.rows.length; i++) {
+    const row = hat.rows[i];
+    for (let j = 0; j < row.length; j++) {
+      const ch = row[j];
+      if (ch === '.') continue;
+      const r = document.createElementNS(SVG_NS, 'rect');
+      r.setAttribute('x', hat.anchor_x + j);
+      r.setAttribute('y', i - ext);
+      r.setAttribute('width', 1);
+      r.setAttribute('height', 1);
+      r.setAttribute('class', ch === 'A' ? 'hat-a' : 'hat-q');
+      r.setAttribute('fill', ch === 'A' ? c.A : (c.Q ?? c.A));
+      svg.appendChild(r);
+    }
+  }
+  if (hat.animation && hat.rarity === 'legendary') svg.classList.add('legendary-current');
+
+  stage.appendChild(svg);
+  refreshLegendaryAnimationStyle(hat);
+}
+
+function refreshLegendaryAnimationStyle(hat) {
+  if (State.legendaryStyleEl) State.legendaryStyleEl.remove();
+  if (hat.rarity !== 'legendary' || !hat.animation) return;
+  const { frames, fps } = hat.animation;
+  if (frames.length < 1) return;
+  const N = frames.length;
+  const dur = N / fps;
+  const epsilon = 0.001;
+  let stops = '';
+  for (let i = 0; i < N; i++) {
+    const startPct = (i / N) * 100;
+    const endPct = ((i + 1) / N) * 100 - epsilon;
+    stops += `${startPct.toFixed(4)}% { fill: ${frames[i]}; } ${endPct.toFixed(4)}% { fill: ${frames[i]}; } `;
+  }
+  const style = document.createElement('style');
+  style.textContent = `
+    @keyframes anim-current { ${stops} }
+    .legendary-current .hat-a { animation: anim-current ${dur}s linear infinite; }
+  `;
+  document.head.appendChild(style);
+  State.legendaryStyleEl = style;
+}
+
+function renderPaletteButtons() {
+  const container = document.getElementById('palette-buttons');
+  container.innerHTML = '';
+  for (const [key, p] of Object.entries(PALETTES)) {
+    const btn = document.createElement('button');
+    btn.textContent = p.name;
+    btn.className = key === State.palette ? 'active' : '';
+    btn.onclick = () => { State.palette = key; renderPreview(); renderPaletteButtons(); };
+    container.appendChild(btn);
+  }
+}
+
+// ── Export / import ─────────────────────────────────────────────────
+function fmtVariant(v) {
+  return v.Q !== undefined ? `{ A: '${v.A}', Q: '${v.Q}' }` : `{ A: '${v.A}' }`;
+}
+
+function fmtHatLine(h) {
+  const rowsStr = h.rows.map(r => `'${r}'`).join(',');
+  let line = `{ id: '${h.id}', name: ${JSON.stringify(h.name)}, rarity: '${h.rarity}', width: ${h.width}, anchor_x: ${h.anchor_x}, rows: [${rowsStr}]`;
+  if (h.rarity === 'legendary') {
+    const colors = h.colors.Q !== undefined
+      ? `colors: { A: '${h.colors.A}', Q: '${h.colors.Q}' }`
+      : `colors: { A: '${h.colors.A}' }`;
+    line += `, ${colors}`;
+    if (h.animation) {
+      const fr = h.animation.frames.map(c => `'${c}'`).join(',');
+      line += `, animation: { type: '${h.animation.type ?? 'cycle'}', frames: [${fr}], fps: ${h.animation.fps} }`;
+    }
+  } else {
+    const vs = (h.variants ?? []).map(fmtVariant).join(', ');
+    line += `, variants: [${vs}]`;
+  }
+  line += ' }';
+  return line;
+}
+
+function exportAll() {
+  const sections = [];
+  for (const rarity of RARITIES) {
+    const hats = State.hats.filter(h => h.rarity === rarity);
+    if (hats.length === 0) continue;
+    const headerName = rarity.toUpperCase();
+    const dashes = '─'.repeat(Math.max(0, 64 - headerName.length - hats.length.toString().length));
+    sections.push(`  // ── ${headerName} (${hats.length}) ${dashes}`);
+    for (const h of hats) sections.push(`  ${fmtHatLine(h)},`);
+  }
+  const code = `import type { Hat } from './types.js';\n\nexport const HATS: Hat[] = [\n${sections.join('\n')}\n];\n`;
+  openModal('Export catalog', code, true);
+}
+
+function exportSingle(h) {
+  openModal(`Export "${h.name}"`, fmtHatLine(h), true);
+}
+
+function importDialog() {
+  openModal('Import — paste a JSON array of hats here', '', false, async (text) => {
+    let data;
+    try { data = JSON.parse(text); } catch { alert('Invalid JSON.'); return false; }
+    if (!Array.isArray(data)) { alert('Expected a JSON array.'); return false; }
+    if (!data.every(h => h && typeof h.id === 'string' && Array.isArray(h.rows))) { alert('Each entry needs at least an id and rows[].'); return false; }
+    if (!confirm(`Replace your current catalog with ${data.length} hats from JSON?`)) return false;
+    State.hats = data;
+    State.selectedId = data[0]?.id ?? null;
+    save();
+    renderAll();
+    return true;
+  });
+}
+
+function resetAll() {
+  if (!confirm('Reset ALL hats to the original PR catalog? This will discard every edit.')) return;
+  State.hats = deepClone(ORIGINAL_HATS);
+  State.selectedId = State.hats[0]?.id ?? null;
+  save();
+  renderAll();
+}
+
+function openModal(title, text, isExport, importCb) {
+  document.getElementById('modal-title').textContent = title;
+  const ta = document.getElementById('modal-textarea');
+  ta.value = text;
+  ta.readOnly = !!isExport;
+  const action = document.getElementById('modal-action');
+  action.textContent = isExport ? 'Copy to clipboard' : 'Import';
+  action.onclick = async () => {
+    if (isExport) {
+      try { await navigator.clipboard.writeText(ta.value); action.textContent = 'Copied!'; setTimeout(() => action.textContent = 'Copy to clipboard', 1200); }
+      catch { ta.select(); document.execCommand('copy'); }
+    } else if (importCb) {
+      const ok = await importCb(ta.value);
+      if (ok) closeModal();
+    }
+  };
+  document.getElementById('modal-bg').classList.add('open');
+}
+
+function closeModal() { document.getElementById('modal-bg').classList.remove('open'); }
+document.getElementById('modal-cancel').onclick = closeModal;
+document.getElementById('modal-bg').onclick = (e) => { if (e.target.id === 'modal-bg') closeModal(); };
+document.getElementById('btn-export-all').onclick = exportAll;
+document.getElementById('btn-import').onclick = importDialog;
+document.getElementById('btn-reset-all').onclick = resetAll;
+
+// ── Bootstrap ───────────────────────────────────────────────────────
+function renderAll() {
+  renderSidebar();
+  renderEditor();
+  renderPreview();
+  renderPaletteButtons();
+}
+
+load();
+renderAll();
+</script>
+</body>
+</html>
