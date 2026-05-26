@@ -116,6 +116,8 @@ export class TokenDerbyStack extends cdk.Stack {
     const createStableHorseFn = makeFn('CreateStableHorseFn', 'create-stable-horse');
     const updateStableHorseFn = makeFn('UpdateStableHorseFn', 'update-stable-horse');
     const deleteStableHorseFn = makeFn('DeleteStableHorseFn', 'delete-stable-horse');
+    const rollHatFn = makeFn('RollHatFn', 'roll-hat');
+    const equipHatFn = makeFn('EquipHatFn', 'equip-hat');
 
     // ── HTTP API Gateway ───────────────────────────────────────────────
     const httpApi = new HttpApi(this, 'TokenDerbyApi', {
@@ -159,6 +161,8 @@ export class TokenDerbyStack extends cdk.Stack {
     httpApi.addRoutes({ path: '/api/jockey/me/horses', methods: [HttpMethod.POST], integration: new HttpLambdaIntegration('CreateStableHorseInt', createStableHorseFn) });
     httpApi.addRoutes({ path: '/api/jockey/me/horses/{stable_horse_id}', methods: [HttpMethod.PUT], integration: new HttpLambdaIntegration('UpdateStableHorseInt', updateStableHorseFn) });
     httpApi.addRoutes({ path: '/api/jockey/me/horses/{stable_horse_id}', methods: [HttpMethod.DELETE], integration: new HttpLambdaIntegration('DeleteStableHorseInt', deleteStableHorseFn) });
+    httpApi.addRoutes({ path: '/api/jockey/me/horses/{stable_horse_id}/roll',  methods: [HttpMethod.POST], integration: new HttpLambdaIntegration('RollHatInt',  rollHatFn) });
+    httpApi.addRoutes({ path: '/api/jockey/me/horses/{stable_horse_id}/equip', methods: [HttpMethod.POST], integration: new HttpLambdaIntegration('EquipHatInt', equipHatFn) });
 
     // API throttling (rate-limit guardrails, not hard security)
     const defaultStage = httpApi.defaultStage!.node.defaultChild as apigatewayv2.CfnStage;
