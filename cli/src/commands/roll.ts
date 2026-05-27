@@ -14,6 +14,7 @@ function pendingFor(horse: StableHorse): number {
 }
 
 async function promptYesNo(question: string): Promise<boolean> {
+  resetStdinAfterInk();
   const readline = await import('node:readline/promises');
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   const a = (await rl.question(question)).trim().toLowerCase();
@@ -21,10 +22,28 @@ async function promptYesNo(question: string): Promise<boolean> {
   return a === '' || a === 'y' || a === 'yes';
 }
 
+/**
+ * The Ink-based RollHorsePicker uses useInput (raw mode + a 'keypress'
+ * listener on stdin). After it unmounts, stdin can still hold a buffered
+ * Enter or be left in a state where readline's first `question` returns
+ * immediately. Reset stdin to a known clean state before any readline.
+ */
+function resetStdinAfterInk(): void {
+  if (process.stdin.isTTY && typeof process.stdin.setRawMode === 'function') {
+    process.stdin.setRawMode(false);
+  }
+  // Drain any buffered bytes the picker's useInput didn't consume.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  while (process.stdin.read() !== null) { /* discard */ }
+  process.stdin.pause();
+}
+
 /** Show the closed box, wait for Enter, then play the open/reveal animation. */
 async function runReveal(outcome: RollOutcome): Promise<void> {
-  // Stage 1: print closed box to stdout (no Ink) so readline can prompt
-  // for Enter without fighting Ink for stdin.
+  // Stage 1: print closed box to stdout (no Ink) and prompt for Enter via
+  // readline. Reset stdin first because a prior Ink mount (e.g., the
+  // picker) can leave stdin in a state where readline gets a phantom CR.
+  resetStdinAfterInk();
   printClosedBox();
   const readline = await import('node:readline/promises');
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
