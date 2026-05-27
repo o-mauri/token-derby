@@ -1,19 +1,3 @@
-// Canonical hat catalog.
-//
-// At implementation time, this file moves to `shared/src/hats.ts` and the
-// `Hat`/`HatVariant`/`HatAnimation` types are added to `shared/src/types.ts`.
-// Until then it lives here as the source-of-truth draft.
-//
-// To edit: open `tools/hat-editor/index.html`, make changes, click
-// "Export catalog (TS)", paste the result back into this file.
-//
-// Variant model (non-legendary): each hat ships with one or more colour
-// variants. A rolled hat is `(hat_id, variant_index)`. Variants are named
-// at display time as "<Hat Name> #<n>" where n starts at 1.
-//
-// Legendaries: no variants — exactly one per legendary, with its built-in
-// animation. Displayed by name only.
-
 import type { Hat } from './types.js';
 
 export const HATS: Hat[] = [
@@ -48,14 +32,14 @@ export const HATS: Hat[] = [
   { id: 'headdress', name: "Headdress", rarity: 'rare', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','...........','...........','..AQAQAQA..','..AQAQAQA..','..AAAAAAA..','...QQQQQ...'], variants: [{ A: '#FF8F00', Q: '#1565C0' }] },
   { id: 'sombrero', name: "Sombrero", rarity: 'rare', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','...........','.....A.....','....AAA....','...AAAAA...','...AQAQA...','AAAAAAAAAAA'], variants: [{ A: '#F57F17', Q: '#BF360C' }, { A: '#f8b377', Q: '#3e1204' }, { A: '#d6f877', Q: '#04133e' }, { A: '#d6f877', Q: '#04133e' }] },
   // ── EPIC (6) ───────────────────────────────────────────────────────────
-  { id: 'papal_tiara', name: "Papal Tiara", rarity: 'epic', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','....QQ.....','...QQQQQ...','...QAAQQ...','...QQQQQ...','..AAAAAAA..','..AQQQQQA..'], variants: [{ A: '#FFFFFF', Q: '#FFD700' }] },
-  { id: 'samurai_kabuto', name: "Samurai Kabuto", rarity: 'epic', width: 11, anchor_x: 23, rows: ['....Q...Q..','....QQ.QQ..','.....QQQ...','.......Q...','...AAAAQ...','..AAAAAQQ..','..AAAAAQQ..','.AAAAAAAQ..','AAAAAAAAQ..','AAAAAAAAQ..'], variants: [{ A: '#B0BEC5', Q: '#C62828' }] },
-  { id: 'gladiator_galea', name: "Gladiator Galea", rarity: 'epic', width: 11, anchor_x: 23, rows: ['...........','...........','...........','....QQQQQQ.','...QQQQQ...','...QQQQQ...','...QAAA....','..AAAAAAA..','..AAAAAAA..','..AQQQQQA..'], variants: [{ A: '#B0BEC5', Q: '#C62828' }] },
-  { id: 'pharaoh_nemes', name: "Pharaoh Nemes", rarity: 'epic', width: 11, anchor_x: 23, rows: ['...........','...........','...........','..AAAAAAA..','..AAQAQAA..','..QAQAQAQ..','..QAQAQAQ..','..QQAAAQQ..','..QQAAAAA..','...QAQA....'], variants: [{ A: '#FFD700', Q: '#1565C0' }] },
-  { id: 'spartan_helmet', name: "Spartan Helmet", rarity: 'epic', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','....QQQ....','...QQQQQ...','.QQQAAQQ...','.QAAAAAAA..','QQAAAAAAA..','QQAQQQQQA..'], variants: [{ A: '#B0BEC5', Q: '#B71C1C' }] },
-  { id: 'conquistador_full', name: "Conquistador Helm", rarity: 'epic', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','.....A.....','....AAA....','...AAAAA...','..AAAAAAA..','...AQQQA...','...AQQQA...'], variants: [{ A: '#B0BEC5', Q: '#FFD700' }] },
+  { id: 'papal_tiara', name: "Papal Tiara", rarity: 'epic', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','....QQ.....','...QQQQQ...','...QAAQQ...','...QQQQQ...','..AAAAAAA..','..AQQQQQA..'], variants: [{ A: '#FFFFFF', Q: '#FFD700' }, { A: '#b18e10', Q: '#f3f3f1' }] },
+  { id: 'samurai_kabuto', name: "Samurai Kabuto", rarity: 'epic', width: 11, anchor_x: 23, rows: ['....Q...Q..','....QQ.QQ..','.....QQQ...','.......Q...','...AAAAQ...','..AAAAAQQ..','..AAAAAQQ..','.AAAAAAAQ..','AAAAAAAAQ..','AAAAAAAAQ..'], variants: [{ A: '#B0BEC5', Q: '#C62828' }, { A: '#050505', Q: '#C62828' }, { A: '#675f5f', Q: '#c4c729' }] },
+  { id: 'gladiator_galea', name: "Gladiator Galea", rarity: 'epic', width: 11, anchor_x: 23, rows: ['...........','...........','...........','....QQQQQQ.','...QQQQQ...','...QQQQQ...','...QAAA....','..AAAAAAA..','..AAAAAAA..','..AQQQQQA..'], variants: [{ A: '#B0BEC5', Q: '#C62828' }, { A: '#ffe907', Q: '#C62828' }] },
+  { id: 'pharaoh_nemes', name: "Pharaoh Nemes", rarity: 'epic', width: 11, anchor_x: 23, rows: ['...........','...........','...........','..AAAAAAA..','..AAQAQAA..','..QAQAQAQ..','..QAQAQAQ..','..QQAAAQQ..','..QQAAAAA..','...QAQA....'], variants: [{ A: '#FFD700', Q: '#1565C0' }, { A: '#8d342a', Q: '#63686e' }] },
+  { id: 'spartan_helmet', name: "Spartan Helmet", rarity: 'epic', width: 11, anchor_x: 23, rows: ['...........','........Q..','.......QQ..','.....QQQQ..','....QQQQQ..','..QQQQQQ...','.QQQAA.....','QQAAAAAAA..','Q.AAAAAAA..','..AQQQQQA..'], variants: [{ A: '#B0BEC5', Q: '#B71C1C' }, { A: '#B0BEC5', Q: '#b2b51c' }, { A: '#B0BEC5', Q: '#b5611c' }] },
+  { id: 'conquistador_full', name: "Conquistador Helm", rarity: 'epic', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...........','.....A.....','....AAA....','...AAAAA...','..AAAAAAA..','...AQQQA...','...AQQQA...'], variants: [{ A: '#B0BEC5', Q: '#FFD700' }, { A: '#B0BEC5', Q: '#0040ff' }, { A: '#B0BEC5', Q: '#36123b' }] },
   // ── LEGENDARY (5) ──────────────────────────────────────────────────────
-  { id: 'rainbow_crown', name: "Rainbow Crown", rarity: 'legendary', width: 11, anchor_x: 23, rows: ['...........','...........','.....A.....','....AQA....','....AQA....','....AQA....','...AAQAA...','...AQQQA...','..AAQQQAA..','..AAAAAAA..'], colors: { A: '#FFD700', Q: '#553f3f' }, animation: { type: 'cycle', frames: ['#FF0000','#FF7F00','#FFFF00','#00FF00','#0000FF','#8B00FF'], fps: 8 } },
+  { id: 'rainbow_crown', name: "Rainbow Crown", rarity: 'legendary', width: 11, anchor_x: 23, rows: ['...........','...........','.....A.....','....AAA....','....AQA....','....AAA....','...AAQAA...','...AAAAA...','..AAAQAAA..','..AAAAAAA..'], colors: { A: '#FFD700', Q: '#553f3f' }, animation: { type: 'cycle', frames: ['#FF0000','#FF7F00','#FFFF00','#00FF00','#0000FF','#8B00FF'], fps: 8 } },
   { id: 'inferno_cap', name: "Inferno Cap", rarity: 'legendary', width: 11, anchor_x: 23, rows: ['...........','....AAA....','...AAAAA...','....AAA....','.....Q.....','A....Q....A','A...QQQ...A','.A..QQQ..A.','..AAAAAAA..','..AAAAAAA..'], colors: { A: '#FF4500', Q: '#FFD700' }, animation: { type: 'cycle', frames: ['#FF0000','#FF2200','#FF4500','#FF6600','#FF8C00','#FFA500'], fps: 12 } },
   { id: 'void_hood', name: "Void Hood", rarity: 'legendary', width: 11, anchor_x: 23, rows: ['...........','...........','...........','...AAA.....','..AAAAAA...','.AAAAAAA...','.AAAAAAAA..','AAAAAAAAA..','AAAAQQQAA..','AAAAQQQAA..'], colors: { A: '#1A0033', Q: '#d9cfe3' }, animation: { type: 'cycle', frames: ['#0D0019','#1A0033','#2D004D','#3D0066','#2D004D','#1A0033'], fps: 3 } },
   { id: 'prismatic_jester', name: "Prismatic Jester", rarity: 'legendary', width: 11, anchor_x: 23, rows: ['...........','..Q.Q.Q.Q..','Q..A.A.A..Q','.Q.A.A.A.Q.','..AQAQAQA..','..AQAQAQA..','..AAAAAAA..','..AAAAAAA..','..AAAAAAA..','..AAAAAAA..'], colors: { A: '#FF0000', Q: '#0000FF' }, animation: { type: 'cycle', frames: ['#FF0000','#FF7F00','#FFFF00','#00FF00','#0000FF','#8B00FF','#FF00FF','#00FFFF'], fps: 15 } },
