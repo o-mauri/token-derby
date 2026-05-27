@@ -40,7 +40,17 @@ export async function updateCommand(deps: Deps = {}): Promise<number> {
     return 0;
   }
 
-  return runNpmUpgrade(spawnImpl);
+  const code = await runNpmUpgrade(spawnImpl);
+  if (code === 0) {
+    console.log(`\nUpgraded to ${latest}.`);
+    console.log(`If \`token-derby --version\` still shows ${CLI_VERSION}, your shell has`);
+    console.log(`the old path cached. Open a new terminal, or run:`);
+    console.log(`  zsh:  rehash`);
+    console.log(`  bash: hash -r`);
+    console.log(`If --version still doesn't match, you may have multiple installs.`);
+    console.log(`Run \`which -a token-derby\` to compare against \`npm bin -g\`.`);
+  }
+  return code;
 }
 
 async function fetchLatestVersion(fetchImpl: typeof fetch): Promise<string> {
