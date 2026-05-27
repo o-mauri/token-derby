@@ -1,8 +1,8 @@
 import React from 'react';
 import { render } from 'ink';
-import { hatById, HATS } from '@token-derby/shared';
+import { HATS } from '@token-derby/shared';
 import type { Hat } from '@token-derby/shared';
-import { RollReveal } from '../ui/RollReveal.js';
+import { RollReveal, ClosedBoxPrompt, type RollOutcome } from '../ui/RollReveal.js';
 
 type Demo =
   | { kind: 'no_hat' }
@@ -27,33 +27,49 @@ async function pause(): Promise<void> {
   rl.close();
 }
 
-async function showNoHat(): Promise<void> {
-  console.log(`\n\x1b[1m── No hat ──────────────────────────────────────────\x1b[0m`);
-  console.log('\nNo hat this time. +12 XP toward your next level.\n');
-}
-
-async function showDuplicate(hat: Hat, variant: number | undefined, xp: number): Promise<void> {
-  console.log(`\n\x1b[1m── Duplicate ───────────────────────────────────────\x1b[0m`);
-  console.log(`\nYou already have ${hat.name}${variantLabel(hat, variant)}. +${xp} XP.\n`);
-}
-
-async function showHat(hat: Hat, variant: number | undefined): Promise<void> {
-  const rarityTag = `[${hat.rarity.toUpperCase()}]`;
-  console.log(`\n\x1b[1m── Fresh hat (${hat.rarity}) ─────────────────────────────\x1b[0m\n`);
-
+/** Two-stage reveal: closed box (Enter to open) → animation. */
+async function runReveal(outcome: RollOutcome): Promise<void> {
+  await new Promise<void>(resolve => {
+    const app = render(React.createElement(ClosedBoxPrompt, {
+      onOpen: () => { app.unmount(); resolve(); },
+    }));
+  });
   await new Promise<void>(resolve => {
     const app = render(React.createElement(RollReveal, {
-      hat,
-      variant,
+      outcome,
       onDone: () => { app.unmount(); resolve(); },
     }));
   });
-  console.log(`\n✨ ${hat.name}${variantLabel(hat, variant)} ${rarityTag}\n`);
+}
+
+async function play(d: Demo): Promise<void> {
+  switch (d.kind) {
+    case 'no_hat': {
+      console.log('\n\x1b[1m── No hat ──────────────────────────────────────────\x1b[0m');
+      await runReveal({ kind: 'no_hat' });
+      console.log('\nNo hat this time. +12 XP toward your next level.\n');
+      break;
+    }
+    case 'duplicate': {
+      console.log('\n\x1b[1m── Duplicate ───────────────────────────────────────\x1b[0m');
+      await runReveal({ kind: 'duplicate', hat: d.hat, variant: d.variant });
+      const xpByRarity = { common: 6, rare: 12, epic: 21, legendary: 30 } as const;
+      const xp = xpByRarity[d.hat.rarity];
+      console.log(`\nYou already have ${d.hat.name}${variantLabel(d.hat, d.variant)}. +${xp} XP.\n`);
+      break;
+    }
+    case 'hat': {
+      console.log(`\n\x1b[1m── Fresh hat (${d.hat.rarity}) ─────────────────────────────\x1b[0m`);
+      await runReveal({ kind: 'hat', hat: d.hat, variant: d.variant });
+      console.log(`\n✨ ${d.hat.name}${variantLabel(d.hat, d.variant)} [${d.hat.rarity.toUpperCase()}]\n`);
+      break;
+    }
+  }
 }
 
 /**
  * Walks through every roll outcome type once, in order, so you can eyeball
- * the reveals (banner copy, sprite preview, legendary animation timing).
+ * the reveals (box open, confetti, hat sprite, legendary animations).
  * Hits no API — uses hardcoded picks from the catalog.
  */
 export async function rollDemoCommand(): Promise<number> {
@@ -76,20 +92,10 @@ export async function rollDemoCommand(): Promise<number> {
   }
 
   console.log('\nroll-demo: walking through each reveal type. No API calls.');
-  console.log('Pauses between each — press Enter to advance.\n');
+  console.log('Press Enter to open each box; then press Enter again to advance to the next.\n');
 
   for (let i = 0; i < demos.length; i++) {
-    const d = demos[i]!;
-    if (d.kind === 'no_hat') {
-      await showNoHat();
-    } else if (d.kind === 'duplicate') {
-      // Use rarity-appropriate consolation XP for demo flavor.
-      const xpByRarity = { common: 6, rare: 12, epic: 21, legendary: 30 } as const;
-      const xp = xpByRarity[d.hat.rarity];
-      await showDuplicate(d.hat, d.variant, xp);
-    } else {
-      await showHat(d.hat, d.variant);
-    }
+    await play(demos[i]!);
     if (i < demos.length - 1) await pause();
   }
 

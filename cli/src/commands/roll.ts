@@ -4,7 +4,7 @@ import { levelFromXp, hatById } from '@token-derby/shared';
 import type { StableHorse } from '@token-derby/shared';
 import { ApiError } from '../api/client.js';
 import { listStable, rollHat, equipHat } from '../api/endpoints.js';
-import { RollReveal } from '../ui/RollReveal.js';
+import { RollReveal, ClosedBoxPrompt, type RollOutcome } from '../ui/RollReveal.js';
 import { RollHorsePicker } from '../ui/RollHorsePicker.js';
 
 function pendingFor(horse: StableHorse): number {
@@ -19,6 +19,23 @@ async function promptYesNo(question: string): Promise<boolean> {
   const a = (await rl.question(question)).trim().toLowerCase();
   rl.close();
   return a === '' || a === 'y' || a === 'yes';
+}
+
+/** Show the closed box, wait for Enter, then play the open/reveal animation. */
+async function runReveal(outcome: RollOutcome): Promise<void> {
+  // Stage 1: closed box, await Enter via Ink's useInput.
+  await new Promise<void>(resolve => {
+    const app = render(React.createElement(ClosedBoxPrompt, {
+      onOpen: () => { app.unmount(); resolve(); },
+    }));
+  });
+  // Stage 2: open → burst → reveal (or open → empty → done for no_hat).
+  await new Promise<void>(resolve => {
+    const app = render(React.createElement(RollReveal, {
+      outcome,
+      onDone: () => { app.unmount(); resolve(); },
+    }));
+  });
 }
 
 export async function rollCommand(): Promise<number> {
@@ -64,26 +81,36 @@ export async function rollCommand(): Promise<number> {
       throw e;
     }
 
-    if (result.result === 'hat') {
-      const hat = hatById(result.collected.id);
-      if (!hat) {
-        console.error('Server returned an unknown hat id — catalog mismatch.');
-        return 1;
+    // Build a tier-agnostic outcome shape for RollReveal. The closed box is
+    // the same colour for every outcome — rarity only reveals during the
+    // confetti burst (and is absent entirely for no_hat).
+    const outcome: RollOutcome | null = (() => {
+      if (result.result === 'hat') {
+        const hat = hatById(result.collected.id);
+        if (!hat) return null;
+        return { kind: 'hat', hat, variant: result.collected.variant };
       }
+      if (result.result === 'duplicate') {
+        const hat = hatById(result.hat_id);
+        if (!hat) return null;
+        return { kind: 'duplicate', hat, variant: result.variant };
+      }
+      return { kind: 'no_hat' };
+    })();
+    if (!outcome) {
+      console.error('Server returned an unknown hat id — catalog mismatch.');
+      return 1;
+    }
+
+    // Closed box + Enter prompt, then the open/burst/reveal animation.
+    await runReveal(outcome);
+
+    if (result.result === 'hat') {
+      const hat = hatById(result.collected.id)!;
       const variantSuffix = hat.rarity !== 'legendary' && result.collected.variant !== undefined
         ? ` #${result.collected.variant + 1}`
         : '';
-      // Multi-phase reveal: box opens → tier-coloured confetti → hat appears.
-      // RollReveal calls its onDone callback when the full sequence finishes.
-      await new Promise<void>(resolve => {
-        const app = render(React.createElement(RollReveal, {
-          hat,
-          variant: result.collected.variant,
-          onDone: () => { app.unmount(); resolve(); },
-        }));
-      });
       console.log(`\n✨ ${hat.name}${variantSuffix} [${hat.rarity.toUpperCase()}]\n`);
-
       if (await promptYesNo('Equip now? [Y/n] ')) {
         try {
           await equipHat(chosen.stable_horse_id, { hat_index: result.hat_index });

@@ -1,10 +1,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Box, Text } from 'ink';
+import { Box, Text, useInput } from 'ink';
 import type { Hat } from '@token-derby/shared';
 import { HatSprite, AnimatedHatSprite } from './HatSprite.js';
 import { ansiFg } from './half-blocks.js';
 
 const RESET = '\x1b[0m';
+
+// The box itself is always the same warm-gold colour — it gives away no
+// rarity. The rarity is revealed by the confetti burst once the box opens.
+const BOX_COLOR = '#E5C76B';
 
 // Palettes per rarity tier. Confetti picks uniformly from these.
 const TIER_PALETTE: Record<Hat['rarity'], string[]> = {
@@ -19,13 +23,13 @@ const CONFETTI_CHARS = ['✦', '✧', '⋆', '★', '☆', '✨', '*', '•', '�
 const SCENE_W = 32;
 const SCENE_H = 10;
 
-// ─── Box frames (each 25 chars wide, 10 rows tall to match scene) ──
+// ─── Box frames ──────────────────────────────────────────────────────
 
-const PAD = (line: string): string => {
+function pad(line: string): string {
   const visible = stripAnsi(line).length;
   const lead = Math.max(0, Math.floor((SCENE_W - visible) / 2));
   return ' '.repeat(lead) + line + ' '.repeat(Math.max(0, SCENE_W - lead - visible));
-};
+}
 
 function stripAnsi(s: string): string {
   return s.replace(/\x1b\[[0-9;]*m/g, '');
@@ -42,7 +46,7 @@ const BOX_CLOSED: string[] = [
   '╚═════════════╝',
   '',
   '',
-].map(PAD);
+].map(pad);
 
 const BOX_OPENING_1: string[] = [
   '',
@@ -55,7 +59,7 @@ const BOX_OPENING_1: string[] = [
   '╚═════════════╝',
   '',
   '',
-].map(PAD);
+].map(pad);
 
 const BOX_OPENING_2: string[] = [
   '  ╔═════════════╗',
@@ -68,7 +72,20 @@ const BOX_OPENING_2: string[] = [
   '║             ║',
   '╚═════════════╝',
   '',
-].map(PAD);
+].map(pad);
+
+const BOX_EMPTY: string[] = [
+  '',
+  '',
+  '',
+  '',
+  '',
+  '',
+  '╔═════════════╗',
+  '║             ║',
+  '╚═════════════╝',
+  '',
+].map(pad);
 
 // ─── Gift box component ──────────────────────────────────────────────
 
@@ -78,6 +95,23 @@ function GiftBox({ frame, color }: { frame: string[]; color: string }) {
       {frame.map((line, i) => (
         <Text key={i}>{line ? ansiFg(color) + line + RESET : line}</Text>
       ))}
+    </Box>
+  );
+}
+
+// ─── Closed-box-with-prompt ──────────────────────────────────────────
+
+/**
+ * Renders the closed gift box and a prompt; calls onOpen when the user
+ * presses Enter. The box colour is identical across all rarities — no
+ * tier hint until the burst.
+ */
+export function ClosedBoxPrompt({ onOpen, promptText }: { onOpen: () => void; promptText?: string }) {
+  useInput((_input, key) => { if (key.return) onOpen(); });
+  return (
+    <Box flexDirection="column">
+      <GiftBox frame={BOX_CLOSED} color={BOX_COLOR} />
+      <Text dimColor>{promptText ?? 'Press Enter to open the box…'}</Text>
     </Box>
   );
 }
@@ -100,8 +134,6 @@ function spawnParticles(tier: Hat['rarity'], count: number, cx: number, cy: numb
     out.push({
       x: cx,
       y: cy,
-      // Terminal cells are taller than wide → less vertical movement so the
-      // visual disc looks roughly circular rather than squashed.
       vx: Math.cos(angle) * speed,
       vy: Math.sin(angle) * speed * 0.5,
       char: CONFETTI_CHARS[Math.floor(Math.random() * CONFETTI_CHARS.length)]!,
@@ -140,37 +172,53 @@ function ConfettiBurst({ tier }: { tier: Hat['rarity'] }) {
   );
 }
 
-// ─── Main RollReveal ─────────────────────────────────────────────────
+// ─── Outcome-aware reveal ────────────────────────────────────────────
 
-type Props = {
-  hat: Hat;
-  variant?: number;
+export type RollOutcome =
+  | { kind: 'hat'; hat: Hat; variant?: number }
+  | { kind: 'duplicate'; hat: Hat; variant?: number }
+  | { kind: 'no_hat' };
+
+type RevealProps = {
+  outcome: RollOutcome;
   onDone: () => void;
 };
 
-export function RollReveal({ hat, variant, onDone }: Props) {
-  const [phase, setPhase] = useState<'closed' | 'open1' | 'open2' | 'burst' | 'reveal'>('closed');
+/**
+ * Plays the reveal animation starting from "lid lifting" (the closed box
+ * + Enter prompt is a separate component). Sequence depends on outcome:
+ *   - hat / duplicate: open → tier-coloured burst → hat shown alone
+ *   - no_hat:          open → empty box pause → done (no confetti)
+ */
+export function RollReveal({ outcome, onDone }: RevealProps) {
+  const isNoHat = outcome.kind === 'no_hat';
+  const isLegendary = outcome.kind !== 'no_hat' && outcome.hat.rarity === 'legendary';
+
+  const [phase, setPhase] = useState<'open1' | 'open2' | 'burst' | 'empty' | 'reveal'>('open1');
 
   useEffect(() => {
-    const t1 = setTimeout(() => setPhase('open1'),  450);
-    const t2 = setTimeout(() => setPhase('open2'),  800);
-    const t3 = setTimeout(() => setPhase('burst'), 1100);
-    const t4 = setTimeout(() => setPhase('reveal'),2050);
-    const isLegendary = hat.rarity === 'legendary';
-    // Total reveal: box (1.1s) + burst (0.95s) + hat (3s legendary / 1s non-legendary)
-    const t5 = setTimeout(onDone, isLegendary ? 5050 : 3050);
-    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4); clearTimeout(t5); };
-  }, []);
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    timers.push(setTimeout(() => setPhase('open2'), 350));
+    if (isNoHat) {
+      timers.push(setTimeout(() => setPhase('empty'), 700));
+      timers.push(setTimeout(onDone, 1500));
+    } else {
+      timers.push(setTimeout(() => setPhase('burst'), 700));
+      timers.push(setTimeout(() => setPhase('reveal'), 1650));
+      timers.push(setTimeout(onDone, isLegendary ? 4650 : 2650));
+    }
+    return () => timers.forEach(clearTimeout);
+  }, [isNoHat, isLegendary, onDone]);
 
-  const primaryColor = TIER_PALETTE[hat.rarity][0]!;
-
-  if (phase === 'closed') return <GiftBox frame={BOX_CLOSED}     color={primaryColor} />;
-  if (phase === 'open1')  return <GiftBox frame={BOX_OPENING_1}  color={primaryColor} />;
-  if (phase === 'open2')  return <GiftBox frame={BOX_OPENING_2}  color={primaryColor} />;
-  if (phase === 'burst')  return <ConfettiBurst tier={hat.rarity} />;
-
-  // reveal: show the hat itself, centered in the same scene canvas.
-  return hat.rarity === 'legendary'
-    ? <AnimatedHatSprite hat={hat} centerIn={{ w: SCENE_W, h: SCENE_H }} />
-    : <HatSprite hat={hat} variant={variant} centerIn={{ w: SCENE_W, h: SCENE_H }} />;
+  if (phase === 'open1') return <GiftBox frame={BOX_OPENING_1} color={BOX_COLOR} />;
+  if (phase === 'open2') return <GiftBox frame={BOX_OPENING_2} color={BOX_COLOR} />;
+  if (phase === 'empty') return <GiftBox frame={BOX_EMPTY}     color={BOX_COLOR} />;
+  if (phase === 'burst' && outcome.kind !== 'no_hat') {
+    return <ConfettiBurst tier={outcome.hat.rarity} />;
+  }
+  // phase === 'reveal' — only reachable for hat/duplicate outcomes
+  if (outcome.kind === 'no_hat') return <GiftBox frame={BOX_EMPTY} color={BOX_COLOR} />;
+  return outcome.hat.rarity === 'legendary'
+    ? <AnimatedHatSprite hat={outcome.hat} centerIn={{ w: SCENE_W, h: SCENE_H }} />
+    : <HatSprite hat={outcome.hat} variant={outcome.variant} centerIn={{ w: SCENE_W, h: SCENE_H }} />;
 }
