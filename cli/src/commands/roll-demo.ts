@@ -2,7 +2,7 @@ import React from 'react';
 import { render } from 'ink';
 import { HATS } from '@token-derby/shared';
 import type { Hat } from '@token-derby/shared';
-import { RollReveal, ClosedBoxPrompt, type RollOutcome } from '../ui/RollReveal.js';
+import { RollReveal, printClosedBox, type RollOutcome } from '../ui/RollReveal.js';
 
 type Demo =
   | { kind: 'no_hat' }
@@ -29,11 +29,12 @@ async function pause(): Promise<void> {
 
 /** Two-stage reveal: closed box (Enter to open) → animation. */
 async function runReveal(outcome: RollOutcome): Promise<void> {
-  await new Promise<void>(resolve => {
-    const app = render(React.createElement(ClosedBoxPrompt, {
-      onOpen: () => { app.unmount(); resolve(); },
-    }));
-  });
+  printClosedBox();
+  const readline = await import('node:readline/promises');
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  await rl.question('Press Enter to open the box… ');
+  rl.close();
+
   await new Promise<void>(resolve => {
     const app = render(React.createElement(RollReveal, {
       outcome,

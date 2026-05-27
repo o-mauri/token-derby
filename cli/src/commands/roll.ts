@@ -4,7 +4,7 @@ import { levelFromXp, hatById } from '@token-derby/shared';
 import type { StableHorse } from '@token-derby/shared';
 import { ApiError } from '../api/client.js';
 import { listStable, rollHat, equipHat } from '../api/endpoints.js';
-import { RollReveal, ClosedBoxPrompt, type RollOutcome } from '../ui/RollReveal.js';
+import { RollReveal, printClosedBox, type RollOutcome } from '../ui/RollReveal.js';
 import { RollHorsePicker } from '../ui/RollHorsePicker.js';
 
 function pendingFor(horse: StableHorse): number {
@@ -23,12 +23,14 @@ async function promptYesNo(question: string): Promise<boolean> {
 
 /** Show the closed box, wait for Enter, then play the open/reveal animation. */
 async function runReveal(outcome: RollOutcome): Promise<void> {
-  // Stage 1: closed box, await Enter via Ink's useInput.
-  await new Promise<void>(resolve => {
-    const app = render(React.createElement(ClosedBoxPrompt, {
-      onOpen: () => { app.unmount(); resolve(); },
-    }));
-  });
+  // Stage 1: print closed box to stdout (no Ink) so readline can prompt
+  // for Enter without fighting Ink for stdin.
+  printClosedBox();
+  const readline = await import('node:readline/promises');
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  await rl.question('Press Enter to open the box… ');
+  rl.close();
+
   // Stage 2: open → burst → reveal (or open → empty → done for no_hat).
   await new Promise<void>(resolve => {
     const app = render(React.createElement(RollReveal, {

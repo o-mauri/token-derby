@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Box, Text, useInput } from 'ink';
+import { Box, Text } from 'ink';
 import type { Hat } from '@token-derby/shared';
 import { HatSprite, AnimatedHatSprite } from './HatSprite.js';
 import { ansiFg } from './half-blocks.js';
@@ -99,21 +99,21 @@ function GiftBox({ frame, color }: { frame: string[]; color: string }) {
   );
 }
 
-// ─── Closed-box-with-prompt ──────────────────────────────────────────
+// ─── Closed-box-to-stdout ────────────────────────────────────────────
 
 /**
- * Renders the closed gift box and a prompt; calls onOpen when the user
- * presses Enter. The box colour is identical across all rarities — no
- * tier hint until the burst.
+ * Print the closed box directly to stdout — bypasses Ink so we can use
+ * readline for the Enter-to-open prompt without fighting Ink for stdin.
+ * Box colour is identical across all rarities; rarity reveals later via
+ * the confetti burst.
  */
-export function ClosedBoxPrompt({ onOpen, promptText }: { onOpen: () => void; promptText?: string }) {
-  useInput((_input, key) => { if (key.return) onOpen(); });
-  return (
-    <Box flexDirection="column">
-      <GiftBox frame={BOX_CLOSED} color={BOX_COLOR} />
-      <Text dimColor>{promptText ?? 'Press Enter to open the box…'}</Text>
-    </Box>
-  );
+export function printClosedBox(): void {
+  for (const line of BOX_CLOSED) {
+    const colored = line.trim().length > 0
+      ? `${ansiFg(BOX_COLOR)}${line}${RESET}`
+      : line;
+    process.stdout.write(colored + '\n');
+  }
 }
 
 // ─── Confetti burst ──────────────────────────────────────────────────
