@@ -77,18 +77,17 @@ export async function rollCommand(): Promise<number> {
     return 0;
   }
 
-  let chosen: StableHorse = eligible[0]!;
-  if (eligible.length > 1) {
-    const picked = await new Promise<StableHorse | null>(resolve => {
-      const app = render(React.createElement(RollHorsePicker, {
-        horses: eligible,
-        onPick: (h) => { app.unmount(); resolve(h); },
-        onCancel: () => { app.unmount(); resolve(null); },
-      }));
-    });
-    if (!picked) { console.log('Cancelled.'); return 0; }
-    chosen = picked;
-  }
+  // Always show the picker, even with one eligible horse — it doubles as
+  // a confirmation step so the user can back out before spending a roll.
+  const picked = await new Promise<StableHorse | null>(resolve => {
+    const app = render(React.createElement(RollHorsePicker, {
+      horses: eligible,
+      onPick: (h) => { app.unmount(); resolve(h); },
+      onCancel: () => { app.unmount(); resolve(null); },
+    }));
+  });
+  if (!picked) { console.log('Cancelled.'); return 0; }
+  let chosen: StableHorse = picked;
 
   while (true) {
     let result;
