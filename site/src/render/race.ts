@@ -10,11 +10,13 @@ import { appendSample, trimWindow, computePace, type Sample } from './pace.js';
 import { startAutoScroll } from './autoscroll.js';
 import { horseFaceSvg } from '../horse-face.js';
 import { renderAchievementToast } from './toast.js';
+import { applyInitialTvMode, isTvMode, setTvMode } from './tv-mode.js';
 
 const POLL_INTERVAL_MS = 60_000;
 const TIMER_TICK_MS = 1_000;
 
 export function renderRace(root: HTMLElement, joinCode: string): () => void {
+  applyInitialTvMode();
   root.innerHTML = '';
 
   const frame = root.ownerDocument.createElement('section');
@@ -26,6 +28,8 @@ export function renderRace(root: HTMLElement, joinCode: string): () => void {
         <span>Status: <b class="race-status">—</b></span>
         <span>Time left: <b class="race-time-left">—</b></span>
         <span>Join code: <b>${joinCode}</b></span>
+        <button type="button" class="btn tv-toggle" aria-pressed="false" title="Toggle TV mode">TV: OFF</button>
+        <button type="button" class="btn home-btn">← Home</button>
       </div>
     </header>
     <div class="crowd" aria-hidden="true">
@@ -34,7 +38,6 @@ export function renderRace(root: HTMLElement, joinCode: string): () => void {
       <div class="crowd-cap crowd-cap-right"></div>
     </div>
     <div class="track"></div>
-    <footer class="race-header"><div class="meta"><button type="button" class="btn home-btn">← Home</button></div></footer>
   `;
   root.appendChild(frame);
 
@@ -51,6 +54,18 @@ export function renderRace(root: HTMLElement, joinCode: string): () => void {
   homeBtn.addEventListener('click', () => {
     window.history.pushState({}, '', '/');
     window.dispatchEvent(new PopStateEvent('popstate'));
+  });
+
+  const tvBtn = frame.querySelector<HTMLButtonElement>('.tv-toggle')!;
+  const refreshTvBtn = () => {
+    const on = isTvMode();
+    tvBtn.textContent = `TV: ${on ? 'ON' : 'OFF'}`;
+    tvBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+  };
+  refreshTvBtn();
+  tvBtn.addEventListener('click', () => {
+    setTvMode(!isTvMode());
+    refreshTvBtn();
   });
 
   const ctrl = new AbortController();
