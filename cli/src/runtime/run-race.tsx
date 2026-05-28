@@ -96,21 +96,28 @@ export function RunRace({ active, startingBaseline, pendingMode, ownUserName }: 
     });
 
     // Token sampler — refresh the running token total every 5s so the heartbeat sees fresh data.
-    const sampler = setInterval(async () => {
+    // Uses sequential setTimeout to prevent overlapping scans if a read takes longer than 5s.
+    let samplerTimer: ReturnType<typeof setTimeout> | null = null;
+    let samplerStopped = false;
+    const sampleTick = async () => {
+      if (samplerStopped) return;
       try {
         lastTokenSampleRef.current = await sumTokensForRace(active);
       } catch (e) {
         console.error('[token-derby] token sampler failed:', e);
       }
-    }, 5_000);
-    // Prime it once at startup.
+      if (!samplerStopped) samplerTimer = setTimeout(sampleTick, 5_000);
+    };
+    // Prime it once at startup, then begin the loop.
     sumTokensForRace(active)
       .then(t => { lastTokenSampleRef.current = t; })
       .catch(e => console.error('[token-derby] token sampler prime failed:', e));
+    samplerTimer = setTimeout(sampleTick, 5_000);
 
     const controller = ctrl.current;
     return () => {
-      clearInterval(sampler);
+      samplerStopped = true;
+      if (samplerTimer) clearTimeout(samplerTimer);
       controller.abort();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

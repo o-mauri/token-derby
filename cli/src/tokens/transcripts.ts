@@ -47,17 +47,26 @@ async function listJsonlFiles(root: string): Promise<string[]> {
       continue;
     }
     if (!stat.isDirectory()) continue;
-    let entries: string[];
-    try {
-      entries = await fs.readdir(projectDir);
-    } catch {
-      continue;
-    }
-    for (const entry of entries) {
-      if (entry.endsWith('.jsonl')) out.push(path.join(projectDir, entry));
-    }
+    await collectJsonl(projectDir, 3, out);
   }
   return out;
+}
+
+/** Recursively collect .jsonl files up to `depth` levels below `dir`. */
+async function collectJsonl(dir: string, depth: number, out: string[]): Promise<void> {
+  if (depth <= 0) return;
+  let entries: string[];
+  try { entries = await fs.readdir(dir); } catch { return; }
+  for (const entry of entries) {
+    if (entry.endsWith('.jsonl')) {
+      out.push(path.join(dir, entry));
+    } else if (depth > 1) {
+      const child = path.join(dir, entry);
+      let st;
+      try { st = await fs.stat(child); } catch { continue; }
+      if (st.isDirectory()) await collectJsonl(child, depth - 1, out);
+    }
+  }
 }
 
 function addNum(value: unknown): number {
