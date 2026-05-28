@@ -2,6 +2,7 @@ import { parseRoute } from './route.js';
 import { renderHome } from './render/home.js';
 import { renderRace } from './render/race.js';
 import { renderOrg } from './render/org.js';
+import { renderCatalog } from './render/catalog.js';
 
 // Legendary hat keyframes are installed lazily on the first buildHatGroup
 // call (see hat-svg.ts), so every entry point — main.ts, preview-race.ts,
@@ -22,6 +23,8 @@ function route() {
     activeCleanup = renderRace(root, r.joinCode);
   } else if (r.type === 'org') {
     activeCleanup = renderOrg(root, r.orgName);
+  } else if (r.type === 'catalog') {
+    activeCleanup = renderCatalog(root);
   } else {
     root.innerHTML = `
       <section class="error">

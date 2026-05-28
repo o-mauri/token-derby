@@ -640,6 +640,221 @@ html, body {
   animation: body-bob 0.4s ease-in-out infinite;
 }
 
+/* ── Catalog view ─────────────────────────────────── */
+
+:root {
+  --rarity-common: #9ca3af;
+  --rarity-rare: #60a5fa;
+  --rarity-epic: #c084fc;
+  --rarity-legendary: #fbbf24;
+}
+
+.catalog {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 24px;
+  gap: 16px;
+  max-width: 1280px;
+  width: 100%;
+  margin: 0 auto;
+}
+.catalog-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  border-bottom: 2px solid var(--panel);
+  padding-bottom: 12px;
+}
+.catalog-header h1 {
+  margin: 0;
+  color: var(--accent);
+  font-size: 1.75rem;
+  letter-spacing: 0.08em;
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+}
+.catalog-intro {
+  color: var(--muted);
+  margin: 0;
+  max-width: 70ch;
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+.catalog-intro em { color: var(--text); font-style: normal; }
+
+.catalog-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 4px 0 8px;
+}
+.catalog-control-label {
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.75rem;
+}
+.palette-controls {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.palette-btn {
+  background: var(--panel);
+  color: var(--text);
+  border: 2px solid var(--border);
+  padding: 6px 14px;
+  font: inherit;
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  border-radius: 4px;
+}
+.palette-btn:hover { border-color: var(--accent); }
+.palette-btn.active {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--bg);
+}
+
+.catalog-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rarity-heading {
+  margin: 24px 0 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+  font-size: 1rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+.rarity-heading .rarity-name { color: var(--accent); }
+.rarity-heading.rarity-common .rarity-name    { color: var(--rarity-common); }
+.rarity-heading.rarity-rare .rarity-name      { color: var(--rarity-rare); }
+.rarity-heading.rarity-epic .rarity-name      { color: var(--rarity-epic); }
+.rarity-heading.rarity-legendary .rarity-name { color: var(--rarity-legendary); }
+.rarity-meta {
+  color: var(--muted);
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+}
+
+.hat-row {
+  display: flex;
+  gap: 16px;
+  padding: 12px 16px;
+  background: var(--panel);
+  border: 2px solid var(--border);
+  border-radius: 6px;
+  align-items: stretch;
+}
+.hat-meta {
+  width: 13rem;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+}
+.hat-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.hat-name {
+  color: var(--text);
+  font-size: 1.15rem;
+  letter-spacing: 0.03em;
+}
+.hat-id {
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  letter-spacing: 0;
+}
+.hat-count {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.rarity-badge {
+  display: inline-block;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  padding: 2px 8px;
+  border-radius: 3px;
+  color: var(--bg);
+  text-transform: uppercase;
+}
+.rarity-badge.rarity-common    { background: var(--rarity-common); }
+.rarity-badge.rarity-rare      { background: var(--rarity-rare); }
+.rarity-badge.rarity-epic      { background: var(--rarity-epic); }
+.rarity-badge.rarity-legendary { background: var(--rarity-legendary); }
+
+.variants-strip {
+  flex: 1;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+.variant-card {
+  width: 88px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px 6px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.variant-card-dark  { background: #0a0a0a; }
+.variant-card-light { background: #3a3a3a; }
+.variant-card .horse-sprite {
+  width: 100%;
+  height: auto;
+  image-rendering: pixelated;
+  shape-rendering: crispEdges;
+}
+.variant-card .variant-name {
+  font-size: 0.7rem;
+  color: var(--text);
+  text-align: center;
+  letter-spacing: 0.02em;
+}
+
+.catalog-footer {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin: 24px 0 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  line-height: 1.5;
+}
+
+.home .catalog-link {
+  color: var(--muted);
+  font-size: 0.85rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  text-decoration: none;
+  border-bottom: 1px dashed var(--border);
+  padding-bottom: 2px;
+}
+.home .catalog-link:hover { color: var(--accent); border-color: var(--accent); }
+
 /* ── Error / fallback ─────────────────────────────── */
 
 .error {

@@ -16,6 +16,8 @@ export function renderHome(root: HTMLElement): void {
       <input id="org-name" name="org" placeholder="myteam" maxlength="12" pattern="[A-Za-z0-9]{1,12}" required>
       <button type="submit">Go</button>
     </form>
+    <p class="home-divider">— or browse the —</p>
+    <a class="catalog-link" href="/catalog" id="catalog-link">Hat catalog →</a>
     <div class="install-line terminal" role="note" aria-label="Install command">
       <span class="terminal-prompt">$</span>
       <span class="terminal-cmd">npm i -g @mauricode/token-derby</span>

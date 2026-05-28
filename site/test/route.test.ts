@@ -39,6 +39,11 @@ describe('parseRoute', () => {
     expect(parseRoute('/org/with space')).toEqual({ type: 'not-found' });
   });
 
+  it('maps "/catalog" to catalog', () => {
+    expect(parseRoute('/catalog')).toEqual({ type: 'catalog' });
+    expect(parseRoute('/catalog/')).toEqual({ type: 'catalog' });
+  });
+
   it('returns not-found for unknown paths', () => {
     expect(parseRoute('/foo')).toEqual({ type: 'not-found' });
     expect(parseRoute('/race/')).toEqual({ type: 'not-found' });
