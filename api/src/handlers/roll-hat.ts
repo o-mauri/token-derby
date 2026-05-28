@@ -16,10 +16,12 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
   const horse = await getStableHorse(auth.user_id, stable_horse_id);
   if (!horse) return err('STABLE_HORSE_NOT_FOUND', 'No such horse in your stable');
 
-  // Lazy migration: pre-existing horses (no `last_rolled_level` field) get
-  // exactly 1 starter roll regardless of current level — not retroactive.
+  // Rolls accrue when a horse levels up from level 1 onwards — a fresh
+  // level-1 horse has zero pending rolls, otherwise you could farm rolls by
+  // spawning new horses. Lazy migration: legacy horses (no `last_rolled_level`
+  // field) at level ≥ 2 still get exactly 1 starter roll (not retroactive).
   const currentLevel = levelFromXp(horse.xp);
-  const lastRolledLevel = horse.last_rolled_level ?? Math.max(0, currentLevel - 1);
+  const lastRolledLevel = horse.last_rolled_level ?? Math.max(1, currentLevel - 1);
   const eligible = currentLevel - lastRolledLevel;
   if (eligible <= 0) {
     return err('INSUFFICIENT_ROLLS', 'No pending rolls. Level up to earn more.');

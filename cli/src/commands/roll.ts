@@ -8,8 +8,10 @@ import { RollReveal, type RollOutcome } from '../ui/RollReveal.js';
 import { RollHorsePicker } from '../ui/RollHorsePicker.js';
 
 function pendingFor(horse: StableHorse): number {
+  // Mirrors api/src/handlers/roll-hat.ts: rolls accrue from level 2 onwards;
+  // legacy horses (no last_rolled_level) at level ≥ 2 get one starter roll.
   const level = levelFromXp(horse.xp);
-  const lastRolled = horse.last_rolled_level ?? Math.max(0, level - 1);
+  const lastRolled = horse.last_rolled_level ?? Math.max(1, level - 1);
   return level - lastRolled;
 }
 

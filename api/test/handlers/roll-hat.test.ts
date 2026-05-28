@@ -24,23 +24,28 @@ function rollEvent(user: TestUser, stable_horse_id: string): APIGatewayProxyEven
 }
 
 describe('roll-hat handler', () => {
-  it('grants the starter roll on first call', async () => {
-    const user = await makeUser('RollUser_Starter');
+  it('refuses to roll for a brand-new level-1 horse (prevents farming via re-creation)', async () => {
+    const user = await makeUser('RollUser_L1');
     const horse = await makeHorse(user, 'Storm');
     const res = await rollHandler(rollEvent(user, horse.stable_horse_id));
-    expect(res.statusCode).toBe(200);
-    const body = JSON.parse((res as any).body);
+    expect(res.statusCode).toBe(402);
+    expect(JSON.parse((res as any).body).code).toBe('INSUFFICIENT_ROLLS');
+    const after = await getStableHorse(user.user_id, horse.stable_horse_id);
+    // No write should have happened.
+    expect(after?.last_rolled_level).toBeUndefined();
+  });
+
+  it('grants exactly one roll on reaching level 2, then INSUFFICIENT_ROLLS', async () => {
+    const user = await makeUser('RollUser_L2');
+    const horse = await makeHorse(user, 'Lightning');
+    await awardHorseXp(user.user_id, horse.stable_horse_id, thresholdForLevel(2));
+    const first = await rollHandler(rollEvent(user, horse.stable_horse_id));
+    expect(first.statusCode).toBe(200);
+    const body = JSON.parse((first as any).body);
     expect(['hat', 'no_hat', 'duplicate']).toContain(body.result);
     expect(body.remaining_rolls).toBe(0);
     const after = await getStableHorse(user.user_id, horse.stable_horse_id);
-    expect(after?.last_rolled_level).toBe(1);
-  });
-
-  it('returns INSUFFICIENT_ROLLS once the starter roll is spent', async () => {
-    const user = await makeUser('RollUser_Empty');
-    const horse = await makeHorse(user, 'Lightning');
-    const first = await rollHandler(rollEvent(user, horse.stable_horse_id));
-    expect(first.statusCode).toBe(200);
+    expect(after?.last_rolled_level).toBe(2);
     const second = await rollHandler(rollEvent(user, horse.stable_horse_id));
     expect(second.statusCode).toBe(402);
     expect(JSON.parse((second as any).body).code).toBe('INSUFFICIENT_ROLLS');
