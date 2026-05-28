@@ -32,7 +32,7 @@ Maintenance:
 Stable management:
   token-derby stable create               Make a new horse (interactive)
   token-derby stable list                 Show your saved horses
-  token-derby stable edit <name>          Edit an existing horse's colors
+  token-derby stable edit [name]          Edit an existing horse's colors (interactive picker if no name)
   token-derby stable delete <name>        Remove a horse from your stable
 
 Organisations:

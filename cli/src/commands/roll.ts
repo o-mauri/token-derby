@@ -4,7 +4,7 @@ import { levelFromXp, hatById } from '@token-derby/shared';
 import type { StableHorse } from '@token-derby/shared';
 import { ApiError } from '../api/client.js';
 import { listStable, rollHat, equipHat } from '../api/endpoints.js';
-import { RollReveal, printClosedBox, type RollOutcome } from '../ui/RollReveal.js';
+import { RollReveal, type RollOutcome } from '../ui/RollReveal.js';
 import { RollHorsePicker } from '../ui/RollHorsePicker.js';
 
 function pendingFor(horse: StableHorse): number {
@@ -23,10 +23,15 @@ async function promptYesNo(question: string): Promise<boolean> {
 }
 
 /**
- * The Ink-based RollHorsePicker uses useInput (raw mode + a 'keypress'
- * listener on stdin). After it unmounts, stdin can still hold a buffered
- * Enter or be left in a state where readline's first `question` returns
- * immediately. Reset stdin to a known clean state before any readline.
+ * After an Ink mount unmounts, stdin is left in a state where readline
+ * mis-behaves:
+ *   1. Ink calls `stdin.unref()` in its raw-mode teardown, so with no
+ *      other pending I/O the event loop exits as soon as we await
+ *      readline's `question` — the prompt prints, the process drops to
+ *      the shell, and the user never gets to answer.
+ *   2. Ink may have buffered bytes its useInput didn't consume; those
+ *      would auto-resolve readline's first read.
+ * Reset to a known-clean, ref'd state before any readline prompt.
  */
 function resetStdinAfterInk(): void {
   if (process.stdin.isTTY && typeof process.stdin.setRawMode === 'function') {
@@ -36,21 +41,12 @@ function resetStdinAfterInk(): void {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   while (process.stdin.read() !== null) { /* discard */ }
   process.stdin.pause();
+  // Re-ref stdin so readline's await actually keeps the process alive.
+  process.stdin.ref();
 }
 
-/** Show the closed box, wait for Enter, then play the open/reveal animation. */
+/** Closed box → 3s suspense beat → open/reveal animation, all in one Ink mount. */
 async function runReveal(outcome: RollOutcome): Promise<void> {
-  // Stage 1: print closed box to stdout (no Ink) and prompt for Enter via
-  // readline. Reset stdin first because a prior Ink mount (e.g., the
-  // picker) can leave stdin in a state where readline gets a phantom CR.
-  resetStdinAfterInk();
-  printClosedBox();
-  const readline = await import('node:readline/promises');
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-  await rl.question('Press Enter to open the box… ');
-  rl.close();
-
-  // Stage 2: open → burst → reveal (or open → empty → done for no_hat).
   await new Promise<void>(resolve => {
     const app = render(React.createElement(RollReveal, {
       outcome,

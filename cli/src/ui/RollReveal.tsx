@@ -99,23 +99,6 @@ function GiftBox({ frame, color }: { frame: string[]; color: string }) {
   );
 }
 
-// ─── Closed-box-to-stdout ────────────────────────────────────────────
-
-/**
- * Print the closed box directly to stdout — bypasses Ink so we can use
- * readline for the Enter-to-open prompt without fighting Ink for stdin.
- * Box colour is identical across all rarities; rarity reveals later via
- * the confetti burst.
- */
-export function printClosedBox(): void {
-  for (const line of BOX_CLOSED) {
-    const colored = line.trim().length > 0
-      ? `${ansiFg(BOX_COLOR)}${line}${RESET}`
-      : line;
-    process.stdout.write(colored + '\n');
-  }
-}
-
 // ─── Confetti burst ──────────────────────────────────────────────────
 
 type Particle = {
@@ -185,31 +168,35 @@ type RevealProps = {
 };
 
 /**
- * Plays the reveal animation starting from "lid lifting" (the closed box
- * + Enter prompt is a separate component). Sequence depends on outcome:
+ * Plays the reveal animation. Starts with a 3s "closed box" suspense
+ * beat, then lifts the lid. Sequence depends on outcome:
  *   - hat / duplicate: open → tier-coloured burst → hat shown alone
  *   - no_hat:          open → empty box pause → done (no confetti)
  */
+const CLOSED_HOLD_MS = 3000;
+
 export function RollReveal({ outcome, onDone }: RevealProps) {
   const isNoHat = outcome.kind === 'no_hat';
   const isLegendary = outcome.kind !== 'no_hat' && outcome.hat.rarity === 'legendary';
 
-  const [phase, setPhase] = useState<'open1' | 'open2' | 'burst' | 'empty' | 'reveal'>('open1');
+  const [phase, setPhase] = useState<'closed' | 'open1' | 'open2' | 'burst' | 'empty' | 'reveal'>('closed');
 
   useEffect(() => {
     const timers: ReturnType<typeof setTimeout>[] = [];
-    timers.push(setTimeout(() => setPhase('open2'), 350));
+    timers.push(setTimeout(() => setPhase('open1'), CLOSED_HOLD_MS));
+    timers.push(setTimeout(() => setPhase('open2'), CLOSED_HOLD_MS + 350));
     if (isNoHat) {
-      timers.push(setTimeout(() => setPhase('empty'), 700));
-      timers.push(setTimeout(onDone, 1500));
+      timers.push(setTimeout(() => setPhase('empty'), CLOSED_HOLD_MS + 700));
+      timers.push(setTimeout(onDone, CLOSED_HOLD_MS + 1500));
     } else {
-      timers.push(setTimeout(() => setPhase('burst'), 700));
-      timers.push(setTimeout(() => setPhase('reveal'), 1650));
-      timers.push(setTimeout(onDone, isLegendary ? 4650 : 2650));
+      timers.push(setTimeout(() => setPhase('burst'), CLOSED_HOLD_MS + 700));
+      timers.push(setTimeout(() => setPhase('reveal'), CLOSED_HOLD_MS + 1650));
+      timers.push(setTimeout(onDone, CLOSED_HOLD_MS + (isLegendary ? 4650 : 2650)));
     }
     return () => timers.forEach(clearTimeout);
   }, [isNoHat, isLegendary, onDone]);
 
+  if (phase === 'closed') return <GiftBox frame={BOX_CLOSED} color={BOX_COLOR} />;
   if (phase === 'open1') return <GiftBox frame={BOX_OPENING_1} color={BOX_COLOR} />;
   if (phase === 'open2') return <GiftBox frame={BOX_OPENING_2} color={BOX_COLOR} />;
   if (phase === 'empty') return <GiftBox frame={BOX_EMPTY}     color={BOX_COLOR} />;
