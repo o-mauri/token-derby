@@ -14,7 +14,8 @@ export type ErrorCode =
   | 'NOT_ORG_OWNER'
   | 'UNAUTHENTICATED'
   | 'STABLE_HORSE_NOT_FOUND'
-  | 'STABLE_HORSE_NAME_TAKEN';
+  | 'STABLE_HORSE_NAME_TAKEN'
+  | 'INSUFFICIENT_ROLLS';
 
 export type ErrorEnvelope = {
   code: ErrorCode;
@@ -26,6 +27,7 @@ export const ERROR_STATUS: Record<ErrorCode, number> = {
   IDENTITY_REQUIRED: 400,
   INVALID_TOKEN: 401,
   UNAUTHENTICATED: 401,
+  INSUFFICIENT_ROLLS: 402,
   NOT_ORG_MEMBER: 403,
   NOT_ORG_OWNER: 403,
   RACE_NOT_FOUND: 404,

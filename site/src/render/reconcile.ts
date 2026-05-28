@@ -1,7 +1,8 @@
 import type { GetRaceResponse, HorseView } from '@token-derby/shared';
-import { levelFromXp } from '@token-derby/shared';
+import { levelFromXp, hatById } from '@token-derby/shared';
 import { elapsedPct, horseXPct } from '../position.js';
 import { buildHorseSvg } from '../sprite-svg.js';
+import { buildHatGroup } from '../hat-svg.js';
 
 const tokenFmt = new Intl.NumberFormat('en-US');
 
@@ -92,7 +93,14 @@ function createLane(doc: Document, horse: HorseView): HTMLElement {
   wrap.appendChild(dust);
 
   wrap.appendChild(info);
-  wrap.appendChild(buildHorseSvg(doc));
+  const horseSvg = buildHorseSvg(doc);
+  if (horse.equipped_hat) {
+    const hat = hatById(horse.equipped_hat.id);
+    if (hat) {
+      horseSvg.appendChild(buildHatGroup(doc, hat, horse.equipped_hat.variant ?? 0));
+    }
+  }
+  wrap.appendChild(horseSvg);
   lane.appendChild(wrap);
   return lane;
 }

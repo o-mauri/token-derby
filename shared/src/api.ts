@@ -1,4 +1,4 @@
-import type { HorseColors, HorseView, Race, RaceStatus, RaceSummary, RaceView, OrganisationSummary, StableHorse } from './types.js';
+import type { CollectedHat, HatId, HorseColors, HorseView, Race, RaceStatus, RaceSummary, RaceView, OrganisationSummary, StableHorse } from './types.js';
 
 export type CreateRaceRequest = {
   name: string;
@@ -130,3 +130,14 @@ export type SetOrgWebhookRequest = { url: string };
 export type SetOrgWebhookResponse = { webhook_url: string; webhook_secret: string };
 export type GetOrgWebhookResponse = { webhook_url: string | null };
 export type DeleteOrgWebhookResponse = { ok: true };
+
+export type RollHatResponse =
+  | { result: 'hat'; collected: CollectedHat; hat_index: number; remaining_rolls: number }
+  | { result: 'duplicate'; hat_id: HatId; variant?: number; xp_awarded: number; new_xp: number; remaining_rolls: number }
+  | { result: 'no_hat'; xp_awarded: number; new_xp: number; remaining_rolls: number };
+
+export type EquipHatRequest = {
+  hat_index: number | null;   // null = unequip
+};
+
+export type EquipHatResponse = StableHorse;

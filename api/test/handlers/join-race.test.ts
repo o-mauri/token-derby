@@ -6,6 +6,7 @@ import { handler as joinOrgHandler } from '../../src/handlers/join-organisation.
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { listHorses } from '../../src/db/horses.js';
 import { setRaceEnded } from '../../src/db/races.js';
+import { equipHat as dbEquipHat, applyRollResult } from '../../src/db/stable.js';
 import { makeUser, makeHorse, type TestUser } from '../helpers/auth-helper.js';
 
 const COLORS = { body: '#8B4513', mane: '#000', tail: '#000', saddle: '#C0392B' };
@@ -214,5 +215,45 @@ describe('joinRace handler', () => {
 
     const res: any = await joinHandler(joinEvent(join_code, member, { stable_horse_id: horse.stable_horse_id }));
     expect(res.statusCode).toBe(200);
+  });
+
+  it('snapshots the equipped hat onto the race-Horse', async () => {
+    const user = await makeUser('HatJoiner_Snap');
+    const horse = await makeHorse(user, 'Caped');
+
+    // Plant a hat directly via DB ops (avoid roll RNG), then equip it.
+    const collected = { id: 'flat_cap', variant: 0, obtained_at: new Date().toISOString() };
+    await applyRollResult(user.user_id, horse.stable_horse_id, {
+      expected_last_rolled_level: 0,
+      append_hat: collected,
+    });
+    await dbEquipHat(user.user_id, horse.stable_horse_id, 0);
+
+    const creator = await makeUser('HatJoiner_Snap_Creator');
+    const { join_code, race_id } = await createTestRace(creator);
+
+    const res: any = await joinHandler(joinEvent(join_code, user, { stable_horse_id: horse.stable_horse_id }));
+    expect(res.statusCode).toBe(200);
+
+    const horses = await listHorses(race_id);
+    expect(horses).toHaveLength(1);
+    expect(horses[0]?.equipped_hat).toEqual(
+      expect.objectContaining({ id: 'flat_cap', variant: 0 }),
+    );
+  });
+
+  it('leaves equipped_hat undefined on race-Horse when nothing is equipped', async () => {
+    const user = await makeUser('HatJoiner_None');
+    const horse = await makeHorse(user, 'Bareheaded');
+
+    const creator = await makeUser('HatJoiner_None_Creator');
+    const { join_code, race_id } = await createTestRace(creator);
+
+    const res: any = await joinHandler(joinEvent(join_code, user, { stable_horse_id: horse.stable_horse_id }));
+    expect(res.statusCode).toBe(200);
+
+    const horses = await listHorses(race_id);
+    expect(horses).toHaveLength(1);
+    expect(horses[0]?.equipped_hat).toBeUndefined();
   });
 });

@@ -1,5 +1,5 @@
 import type { APIGatewayProxyHandlerV2 } from 'aws-lambda';
-import type { JoinRaceRequest, JoinRaceResponse } from '@token-derby/shared';
+import type { JoinRaceRequest, JoinRaceResponse, CollectedHat } from '@token-derby/shared';
 import { minorMatches } from '@token-derby/shared';
 import { generateHorseId, generateHeartbeatToken } from '../lib/codes.js';
 import { getRaceByJoinCode } from '../db/races.js';
@@ -88,6 +88,15 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
   const heartbeat_token = generateHeartbeatToken();
   const now = new Date().toISOString();
 
+  // Snapshot the equipped hat (if any) onto the race-Horse so it persists for
+  // the duration of the race even if the player changes their stable equip
+  // after the race starts.
+  let equipped_hat: CollectedHat | undefined;
+  if (typeof stable_horse.equipped_hat === 'number') {
+    const hat = stable_horse.hats?.[stable_horse.equipped_hat];
+    if (hat) equipped_hat = hat;
+  }
+
   await putHorse(
     race.race_id,
     {
@@ -101,6 +110,7 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
       user_id: auth.user_id,
       user_name: auth.display_name,
       xp: stable_horse.xp,
+      ...(equipped_hat ? { equipped_hat } : {}),
     },
     heartbeat_token,
   );

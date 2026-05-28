@@ -11,6 +11,7 @@ import type {
   UpdateStableHorseRequest, UpdateStableHorseResponse, DeleteStableHorseResponse,
   SetOrgWebhookRequest, SetOrgWebhookResponse,
   GetOrgWebhookResponse, DeleteOrgWebhookResponse,
+  RollHatResponse, EquipHatRequest, EquipHatResponse,
 } from '@token-derby/shared';
 import { request } from './client.js';
 
@@ -118,4 +119,12 @@ export function deleteOrgWebhook(orgName: string) {
     undefined,
     undefined,
   );
+}
+
+export function rollHat(stableHorseId: string) {
+  return request<RollHatResponse>('POST', `/jockey/me/horses/${encodeURIComponent(stableHorseId)}/roll`, undefined, undefined);
+}
+
+export function equipHat(stableHorseId: string, body: EquipHatRequest) {
+  return request<EquipHatResponse>('POST', `/jockey/me/horses/${encodeURIComponent(stableHorseId)}/equip`, body, undefined);
 }

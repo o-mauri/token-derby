@@ -1,7 +1,7 @@
 // Standalone preview of the live race view with dummy data.
 // Loaded by /preview-race.html — not part of the main app bundle.
 import { renderRace } from './render/race.js';
-import type { GetRaceResponse, HorseView } from '@token-derby/shared';
+import type { CollectedHat, GetRaceResponse, HorseView } from '@token-derby/shared';
 
 const COLORS_A = { body: '#8B4513', mane: '#000000', tail: '#000000', saddle: '#C0392B' };
 const COLORS_B = { body: '#FFFFFF', mane: '#000000', tail: '#000000', saddle: '#1B4F72' };
@@ -21,6 +21,7 @@ function horse(
   tokens: number,
   xp: number,
   colors: { body: string; mane: string; tail: string; saddle: string },
+  equipped_hat?: CollectedHat,
 ): HorseView {
   const id = name.toLowerCase();
   return {
@@ -35,16 +36,30 @@ function horse(
     user_id: `user-${id}`,
     user_name,
     xp,
+    ...(equipped_hat ? { equipped_hat } : {}),
   };
 }
 
+const OBTAINED = new Date(RACE_START_MS - 24 * 60 * 60 * 1000).toISOString();
+
 function snapshot(now: number): GetRaceResponse {
   const horses = [
-    horse(1, 'Stormbringer', 'Alice', 4280, 40,   COLORS_A),
-    horse(2, 'Pegasus',      'Bob',   3915, 170,  COLORS_B),
-    horse(3, 'Cloudrunner',  'Carol', 3502, 300,  COLORS_C),
-    horse(4, 'Thunderbolt',  'Dan',   2880, 1000, COLORS_D),
-    horse(5, 'Embers',       'Eve',   1240, 655,  COLORS_E),
+    // Stormbringer in the lead, sporting a rainbow crown (animated legendary)
+    horse(1, 'Stormbringer', 'Alice', 4280, 40,   COLORS_A,
+      { id: 'rainbow_crown', obtained_at: OBTAINED }),
+    // Pegasus chasing in a cowboy hat #1
+    horse(2, 'Pegasus',      'Bob',   3915, 170,  COLORS_B,
+      { id: 'cowboy_hat', variant: 0, obtained_at: OBTAINED }),
+    // Cloudrunner in a sailor hat #1 (white + navy)
+    horse(3, 'Cloudrunner',  'Carol', 3502, 300,  COLORS_C,
+      { id: 'sailor_hat', variant: 0, obtained_at: OBTAINED }),
+    // Thunderbolt: heavy hitter wearing a spartan helmet (epic, anchor extends forward)
+    horse(4, 'Thunderbolt',  'Dan',   2880, 1000, COLORS_D,
+      { id: 'spartan_helmet', variant: 0, obtained_at: OBTAINED }),
+    // Embers: lit up with the inferno cap (animated legendary)
+    horse(5, 'Embers',       'Eve',   1240, 655,  COLORS_E,
+      { id: 'inferno_cap', obtained_at: OBTAINED }),
+    // Misty: bareheaded — control case so you can compare with-hat vs without
     horse(6, 'Misty',        'Frank', 412,  10,   COLORS_F),
   ];
   const ranked: HorseView[] = horses
