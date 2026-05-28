@@ -71,22 +71,27 @@ function createLane(doc: Document, horse: HorseView): HTMLElement {
   levelChip.textContent = `Lvl. ${levelFromXp(horse.xp + (horse.live_xp ?? 0))}`;
   nameRow.appendChild(levelChip);
 
-  info.appendChild(nameRow);
-
   if (horse.user_name) {
     const userLabel = doc.createElement('span');
     userLabel.className = 'user-label';
     userLabel.textContent = `(${horse.user_name})`;
-    info.appendChild(userLabel);
+    nameRow.appendChild(userLabel);
   }
+
+  info.appendChild(nameRow);
+
+  const statsRow = doc.createElement('div');
+  statsRow.className = 'horse-stats-row';
 
   const tokens = doc.createElement('span');
   tokens.className = 'horse-tokens';
-  info.appendChild(tokens);
+  statsRow.appendChild(tokens);
 
   const pace = doc.createElement('span');
   pace.className = 'horse-pace';
-  info.appendChild(pace);
+  statsRow.appendChild(pace);
+
+  info.appendChild(statsRow);
 
   const dust = doc.createElement('span');
   dust.className = 'horse-dust';

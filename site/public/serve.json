@@ -1,0 +1,7 @@
+{
+  "rewrites": [
+    { "source": "race/:code", "destination": "/index.html" },
+    { "source": "org/:name", "destination": "/index.html" },
+    { "source": "catalog", "destination": "/index.html" }
+  ]
+}

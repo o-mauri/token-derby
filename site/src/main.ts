@@ -3,10 +3,13 @@ import { renderHome } from './render/home.js';
 import { renderRace } from './render/race.js';
 import { renderOrg } from './render/org.js';
 import { renderCatalog } from './render/catalog.js';
+import { applyInitialTvMode } from './render/tv-mode.js';
 
 // Legendary hat keyframes are installed lazily on the first buildHatGroup
 // call (see hat-svg.ts), so every entry point — main.ts, preview-race.ts,
 // preview-finished.ts — gets animated legendaries automatically.
+
+applyInitialTvMode();
 
 let activeCleanup: (() => void) | null = null;
 
