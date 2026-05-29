@@ -282,6 +282,31 @@ describe('heartbeat handler', () => {
     expect(own.recent_events?.some((e: any) => e.name === 'Stampede!')).toBe(true);
   });
 
+  it('rejects heartbeat when the version header is missing, even for a race without cli_version', async () => {
+    const { putRace } = await import('../../src/db/races.js');
+    const { putHorse } = await import('../../src/db/horses.js');
+    const user = await makeUser('NoVer_User');
+    const horse = await makeHorse(user, 'NoVer_Gary', COLORS);
+    const race_id = `r-${Math.random().toString(36).slice(2)}`;
+    const join_code = `NV${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+    await putRace({
+      race_id, name: 'NoVer', join_code,
+      start_time: new Date(Date.now() - 60_000).toISOString(),
+      end_time: new Date(Date.now() + 3_600_000).toISOString(),
+      tz: 'UTC', max_participants: 10, created_at: new Date().toISOString(),
+      // intentionally no cli_version
+    } as any, `admin-${Math.random().toString(36).slice(2)}`);
+    await putHorse(race_id, {
+      horse_id: 'h-nv', stable_horse_id: horse.stable_horse_id, name: 'NoVer_Gary',
+      colors: COLORS, current_tokens: 0, last_heartbeat: new Date().toISOString(),
+      joined_at: new Date().toISOString(), user_id: user.user_id, user_name: 'NoVer_User', xp: 0,
+    } as any, 'tok');
+
+    const res: any = await hbHandler(hbEvent(join_code, 'h-nv', 'tok', { seq: 1, delta: 0 }, null));
+    expect(res.statusCode).toBe(426);
+    expect(JSON.parse(res.body).code).toBe('VERSION_MISMATCH');
+  });
+
   it('does not accrue XP during the warm-up window', async () => {
     // Set up a race with start_time = now (so warm-up just began).
     const user = await makeUser('WU_User');

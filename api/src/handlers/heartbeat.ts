@@ -18,7 +18,7 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
   if (!join_code || !horse_id) return err('BAD_REQUEST', 'path params required');
 
   const caller_version = readCliVersion(event);
-  if (caller_version && !meetsMinimumCliVersion(caller_version)) {
+  if (!caller_version || !meetsMinimumCliVersion(caller_version)) {
     return err('VERSION_MISMATCH', versionMismatchMessage());
   }
 
