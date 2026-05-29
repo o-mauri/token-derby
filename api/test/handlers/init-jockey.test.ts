@@ -3,7 +3,7 @@ import { handler as initJockey } from '../../src/handlers/init-jockey.js';
 import { handler as getJockey } from '../../src/handlers/get-jockey.js';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 
-function initEvent(body: unknown, cliVersion: string | null = '2.4.0'): APIGatewayProxyEventV2 {
+function initEvent(body: unknown, cliVersion: string | null = '2.6.0'): APIGatewayProxyEventV2 {
   const headers: Record<string, string> = { 'content-type': 'application/json' };
   if (cliVersion) headers['x-cli-version'] = cliVersion;
   return {
@@ -25,7 +25,7 @@ function meEvent(userId: string, token: string): APIGatewayProxyEventV2 {
     rawPath: '/jockey/me',
     rawQueryString: '',
     headers: {
-      'x-cli-version': '2.4.0',
+      'x-cli-version': '2.6.0',
       'x-user-id': userId,
       'x-user-token': token,
     },

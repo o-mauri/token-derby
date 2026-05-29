@@ -9,7 +9,7 @@ function event(
   orgName: string,
   body: unknown,
   user: TestUser | null,
-  cliVersion: string | null = '2.4.0',
+  cliVersion: string | null = '2.6.0',
 ): APIGatewayProxyEventV2 {
   const headers: Record<string, string> = { 'content-type': 'application/json' };
   if (cliVersion) headers['x-cli-version'] = cliVersion;
@@ -38,7 +38,7 @@ async function createOrg(user: TestUser, name: string): Promise<string> {
     rawQueryString: '',
     headers: {
       'content-type': 'application/json',
-      'x-cli-version': '2.4.0',
+      'x-cli-version': '2.6.0',
       'x-user-id': user.user_id,
       'x-user-token': user.secret_token,
     },

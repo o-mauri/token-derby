@@ -13,7 +13,7 @@ function postEvent(path: string, body: unknown, user: TestUser): APIGatewayProxy
     rawQueryString: '',
     headers: {
       'content-type': 'application/json',
-      'x-cli-version': '2.4.0',
+      'x-cli-version': '2.6.0',
       'x-user-id': user.user_id,
       'x-user-token': user.secret_token,
     },
@@ -30,7 +30,7 @@ function getEvent(user: TestUser): APIGatewayProxyEventV2 {
     rawPath: '/organisations',
     rawQueryString: '',
     headers: {
-      'x-cli-version': '2.4.0',
+      'x-cli-version': '2.6.0',
       'x-user-id': user.user_id,
       'x-user-token': user.secret_token,
     },

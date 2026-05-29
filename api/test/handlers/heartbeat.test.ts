@@ -8,7 +8,7 @@ import { makeUser, makeHorse, type TestUser } from '../helpers/auth-helper.js';
 
 const COLORS = { body: '#8B4513', mane: '#000', tail: '#000', saddle: '#C0392B' };
 
-async function setup(cliVersion = '2.4.0') {
+async function setup(cliVersion = '2.6.0') {
   const user = await makeUser('HB_User');
   const horse = await makeHorse(user, 'HB_Gary', COLORS);
   const createRes: any = await createHandler({
@@ -39,7 +39,7 @@ function hbEvent(
   horse_id: string,
   heartbeat_token: string | null,
   body: unknown,
-  cliVersion: string | null = '2.4.0',
+  cliVersion: string | null = '2.6.0',
 ): APIGatewayProxyEventV2 {
   const headers: Record<string, string> = {};
   if (heartbeat_token) headers.authorization = `Bearer ${heartbeat_token}`;
@@ -115,20 +115,20 @@ describe('heartbeat handler', () => {
   });
 
   it('rejects heartbeat with mismatched minor version', async () => {
-    const { join_code, horse_id, heartbeat_token } = await setup('2.4.0');
-    const res: any = await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { seq: 1, delta: 1 }, '2.1.0'));
+    const { join_code, horse_id, heartbeat_token } = await setup('2.6.0');
+    const res: any = await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { seq: 1, delta: 1 }, '2.7.0'));
     expect(res.statusCode).toBe(426);
     expect(JSON.parse(res.body).code).toBe('VERSION_MISMATCH');
   });
 
   it('accepts heartbeat with same minor but different patch', async () => {
-    const { join_code, horse_id, heartbeat_token } = await setup('2.4.0');
-    const res: any = await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { seq: 1, delta: 1 }, '2.4.9'));
+    const { join_code, horse_id, heartbeat_token } = await setup('2.6.0');
+    const res: any = await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { seq: 1, delta: 1 }, '2.6.9'));
     expect(res.statusCode).toBe(200);
   });
 
   it('rejects heartbeat with missing version header', async () => {
-    const { join_code, horse_id, heartbeat_token } = await setup('2.4.0');
+    const { join_code, horse_id, heartbeat_token } = await setup('2.6.0');
     const res: any = await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { seq: 1, delta: 1 }, null));
     expect(res.statusCode).toBe(426);
   });
@@ -139,14 +139,14 @@ describe('heartbeat handler', () => {
     expect(res.statusCode).toBe(426);
     const body = JSON.parse(res.body);
     expect(body.code).toBe('VERSION_MISMATCH');
-    expect(body.message).toMatch(/2\.4\.0/);
+    expect(body.message).toMatch(/2\.6\.0/);
   });
 
   it('returns ranked horses in the response so the CLI can render the leaderboard', async () => {
     const creator = await makeUser('HB_Creator');
     const createRes: any = await createHandler({
       version: '2.0', routeKey: 'POST /races', rawPath: '/races', rawQueryString: '',
-      headers: { 'content-type': 'application/json', 'x-cli-version': '2.4.0', 'x-user-id': creator.user_id, 'x-user-token': creator.secret_token },
+      headers: { 'content-type': 'application/json', 'x-cli-version': '2.6.0', 'x-user-id': creator.user_id, 'x-user-token': creator.secret_token },
       requestContext: {} as any, isBase64Encoded: false,
       body: JSON.stringify({
         name: 'HB Multi',
@@ -162,7 +162,7 @@ describe('heartbeat handler', () => {
       const jr: any = await joinHandler({
         version: '2.0', routeKey: 'POST /races/{join_code}/join', rawPath: `/races/${join_code}/join`, rawQueryString: '',
         pathParameters: { join_code },
-        headers: { 'content-type': 'application/json', 'x-cli-version': '2.4.0', 'x-user-id': user.user_id, 'x-user-token': user.secret_token },
+        headers: { 'content-type': 'application/json', 'x-cli-version': '2.6.0', 'x-user-id': user.user_id, 'x-user-token': user.secret_token },
         requestContext: {} as any, isBase64Encoded: false,
         body: JSON.stringify({ stable_horse_id: h.stable_horse_id }),
       });
@@ -195,7 +195,7 @@ describe('heartbeat handler', () => {
     const horse = await makeHorse(user, 'HB_FinaliseGary', COLORS);
     const createRes: any = await createHandler({
       version: '2.0', routeKey: 'POST /races', rawPath: '/races', rawQueryString: '',
-      headers: { 'content-type': 'application/json', 'x-cli-version': '2.4.0', 'x-user-id': user.user_id, 'x-user-token': user.secret_token },
+      headers: { 'content-type': 'application/json', 'x-cli-version': '2.6.0', 'x-user-id': user.user_id, 'x-user-token': user.secret_token },
       requestContext: {} as any, isBase64Encoded: false,
       body: JSON.stringify({
         name: 'HB Finalise',
@@ -208,7 +208,7 @@ describe('heartbeat handler', () => {
     const joinRes: any = await joinHandler({
       version: '2.0', routeKey: 'POST /races/{join_code}/join', rawPath: `/races/${join_code}/join`, rawQueryString: '',
       pathParameters: { join_code },
-      headers: { 'content-type': 'application/json', 'x-cli-version': '2.4.0', 'x-user-id': user.user_id, 'x-user-token': user.secret_token },
+      headers: { 'content-type': 'application/json', 'x-cli-version': '2.6.0', 'x-user-id': user.user_id, 'x-user-token': user.secret_token },
       requestContext: {} as any, isBase64Encoded: false,
       body: JSON.stringify({ stable_horse_id: horse.stable_horse_id }),
     });
@@ -252,7 +252,7 @@ describe('heartbeat handler', () => {
     // Start 1 hour ago, end 1 hour from now — warm-up is 8% of 2h = ~9.6 min, well past it.
     const createRes: any = await createHandler({
       version: '2.0', routeKey: 'POST /races', rawPath: '/races', rawQueryString: '',
-      headers: { 'content-type': 'application/json', 'x-cli-version': '2.4.0', 'x-user-id': user.user_id, 'x-user-token': user.secret_token },
+      headers: { 'content-type': 'application/json', 'x-cli-version': '2.6.0', 'x-user-id': user.user_id, 'x-user-token': user.secret_token },
       requestContext: {} as any, isBase64Encoded: false,
       body: JSON.stringify({
         name: 'XP Test',
@@ -265,7 +265,7 @@ describe('heartbeat handler', () => {
     const joinRes: any = await joinHandler({
       version: '2.0', routeKey: 'POST /races/{join_code}/join', rawPath: `/races/${join_code}/join`, rawQueryString: '',
       pathParameters: { join_code },
-      headers: { 'content-type': 'application/json', 'x-cli-version': '2.4.0', 'x-user-id': user.user_id, 'x-user-token': user.secret_token },
+      headers: { 'content-type': 'application/json', 'x-cli-version': '2.6.0', 'x-user-id': user.user_id, 'x-user-token': user.secret_token },
       requestContext: {} as any, isBase64Encoded: false,
       body: JSON.stringify({ stable_horse_id: horse.stable_horse_id }),
     });
@@ -315,7 +315,7 @@ describe('heartbeat handler', () => {
     const endIso = new Date(Date.now() + 60 * 60 * 1000).toISOString();
     const createRes: any = await createHandler({
       version: '2.0', routeKey: 'POST /races', rawPath: '/races', rawQueryString: '',
-      headers: { 'content-type': 'application/json', 'x-cli-version': '2.4.0', 'x-user-id': user.user_id, 'x-user-token': user.secret_token },
+      headers: { 'content-type': 'application/json', 'x-cli-version': '2.6.0', 'x-user-id': user.user_id, 'x-user-token': user.secret_token },
       requestContext: {} as any, isBase64Encoded: false,
       body: JSON.stringify({ name: 'WU Test', start_time: startIso, end_time: endIso, tz: 'UTC' }),
     });
@@ -323,7 +323,7 @@ describe('heartbeat handler', () => {
     const joinRes: any = await joinHandler({
       version: '2.0', routeKey: 'POST /races/{join_code}/join', rawPath: `/races/${join_code}/join`, rawQueryString: '',
       pathParameters: { join_code },
-      headers: { 'content-type': 'application/json', 'x-cli-version': '2.4.0', 'x-user-id': user.user_id, 'x-user-token': user.secret_token },
+      headers: { 'content-type': 'application/json', 'x-cli-version': '2.6.0', 'x-user-id': user.user_id, 'x-user-token': user.secret_token },
       requestContext: {} as any, isBase64Encoded: false,
       body: JSON.stringify({ stable_horse_id: horse.stable_horse_id }),
     });

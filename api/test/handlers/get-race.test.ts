@@ -17,7 +17,7 @@ function evt(
   bearer?: string,
 ): APIGatewayProxyEventV2 {
   const headers: Record<string, string> = {
-    'x-cli-version': '2.4.0',
+    'x-cli-version': '2.6.0',
   };
   if (user) {
     headers['x-user-id'] = user.user_id;
