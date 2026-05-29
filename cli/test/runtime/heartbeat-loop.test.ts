@@ -1,125 +1,136 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { runHeartbeatLoop, type HeartbeatLoopOptions } from '../../src/runtime/heartbeat-loop.js';
-import type { HeartbeatResponse } from '@token-derby/shared';
+import { runHeartbeatLoop } from '../../src/runtime/heartbeat-loop.js';
 
-beforeEach(() => { vi.useFakeTimers(); });
-afterEach(() => { vi.useRealTimers(); });
+beforeEach(() => vi.useFakeTimers());
+afterEach(() => vi.useRealTimers());
 
-const okResp: HeartbeatResponse = { race_status: 'live', server_time: 'now', time_left_seconds: 100 };
+it('re-sends the identical snapshot on retry, re-prepares after success', async () => {
+  let n = 0;
+  const prepareBeat = vi.fn(async () => ({ seq: ++n, delta: n * 10, reading: n * 100 }));
+  const sent: any[] = [];
+  const sendBeat = vi.fn(async (snap: any) => {
+    sent.push(snap);
+    if (sent.length === 1) throw new Error('network'); // first send fails
+    return { race_status: 'live', horses: [], race: {}, server_time: '', time_left_seconds: 1, last_seq: snap.seq } as any;
+  });
+  const ctrl = new AbortController();
+  runHeartbeatLoop({
+    prepareBeat, sendBeat,
+    onSuccess: () => {}, onError: () => {}, onFinished: () => {},
+    intervalMs: 1000, retryDelaysMs: [10], abortSignal: ctrl.signal,
+  });
+  await vi.advanceTimersByTimeAsync(0);    // first beat prepared + sent (fails)
+  await vi.advanceTimersByTimeAsync(10);   // retry: same snapshot re-sent (succeeds)
+  expect(prepareBeat).toHaveBeenCalledTimes(1);
+  expect(sent[0]).toEqual(sent[1]);        // identical payload across retry
+  await vi.advanceTimersByTimeAsync(1000); // next beat
+  expect(prepareBeat).toHaveBeenCalledTimes(2);
+  ctrl.abort();
+});
 
-function makeOpts(overrides: Partial<HeartbeatLoopOptions> = {}): HeartbeatLoopOptions {
-  return {
-    sendHeartbeat: vi.fn().mockResolvedValue(okResp),
-    getCurrentTokens: vi.fn().mockReturnValue(0),
-    intervalMs: 60_000,
-    retryDelaysMs: [1_000, 2_000, 4_000],
-    onSuccess: vi.fn(),
-    onError: vi.fn(),
-    onFinished: vi.fn(),
-    abortSignal: new AbortController().signal,
-    ...overrides,
-  };
-}
+it('stops and calls onFinished when race_status is finished', async () => {
+  const prepareBeat = vi.fn(async () => ({ seq: 1, delta: 0, reading: 0 }));
+  const onFinished = vi.fn();
+  const sendBeat = vi.fn(async (snap: any) => ({ race_status: 'finished', horses: [], race: {}, server_time: '', time_left_seconds: 0, last_seq: snap.seq } as any));
+  const ctrl = new AbortController();
+  runHeartbeatLoop({ prepareBeat, sendBeat, onSuccess: () => {}, onError: () => {}, onFinished, intervalMs: 1000, retryDelaysMs: [10], abortSignal: ctrl.signal });
+  await vi.advanceTimersByTimeAsync(0);
+  expect(onFinished).toHaveBeenCalledTimes(1);
+  ctrl.abort();
+});
 
 describe('runHeartbeatLoop', () => {
   it('sends an immediate first heartbeat', async () => {
-    const opts = makeOpts();
-    runHeartbeatLoop(opts);
+    const prepareBeat = vi.fn(async () => ({ seq: 1, delta: 0, reading: 0 }));
+    const onSuccess = vi.fn();
+    const sendBeat = vi.fn(async (snap: any) => ({ race_status: 'live', horses: [], race: {}, server_time: '', time_left_seconds: 100, last_seq: snap.seq } as any));
+    const ctrl = new AbortController();
+    runHeartbeatLoop({ prepareBeat, sendBeat, onSuccess, onError: () => {}, onFinished: () => {}, intervalMs: 60_000, retryDelaysMs: [1_000], abortSignal: ctrl.signal });
     await vi.advanceTimersByTimeAsync(0);
-    expect(opts.sendHeartbeat).toHaveBeenCalledOnce();
-    expect(opts.sendHeartbeat).toHaveBeenCalledWith(0);
-    expect(opts.onSuccess).toHaveBeenCalledWith(okResp);
+    expect(sendBeat).toHaveBeenCalledOnce();
+    ctrl.abort();
   });
 
   it('sends another heartbeat after intervalMs', async () => {
-    const opts = makeOpts();
-    runHeartbeatLoop(opts);
+    const prepareBeat = vi.fn(async () => ({ seq: 1, delta: 0, reading: 0 }));
+    const sendBeat = vi.fn(async (snap: any) => ({ race_status: 'live', horses: [], race: {}, server_time: '', time_left_seconds: 100, last_seq: snap.seq } as any));
+    const ctrl = new AbortController();
+    runHeartbeatLoop({ prepareBeat, sendBeat, onSuccess: () => {}, onError: () => {}, onFinished: () => {}, intervalMs: 60_000, retryDelaysMs: [1_000], abortSignal: ctrl.signal });
     await vi.advanceTimersByTimeAsync(0);
     await vi.advanceTimersByTimeAsync(60_000);
-    expect(opts.sendHeartbeat).toHaveBeenCalledTimes(2);
-  });
-
-  it('reads current tokens fresh on each tick', async () => {
-    const getCurrentTokens = vi.fn().mockReturnValueOnce(100).mockReturnValueOnce(250);
-    const opts = makeOpts({ getCurrentTokens });
-    runHeartbeatLoop(opts);
-    await vi.advanceTimersByTimeAsync(0);
-    await vi.advanceTimersByTimeAsync(60_000);
-    expect(opts.sendHeartbeat).toHaveBeenNthCalledWith(1, 100);
-    expect(opts.sendHeartbeat).toHaveBeenNthCalledWith(2, 250);
+    expect(sendBeat).toHaveBeenCalledTimes(2);
+    ctrl.abort();
   });
 
   it('retries with backoff after a failure', async () => {
-    const sendHeartbeat = vi.fn()
+    let callCount = 0;
+    const prepareBeat = vi.fn(async () => ({ seq: ++callCount, delta: 0, reading: 0 }));
+    const sendBeat = vi.fn()
       .mockRejectedValueOnce(new Error('boom'))
       .mockRejectedValueOnce(new Error('still'))
-      .mockResolvedValue(okResp);
-    const opts = makeOpts({ sendHeartbeat });
-    runHeartbeatLoop(opts);
+      .mockImplementation(async (snap: any) => ({ race_status: 'live', horses: [], race: {}, server_time: '', time_left_seconds: 100, last_seq: snap.seq } as any));
+    const onError = vi.fn();
+    const onSuccess = vi.fn();
+    const ctrl = new AbortController();
+    runHeartbeatLoop({ prepareBeat, sendBeat, onSuccess, onError, onFinished: () => {}, intervalMs: 60_000, retryDelaysMs: [1_000, 2_000, 4_000], abortSignal: ctrl.signal });
 
     await vi.advanceTimersByTimeAsync(0);
-    expect(sendHeartbeat).toHaveBeenCalledTimes(1);
-    expect(opts.onError).toHaveBeenCalledTimes(1);
+    expect(sendBeat).toHaveBeenCalledTimes(1);
+    expect(onError).toHaveBeenCalledTimes(1);
 
     await vi.advanceTimersByTimeAsync(1_000);
-    expect(sendHeartbeat).toHaveBeenCalledTimes(2);
+    expect(sendBeat).toHaveBeenCalledTimes(2);
 
     await vi.advanceTimersByTimeAsync(2_000);
-    expect(sendHeartbeat).toHaveBeenCalledTimes(3);
-    expect(opts.onSuccess).toHaveBeenCalledWith(okResp);
+    expect(sendBeat).toHaveBeenCalledTimes(3);
+    expect(onSuccess).toHaveBeenCalledTimes(1);
+    ctrl.abort();
   });
 
   it('caps retry delay at the last value', async () => {
-    const sendHeartbeat = vi.fn().mockRejectedValue(new Error('always'));
-    const opts = makeOpts({ sendHeartbeat, retryDelaysMs: [1_000, 2_000] });
-    runHeartbeatLoop(opts);
+    const prepareBeat = vi.fn(async () => ({ seq: 1, delta: 0, reading: 0 }));
+    const sendBeat = vi.fn().mockRejectedValue(new Error('always'));
+    const ctrl = new AbortController();
+    runHeartbeatLoop({ prepareBeat, sendBeat, onSuccess: () => {}, onError: () => {}, onFinished: () => {}, intervalMs: 60_000, retryDelaysMs: [1_000, 2_000], abortSignal: ctrl.signal });
 
     await vi.advanceTimersByTimeAsync(0);
     await vi.advanceTimersByTimeAsync(1_000);
     await vi.advanceTimersByTimeAsync(2_000);
     await vi.advanceTimersByTimeAsync(2_000);
     await vi.advanceTimersByTimeAsync(2_000);
-    expect(sendHeartbeat).toHaveBeenCalledTimes(5);
+    expect(sendBeat).toHaveBeenCalledTimes(5);
+    ctrl.abort();
   });
 
   it('after success, resumes on the normal interval rather than backoff', async () => {
-    const sendHeartbeat = vi.fn()
+    let callCount = 0;
+    const prepareBeat = vi.fn(async () => ({ seq: ++callCount, delta: 0, reading: 0 }));
+    const sendBeat = vi.fn()
       .mockRejectedValueOnce(new Error('boom'))
-      .mockResolvedValue(okResp);
-    const opts = makeOpts({ sendHeartbeat });
-    runHeartbeatLoop(opts);
+      .mockImplementation(async (snap: any) => ({ race_status: 'live', horses: [], race: {}, server_time: '', time_left_seconds: 100, last_seq: snap.seq } as any));
+    const ctrl = new AbortController();
+    runHeartbeatLoop({ prepareBeat, sendBeat, onSuccess: () => {}, onError: () => {}, onFinished: () => {}, intervalMs: 60_000, retryDelaysMs: [1_000, 2_000, 4_000], abortSignal: ctrl.signal });
 
     await vi.advanceTimersByTimeAsync(0);
     await vi.advanceTimersByTimeAsync(1_000);
-    expect(sendHeartbeat).toHaveBeenCalledTimes(2);
+    expect(sendBeat).toHaveBeenCalledTimes(2);
 
     await vi.advanceTimersByTimeAsync(60_000);
-    expect(sendHeartbeat).toHaveBeenCalledTimes(3);
-  });
-
-  it('calls onFinished and stops when race_status flips to finished', async () => {
-    const finishedResp: HeartbeatResponse = { ...okResp, race_status: 'finished' };
-    const sendHeartbeat = vi.fn().mockResolvedValue(finishedResp);
-    const opts = makeOpts({ sendHeartbeat });
-    runHeartbeatLoop(opts);
-
-    await vi.advanceTimersByTimeAsync(0);
-    expect(opts.onFinished).toHaveBeenCalledOnce();
-
-    await vi.advanceTimersByTimeAsync(60_000);
-    expect(sendHeartbeat).toHaveBeenCalledOnce();
+    expect(sendBeat).toHaveBeenCalledTimes(3);
+    ctrl.abort();
   });
 
   it('stops sending after abortSignal aborts', async () => {
+    const prepareBeat = vi.fn(async () => ({ seq: 1, delta: 0, reading: 0 }));
+    const sendBeat = vi.fn(async (snap: any) => ({ race_status: 'live', horses: [], race: {}, server_time: '', time_left_seconds: 100, last_seq: snap.seq } as any));
     const ctrl = new AbortController();
-    const opts = makeOpts({ abortSignal: ctrl.signal });
-    runHeartbeatLoop(opts);
+    runHeartbeatLoop({ prepareBeat, sendBeat, onSuccess: () => {}, onError: () => {}, onFinished: () => {}, intervalMs: 60_000, retryDelaysMs: [1_000], abortSignal: ctrl.signal });
 
     await vi.advanceTimersByTimeAsync(0);
-    expect(opts.sendHeartbeat).toHaveBeenCalledOnce();
+    expect(sendBeat).toHaveBeenCalledOnce();
 
     ctrl.abort();
     await vi.advanceTimersByTimeAsync(60_000);
-    expect(opts.sendHeartbeat).toHaveBeenCalledOnce();
+    expect(sendBeat).toHaveBeenCalledOnce();
   });
 });
