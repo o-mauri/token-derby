@@ -49,3 +49,22 @@ export function stableHorseNameKey(user_id: string, name: string) {
 export function parseStableHorseId(sk: string): string | null {
   return sk.startsWith(STABLE_HORSE_SK_PREFIX) ? sk.slice(STABLE_HORSE_SK_PREFIX.length) : null;
 }
+
+export const POINT_SK_PREFIX = 'POINT#';
+
+// 12 digits comfortably exceeds any realistic per-race heartbeat count and
+// keeps lexical sort order aligned with numeric seq.
+function padSeq(seq: number): string {
+  return String(seq).padStart(12, '0');
+}
+
+export function seriesPointPrefix(horse_id: string): string {
+  return `${POINT_SK_PREFIX}${horse_id}#`;
+}
+
+export function seriesPointKey(race_id: string, horse_id: string, seq: number) {
+  return {
+    pk: `${RACE_PK_PREFIX}${race_id}`,
+    sk: `${seriesPointPrefix(horse_id)}${padSeq(seq)}`,
+  };
+}

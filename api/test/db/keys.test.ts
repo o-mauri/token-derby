@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   raceMetaKey, horseKey, parseHorseId,
   orgMetaKey, orgMemberKey, parseOrgId, parseMemberUserId,
+  seriesPointKey, seriesPointPrefix,
 } from '../../src/db/keys.js';
 
 describe('keys', () => {
@@ -37,5 +38,19 @@ describe('keys', () => {
   it('parses member user_id from sk', () => {
     expect(parseMemberUserId('MEMBER#u9')).toBe('u9');
     expect(parseMemberUserId('META')).toBe(null);
+  });
+});
+
+describe('series point keys', () => {
+  it('zero-pads seq so lexical order matches numeric order', () => {
+    const k1 = seriesPointKey('race1', 'horseA', 9);
+    const k2 = seriesPointKey('race1', 'horseA', 10);
+    expect(k1.pk).toBe('RACE#race1');
+    expect(k1.sk < k2.sk).toBe(true); // '...000009' < '...000010'
+  });
+
+  it('prefix targets exactly one horse', () => {
+    expect(seriesPointKey('r', 'horseA', 1).sk.startsWith(seriesPointPrefix('horseA'))).toBe(true);
+    expect(seriesPointKey('r', 'horseB', 1).sk.startsWith(seriesPointPrefix('horseA'))).toBe(false);
   });
 });
