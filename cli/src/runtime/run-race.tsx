@@ -5,7 +5,7 @@ import { StatusScreen } from '../ui/StatusScreen.js';
 import { describeAchievement, type RecentEvent } from '@token-derby/shared';
 import { runHeartbeatLoop } from './heartbeat-loop.js';
 import { sumTokensForRace } from '../tokens/transcripts.js';
-import { initialBaseline } from '../tokens/baseline.js';
+import { RaceScoreTracker, type RaceScoreState } from '../tokens/race-score.js';
 import * as endpoints from '../api/endpoints.js';
 import { ApiError } from '../api/client.js';
 import { saveActiveRace, type ActiveRace } from '../stable/active-race.js';
@@ -13,12 +13,12 @@ import { HEARTBEAT_INTERVAL_MS, HEARTBEAT_RETRY_DELAYS_MS } from '../config.js';
 
 export type RunRaceProps = {
   active: ActiveRace;
-  startingBaseline: number;
+  initialState: RaceScoreState;   // seeded by join.ts (anchors primed, seq from server)
   pendingMode: boolean;
   ownUserName: string;
 };
 
-export function RunRace({ active, startingBaseline, pendingMode, ownUserName }: RunRaceProps) {
+export function RunRace({ active, initialState, pendingMode, ownUserName }: RunRaceProps) {
   const { exit } = useApp();
   const [race, setRace] = useState<GetRaceResponse | null>(null);
   const [lastHbAt, setLastHbAt] = useState<Date | null>(null);
@@ -28,10 +28,10 @@ export function RunRace({ active, startingBaseline, pendingMode, ownUserName }: 
   const [achievements, setAchievements] = useState<Array<{ key: string; event: RecentEvent }>>([]);
   const shownAchievementAtRef = useRef<number>(0);
 
-  const baselineRef = useRef(startingBaseline);
+  const trackerRef = useRef(new RaceScoreTracker(initialState));
   const pendingRef = useRef(pendingMode);
-  const lastTokenSampleRef = useRef<number>(startingBaseline);
   const ctrl = useRef(new AbortController());
+  const [stalled, setStalled] = useState(false);
 
   // Re-render every second so the "Ns ago" counter updates.
   useEffect(() => {
@@ -39,37 +39,49 @@ export function RunRace({ active, startingBaseline, pendingMode, ownUserName }: 
     return () => clearInterval(t);
   }, []);
 
-  // Re-snapshot baseline when race transitions pending → live.
+  // Re-prime the anchor when the race goes live so pre-live tokens aren't counted.
   useEffect(() => {
     if (pendingRef.current && race?.status === 'live') {
-      sumTokensForRace(active).then(total => {
-        baselineRef.current = total;
-        pendingRef.current = false;
-      });
+      trackerRef.current.reprime();
+      pendingRef.current = false;
     }
   }, [race?.status]);
 
   useEffect(() => {
+    const tracker = trackerRef.current;
+
+    const scanWithTimeout = async (): Promise<number | null> => {
+      try {
+        return await Promise.race([
+          sumTokensForRace(active),
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('scan timeout')), 10_000)),
+        ]);
+      } catch {
+        return null; // fail-loud scan OR timeout → "no reading this beat"
+      }
+    };
+
     runHeartbeatLoop({
-      sendHeartbeat: async (currentTokens) => {
-        const resp = await endpoints.heartbeat(
-          active.join_code, active.horse_id, active.heartbeat_token, { current_tokens: currentTokens },
-        );
+      prepareBeat: async () => {
+        const reading = await scanWithTimeout();
+        tracker.recordReading(reading);
+        if (pendingRef.current) tracker.reprime(); // no credit while pending
+        setStalled(tracker.stalled);
+        return tracker.nextBeat();
+      },
+      sendBeat: async (snapshot) => {
+        return endpoints.heartbeat(active.join_code, active.horse_id, active.heartbeat_token, {
+          seq: snapshot.seq, delta: snapshot.delta,
+        });
+      },
+      onSuccess: (resp, snapshot) => {
+        tracker.ack(snapshot, resp.last_seq);
         const updated: ActiveRace = {
           ...active,
-          last_race_tokens: currentTokens,
+          ...tracker.toState(),
           last_heartbeat_at: new Date().toISOString(),
         };
-        await saveActiveRace(updated);
-        return resp;
-      },
-      getCurrentTokens: () => {
-        if (pendingRef.current) return 0;
-        return Math.max(0, lastTokenSampleRef.current - baselineRef.current);
-      },
-      intervalMs: HEARTBEAT_INTERVAL_MS,
-      retryDelaysMs: HEARTBEAT_RETRY_DELAYS_MS,
-      onSuccess: (resp: HeartbeatResponse) => {
+        void saveActiveRace(updated);
         setLastHbAt(new Date());
         setLastHbOk(true);
         setRace(raceViewFrom(resp));
@@ -77,8 +89,8 @@ export function RunRace({ active, startingBaseline, pendingMode, ownUserName }: 
         const candidates = (own?.recent_events ?? []).filter(e => e.at > shownAchievementAtRef.current);
         if (candidates.length > 0) {
           shownAchievementAtRef.current = Math.max(...candidates.map(e => e.at));
-          const fresh = candidates.map(e => ({ key: `${e.at}-${e.name}`, event: e }));
-          setAchievements(prev => [...prev, ...fresh]);
+          const freshEvents = candidates.map(e => ({ key: `${e.at}-${e.name}`, event: e }));
+          setAchievements(prev => [...prev, ...freshEvents]);
         }
         if (resp.race_status === 'finished') exit();
       },
@@ -92,34 +104,13 @@ export function RunRace({ active, startingBaseline, pendingMode, ownUserName }: 
         setLastHbOk(false);
       },
       onFinished: () => exit(),
+      intervalMs: HEARTBEAT_INTERVAL_MS,
+      retryDelaysMs: HEARTBEAT_RETRY_DELAYS_MS,
       abortSignal: ctrl.current.signal,
     });
 
-    // Token sampler — refresh the running token total every 5s so the heartbeat sees fresh data.
-    // Uses sequential setTimeout to prevent overlapping scans if a read takes longer than 5s.
-    let samplerTimer: ReturnType<typeof setTimeout> | null = null;
-    let samplerStopped = false;
-    const sampleTick = async () => {
-      if (samplerStopped) return;
-      try {
-        lastTokenSampleRef.current = await sumTokensForRace(active);
-      } catch (e) {
-        console.error('[token-derby] token sampler failed:', e);
-      }
-      if (!samplerStopped) samplerTimer = setTimeout(sampleTick, 5_000);
-    };
-    // Prime it once at startup, then begin the loop.
-    sumTokensForRace(active)
-      .then(t => { lastTokenSampleRef.current = t; })
-      .catch(e => console.error('[token-derby] token sampler prime failed:', e));
-    samplerTimer = setTimeout(sampleTick, 5_000);
-
     const controller = ctrl.current;
-    return () => {
-      samplerStopped = true;
-      if (samplerTimer) clearTimeout(samplerTimer);
-      controller.abort();
-    };
+    return () => { controller.abort(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -146,6 +137,7 @@ export function RunRace({ active, startingBaseline, pendingMode, ownUserName }: 
         ownUserName={ownUserName}
         lastHeartbeatAgoSec={lastHeartbeatAgoSec}
         lastHeartbeatOk={lastHbOk}
+        stalled={stalled}
       />
       {achievements.length > 0 && (
         <Box flexDirection="column" marginTop={1}>
@@ -188,17 +180,12 @@ function raceViewFrom(resp: HeartbeatResponse): GetRaceResponse {
 export async function buildInitialState(args: {
   active: ActiveRace;
   raceStatus: 'pending' | 'live';
-  rejoin: boolean;
-}): Promise<{ startingBaseline: number; pendingMode: boolean }> {
-  const runningTotal = await sumTokensForRace(args.active);
-  if (args.rejoin) {
-    return {
-      startingBaseline: Math.max(0, runningTotal - args.active.last_race_tokens),
-      pendingMode: args.raceStatus === 'pending',
-    };
-  }
+  serverLastSeq: number;
+}): Promise<{ initialState: RaceScoreState; pendingMode: boolean }> {
+  let diskNow = 0;
+  try { diskNow = await sumTokensForRace(args.active); } catch { diskNow = 0; }
   return {
-    startingBaseline: initialBaseline({ runningTotal, status: args.raceStatus }),
+    initialState: { ackedReading: diskNow, lastGoodReading: diskNow, seq: args.serverLastSeq },
     pendingMode: args.raceStatus === 'pending',
   };
 }

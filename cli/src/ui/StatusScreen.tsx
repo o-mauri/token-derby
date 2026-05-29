@@ -13,10 +13,11 @@ type Props = {
   ownUserName: string;
   lastHeartbeatAgoSec: number | null;
   lastHeartbeatOk: boolean;
+  stalled?: boolean;
 };
 
 export function StatusScreen(props: Props) {
-  const { race, ownHorseId, ownHorseName, ownColors, ownUserName, lastHeartbeatAgoSec, lastHeartbeatOk } = props;
+  const { race, ownHorseId, ownHorseName, ownColors, ownUserName, lastHeartbeatAgoSec, lastHeartbeatOk, stalled } = props;
 
   if (!race) {
     return (
@@ -66,6 +67,9 @@ export function StatusScreen(props: Props) {
             {lastHeartbeatOk ? '✓' : '⚠'}
           </Text>
         </Text>
+        {stalled && (
+          <Text color="yellow">⚠ Can't read token usage — try restarting this terminal. Your race continues.</Text>
+        )}
       </Box>
 
       <Box marginTop={1}>

@@ -4,7 +4,7 @@ import type { HorseColors, StableHorse } from '@token-derby/shared';
 import { HorsePicker } from '../ui/HorsePicker.js';
 import { joinRace, getRace, listStable, listOrganisations } from '../api/endpoints.js';
 import { ApiError } from '../api/client.js';
-import { saveActiveRace, loadActiveRace, type ActiveRace } from '../stable/active-race.js';
+import { saveActiveRace, type ActiveRace } from '../stable/active-race.js';
 import { RunRace, buildInitialState } from '../runtime/run-race.js';
 import { loadIdentity } from '../identity/identity.js';
 
@@ -44,14 +44,12 @@ export async function joinCommand(joinCode: string | undefined): Promise<number>
   let chosenStableHorseId: string;
   let chosenName: string;
   let chosenColors: HorseColors;
-  let isResume: boolean;
 
   if (ownHorse) {
     // Auto-resume: use server's snapshot of the horse, no picker.
     chosenStableHorseId = ownHorse.stable_horse_id;
     chosenName = ownHorse.name;
     chosenColors = ownHorse.colors;
-    isResume = true;
   } else {
     // For org-restricted races, surface NOT_ORG_MEMBER before walking the user
     // through stable/picker flows — otherwise the first thing they see is
@@ -90,7 +88,6 @@ export async function joinCommand(joinCode: string | undefined): Promise<number>
     chosenStableHorseId = picked.stable_horse_id;
     chosenName = picked.name;
     chosenColors = picked.colors;
-    isResume = false;
   }
 
   let joinResp;
@@ -113,10 +110,6 @@ export async function joinCommand(joinCode: string | undefined): Promise<number>
     throw e;
   }
 
-  // For resume, try to carry forward our last token total from active-races state.
-  const prior = await loadActiveRace(code);
-  const lastTokens = isResume && prior?.horse_id === joinResp.horse_id ? prior.last_race_tokens : (ownHorse?.current_tokens ?? 0);
-
   const status: 'pending' | 'live' = race.status;
   const active: ActiveRace = {
     join_code: code,
@@ -126,14 +119,16 @@ export async function joinCommand(joinCode: string | undefined): Promise<number>
     horse_name: chosenName,
     horse_colors: chosenColors,
     joined_at: ownHorse?.joined_at ?? new Date().toISOString(),
-    last_race_tokens: lastTokens,
+    ackedReading: 0,
+    lastGoodReading: 0,
+    seq: ownHorse?.last_seq ?? 0,
     last_heartbeat_at: new Date(0).toISOString(),
     ...(race.counts_input ? { counts_input: true } : {}),
   };
   await saveActiveRace(active);
 
-  const initial = await buildInitialState({ active, raceStatus: status, rejoin: isResume });
-  const app = render(React.createElement(RunRace, { active, ...initial, ownUserName: identity.display_name }));
+  const initial = await buildInitialState({ active, raceStatus: status, serverLastSeq: ownHorse?.last_seq ?? 0 });
+  const app = render(React.createElement(RunRace, { active, initialState: initial.initialState, pendingMode: initial.pendingMode, ownUserName: identity.display_name }));
   await app.waitUntilExit();
   return 0;
 }

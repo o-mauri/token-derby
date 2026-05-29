@@ -22,9 +22,10 @@ describe('endpoints', () => {
     });
     (globalThis as any).fetch = fetch;
     const { heartbeat } = await import('../../src/api/endpoints.js');
-    await heartbeat('JC1234', 'h-1', 'tok-xyz', { current_tokens: 42 });
+    await heartbeat('JC1234', 'h-1', 'tok-xyz', { seq: 1, delta: 42 });
     const init = fetch.mock.calls[0]?.[1] as RequestInit;
     expect((init.headers as Record<string, string>)['authorization']).toBe('Bearer tok-xyz');
+    expect(init.body).toBe(JSON.stringify({ seq: 1, delta: 42 }));
   });
 
   it('createOrganisation POSTs to /organisations', async () => {

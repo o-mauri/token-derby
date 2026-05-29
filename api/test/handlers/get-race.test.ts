@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { handler as getRaceHandler } from '../../src/handlers/get-race.js';
 import { handler as createHandler } from '../../src/handlers/create-race.js';
 import { handler as joinHandler } from '../../src/handlers/join-race.js';
@@ -17,7 +17,7 @@ function evt(
   bearer?: string,
 ): APIGatewayProxyEventV2 {
   const headers: Record<string, string> = {
-    'x-cli-version': '2.4.0',
+    'x-cli-version': '2.6.0',
   };
   if (user) {
     headers['x-user-id'] = user.user_id;
@@ -36,6 +36,8 @@ function evt(
 }
 
 describe('getRace handler', () => {
+  beforeEach(() => { process.env.TOKEN_DERBY_MAX_RATE = '1000000000'; });
+  afterEach(() => { delete process.env.TOKEN_DERBY_MAX_RATE; });
   async function setupRace(creator: TestUser, overrides: Record<string, any> = {}) {
     const createRes: any = await createHandler(evt({
       name: 'GetRace Test',
@@ -61,7 +63,7 @@ describe('getRace handler', () => {
 
   async function hb(join_code: string, horse_id: string, tok: string, current_tokens: number) {
     await hbHandler(evt(
-      { current_tokens },
+      { seq: 1, delta: current_tokens },
       `/races/${join_code}/horses/${horse_id}/heartbeat`,
       'POST /races/{join_code}/horses/{horse_id}/heartbeat',
       { join_code, horse_id }, undefined, tok,

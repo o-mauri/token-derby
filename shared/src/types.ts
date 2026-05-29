@@ -20,6 +20,7 @@ export type Horse = {
   user_name: string;
   xp: number;
   xp_awarded?: number;
+  last_seq?: number;          // highest applied heartbeat sequence (delta protocol)
   // Mid-race XP state — all optional for backwards compat with existing race-horse rows.
   live_xp?: number;
   last_rank?: number;

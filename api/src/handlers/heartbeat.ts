@@ -2,10 +2,11 @@ import type { APIGatewayProxyHandlerV2 } from 'aws-lambda';
 import type { HeartbeatRequest, HeartbeatResponse } from '@token-derby/shared';
 import { minorMatches, MIDRACE_THRESHOLDS } from '@token-derby/shared';
 import { getRaceByJoinCode } from '../db/races.js';
-import { getHorseForHeartbeat, updateHorseHeartbeat, listHorses } from '../db/horses.js';
+import { getHorseForHeartbeat, applyHeartbeatDelta, listHorses } from '../db/horses.js';
+import { appendSeriesPoint } from '../db/series.js';
 import { evaluateAchievements } from '../lib/evaluate-achievements.js';
 import { computeStatus, timeLeftSeconds } from '../lib/status.js';
-import { clampHeartbeat } from '../lib/rate-cap.js';
+import { clampDelta } from '../lib/rate-cap.js';
 import { rankHorses } from '../lib/rank-horses.js';
 import { finaliseRace } from '../lib/finalise-race.js';
 import { ok, err, parseJson } from '../lib/http.js';
@@ -17,7 +18,7 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
   if (!join_code || !horse_id) return err('BAD_REQUEST', 'path params required');
 
   const caller_version = readCliVersion(event);
-  if (caller_version && !meetsMinimumCliVersion(caller_version)) {
+  if (!caller_version || !meetsMinimumCliVersion(caller_version)) {
     return err('VERSION_MISMATCH', versionMismatchMessage());
   }
 
@@ -26,8 +27,12 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
   if (!token) return err('INVALID_TOKEN', 'Authorization: Bearer required');
 
   const body = parseJson<HeartbeatRequest>(event.body);
-  if (!body || typeof body.current_tokens !== 'number' || body.current_tokens < 0) {
-    return err('BAD_REQUEST', 'current_tokens (non-negative number) required');
+  if (
+    !body ||
+    typeof body.seq !== 'number' || !Number.isFinite(body.seq) || body.seq < 1 ||
+    typeof body.delta !== 'number' || !Number.isFinite(body.delta) || body.delta < 0
+  ) {
+    return err('BAD_REQUEST', 'seq (>=1) and delta (>=0) required');
   }
 
   let race = await getRaceByJoinCode(join_code);
@@ -51,21 +56,23 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
   const race_status = computeStatus(race, now);
 
   let horses;
+  let effectiveLastSeq = horse.last_seq;
   if (race_status === 'finished' && !race.ended_at) {
     const result = await finaliseRace(race, now);
     race = result.race;
     horses = result.horses;
   } else if (race_status !== 'finished') {
-    const accepted = clampHeartbeat({
-      previous_tokens: horse.current_tokens,
-      previous_heartbeat_iso: horse.last_heartbeat,
-      proposed_tokens: body.current_tokens,
-      now,
-      counts_input: race.counts_input,
-    });
+    const prevTokens = horse.current_tokens;
+    const elapsedMs = (() => {
+      const prevMs = Date.parse(horse.last_heartbeat);
+      return Number.isFinite(prevMs) ? now.getTime() - prevMs : 0;
+    })();
+    const applied = clampDelta({ delta: body.delta, elapsedMs, counts_input: race.counts_input });
+    const newTokens = prevTokens + applied;
+
     const allHorsesBefore = await listHorses(race.race_id);
     const updatedHorses = allHorsesBefore.map(h =>
-      h.horse_id === horse_id ? { ...h, current_tokens: accepted } : h,
+      h.horse_id === horse_id ? { ...h, current_tokens: newTokens } : h,
     );
     const ranked = rankHorses(updatedHorses);
     const ownRanked = ranked.find(h => h.horse_id === horse_id)!;
@@ -94,38 +101,51 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
       },
       now_ms: now.getTime(),
       last_heartbeat_at_ms: lastHeartbeatMs,
-      current_tokens: accepted,
-      prev_current_tokens: horse.current_tokens,
+      current_tokens: newTokens,
+      prev_current_tokens: prevTokens,
       new_rank: ownRanked.rank,
       total_horses: ranked.length,
       second_place_tokens: second?.current_tokens ?? null,
       warm_up_active: now.getTime() < warmUpEnd,
       counts_input: race.counts_input ?? false,
     });
-    await updateHorseHeartbeat(race.race_id, horse_id, accepted, now.toISOString(), evalResult.next);
-    // Reuse the pre-built horse list, patching the calling horse with fresh evaluator output.
-    horses = updatedHorses.map(h =>
-      h.horse_id === horse_id
-        ? {
-            ...h,
-            current_tokens: accepted,
-            live_xp: evalResult.next.live_xp,
-            last_rank: evalResult.next.last_rank,
-            racer_streak_ms: evalResult.next.racer_streak_ms,
-            racer_awards: evalResult.next.racer_awards,
-            pacesetter_streak_ms: evalResult.next.pacesetter_streak_ms,
-            pacesetter_awards: evalResult.next.pacesetter_awards,
-            overtake_awards: evalResult.next.overtake_awards,
-            lead_take_awards: evalResult.next.lead_take_awards,
-            last_stampede_at: evalResult.next.last_stampede_at,
-            was_in_last: evalResult.next.was_in_last,
-            comeback_awarded: evalResult.next.comeback_awarded,
-            last_gap_in_1st: evalResult.next.last_gap_in_1st,
-            last_pulled_away_at: evalResult.next.last_pulled_away_at,
-            recent_events: evalResult.next.recent_events,
-          }
-        : h,
+
+    const didApply = await applyHeartbeatDelta(
+      race.race_id, horse_id, body.seq, applied, now.toISOString(), evalResult.next,
     );
+
+    if (didApply) {
+      if (applied > 0) {
+        await appendSeriesPoint(race.race_id, horse_id, body.seq, { t: now.getTime(), d: applied });
+      }
+      effectiveLastSeq = body.seq;
+      horses = updatedHorses.map(h =>
+        h.horse_id === horse_id
+          ? {
+              ...h,
+              current_tokens: newTokens,
+              last_seq: body.seq,
+              live_xp: evalResult.next.live_xp,
+              last_rank: evalResult.next.last_rank,
+              racer_streak_ms: evalResult.next.racer_streak_ms,
+              racer_awards: evalResult.next.racer_awards,
+              pacesetter_streak_ms: evalResult.next.pacesetter_streak_ms,
+              pacesetter_awards: evalResult.next.pacesetter_awards,
+              overtake_awards: evalResult.next.overtake_awards,
+              lead_take_awards: evalResult.next.lead_take_awards,
+              last_stampede_at: evalResult.next.last_stampede_at,
+              was_in_last: evalResult.next.was_in_last,
+              comeback_awarded: evalResult.next.comeback_awarded,
+              last_gap_in_1st: evalResult.next.last_gap_in_1st,
+              last_pulled_away_at: evalResult.next.last_pulled_away_at,
+              recent_events: evalResult.next.recent_events,
+            }
+          : h,
+      );
+    } else {
+      effectiveLastSeq = horse.last_seq;
+      horses = await listHorses(race.race_id);
+    }
   } else {
     // Race was already finished before this call — no live update happened.
     horses = await listHorses(race.race_id);
@@ -137,6 +157,7 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
     time_left_seconds: timeLeftSeconds(race, now),
     horses: rankHorses(horses),
     race,
+    last_seq: effectiveLastSeq,
   };
   return ok(response);
 };
