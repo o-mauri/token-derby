@@ -30,22 +30,11 @@ export async function sumTokensForRace(race: { counts_input?: boolean }): Promis
 }
 
 async function listJsonlFiles(root: string): Promise<string[]> {
-  let projects: string[];
-  try {
-    projects = await fs.readdir(root);
-  } catch (e: any) {
-    if (e?.code === 'ENOENT') return [];
-    throw e;
-  }
+  const projects = await fs.readdir(root); // throws (e.g. ENOENT) — caller treats as "no reading"
   const out: string[] = [];
   for (const project of projects) {
     const projectDir = path.join(root, project);
-    let stat;
-    try {
-      stat = await fs.stat(projectDir);
-    } catch {
-      continue;
-    }
+    const stat = await fs.stat(projectDir);
     if (!stat.isDirectory()) continue;
     await collectJsonl(projectDir, 3, out);
   }
@@ -55,15 +44,13 @@ async function listJsonlFiles(root: string): Promise<string[]> {
 /** Recursively collect .jsonl files up to `depth` levels below `dir`. */
 async function collectJsonl(dir: string, depth: number, out: string[]): Promise<void> {
   if (depth <= 0) return;
-  let entries: string[];
-  try { entries = await fs.readdir(dir); } catch { return; }
+  const entries = await fs.readdir(dir);
   for (const entry of entries) {
     if (entry.endsWith('.jsonl')) {
       out.push(path.join(dir, entry));
     } else if (depth > 1) {
       const child = path.join(dir, entry);
-      let st;
-      try { st = await fs.stat(child); } catch { continue; }
+      const st = await fs.stat(child);
       if (st.isDirectory()) await collectJsonl(child, depth - 1, out);
     }
   }
@@ -74,22 +61,13 @@ function addNum(value: unknown): number {
 }
 
 async function sumFile(file: string): Promise<TokenTotals> {
-  let raw: string;
-  try {
-    raw = await fs.readFile(file, 'utf8');
-  } catch {
-    return { input: 0, output: 0 };
-  }
+  const raw = await fs.readFile(file, 'utf8'); // throws on read error — do not swallow
   let input = 0;
   let output = 0;
   for (const line of raw.split('\n')) {
     if (!line.trim()) continue;
     let parsed: any;
-    try {
-      parsed = JSON.parse(line);
-    } catch {
-      continue;
-    }
+    try { parsed = JSON.parse(line); } catch { continue; }
     const usage = parsed?.message?.usage;
     if (!usage) continue;
     input += addNum(usage.input_tokens) + addNum(usage.cache_creation_input_tokens);
