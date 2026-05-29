@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { handler as hbHandler } from '../../src/handlers/heartbeat.js';
 import { handler as createHandler } from '../../src/handlers/create-race.js';
 import { handler as joinHandler } from '../../src/handlers/join-race.js';
@@ -58,65 +58,84 @@ function hbEvent(
 }
 
 describe('heartbeat handler', () => {
-  it('updates current_tokens and last_heartbeat', async () => {
-    const { join_code, race_id, horse_id, heartbeat_token } = await setup();
-    const res: any = await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { current_tokens: 1234 }));
-    expect(res.statusCode).toBe(200);
-    const body = JSON.parse(res.body);
-    expect(body.race_status).toBe('live');
-    expect(typeof body.server_time).toBe('string');
-    expect(typeof body.time_left_seconds).toBe('number');
+  beforeEach(() => { process.env.TOKEN_DERBY_MAX_RATE = '1000000000'; });
+  afterEach(() => { delete process.env.TOKEN_DERBY_MAX_RATE; });
 
+  it('accumulates applied deltas onto current_tokens and returns last_seq', async () => {
+    const { join_code, race_id, horse_id, heartbeat_token } = await setup();
+    const r1: any = await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { seq: 1, delta: 1000 }));
+    expect(r1.statusCode).toBe(200);
+    expect(JSON.parse(r1.body).last_seq).toBe(1);
+    await new Promise(r => setTimeout(r, 5));
+    const r2: any = await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { seq: 2, delta: 200 }));
+    expect(JSON.parse(r2.body).last_seq).toBe(2);
     const horses = await listHorses(race_id);
-    expect(horses[0]?.current_tokens).toBe(1234);
+    expect(horses[0]?.current_tokens).toBe(1200);
+  });
+
+  it('dedups a resent seq (no double-apply)', async () => {
+    const { join_code, race_id, horse_id, heartbeat_token } = await setup();
+    await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { seq: 1, delta: 500 }));
+    await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { seq: 1, delta: 500 })); // resend
+    const horses = await listHorses(race_id);
+    expect(horses[0]?.current_tokens).toBe(500);
+  });
+
+  it('writes a series point for an applied delta', async () => {
+    const { join_code, race_id, horse_id, heartbeat_token } = await setup();
+    await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { seq: 1, delta: 750 }));
+    const { listSeriesPoints } = await import('../../src/db/series.js');
+    const pts = await listSeriesPoints(race_id, horse_id);
+    expect(pts).toHaveLength(1);
+    expect(pts[0]?.d).toBe(750);
+  });
+
+  it('rejects a negative delta or non-positive seq', async () => {
+    const { join_code, horse_id, heartbeat_token } = await setup();
+    expect((await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { seq: 1, delta: -5 }))).statusCode).toBe(400);
+    expect((await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { seq: 0, delta: 5 }))).statusCode).toBe(400);
   });
 
   it('rejects wrong heartbeat token', async () => {
     const { join_code, horse_id } = await setup();
-    const res: any = await hbHandler(hbEvent(join_code, horse_id, 'wrong-token', { current_tokens: 1 }));
+    const res: any = await hbHandler(hbEvent(join_code, horse_id, 'wrong-token', { seq: 1, delta: 1 }));
     expect(res.statusCode).toBe(401);
     expect(JSON.parse(res.body).code).toBe('INVALID_TOKEN');
   });
 
   it('rejects missing authorization header', async () => {
     const { join_code, horse_id } = await setup();
-    const res: any = await hbHandler(hbEvent(join_code, horse_id, null, { current_tokens: 1 }));
+    const res: any = await hbHandler(hbEvent(join_code, horse_id, null, { seq: 1, delta: 1 }));
     expect(res.statusCode).toBe(401);
   });
 
-  it('rejects negative current_tokens', async () => {
-    const { join_code, horse_id, heartbeat_token } = await setup();
-    const res: any = await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { current_tokens: -5 }));
-    expect(res.statusCode).toBe(400);
-  });
-
   it('returns RACE_NOT_FOUND for unknown code', async () => {
-    const res: any = await hbHandler(hbEvent('NOPE99', 'no-horse', 'tok', { current_tokens: 0 }));
+    const res: any = await hbHandler(hbEvent('NOPE99', 'no-horse', 'tok', { seq: 1, delta: 0 }));
     expect(res.statusCode).toBe(404);
   });
 
   it('rejects heartbeat with mismatched minor version', async () => {
     const { join_code, horse_id, heartbeat_token } = await setup('2.4.0');
-    const res: any = await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { current_tokens: 1 }, '2.1.0'));
+    const res: any = await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { seq: 1, delta: 1 }, '2.1.0'));
     expect(res.statusCode).toBe(426);
     expect(JSON.parse(res.body).code).toBe('VERSION_MISMATCH');
   });
 
   it('accepts heartbeat with same minor but different patch', async () => {
     const { join_code, horse_id, heartbeat_token } = await setup('2.4.0');
-    const res: any = await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { current_tokens: 1 }, '2.4.9'));
+    const res: any = await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { seq: 1, delta: 1 }, '2.4.9'));
     expect(res.statusCode).toBe(200);
   });
 
   it('rejects heartbeat with missing version header', async () => {
     const { join_code, horse_id, heartbeat_token } = await setup('2.4.0');
-    const res: any = await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { current_tokens: 1 }, null));
+    const res: any = await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { seq: 1, delta: 1 }, null));
     expect(res.statusCode).toBe(426);
   });
 
   it('rejects heartbeat from a CLI version older than the API minimum', async () => {
     const { join_code, horse_id, heartbeat_token } = await setup();
-    const res: any = await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { current_tokens: 1 }, '1.5.0'));
+    const res: any = await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { seq: 1, delta: 1 }, '1.5.0'));
     expect(res.statusCode).toBe(426);
     const body = JSON.parse(res.body);
     expect(body.code).toBe('VERSION_MISMATCH');
@@ -154,9 +173,9 @@ describe('heartbeat handler', () => {
     const b = await joinOne(await makeUser('HB_Beta'), 'Beta');
     const c = await joinOne(await makeUser('HB_Gamma'), 'Gamma');
 
-    await hbHandler(hbEvent(join_code, a.horse_id, a.heartbeat_token, { current_tokens: 100 }));
-    await hbHandler(hbEvent(join_code, b.horse_id, b.heartbeat_token, { current_tokens: 500 }));
-    const res: any = await hbHandler(hbEvent(join_code, c.horse_id, c.heartbeat_token, { current_tokens: 300 }));
+    await hbHandler(hbEvent(join_code, a.horse_id, a.heartbeat_token, { seq: 1, delta: 100 }));
+    await hbHandler(hbEvent(join_code, b.horse_id, b.heartbeat_token, { seq: 1, delta: 500 }));
+    const res: any = await hbHandler(hbEvent(join_code, c.horse_id, c.heartbeat_token, { seq: 1, delta: 300 }));
 
     expect(res.statusCode).toBe(200);
     const body = JSON.parse(res.body);
@@ -194,11 +213,11 @@ describe('heartbeat handler', () => {
       body: JSON.stringify({ stable_horse_id: horse.stable_horse_id }),
     });
     const { horse_id, heartbeat_token } = JSON.parse(joinRes.body);
-    await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { current_tokens: 4242 }));
+    await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { seq: 1, delta: 4242 }));
 
     await new Promise(r => setTimeout(r, 400));
 
-    const res: any = await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { current_tokens: 9999 }));
+    const res: any = await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { seq: 2, delta: 9999 }));
     expect(res.statusCode).toBe(200);
     const body = JSON.parse(res.body);
     expect(body.race_status).toBe('finished');
@@ -213,12 +232,12 @@ describe('heartbeat handler', () => {
 
   it('returns finished status without writing when race has ended', async () => {
     const { join_code, race_id, horse_id, heartbeat_token } = await setup();
-    await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { current_tokens: 777 }));
+    await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { seq: 1, delta: 777 }));
 
     const { setRaceEnded } = await import('../../src/db/races.js');
     await setRaceEnded(race_id, new Date().toISOString());
 
-    const res: any = await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { current_tokens: 9999 }));
+    const res: any = await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { seq: 2, delta: 9999 }));
     expect(res.statusCode).toBe(200);
     expect(JSON.parse(res.body).race_status).toBe('finished');
 
@@ -252,9 +271,10 @@ describe('heartbeat handler', () => {
     });
     const { horse_id, heartbeat_token } = JSON.parse(joinRes.body);
     // First heartbeat — initializes state.
-    await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { current_tokens: 100 }));
+    await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { seq: 1, delta: 100 }));
+    await new Promise(r => setTimeout(r, 5));
     // Second heartbeat with a big token jump should trigger Stampede! (delta >= 7000).
-    const res: any = await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { current_tokens: 10_000 }));
+    const res: any = await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { seq: 2, delta: 9900 }));
     expect(res.statusCode).toBe(200);
     const body = JSON.parse(res.body);
     const own = body.horses.find((h: any) => h.horse_id === horse_id);
@@ -284,8 +304,9 @@ describe('heartbeat handler', () => {
     });
     const { horse_id: hid, heartbeat_token: hbt } = JSON.parse(joinRes.body);
     // Big token jump that would normally trigger Stampede!
-    await hbHandler(hbEvent(join_code, hid, hbt, { current_tokens: 100 }));
-    const res: any = await hbHandler(hbEvent(join_code, hid, hbt, { current_tokens: 10_000 }));
+    await hbHandler(hbEvent(join_code, hid, hbt, { seq: 1, delta: 100 }));
+    await new Promise(r => setTimeout(r, 5));
+    const res: any = await hbHandler(hbEvent(join_code, hid, hbt, { seq: 2, delta: 9900 }));
     const body = JSON.parse(res.body);
     const own = body.horses.find((h: any) => h.horse_id === hid);
     expect(own.live_xp ?? 0).toBe(0);
