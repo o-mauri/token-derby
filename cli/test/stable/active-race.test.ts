@@ -30,8 +30,10 @@ const sample: ActiveRace = {
   horse_name: 'Gary',
   horse_colors: { body: '#8B4513', mane: '#000', tail: '#000', saddle: '#C0392B' },
   joined_at: '2026-04-23T10:00:00Z',
-  last_race_tokens: 0,
   last_heartbeat_at: '2026-04-23T10:00:00Z',
+  ackedReading: 0,
+  lastGoodReading: 0,
+  seq: 0,
 };
 
 describe('active-race', () => {
@@ -46,9 +48,23 @@ describe('active-race', () => {
 
   it('overwrites an existing active race file', async () => {
     await saveActiveRace(sample);
-    await saveActiveRace({ ...sample, last_race_tokens: 5000 });
+    await saveActiveRace({ ...sample, ackedReading: 5000 });
     const loaded = await loadActiveRace('K3QP7M');
-    expect(loaded?.last_race_tokens).toBe(5000);
+    expect(loaded?.ackedReading).toBe(5000);
+  });
+
+  it('round-trips the delta-protocol tracker fields', async () => {
+    const active = {
+      join_code: 'ABCDEF', race_id: 'r1', horse_id: 'h1', heartbeat_token: 't1',
+      horse_name: 'Gary', horse_colors: { body: '#000', mane: '#000', tail: '#000', saddle: '#000' },
+      joined_at: new Date().toISOString(), last_heartbeat_at: new Date(0).toISOString(),
+      ackedReading: 1234, lastGoodReading: 1300, seq: 7,
+    };
+    await saveActiveRace(active as any);
+    const loaded = await loadActiveRace('ABCDEF');
+    expect(loaded?.ackedReading).toBe(1234);
+    expect(loaded?.lastGoodReading).toBe(1300);
+    expect(loaded?.seq).toBe(7);
   });
 
   it('deletes an active race', async () => {

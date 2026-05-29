@@ -11,8 +11,10 @@ export type ActiveRace = {
   horse_name: string;
   horse_colors: HorseColors;
   joined_at: string;
-  last_race_tokens: number;
   last_heartbeat_at: string;
+  ackedReading: number;
+  lastGoodReading: number;
+  seq: number;
   counts_input?: boolean;
 };
 
