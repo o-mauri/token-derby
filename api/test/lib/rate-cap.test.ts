@@ -1,141 +1,38 @@
 import { describe, it, expect } from 'vitest';
-import { clampHeartbeat } from '../../src/lib/rate-cap.js';
+import { clampDelta } from '../../src/lib/rate-cap.js';
 
-const ISO = (ms: number) => new Date(ms).toISOString();
 const RATE = 500;
 
-describe('clampHeartbeat', () => {
-  it('accepts a plausible increase below the rate cap', () => {
-    const out = clampHeartbeat({
-      previous_tokens: 1_000,
-      previous_heartbeat_iso: ISO(0),
-      proposed_tokens: 1_500,
-      now: new Date(60_000), // 60s later
-      max_rate_per_second: RATE,
-      // ceiling = 1000 + 500*60 = 31_000; proposed 1500 < ceiling → accepted
-    });
-    expect(out).toBe(1_500);
+describe('clampDelta', () => {
+  it('passes a delta below the rate ceiling unchanged', () => {
+    expect(clampDelta({ delta: 1_500, elapsedMs: 60_000, max_rate_per_second: RATE })).toBe(1_500);
   });
 
-  it('clamps an excessive jump to previous + max_rate × elapsed', () => {
-    const out = clampHeartbeat({
-      previous_tokens: 1_000,
-      previous_heartbeat_iso: ISO(0),
-      proposed_tokens: 9_999_999,
-      now: new Date(60_000),
-      max_rate_per_second: RATE,
-    });
-    // ceiling = 1000 + 500*60 = 31_000
-    expect(out).toBe(31_000);
+  it('clamps an excessive delta to rate × elapsed', () => {
+    expect(clampDelta({ delta: 9_999_999, elapsedMs: 60_000, max_rate_per_second: RATE })).toBe(30_000);
   });
 
-  it('refuses to decrease (monotonic)', () => {
-    const out = clampHeartbeat({
-      previous_tokens: 5_000,
-      previous_heartbeat_iso: ISO(0),
-      proposed_tokens: 100,
-      now: new Date(60_000),
-      max_rate_per_second: RATE,
-    });
-    expect(out).toBe(5_000);
+  it('treats a negative delta as zero', () => {
+    expect(clampDelta({ delta: -5, elapsedMs: 60_000, max_rate_per_second: RATE })).toBe(0);
   });
 
-  it('handles the first heartbeat (previous_tokens = 0, last_heartbeat = joined_at)', () => {
-    const out = clampHeartbeat({
-      previous_tokens: 0,
-      previous_heartbeat_iso: ISO(0),
-      proposed_tokens: 1_200,
-      now: new Date(60_000),
-      max_rate_per_second: RATE,
-    });
-    // ceiling = 0 + 500*60 = 30_000; proposed 1200 < ceiling
-    expect(out).toBe(1_200);
+  it('treats zero/negative elapsed as zero ceiling', () => {
+    expect(clampDelta({ delta: 2_000, elapsedMs: 0, max_rate_per_second: RATE })).toBe(0);
+    expect(clampDelta({ delta: 2_000, elapsedMs: -10, max_rate_per_second: RATE })).toBe(0);
   });
 
-  it('clamps the first heartbeat if the claim is implausible', () => {
-    const out = clampHeartbeat({
-      previous_tokens: 0,
-      previous_heartbeat_iso: ISO(0),
-      proposed_tokens: 1_000_000,
-      now: new Date(60_000),
-      max_rate_per_second: RATE,
-    });
-    expect(out).toBe(30_000);
+  it('scales the ceiling by TOKEN_INPUT_MULTIPLIER for input races', () => {
+    // ceiling = 500 × 60 × 10 = 300_000
+    expect(clampDelta({ delta: 200_000, elapsedMs: 60_000, max_rate_per_second: RATE, counts_input: true })).toBe(200_000);
+    expect(clampDelta({ delta: 5_000_000, elapsedMs: 60_000, max_rate_per_second: RATE, counts_input: true })).toBe(300_000);
   });
 
-  it('treats clock skew (now before previous) as zero elapsed', () => {
-    const out = clampHeartbeat({
-      previous_tokens: 1_000,
-      previous_heartbeat_iso: ISO(60_000),
-      proposed_tokens: 2_000,
-      now: new Date(0), // earlier than previous
-      max_rate_per_second: RATE,
-    });
-    // elapsed clamped to 0 → ceiling = 1000; proposed 2000 → clamped to 1000
-    expect(out).toBe(1_000);
-  });
-
-  it('treats invalid previous_heartbeat_iso as zero elapsed', () => {
-    const out = clampHeartbeat({
-      previous_tokens: 500,
-      previous_heartbeat_iso: 'not-a-date',
-      proposed_tokens: 9_000,
-      now: new Date(60_000),
-      max_rate_per_second: RATE,
-    });
-    expect(out).toBe(500);
-  });
-
-  it('honors a custom max_rate_per_second override', () => {
-    const out = clampHeartbeat({
-      previous_tokens: 0,
-      previous_heartbeat_iso: ISO(0),
-      proposed_tokens: 10_000,
-      now: new Date(10_000), // 10s
-      max_rate_per_second: 100,
-    });
-    // ceiling = 0 + 100*10 = 1000
-    expect(out).toBe(1_000);
-  });
-
-  it('scales the rate ceiling by TOKEN_INPUT_MULTIPLIER when counts_input is true', () => {
-    const out = clampHeartbeat({
-      previous_tokens: 0,
-      previous_heartbeat_iso: ISO(0),
-      proposed_tokens: 200_000,
-      now: new Date(60_000), // 60s
-      max_rate_per_second: RATE,
-      counts_input: true,
-    });
-    // ceiling = 0 + 500*60*10 = 300_000; proposed 200_000 < ceiling → accepted as-is
-    expect(out).toBe(200_000);
-  });
-
-  it('still clamps when input+output proposed exceeds the scaled ceiling', () => {
-    const out = clampHeartbeat({
-      previous_tokens: 0,
-      previous_heartbeat_iso: ISO(0),
-      proposed_tokens: 5_000_000,
-      now: new Date(60_000),
-      max_rate_per_second: RATE,
-      counts_input: true,
-    });
-    // ceiling = 500*60*10 = 300_000
-    expect(out).toBe(300_000);
-  });
-
-  it('uses the env var TOKEN_DERBY_MAX_RATE when no override is passed', () => {
+  it('uses TOKEN_DERBY_MAX_RATE env when no override is passed', () => {
     const prev = process.env.TOKEN_DERBY_MAX_RATE;
     process.env.TOKEN_DERBY_MAX_RATE = '50';
     try {
-      const out = clampHeartbeat({
-        previous_tokens: 0,
-        previous_heartbeat_iso: ISO(0),
-        proposed_tokens: 10_000,
-        now: new Date(10_000), // 10s
-      });
-      // ceiling = 0 + 50 × 10 = 500
-      expect(out).toBe(500);
+      // ceiling = 50 × 10 = 500
+      expect(clampDelta({ delta: 10_000, elapsedMs: 10_000 })).toBe(500);
     } finally {
       if (prev === undefined) delete process.env.TOKEN_DERBY_MAX_RATE;
       else process.env.TOKEN_DERBY_MAX_RATE = prev;
