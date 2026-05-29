@@ -130,6 +130,7 @@ export async function setHorseXpAwarded(
 export type HorseHeartbeatRecord = {
   current_tokens: number;
   last_heartbeat: string;
+  last_seq: number;
   live_xp: number;
   last_rank: number | undefined;
   racer_streak_ms: number;
@@ -159,6 +160,7 @@ export async function getHorseForHeartbeat(
   return {
     current_tokens: Number(Item.current_tokens ?? 0),
     last_heartbeat: String(Item.last_heartbeat ?? ''),
+    last_seq: Number(Item.last_seq ?? 0),
     live_xp: Number(Item.live_xp ?? 0),
     last_rank: Item.last_rank == null ? undefined : Number(Item.last_rank),
     racer_streak_ms: Number(Item.racer_streak_ms ?? 0),
@@ -206,6 +208,79 @@ export async function countHorses(race_id: string): Promise<number> {
     Select: 'COUNT',
   }));
   return Count;
+}
+
+// Atomic, idempotent heartbeat apply. Adds `applied` to current_tokens and
+// advances last_seq ONLY when the incoming seq is newer. Returns false (no
+// mutation) for a duplicate/out-of-order seq.
+export async function applyHeartbeatDelta(
+  race_id: string,
+  horse_id: string,
+  seq: number,
+  applied: number,
+  last_heartbeat: string,
+  state: AchievementState,
+): Promise<boolean> {
+  const eav: Record<string, unknown> = {
+    ':seq': seq,
+    ':applied': applied,
+    ':h': last_heartbeat,
+    ':lx': state.live_xp,
+    ':lr': state.last_rank ?? null,
+    ':rs': state.racer_streak_ms,
+    ':ra': state.racer_awards,
+    ':ps': state.pacesetter_streak_ms,
+    ':pa': state.pacesetter_awards,
+    ':oa': state.overtake_awards,
+    ':lta': state.lead_take_awards,
+    ':wil': state.was_in_last,
+    ':ca': state.comeback_awarded,
+    ':re': state.recent_events,
+  };
+  const setParts = [
+    'last_seq = :seq', 'last_heartbeat = :h', 'live_xp = :lx',
+    'last_rank = :lr', 'racer_streak_ms = :rs', 'racer_awards = :ra',
+    'pacesetter_streak_ms = :ps', 'pacesetter_awards = :pa',
+    'overtake_awards = :oa', 'lead_take_awards = :lta',
+    'was_in_last = :wil', 'comeback_awarded = :ca',
+    'recent_events = :re',
+  ];
+  const removeParts: string[] = [];
+
+  if (state.last_stampede_at !== undefined) {
+    setParts.push('last_stampede_at = :sa');
+    eav[':sa'] = state.last_stampede_at;
+  }
+  if (state.last_pulled_away_at !== undefined) {
+    setParts.push('last_pulled_away_at = :pwa');
+    eav[':pwa'] = state.last_pulled_away_at;
+  }
+  if (state.last_gap_in_1st !== undefined) {
+    setParts.push('last_gap_in_1st = :g');
+    eav[':g'] = state.last_gap_in_1st;
+  } else {
+    removeParts.push('last_gap_in_1st');
+  }
+
+  const updateExpression =
+    'SET ' + setParts.join(', ') +
+    ' ADD current_tokens :applied' +
+    (removeParts.length > 0 ? ' REMOVE ' + removeParts.join(', ') : '');
+
+  try {
+    await ddb.send(new UpdateCommand({
+      TableName: TABLE,
+      Key: horseKey(race_id, horse_id),
+      UpdateExpression: updateExpression,
+      ConditionExpression:
+        'attribute_exists(pk) AND (attribute_not_exists(last_seq) OR last_seq < :seq)',
+      ExpressionAttributeValues: eav,
+    }));
+    return true;
+  } catch (e: any) {
+    if (e?.name === 'ConditionalCheckFailedException') return false;
+    throw e;
+  }
 }
 
 function pickHorse(item: Record<string, any>): Horse {

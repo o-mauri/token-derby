@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   putHorse, listHorses, updateHorseHeartbeat, setHorseFinalTokens,
-  getHorseForHeartbeat, findHorseByUser, rotateHeartbeatToken,
+  getHorseForHeartbeat, findHorseByUser, rotateHeartbeatToken, applyHeartbeatDelta,
 } from '../../src/db/horses.js';
 import type { Horse } from '@token-derby/shared';
 import type { AchievementState } from '../../src/lib/evaluate-achievements.js';
@@ -116,6 +116,41 @@ describe('horses db', () => {
     const got2 = await getHorseForHeartbeat(race_id, h.horse_id, 'hb-gap');
     // Must be undefined, not the stale 5000
     expect(got2?.last_gap_in_1st).toBeUndefined();
+  });
+
+  it('applies a delta atomically and advances last_seq', async () => {
+    const race_id = `r-${Math.random().toString(36).slice(2)}`;
+    const h = makeHorse({ current_tokens: 100 });
+    await putHorse(race_id, h, 'tok');
+    const now = new Date().toISOString();
+    const applied = await applyHeartbeatDelta(race_id, h.horse_id, 1, 50, now, emptyState);
+    expect(applied).toBe(true);
+    const [u] = await listHorses(race_id);
+    expect(u?.current_tokens).toBe(150);
+    expect(u?.last_seq).toBe(1);
+  });
+
+  it('rejects a duplicate/old seq without re-applying', async () => {
+    const race_id = `r-${Math.random().toString(36).slice(2)}`;
+    const h = makeHorse({ current_tokens: 100 });
+    await putHorse(race_id, h, 'tok');
+    const now = new Date().toISOString();
+    await applyHeartbeatDelta(race_id, h.horse_id, 2, 50, now, emptyState); // -> 150, last_seq 2
+    const dup = await applyHeartbeatDelta(race_id, h.horse_id, 2, 50, now, emptyState);
+    const older = await applyHeartbeatDelta(race_id, h.horse_id, 1, 50, now, emptyState);
+    expect(dup).toBe(false);
+    expect(older).toBe(false);
+    const [u] = await listHorses(race_id);
+    expect(u?.current_tokens).toBe(150); // unchanged
+    expect(u?.last_seq).toBe(2);
+  });
+
+  it('getHorseForHeartbeat returns last_seq (0 when absent)', async () => {
+    const race_id = `r-${Math.random().toString(36).slice(2)}`;
+    const h = makeHorse();
+    await putHorse(race_id, h, 'tok');
+    const rec = await getHorseForHeartbeat(race_id, h.horse_id, 'tok');
+    expect(rec?.last_seq).toBe(0);
   });
 
   it('rotates heartbeat token while leaving other fields alone', async () => {
