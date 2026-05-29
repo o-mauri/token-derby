@@ -28,7 +28,8 @@ export type JoinRaceResponse = {
 };
 
 export type HeartbeatRequest = {
-  current_tokens: number;
+  seq: number;
+  delta: number;
 };
 
 export type HeartbeatResponse = {
@@ -37,6 +38,12 @@ export type HeartbeatResponse = {
   time_left_seconds: number;
   horses: HorseView[];
   race: Race;
+  last_seq: number;
+};
+
+export type SeriesPoint = {
+  t: number; // server epoch ms
+  d: number; // applied delta (tokens)
 };
 
 export type EndRaceResponse = {
