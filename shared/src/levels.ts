@@ -123,3 +123,40 @@ export function xpForRaceFinish(
 ): number {
   return xpForRaceResult(rank) + xpForTokenBonus(rank, tokens, winner_tokens) + (live_xp ?? 0);
 }
+
+/**
+ * Anti-farm gate for persistent race XP.
+ *
+ * Persistent XP is the only currency that buys hat rolls (rolls accrue on
+ * level-up, levels derive from XP), so XP has to be expensive to mint. Without
+ * a gate, anyone can spin up a free user, create a free race, join their own
+ * horse, and end it instantly for a flat ~95 XP — the "infinite horses" farm
+ * reborn one layer down. This gate makes XP require a *real, sustained
+ * competition* that a solo attacker can't fabricate on demand.
+ *
+ * Two independent factors each scale the awarded XP:
+ *   Distinct jockeys:  ≥3 → full, exactly 2 → half, ≤1 → none
+ *   Race duration:     ≥3h → full, ≥2h → half, <2h → none
+ *
+ * The factors do NOT stack multiplicatively — the harsher (minimum) of the two
+ * wins. So a 2-jockey race that ran 2.5h grants XP/2 (not XP/4), and any solo
+ * race or sub-2-hour race grants nothing regardless of the other factor.
+ */
+export const RACE_XP_GATE = {
+  full_jockeys: 3,
+  half_jockeys: 2,
+  full_hours: 3,
+  half_hours: 2,
+} as const;
+
+export function raceXpMultiplier(input: { distinct_jockeys: number; duration_ms: number }): number {
+  const jockeyFactor =
+    input.distinct_jockeys >= RACE_XP_GATE.full_jockeys ? 1 :
+    input.distinct_jockeys >= RACE_XP_GATE.half_jockeys ? 0.5 : 0;
+  const hours = input.duration_ms / 3_600_000;
+  const durationFactor =
+    hours >= RACE_XP_GATE.full_hours ? 1 :
+    hours >= RACE_XP_GATE.half_hours ? 0.5 : 0;
+  // Non-stacking: the harsher factor governs — never multiply them together.
+  return Math.min(jockeyFactor, durationFactor);
+}

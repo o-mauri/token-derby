@@ -12,6 +12,11 @@ import { makeUser, makeHorse, type TestUser } from '../helpers/auth-helper.js';
 
 const COLORS = { body: '#8B4513', mane: '#000', tail: '#000', saddle: '#C0392B' };
 
+// Finalisation instant that clears the duration half of the anti-farm gate.
+// The race is created "now", so finalising 3h+1m out makes the live duration
+// ≥3h → full duration factor. Paired with ≥3 jockeys this yields full XP.
+const FINALISE_FULL = () => new Date(Date.now() + 3 * 3_600_000 + 60_000);
+
 function authedEvent(
   user: TestUser | null,
   method: string,
@@ -99,12 +104,12 @@ describe('XP awarding on race end', () => {
   //   Rank 2: 65 + round(800/1000 * 15)=12 = 77
   //   Rank 3: 50 + round(500/1000 * 15)=8  = 58
   //   Rank 4: 25 + round(100/1000 * 15)=2  = 27
-  it('awards position XP + token bonus to ranks 1/2/3/4', async () => {
-    const { admin_code, horses } = await setupRaceWithRanks();
+  it('awards position XP + token bonus to ranks 1/2/3/4 (4 jockeys, ≥3h → full)', async () => {
+    const { race_id, horses } = await setupRaceWithRanks();
 
-    const res: any = await endHandler(authedEvent(null, 'DELETE', `/races/admin/${admin_code}`,
-      undefined, { admin_code }));
-    expect(res.statusCode).toBe(200);
+    // 4 distinct jockeys and a ≥3h run clear the anti-farm gate at full rate.
+    const race = await getRaceById(race_id);
+    await finaliseRace(race!, FINALISE_FULL());
 
     expect(await getStableXp(horses[0]!.user)).toBe(95); // winner
     expect(await getStableXp(horses[1]!.user)).toBe(77); // runner-up
@@ -113,9 +118,9 @@ describe('XP awarding on race end', () => {
   });
 
   it('stamps xp_awarded on each race horse', async () => {
-    const { admin_code, race_id } = await setupRaceWithRanks();
-    await endHandler(authedEvent(null, 'DELETE', `/races/admin/${admin_code}`,
-      undefined, { admin_code }));
+    const { race_id } = await setupRaceWithRanks();
+    const race = await getRaceById(race_id);
+    await finaliseRace(race!, FINALISE_FULL());
 
     const raceHorses = await listHorses(race_id);
     const awarded = raceHorses.map(h => (h as any).xp_awarded as number | undefined);
@@ -125,9 +130,10 @@ describe('XP awarding on race end', () => {
 
   it('is idempotent — re-running finaliseRace does not double-award', async () => {
     const { horses, race_id } = await setupRaceWithRanks();
-    // First finalise: real one through end-race.
+    // First finalise at full rate (≥3 jockeys, ≥3h) so the no-double-award
+    // assertion is meaningful against non-zero XP.
     const race = await getRaceById(race_id);
-    await finaliseRace(race!, new Date());
+    await finaliseRace(race!, FINALISE_FULL());
 
     const xpAfterFirst = await Promise.all(horses.map(h => getStableXp(h.user)));
 
@@ -143,7 +149,7 @@ describe('XP awarding on race end', () => {
   });
 
   it('forfeits XP when the stable horse was deleted before race end (race horse still marked)', async () => {
-    const { admin_code, race_id, horses } = await setupRaceWithRanks();
+    const { race_id, horses } = await setupRaceWithRanks();
     // Winner deletes their stable horse before the race ends.
     const winner = horses[0]!;
     const { handler: deleteStableHorse } = await import('../../src/handlers/delete-stable-horse.js');
@@ -152,8 +158,9 @@ describe('XP awarding on race end', () => {
       { stable_horse_id: winner.stable_horse_id }));
     expect(delRes.statusCode).toBe(200);
 
-    await endHandler(authedEvent(null, 'DELETE', `/races/admin/${admin_code}`,
-      undefined, { admin_code }));
+    // Full-rate finalise (≥3 jockeys, ≥3h) so the winner's marker would be 95.
+    const race = await getRaceById(race_id);
+    await finaliseRace(race!, FINALISE_FULL());
 
     // Winner's stable is empty (no XP went anywhere).
     const list: any = await listStable(authedEvent(winner.user, 'GET', '/jockey/me/horses'));
@@ -221,7 +228,11 @@ describe('XP awarding on race end', () => {
     }
   });
 
-  it('single-participant race: that horse is rank 1 and gets 95 XP (80 position + 15 winner bonus)', async () => {
+  // Anti-farm gate (the "infinite horses, one layer down" fix): a solo
+  // self-race — create a free race, join your own horse, end it — must grant
+  // ZERO persistent XP, even if it ran for hours, because 1 jockey fails the
+  // gate outright. This is the loop that would otherwise mint unlimited rolls.
+  async function setupSoloRace(): Promise<{ soloist: TestUser; race_id: string; admin_code: string; horse_id: string; heartbeat_token: string }> {
     const creator = await makeUser('XP_Solo_Creator');
     const soloist = await makeUser('XP_Solo');
     const h = await makeHorse(soloist, 'Solo', COLORS);
@@ -231,7 +242,7 @@ describe('XP awarding on race end', () => {
       end_time: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
       tz: 'UTC',
     }));
-    const { join_code, admin_code } = JSON.parse(createRes.body);
+    const { race_id, join_code, admin_code } = JSON.parse(createRes.body);
     const joinRes: any = await joinHandler(authedEvent(soloist, 'POST', `/races/${join_code}/join`,
       { stable_horse_id: h.stable_horse_id }, { join_code }));
     const { horse_id, heartbeat_token } = JSON.parse(joinRes.body);
@@ -240,10 +251,59 @@ describe('XP awarding on race end', () => {
       { seq: 1, delta: 42 },
       { join_code, horse_id }, heartbeat_token,
     ));
+    return { soloist, race_id, admin_code, horse_id, heartbeat_token };
+  }
 
+  it('solo race ended instantly grants 0 XP (gate: 1 jockey + <2h)', async () => {
+    const { soloist, admin_code } = await setupSoloRace();
     await endHandler(authedEvent(null, 'DELETE', `/races/admin/${admin_code}`,
       undefined, { admin_code }));
+    expect(await getStableXp(soloist)).toBe(0);
+  });
 
-    expect(await getStableXp(soloist)).toBe(95);
+  it('solo race that ran ≥3h still grants 0 XP (1 jockey fails the gate regardless of duration)', async () => {
+    const { soloist, race_id } = await setupSoloRace();
+    const race = await getRaceById(race_id);
+    await finaliseRace(race!, FINALISE_FULL());
+    expect(await getStableXp(soloist)).toBe(0);
+  });
+
+  it('4-jockey race that only ran ~2.5h grants HALF XP (duration factor, no stacking)', async () => {
+    const { race_id, horses } = await setupRaceWithRanks();
+    const race = await getRaceById(race_id);
+    // 4 jockeys (full) but 2.5h (half) → min = 0.5. Not 0.25.
+    await finaliseRace(race!, new Date(Date.now() + 2.5 * 3_600_000));
+    expect(await getStableXp(horses[0]!.user)).toBe(48); // round(95 * 0.5)
+    expect(await getStableXp(horses[1]!.user)).toBe(39); // round(77 * 0.5)
+    expect(await getStableXp(horses[2]!.user)).toBe(29); // round(58 * 0.5)
+    expect(await getStableXp(horses[3]!.user)).toBe(14); // round(27 * 0.5)
+  });
+
+  it('2-jockey race over ≥3h grants HALF XP (jockey factor)', async () => {
+    const creator = await makeUser('XP_2J_Creator');
+    const createRes: any = await createHandler(authedEvent(creator, 'POST', '/races', {
+      name: 'Duel',
+      start_time: new Date(Date.now() - 60_000).toISOString(),
+      end_time: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      tz: 'UTC',
+    }));
+    const { race_id, join_code } = JSON.parse(createRes.body);
+    const tokensByPlace = [1000, 800];
+    const users: TestUser[] = [];
+    for (let i = 0; i < tokensByPlace.length; i++) {
+      const u = await makeUser(`XP_2J_${i + 1}`);
+      users.push(u);
+      const h = await makeHorse(u, `D${i + 1}`, COLORS);
+      const joinRes: any = await joinHandler(authedEvent(u, 'POST', `/races/${join_code}/join`,
+        { stable_horse_id: h.stable_horse_id }, { join_code }));
+      const { horse_id, heartbeat_token } = JSON.parse(joinRes.body);
+      await hbHandler(authedEvent(null, 'POST',
+        `/races/${join_code}/horses/${horse_id}/heartbeat`,
+        { seq: 1, delta: tokensByPlace[i]! }, { join_code, horse_id }, heartbeat_token));
+    }
+    const race = await getRaceById(race_id);
+    await finaliseRace(race!, FINALISE_FULL());
+    expect(await getStableXp(users[0]!)).toBe(48); // round(95 * 0.5)
+    expect(await getStableXp(users[1]!)).toBe(39); // round(77 * 0.5)
   });
 });

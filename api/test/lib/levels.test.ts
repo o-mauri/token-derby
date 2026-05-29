@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { XP_THRESHOLDS, MAX_LEVEL, levelFromXp, levelInfo, thresholdForLevel, xpForLevel, xpForRaceResult, xpForTokenBonus, XP_AWARDS } from '@token-derby/shared';
+import { XP_THRESHOLDS, MAX_LEVEL, levelFromXp, levelInfo, thresholdForLevel, xpForLevel, xpForRaceResult, xpForTokenBonus, XP_AWARDS, raceXpMultiplier } from '@token-derby/shared';
+
+const H = 3_600_000; // one hour in ms
 
 describe('xpForLevel formula', () => {
   it('matches the documented values from 1.8n³ + 18n² + 50n − 19.8', () => {
@@ -126,5 +128,43 @@ describe('xpForTokenBonus', () => {
 
   it('caps at the full bonus if tokens somehow exceed winner_tokens', () => {
     expect(xpForTokenBonus(2, 9999, 100)).toBe(15);
+  });
+});
+
+describe('raceXpMultiplier (anti-farm gate)', () => {
+  it('grants full XP only with ≥3 jockeys AND ≥3h', () => {
+    expect(raceXpMultiplier({ distinct_jockeys: 3, duration_ms: 3 * H })).toBe(1);
+    expect(raceXpMultiplier({ distinct_jockeys: 10, duration_ms: 5 * H })).toBe(1);
+  });
+
+  it('1 jockey earns nothing no matter how long the race ran', () => {
+    expect(raceXpMultiplier({ distinct_jockeys: 1, duration_ms: 5 * H })).toBe(0);
+    expect(raceXpMultiplier({ distinct_jockeys: 0, duration_ms: 5 * H })).toBe(0);
+  });
+
+  it('a sub-2h race earns nothing no matter how many jockeys', () => {
+    expect(raceXpMultiplier({ distinct_jockeys: 10, duration_ms: 1.99 * H })).toBe(0);
+    expect(raceXpMultiplier({ distinct_jockeys: 10, duration_ms: 0 })).toBe(0);
+  });
+
+  it('exactly 2 jockeys halves XP (when duration is full)', () => {
+    expect(raceXpMultiplier({ distinct_jockeys: 2, duration_ms: 3 * H })).toBe(0.5);
+    expect(raceXpMultiplier({ distinct_jockeys: 2, duration_ms: 10 * H })).toBe(0.5);
+  });
+
+  it('2–3h duration halves XP (when jockeys is full)', () => {
+    expect(raceXpMultiplier({ distinct_jockeys: 5, duration_ms: 2 * H })).toBe(0.5);
+    expect(raceXpMultiplier({ distinct_jockeys: 5, duration_ms: 2.99 * H })).toBe(0.5);
+  });
+
+  it('does NOT stack the two halvings — 2 jockeys + 2.5h is half, not a quarter', () => {
+    expect(raceXpMultiplier({ distinct_jockeys: 2, duration_ms: 2.5 * H })).toBe(0.5);
+  });
+
+  it('the harsher (minimum) factor governs', () => {
+    // 2 jockeys (0.5) + sub-2h (0) → 0
+    expect(raceXpMultiplier({ distinct_jockeys: 2, duration_ms: 1 * H })).toBe(0);
+    // 3 jockeys (1) + 2.5h (0.5) → 0.5
+    expect(raceXpMultiplier({ distinct_jockeys: 3, duration_ms: 2.5 * H })).toBe(0.5);
   });
 });
