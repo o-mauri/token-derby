@@ -1,6 +1,6 @@
 {
   "name": "@mauricode/token-derby",
-  "version": "2.5.6",
+  "version": "2.5.7",
   "description": "Token Derby CLI — manage your stable, run horses in token races driven by Claude Code output.",
   "type": "module",
   "bin": {
