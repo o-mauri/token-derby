@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { handler as endHandler } from '../../src/handlers/end-race.js';
 import { handler as createHandler } from '../../src/handlers/create-race.js';
 import { handler as joinHandler } from '../../src/handlers/join-race.js';
@@ -35,6 +35,9 @@ function evt(
 }
 
 describe('endRace handler', () => {
+  beforeEach(() => { process.env.TOKEN_DERBY_MAX_RATE = '1000000000'; });
+  afterEach(() => { delete process.env.TOKEN_DERBY_MAX_RATE; });
+
   it('ends the race and freezes final_tokens', async () => {
     const creator = await makeUser('End_Creator');
     const joiner = await makeUser('End_Joiner');
@@ -53,7 +56,7 @@ describe('endRace handler', () => {
       joiner,
     ));
     const { horse_id, heartbeat_token } = JSON.parse(joinRes.body);
-    await hbHandler(evt({ current_tokens: 777 },
+    await hbHandler(evt({ seq: 1, delta: 777 },
       `/races/${join_code}/horses/${horse_id}/heartbeat`,
       'POST /races/{join_code}/horses/{horse_id}/heartbeat',
       { join_code, horse_id }, undefined, heartbeat_token,

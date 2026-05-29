@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { handler as createHandler } from '../../src/handlers/create-race.js';
 import { handler as joinHandler } from '../../src/handlers/join-race.js';
@@ -70,7 +70,7 @@ async function setupRaceWithRanks(): Promise<{
     const { horse_id, heartbeat_token } = JSON.parse(joinRes.body);
     await hbHandler(authedEvent(null, 'POST',
       `/races/${join_code}/horses/${horse_id}/heartbeat`,
-      { current_tokens: tokensByPlace[i]! },
+      { seq: 1, delta: tokensByPlace[i]! },
       { join_code, horse_id }, heartbeat_token,
     ));
     horses.push({ user: u, stable_horse_id: h.stable_horse_id, horse_id, heartbeat_token });
@@ -90,6 +90,9 @@ async function getStableHorse(user: TestUser): Promise<any> {
 }
 
 describe('XP awarding on race end', () => {
+  beforeEach(() => { process.env.TOKEN_DERBY_MAX_RATE = '1000000000'; });
+  afterEach(() => { delete process.env.TOKEN_DERBY_MAX_RATE; });
+
   // tokensByPlace = [1000, 800, 500, 100], winner = 1000
   // Position XP + token bonus:
   //   Rank 1: 80 + 15 (flat winner)        = 95
@@ -234,7 +237,7 @@ describe('XP awarding on race end', () => {
     const { horse_id, heartbeat_token } = JSON.parse(joinRes.body);
     await hbHandler(authedEvent(null, 'POST',
       `/races/${join_code}/horses/${horse_id}/heartbeat`,
-      { current_tokens: 42 },
+      { seq: 1, delta: 42 },
       { join_code, horse_id }, heartbeat_token,
     ));
 
