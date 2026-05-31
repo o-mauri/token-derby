@@ -1,5 +1,5 @@
 import type { Horse, Race, RaceEndedEvent } from '@token-derby/shared';
-import { xpForRaceFinish } from '@token-derby/shared';
+import { xpForRaceFinish, raceXpMultiplier } from '@token-derby/shared';
 import { listHorses, setHorseFinalTokens, setHorseXpAwarded } from '../db/horses.js';
 import { awardHorseXp, recordHorseRaceResult } from '../db/stable.js';
 import { setRaceEndedIfAbsent } from '../db/races.js';
@@ -47,9 +47,31 @@ export async function finaliseRace(race: Race, now: Date): Promise<FinaliseResul
     return new Date(a.joined_at).getTime() - new Date(b.joined_at).getTime();
   });
   const winner_tokens = ranked[0]?.final_tokens ?? 0;
+
+  // Anti-farm gate: persistent XP (the currency that buys hat rolls) is only
+  // awarded for a real, sustained competition. A solo or instant self-race —
+  // the natural successor to the "infinite horses" farm — earns nothing.
+  //   • Distinct jockeys: count unique jockeys, not horses (a single user can
+  //     only field one horse per race, but counting users is the robust check).
+  //   • Duration: measured from when the race actually went live to *now* (the
+  //     finalisation instant). live-start is clamped to created_at so a
+  //     back-dated start_time can't fake hours of elapsed time — the only
+  //     server-trusted anchors are created_at and the finalisation time.
+  const distinct_jockeys = new Set(
+    stamped.map(h => h.user_id).filter((id): id is string => Boolean(id)),
+  ).size;
+  const startMs = new Date(race.start_time).getTime();
+  const createdMs = new Date(race.created_at).getTime();
+  const liveStartMs = Math.max(
+    Number.isFinite(startMs) ? startMs : createdMs,
+    Number.isFinite(createdMs) ? createdMs : startMs,
+  );
+  const duration_ms = Math.max(0, now.getTime() - liveStartMs);
+  const xp_multiplier = raceXpMultiplier({ distinct_jockeys, duration_ms });
+
   await Promise.all(ranked.map(async (h, i) => {
     const rank = i + 1;
-    const xp = xpForRaceFinish(rank, h.final_tokens, winner_tokens, h.live_xp);
+    const xp = Math.round(xpForRaceFinish(rank, h.final_tokens, winner_tokens, h.live_xp) * xp_multiplier);
     const isFirstAward = await setHorseXpAwarded(race.race_id, h.horse_id, xp);
     if (isFirstAward && h.user_id && h.stable_horse_id) {
       await Promise.all([
@@ -75,7 +97,7 @@ export async function finaliseRace(race: Race, now: Date): Promise<FinaliseResul
         name: h.name,
         colors: h.colors,
         final_tokens: h.final_tokens,
-        xp_awarded: xpForRaceFinish(i + 1, h.final_tokens, winner_tokens, h.live_xp),
+        xp_awarded: Math.round(xpForRaceFinish(i + 1, h.final_tokens, winner_tokens, h.live_xp) * xp_multiplier),
         user_id: h.user_id,
         user_name: h.user_name,
       }));

@@ -142,14 +142,18 @@ describe('finaliseRace', () => {
   it('adds live_xp to the awarded XP at finalisation', async () => {
     const horseWithLive = makeHorse('Alpha', 100);
     horseWithLive.live_xp = 12;  // mid-race XP accrued during the race
-    const horses = [horseWithLive, makeHorse('Beta', 250)];
+    // Three distinct jockeys + a ≥3h run clear the anti-farm gate at full rate,
+    // so we can assert the raw (unscaled) XP total. Alpha is still 2nd.
+    const horses = [horseWithLive, makeHorse('Beta', 250), makeHorse('Gamma', 50)];
     const race = await setupRace(horses);
 
-    const result = await finaliseRace(race, new Date());
+    // Finalise ≥3h after created_at (gate measures live duration, anchored to
+    // created_at so a back-dated start_time can't fake it).
+    const result = await finaliseRace(race, new Date(Date.now() + 3 * 3_600_000 + 60_000));
 
     const stored = await listHorses(race.race_id);
     const alpha = findHorse(stored, 'Alpha');
-    // Alpha came 2nd in a 2-horse race.
+    // Alpha came 2nd (Beta 250 > Alpha 100 > Gamma 50).
     // xpForRaceResult(2): compete(25) + podium(25) + runner_up(15) = 65
     // token_bonus: round(100/250 * 15) = 6
     // live_xp: 12
