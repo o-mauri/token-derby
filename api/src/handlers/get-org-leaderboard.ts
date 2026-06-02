@@ -16,20 +16,23 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
 
   const members = await listOrgMembers(org.org_id);
 
-  const entries: LeaderboardEntry[] = [];
-  for (const member of members) {
-    const horses = await listStableHorses(member.user_id);
-    for (const h of horses) {
-      entries.push({
+  // Fan out the per-member stable lookups concurrently (same pattern as finalise-race.ts).
+  // owner_name is the member's display name as snapshot in the org membership record at
+  // join time — it can lag a later rename, consistent with the rest of the codebase.
+  const perMember = await Promise.all(
+    members.map(async (member) => {
+      const horses = await listStableHorses(member.user_id);
+      return horses.map((h): LeaderboardEntry => ({
         name: h.name,
         owner_name: member.user_name,
         wins: h.wins ?? 0,
         podiums: h.podiums ?? 0,
         xp: h.xp ?? 0,
         races_entered: h.races_entered ?? 0,
-      });
-    }
-  }
+      }));
+    }),
+  );
+  const entries: LeaderboardEntry[] = perMember.flat();
 
   entries.sort((a, b) => b.xp - a.xp);
 
