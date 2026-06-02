@@ -129,6 +129,23 @@ export async function listMembersForOrg(org_id: string): Promise<string[]> {
   return Items.map(it => String(it.member_user_id ?? ''));
 }
 
+export type OrgMember = { user_id: string; user_name: string };
+
+export async function listOrgMembers(org_id: string): Promise<OrgMember[]> {
+  const { Items = [] } = await ddb.send(new QueryCommand({
+    TableName: TABLE,
+    KeyConditionExpression: 'pk = :pk AND begins_with(sk, :mp)',
+    ExpressionAttributeValues: {
+      ':pk': `${ORG_PK_PREFIX}${org_id}`,
+      ':mp': MEMBER_SK_PREFIX,
+    },
+  }));
+  return Items.map(it => ({
+    user_id: String(it.member_user_id ?? ''),
+    user_name: String(it.user_name ?? ''),
+  })).filter(m => m.user_id !== '');
+}
+
 export async function setOrgWebhook(
   org_id: string,
   webhook_url: string,
