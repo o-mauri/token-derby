@@ -116,19 +116,6 @@ export async function listOrganisationsForUser(user_id: string): Promise<Organis
   return summaries;
 }
 
-// Stable for tests. Not used in handler paths.
-export async function listMembersForOrg(org_id: string): Promise<string[]> {
-  const { Items = [] } = await ddb.send(new QueryCommand({
-    TableName: TABLE,
-    KeyConditionExpression: 'pk = :pk AND begins_with(sk, :mp)',
-    ExpressionAttributeValues: {
-      ':pk': `${ORG_PK_PREFIX}${org_id}`,
-      ':mp': MEMBER_SK_PREFIX,
-    },
-  }));
-  return Items.map(it => String(it.member_user_id ?? ''));
-}
-
 export type OrgMember = { user_id: string; user_name: string };
 
 export async function listOrgMembers(org_id: string): Promise<OrgMember[]> {
@@ -139,11 +126,17 @@ export async function listOrgMembers(org_id: string): Promise<OrgMember[]> {
       ':pk': `${ORG_PK_PREFIX}${org_id}`,
       ':mp': MEMBER_SK_PREFIX,
     },
+    ProjectionExpression: 'member_user_id, user_name',
   }));
   return Items.map(it => ({
     user_id: String(it.member_user_id ?? ''),
     user_name: String(it.user_name ?? ''),
   })).filter(m => m.user_id !== '');
+}
+
+// Stable for tests. Not used in handler paths.
+export async function listMembersForOrg(org_id: string): Promise<string[]> {
+  return (await listOrgMembers(org_id)).map(m => m.user_id);
 }
 
 export async function setOrgWebhook(
