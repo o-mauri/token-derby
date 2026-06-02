@@ -86,6 +86,20 @@ export type ListOrgRacesResponse = {
   races: RaceSummary[];
 };
 
+export type LeaderboardEntry = {
+  name: string;          // stable horse name
+  owner_name: string;    // owning member's display name
+  wins: number;
+  podiums: number;
+  xp: number;
+  races_entered: number;
+};
+
+export type GetOrgLeaderboardResponse = {
+  org_name: string;
+  horses: LeaderboardEntry[];   // all org horses, sorted by xp descending
+};
+
 export type InitJockeyRequest = {
   display_name: string;
 };
