@@ -85,8 +85,10 @@ describe('renderOrg', () => {
     const leader = row.querySelector('.race-row-leader')!;
     expect(leader.textContent).toContain('Comet');
     expect(leader.textContent).toContain((1234).toLocaleString());
+    expect(row.querySelector('.race-row-label')?.textContent).toBe('Current leader');
 
-    const countdown = row.querySelector('.race-row-countdown')!;
+    // Countdown lives in the left meta line, next to the join code.
+    const countdown = row.querySelector('.race-row-meta .race-row-countdown')!;
     expect(countdown.textContent).toBe('00:01:05'); // 65s
 
     vi.advanceTimersByTime(5000);
@@ -139,8 +141,11 @@ describe('renderOrg', () => {
     expect(row.querySelector('.race-row-leader')).toBeNull();
     expect(row.querySelector('.race-row-name')?.textContent).toBe('Empty Live');
     expect(row.querySelector('.race-row-code')?.textContent).toBe('DEF456');
-    // Live rows carry no date in the meta line.
+    // Live rows carry the countdown (not a date) in the meta line, and no
+    // leader label without a highlight.
     expect(row.querySelector('.race-row-date')).toBeNull();
+    expect(row.querySelector('.race-row-meta .race-row-countdown')).not.toBeNull();
+    expect(row.querySelector('.race-row-label')).toBeNull();
     cleanup();
   });
 

@@ -225,7 +225,14 @@ html, body {
   letter-spacing: 0.05em;
 }
 .race-row-meta .race-row-date { color: var(--muted); }
-.race-row-meta .race-row-date::before { content: '· '; }
+.race-row-meta .race-row-date::before,
+.race-row-meta .race-row-countdown::before { content: '· '; font-weight: normal; color: var(--muted); }
+.race-row-label {
+  font-size: 0.7rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
 .race-row-info {
   display: flex;
   flex-direction: column;

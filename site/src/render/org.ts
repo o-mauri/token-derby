@@ -123,7 +123,8 @@ function renderRaceRow(doc: Document, r: RaceSummary, tickers: Ticker[]): HTMLEl
   const a = doc.createElement('a');
   a.href = `/race/${encodeURIComponent(r.join_code)}`;
 
-  // 1. Name + join code (+ date for finished/pending races).
+  // 1. Name + join code (+ date for finished/pending races, ticking
+  //    time-left countdown for live ones).
   const ident = doc.createElement('div');
   ident.className = 'race-row-ident';
   const nameEl = doc.createElement('span');
@@ -135,14 +136,16 @@ function renderRaceRow(doc: Document, r: RaceSummary, tickers: Ticker[]): HTMLEl
   codeEl.className = 'race-row-code';
   codeEl.textContent = r.join_code;
   meta.appendChild(codeEl);
-  const dateText = r.status === 'finished' ? formatEndDate(r)
-    : r.status === 'pending' ? formatStart(r)
-    : '';
-  if (dateText) {
-    const dateEl = doc.createElement('span');
-    dateEl.className = 'race-row-date';
-    dateEl.textContent = dateText;
-    meta.appendChild(dateEl);
+  if (r.status === 'live') {
+    meta.appendChild(buildLiveCountdown(doc, r, tickers));
+  } else {
+    const dateText = r.status === 'finished' ? formatEndDate(r) : formatStart(r);
+    if (dateText) {
+      const dateEl = doc.createElement('span');
+      dateEl.className = 'race-row-date';
+      dateEl.textContent = dateText;
+      meta.appendChild(dateEl);
+    }
   }
   ident.appendChild(nameEl);
   ident.appendChild(meta);
@@ -171,6 +174,22 @@ function buildMiniSprite(doc: Document, highlight: RaceHighlight): HTMLElement {
   }
   wrap.appendChild(svg);
   return wrap;
+}
+
+// A live race's time-left cell: anchored to the server snapshot once, then
+// ticked client-side. Shows "Finished" at zero — no refetch.
+function buildLiveCountdown(doc: Document, r: RaceSummary, tickers: Ticker[]): HTMLElement {
+  const countdown = doc.createElement('span');
+  countdown.className = 'race-row-countdown';
+  const anchor: CountdownAnchor = {
+    atMs: Date.now(),
+    timeLeftSeconds: r.time_left_seconds ?? 0,
+  };
+  tickers.push((nowMs) => {
+    const left = predictTimeLeftSeconds(anchor, nowMs);
+    countdown.textContent = left <= 0 ? 'Finished' : formatDuration(left);
+  });
+  return countdown;
 }
 
 // A winner/leader line: mini sprite followed by "name · N tokens" text.
@@ -204,19 +223,11 @@ function buildStatusInfo(doc: Document, r: RaceSummary, tickers: Ticker[]): HTML
   }
 
   if (r.status === 'live') {
-    const countdown = doc.createElement('span');
-    countdown.className = 'race-row-countdown';
-    const anchor: CountdownAnchor = {
-      atMs: Date.now(),
-      timeLeftSeconds: r.time_left_seconds ?? 0,
-    };
-    tickers.push((nowMs) => {
-      const left = predictTimeLeftSeconds(anchor, nowMs);
-      countdown.textContent = left <= 0 ? 'Finished' : formatDuration(left);
-    });
-    info.appendChild(countdown);
-
     if (r.highlight) {
+      const label = doc.createElement('span');
+      label.className = 'race-row-label';
+      label.textContent = 'Current leader';
+      info.appendChild(label);
       info.appendChild(buildHighlightLine(
         doc, r.highlight, 'race-row-leader',
         `${r.highlight.horse_name} · ${r.highlight.tokens.toLocaleString()} tokens`,
