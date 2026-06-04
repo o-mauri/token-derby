@@ -123,12 +123,7 @@ function renderRaceRow(doc: Document, r: RaceSummary, tickers: Ticker[]): HTMLEl
   const a = doc.createElement('a');
   a.href = `/race/${encodeURIComponent(r.join_code)}`;
 
-  // 1. Mini sprite (live/finished rows with a highlight only).
-  if (r.highlight) {
-    a.appendChild(buildMiniSprite(doc, r.highlight));
-  }
-
-  // 2. Name + join code.
+  // 1. Name + join code.
   const ident = doc.createElement('div');
   ident.className = 'race-row-ident';
   const nameEl = doc.createElement('span');
@@ -141,7 +136,8 @@ function renderRaceRow(doc: Document, r: RaceSummary, tickers: Ticker[]): HTMLEl
   ident.appendChild(codeEl);
   a.appendChild(ident);
 
-  // 3. Status-specific info, right-aligned.
+  // 2. Status-specific info, right-aligned. The winner/leader line carries the
+  //    mini sprite next to the horse name.
   a.appendChild(buildStatusInfo(doc, r, tickers));
 
   li.appendChild(a);
@@ -165,17 +161,32 @@ function buildMiniSprite(doc: Document, highlight: RaceHighlight): HTMLElement {
   return wrap;
 }
 
+// A winner/leader line: mini sprite followed by "name · N tokens" text.
+function buildHighlightLine(
+  doc: Document,
+  highlight: RaceHighlight,
+  className: string,
+  label: string,
+): HTMLElement {
+  const line = doc.createElement('span');
+  line.className = className;
+  line.appendChild(buildMiniSprite(doc, highlight));
+  const text = doc.createElement('span');
+  text.textContent = label;
+  line.appendChild(text);
+  return line;
+}
+
 function buildStatusInfo(doc: Document, r: RaceSummary, tickers: Ticker[]): HTMLElement {
   const info = doc.createElement('div');
   info.className = 'race-row-info';
 
   if (r.status === 'finished') {
     if (r.highlight) {
-      const winner = doc.createElement('span');
-      winner.className = 'race-row-winner';
-      winner.textContent =
-        `🏆 ${r.highlight.horse_name} · ${r.highlight.tokens.toLocaleString()} tokens`;
-      info.appendChild(winner);
+      info.appendChild(buildHighlightLine(
+        doc, r.highlight, 'race-row-winner',
+        `🏆 ${r.highlight.horse_name} · ${r.highlight.tokens.toLocaleString()} tokens`,
+      ));
     }
     const date = doc.createElement('span');
     date.className = 'race-row-date';
@@ -198,11 +209,10 @@ function buildStatusInfo(doc: Document, r: RaceSummary, tickers: Ticker[]): HTML
     info.appendChild(countdown);
 
     if (r.highlight) {
-      const leader = doc.createElement('span');
-      leader.className = 'race-row-leader';
-      leader.textContent =
-        `${r.highlight.horse_name} · ${r.highlight.tokens.toLocaleString()} tokens`;
-      info.appendChild(leader);
+      info.appendChild(buildHighlightLine(
+        doc, r.highlight, 'race-row-leader',
+        `${r.highlight.horse_name} · ${r.highlight.tokens.toLocaleString()} tokens`,
+      ));
     }
     return info;
   }

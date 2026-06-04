@@ -52,7 +52,8 @@ describe('renderOrg', () => {
     await flush();
 
     const row = root.querySelector('.race-row')!;
-    expect(row.querySelector('.race-row-sprite svg.horse-sprite')).not.toBeNull();
+    // Sprite sits inside the winner line, next to the horse name.
+    expect(row.querySelector('.race-row-winner .race-row-sprite svg.horse-sprite')).not.toBeNull();
     expect(row.querySelector('.race-row-name')?.textContent).toBe('Showdown');
     expect(row.querySelector('.race-row-code')?.textContent).toBe('MNO345');
     const winner = row.querySelector('.race-row-winner')!;
@@ -79,7 +80,8 @@ describe('renderOrg', () => {
     await flush();
 
     const row = root.querySelector('.race-row')!;
-    expect(row.querySelector('.race-row-sprite svg.horse-sprite')).not.toBeNull();
+    // Sprite sits inside the leader line, next to the horse name.
+    expect(row.querySelector('.race-row-leader .race-row-sprite svg.horse-sprite')).not.toBeNull();
     const leader = row.querySelector('.race-row-leader')!;
     expect(leader.textContent).toContain('Comet');
     expect(leader.textContent).toContain((1234).toLocaleString());

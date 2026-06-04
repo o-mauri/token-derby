@@ -197,8 +197,8 @@ html, body {
 .race-row a:hover { border-color: var(--accent); }
 .race-row-sprite {
   flex: 0 0 auto;
-  width: 56px;
-  height: 40px;
+  width: 36px;
+  height: 26px;
   display: flex;
   align-items: flex-end;
 }
@@ -231,7 +231,12 @@ html, body {
 }
 .race-row-countdown { font-weight: bold; color: var(--text); }
 .race-row-winner,
-.race-row-leader { color: var(--text); }
+.race-row-leader {
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
 
 /* ── Race view ─────────────────────────────────────── */
 
