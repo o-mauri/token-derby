@@ -39,6 +39,17 @@ describe('parseRoute', () => {
     expect(parseRoute('/org/with space')).toEqual({ type: 'not-found' });
   });
 
+  it('maps "/org/myteam/live" to org-live', () => {
+    expect(parseRoute('/org/myteam/live')).toEqual({ type: 'org-live', orgName: 'myteam' });
+    expect(parseRoute('/org/MyTeam/live/')).toEqual({ type: 'org-live', orgName: 'MyTeam' });
+  });
+
+  it('rejects bad org-live paths', () => {
+    expect(parseRoute('/org/abcdefghijklm/live')).toEqual({ type: 'not-found' });
+    expect(parseRoute('/org/myteam/liveX')).toEqual({ type: 'not-found' });
+    expect(parseRoute('/org//live')).toEqual({ type: 'not-found' });
+  });
+
   it('maps "/catalog" to catalog', () => {
     expect(parseRoute('/catalog')).toEqual({ type: 'catalog' });
     expect(parseRoute('/catalog/')).toEqual({ type: 'catalog' });

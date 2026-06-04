@@ -2,6 +2,7 @@ import { parseRoute } from './route.js';
 import { renderHome } from './render/home.js';
 import { renderRace } from './render/race.js';
 import { renderOrg } from './render/org.js';
+import { renderOrgLive } from './render/org-live.js';
 import { renderCatalog } from './render/catalog.js';
 import { applyInitialTvMode } from './render/tv-mode.js';
 
@@ -26,6 +27,8 @@ function route() {
     activeCleanup = renderRace(root, r.joinCode);
   } else if (r.type === 'org') {
     activeCleanup = renderOrg(root, r.orgName);
+  } else if (r.type === 'org-live') {
+    activeCleanup = renderOrgLive(root, r.orgName);
   } else if (r.type === 'catalog') {
     activeCleanup = renderCatalog(root);
   } else {

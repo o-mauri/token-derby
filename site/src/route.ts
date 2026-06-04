@@ -2,6 +2,7 @@ export type Route =
   | { type: 'home' }
   | { type: 'race'; joinCode: string }
   | { type: 'org'; orgName: string }
+  | { type: 'org-live'; orgName: string }
   | { type: 'catalog' }
   | { type: 'not-found' };
 
@@ -11,6 +12,9 @@ export function parseRoute(pathname: string): Route {
 
   const raceMatch = trimmed.match(/^\/race\/([A-Za-z0-9]+)$/);
   if (raceMatch) return { type: 'race', joinCode: raceMatch[1]!.toUpperCase() };
+
+  const orgLiveMatch = trimmed.match(/^\/org\/([A-Za-z0-9]{1,12})\/live$/);
+  if (orgLiveMatch) return { type: 'org-live', orgName: orgLiveMatch[1]! };
 
   const orgMatch = trimmed.match(/^\/org\/([A-Za-z0-9]{1,12})$/);
   if (orgMatch) return { type: 'org', orgName: orgMatch[1]! };
