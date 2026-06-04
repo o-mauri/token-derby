@@ -167,6 +167,17 @@ html, body {
   gap: 32px;
 }
 .org-status { color: var(--muted); }
+/* Live section pins to the viewport top; the bg + padding mask the rows
+   scrolling beneath it (negative margins keep the resting layout unchanged). */
+.org-section-live {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--bg);
+  padding: 12px 0 16px;
+  margin: -12px 0 -16px;
+}
+.org-section-live:not(:last-child) { border-bottom: 2px solid var(--panel); }
 .org-section h2 {
   color: var(--accent);
   text-transform: uppercase;

@@ -159,6 +159,9 @@ describe('renderOrg', () => {
     await flush();
     const titles = Array.from(root.querySelectorAll('.org-section h2')).map(h => h.textContent);
     expect(titles).toEqual(['Live', 'Upcoming', 'Finished']);
+    // Only the Live section gets the sticky modifier.
+    const sticky = Array.from(root.querySelectorAll('.org-section-live h2')).map(h => h.textContent);
+    expect(sticky).toEqual(['Live']);
     cleanup();
   });
 

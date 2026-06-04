@@ -104,6 +104,8 @@ function renderSection(
   if (races.length === 0) return null;
   const section = doc.createElement('section');
   section.className = 'org-section';
+  // Live races pin to the top of the viewport while the rest scroll beneath.
+  if (title === 'Live') section.classList.add('org-section-live');
 
   const h2 = doc.createElement('h2');
   h2.textContent = title;
