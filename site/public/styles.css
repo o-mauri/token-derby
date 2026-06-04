@@ -174,8 +174,9 @@ html, body {
   top: 0;
   z-index: 5;
   background: var(--bg);
-  padding: 12px 0 16px;
-  margin: -12px 0 -16px;
+  /* mask the full 32px org-body gap below so scrolling rows don't peek through */
+  padding: 12px 0 32px;
+  margin: -12px 0 -32px;
 }
 .org-section-live:not(:last-child) { border-bottom: 2px solid var(--panel); }
 .org-section h2 {

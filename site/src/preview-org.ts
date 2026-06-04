@@ -59,6 +59,22 @@ const FIXTURE: ListOrgRacesResponse = {
         hat: { id: 'party_hat', variant: 1, obtained_at: new Date().toISOString() },
       },
     },
+    // A pile of older finished races so the page scrolls — demonstrates the
+    // sticky Live section.
+    ...Array.from({ length: 8 }, (_, i): ListOrgRacesResponse['races'][number] => ({
+      race_id: `old-${i}`,
+      name: `Archive Race #${8 - i}`,
+      join_code: `OLD10${i}`,
+      start_time: new Date(Date.now() - (20 + i) * 24 * 60 * 60 * 1000).toISOString(),
+      end_time: new Date(Date.now() - (20 + i) * 24 * 60 * 60 * 1000 + 2 * 60 * 60 * 1000).toISOString(),
+      status: 'finished',
+      ended_at: new Date(Date.now() - (20 + i) * 24 * 60 * 60 * 1000 + 2 * 60 * 60 * 1000).toISOString(),
+      highlight: {
+        horse_name: ['Blaze', 'Nimbus', 'Pickle', 'Rocket', 'Waffles', 'Zephyr', 'Biscuit', 'Mango'][i]!,
+        tokens: 900_000 - i * 87_341,
+        colors: PALETTE,
+      },
+    })),
     // Finished with no highlight — no sprite, no winner text, just the date.
     {
       race_id: 'r6',
