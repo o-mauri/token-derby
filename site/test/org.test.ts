@@ -60,10 +60,10 @@ describe('renderOrg', () => {
     expect(winner.textContent).toContain('Thunderbolt');
     expect(winner.textContent).toContain((980421).toLocaleString());
     expect(winner.textContent).toContain('🏆');
-    // Date derived from ended_at, "MMM D".
+    // Date derived from ended_at, "MMM D", shown in the left meta line next to the code.
     const expected = new Date('2026-05-01T12:00:00Z')
       .toLocaleString(undefined, { month: 'short', day: 'numeric' });
-    expect(row.querySelector('.race-row-date')?.textContent).toBe(expected);
+    expect(row.querySelector('.race-row-meta .race-row-date')?.textContent).toBe(expected);
     cleanup();
   });
 
@@ -115,6 +115,11 @@ describe('renderOrg', () => {
     expect(countdown.textContent).toBe('Starts in 00:00:30');
     vi.advanceTimersByTime(10_000);
     expect(countdown.textContent).toBe('Starts in 00:00:20');
+    // Start time shown in the left meta line next to the code.
+    const expected = new Date('2026-06-04T12:00:30Z').toLocaleString(undefined, {
+      month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+    });
+    expect(root.querySelector('.race-row-meta .race-row-date')?.textContent).toBe(expected);
     cleanup();
   });
 
@@ -134,6 +139,8 @@ describe('renderOrg', () => {
     expect(row.querySelector('.race-row-leader')).toBeNull();
     expect(row.querySelector('.race-row-name')?.textContent).toBe('Empty Live');
     expect(row.querySelector('.race-row-code')?.textContent).toBe('DEF456');
+    // Live rows carry no date in the meta line.
+    expect(row.querySelector('.race-row-date')).toBeNull();
     cleanup();
   });
 

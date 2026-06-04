@@ -197,8 +197,8 @@ html, body {
 .race-row a:hover { border-color: var(--accent); }
 .race-row-sprite {
   flex: 0 0 auto;
-  width: 36px;
-  height: 26px;
+  width: 56px;
+  height: 40px;
   display: flex;
   align-items: flex-end;
 }
@@ -214,11 +214,18 @@ html, body {
   flex: 1 1 200px;
 }
 .race-row-name { font-weight: bold; }
-.race-row-code {
+.race-row-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
   font-size: 0.75rem;
+}
+.race-row-code {
   color: var(--accent);
   letter-spacing: 0.05em;
 }
+.race-row-meta .race-row-date { color: var(--muted); }
+.race-row-meta .race-row-date::before { content: '· '; }
 .race-row-info {
   display: flex;
   flex-direction: column;

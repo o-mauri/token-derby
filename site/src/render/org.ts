@@ -123,17 +123,29 @@ function renderRaceRow(doc: Document, r: RaceSummary, tickers: Ticker[]): HTMLEl
   const a = doc.createElement('a');
   a.href = `/race/${encodeURIComponent(r.join_code)}`;
 
-  // 1. Name + join code.
+  // 1. Name + join code (+ date for finished/pending races).
   const ident = doc.createElement('div');
   ident.className = 'race-row-ident';
   const nameEl = doc.createElement('span');
   nameEl.className = 'race-row-name';
   nameEl.textContent = r.name;
+  const meta = doc.createElement('span');
+  meta.className = 'race-row-meta';
   const codeEl = doc.createElement('span');
   codeEl.className = 'race-row-code';
   codeEl.textContent = r.join_code;
+  meta.appendChild(codeEl);
+  const dateText = r.status === 'finished' ? formatEndDate(r)
+    : r.status === 'pending' ? formatStart(r)
+    : '';
+  if (dateText) {
+    const dateEl = doc.createElement('span');
+    dateEl.className = 'race-row-date';
+    dateEl.textContent = dateText;
+    meta.appendChild(dateEl);
+  }
   ident.appendChild(nameEl);
-  ident.appendChild(codeEl);
+  ident.appendChild(meta);
   a.appendChild(ident);
 
   // 2. Status-specific info, right-aligned. The winner/leader line carries the
@@ -188,10 +200,6 @@ function buildStatusInfo(doc: Document, r: RaceSummary, tickers: Ticker[]): HTML
         `🏆 ${r.highlight.horse_name} · ${r.highlight.tokens.toLocaleString()} tokens`,
       ));
     }
-    const date = doc.createElement('span');
-    date.className = 'race-row-date';
-    date.textContent = formatEndDate(r);
-    info.appendChild(date);
     return info;
   }
 
@@ -225,11 +233,6 @@ function buildStatusInfo(doc: Document, r: RaceSummary, tickers: Ticker[]): HTML
     countdown.textContent = left <= 0 ? 'Starting…' : `Starts in ${formatDuration(left)}`;
   });
   info.appendChild(countdown);
-
-  const start = doc.createElement('span');
-  start.className = 'race-row-date';
-  start.textContent = formatStart(r);
-  info.appendChild(start);
   return info;
 }
 
