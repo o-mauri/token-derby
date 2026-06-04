@@ -2,7 +2,7 @@ import type { APIGatewayProxyHandlerV2 } from 'aws-lambda';
 import type { CreateRaceRequest, CreateRaceResponse, RaceCreatedEvent } from '@token-derby/shared';
 import { DEFAULT_MAX_PARTICIPANTS, ORG_NAME_PATTERN, parseSemver } from '@token-derby/shared';
 import { generateRaceId, generateJoinCode, generateAdminCode } from '../lib/codes.js';
-import { putRace, getRaceByJoinCode } from '../db/races.js';
+import { putRace, getRaceByJoinCode, listRacesByOrgId } from '../db/races.js';
 import { getOrganisationByName, isMember } from '../db/organisations.js';
 import { ok, err, parseJson } from '../lib/http.js';
 import { readCliVersion, meetsMinimumCliVersion, versionMismatchMessage } from '../lib/version.js';
@@ -60,6 +60,23 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
     if (!org) return err('ORG_NOT_FOUND', `No organisation named "${body.organisation_name}"`);
     if (!(await isMember(org.org_id, auth.user_id))) {
       return err('NOT_ORG_MEMBER', `You are not a member of "${org.org_name}"`);
+    }
+
+    // Orgs run one race at a time: reject windows that overlap an existing
+    // org race. Races ended early count up to their ended_at, not their
+    // scheduled end. Best-effort (check-then-write) — two simultaneous
+    // creates could both pass, which is acceptable at this scale.
+    const existing = await listRacesByOrgId(org.org_id);
+    const clash = existing.find((r) => {
+      const otherStart = new Date(r.start_time).getTime();
+      const otherEnd = new Date(r.ended_at ?? r.end_time).getTime();
+      return start_ms < otherEnd && end_ms > otherStart;
+    });
+    if (clash) {
+      return err(
+        'RACE_OVERLAP',
+        `"${org.org_name}" already has a race in that window: "${clash.name}" (${clash.join_code}). One race per org at a time.`,
+      );
     }
   }
 

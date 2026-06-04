@@ -172,16 +172,17 @@ describe('listOrgRaces handler', () => {
     }, user));
     const pendingJoin = JSON.parse(pendingRes.body).join_code;
 
-    // Finished race: explicitly ended
+    // Finished race: explicitly ended. Window predates the live race —
+    // create-race rejects org races whose windows overlap an existing one.
     const finishedRes: any = await createRace(createRaceEvent({
       name: 'Finished one',
-      start_time: '2020-02-01T00:00:00Z',
-      end_time: '2099-01-01T00:00:00Z',
+      start_time: '2019-02-01T00:00:00Z',
+      end_time: '2019-02-02T00:00:00Z',
       tz: 'UTC',
       organisation_name: 'LorOrgA',
     }, user));
     const finishedBody = JSON.parse(finishedRes.body);
-    await setRaceEnded(finishedBody.race_id, '2020-02-01T01:00:00Z');
+    await setRaceEnded(finishedBody.race_id, '2019-02-01T01:00:00Z');
 
     const res: any = await listOrgRaces(listEvent('LorOrgA'));
     expect(res.statusCode).toBe(200);
@@ -194,7 +195,7 @@ describe('listOrgRaces handler', () => {
     expect(byCode.get(pendingJoin).status).toBe('pending');
     const finishedSummary = byCode.get(finishedBody.join_code);
     expect(finishedSummary.status).toBe('finished');
-    expect(finishedSummary.ended_at).toBe('2020-02-01T01:00:00Z');
+    expect(finishedSummary.ended_at).toBe('2019-02-01T01:00:00Z');
   });
 
   it('does not require auth (public endpoint)', async () => {

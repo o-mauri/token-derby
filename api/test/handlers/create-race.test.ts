@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { handler } from '../../src/handlers/create-race.js';
 import { handler as createOrgHandler } from '../../src/handlers/create-organisation.js';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
-import { getRaceByJoinCode, getRaceByAdminCode } from '../../src/db/races.js';
+import { getRaceByJoinCode, getRaceByAdminCode, setRaceEnded } from '../../src/db/races.js';
 import { makeUser, type TestUser } from '../helpers/auth-helper.js';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
@@ -279,6 +279,101 @@ describe('createRace handler', () => {
     }, other));
     expect(res.statusCode).toBe(403);
     expect(JSON.parse(res.body).code).toBe('NOT_ORG_MEMBER');
+  });
+
+  it('rejects an org race whose window overlaps an existing org race', async () => {
+    const user = await makeUser('CR_Ovl');
+    await createOrgHandler(orgEvent({ name: 'CrtRaceC' }, user));
+    const first: any = await handler(event({
+      name: 'First',
+      start_time: '2026-04-22T09:00:00Z',
+      end_time: '2026-04-22T17:00:00Z',
+      tz: 'UTC',
+      organisation_name: 'CrtRaceC',
+    }, user));
+    expect(first.statusCode).toBe(200);
+
+    // Starts before the first race ends.
+    const res: any = await handler(event({
+      name: 'Clash',
+      start_time: '2026-04-22T16:00:00Z',
+      end_time: '2026-04-22T20:00:00Z',
+      tz: 'UTC',
+      organisation_name: 'CrtRaceC',
+    }, user));
+    expect(res.statusCode).toBe(409);
+    const body = JSON.parse(res.body);
+    expect(body.code).toBe('RACE_OVERLAP');
+    expect(body.message).toContain('First');
+  });
+
+  it('allows back-to-back org races (new start == previous end)', async () => {
+    const user = await makeUser('CR_B2B');
+    await createOrgHandler(orgEvent({ name: 'CrtRaceD' }, user));
+    const first: any = await handler(event({
+      name: 'Morning',
+      start_time: '2026-04-22T09:00:00Z',
+      end_time: '2026-04-22T12:00:00Z',
+      tz: 'UTC',
+      organisation_name: 'CrtRaceD',
+    }, user));
+    expect(first.statusCode).toBe(200);
+
+    const res: any = await handler(event({
+      name: 'Afternoon',
+      start_time: '2026-04-22T12:00:00Z',
+      end_time: '2026-04-22T17:00:00Z',
+      tz: 'UTC',
+      organisation_name: 'CrtRaceD',
+    }, user));
+    expect(res.statusCode).toBe(200);
+  });
+
+  it('treats a race ended early as occupying only up to its ended_at', async () => {
+    const user = await makeUser('CR_Early');
+    await createOrgHandler(orgEvent({ name: 'CrtRaceE' }, user));
+    const first: any = await handler(event({
+      name: 'Cut short',
+      start_time: '2026-04-22T09:00:00Z',
+      end_time: '2026-04-22T17:00:00Z',
+      tz: 'UTC',
+      organisation_name: 'CrtRaceE',
+    }, user));
+    expect(first.statusCode).toBe(200);
+    const firstRace = await getRaceByJoinCode(JSON.parse(first.body).join_code);
+    await setRaceEnded(firstRace!.race_id, '2026-04-22T11:00:00Z');
+
+    // Overlaps the scheduled window but not the actual (early-ended) one.
+    const res: any = await handler(event({
+      name: 'After early end',
+      start_time: '2026-04-22T12:00:00Z',
+      end_time: '2026-04-22T16:00:00Z',
+      tz: 'UTC',
+      organisation_name: 'CrtRaceE',
+    }, user));
+    expect(res.statusCode).toBe(200);
+  });
+
+  it('does not constrain non-org races against org race windows', async () => {
+    const user = await makeUser('CR_NoOrg');
+    await createOrgHandler(orgEvent({ name: 'CrtRaceF' }, user));
+    const first: any = await handler(event({
+      name: 'Org race',
+      start_time: '2026-04-22T09:00:00Z',
+      end_time: '2026-04-22T17:00:00Z',
+      tz: 'UTC',
+      organisation_name: 'CrtRaceF',
+    }, user));
+    expect(first.statusCode).toBe(200);
+
+    // Same window, but no organisation_name — allowed.
+    const res: any = await handler(event({
+      name: 'Personal race',
+      start_time: '2026-04-22T10:00:00Z',
+      end_time: '2026-04-22T16:00:00Z',
+      tz: 'UTC',
+    }, user));
+    expect(res.statusCode).toBe(200);
   });
 
   it('fires the race.created webhook for org-linked races when configured', async () => {
