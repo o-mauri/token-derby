@@ -66,6 +66,13 @@ export type HorseView = Horse & {
   rank: number;
 };
 
+export type RaceHighlight = {
+  horse_name: string;
+  tokens: number;     // finished: final_tokens (fallback current_tokens); live: current_tokens
+  colors: HorseColors;
+  hat?: CollectedHat; // equipped hat so the mini sprite matches the race page
+};
+
 export type RaceSummary = {
   race_id: string;
   name: string;
@@ -74,6 +81,11 @@ export type RaceSummary = {
   end_time: string;
   status: RaceStatus;
   ended_at?: string;
+  // Winner (finished) or current leader (live). Absent for pending races,
+  // races with zero horses, or when the horse lookup fails.
+  highlight?: RaceHighlight;
+  // Live races only, computed server-side at request time.
+  time_left_seconds?: number;
 };
 
 export type RaceView = Race & {
