@@ -44,10 +44,11 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
 
       try {
         const horses = await listHorses(race.race_id);
-        if (horses.length === 0) return summary;
         // rankHorses sorts by current_tokens desc, joined_at asc. The top horse
-        // is the winner (finished) or current leader (live).
+        // is the winner (finished) or current leader (live). Zero-horse races
+        // have no leader, so they get no highlight.
         const leader = rankHorses(horses)[0];
+        if (!leader) return summary;
         const tokens =
           status === 'finished'
             ? leader.final_tokens ?? leader.current_tokens
