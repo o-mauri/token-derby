@@ -3,9 +3,12 @@ import type { ListOrgRacesResponse } from '@token-derby/shared';
 
 const ORG_NAME = 'PreviewOrg';
 
+const PALETTE = { body: '#8B4513', mane: '#1F1108', tail: '#1F1108', saddle: '#C0392B' };
+
 const FIXTURE: ListOrgRacesResponse = {
   org_name: ORG_NAME,
   races: [
+    // Live with a leader + equipped hat.
     {
       race_id: 'r1',
       name: 'Friday Sprint',
@@ -13,15 +16,25 @@ const FIXTURE: ListOrgRacesResponse = {
       start_time: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
       end_time: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
       status: 'live',
+      time_left_seconds: 2 * 60 * 60,
+      highlight: {
+        horse_name: 'Comet',
+        tokens: 1_234_567,
+        colors: PALETTE,
+        hat: { id: 'stetson', variant: 0, obtained_at: new Date().toISOString() },
+      },
     },
+    // Live with no highlight (zero-horse race) — no sprite, no leader text.
     {
       race_id: 'r2',
-      name: 'Late Night Marathon',
+      name: 'Late Night Marathon (empty)',
       join_code: 'DEF456',
       start_time: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
       end_time: new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString(),
       status: 'live',
+      time_left_seconds: 30,
     },
+    // Pending.
     {
       race_id: 'r3',
       name: 'Monday Warm-up',
@@ -30,14 +43,7 @@ const FIXTURE: ListOrgRacesResponse = {
       end_time: new Date(Date.now() + 26 * 60 * 60 * 1000).toISOString(),
       status: 'pending',
     },
-    {
-      race_id: 'r4',
-      name: 'Quarterly Grand Prix',
-      join_code: 'JKL012',
-      start_time: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-      end_time: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000 + 4 * 60 * 60 * 1000).toISOString(),
-      status: 'pending',
-    },
+    // Finished with a winner + hat.
     {
       race_id: 'r5',
       name: 'Last Week Showdown',
@@ -46,24 +52,22 @@ const FIXTURE: ListOrgRacesResponse = {
       end_time: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000 + 4 * 60 * 60 * 1000).toISOString(),
       status: 'finished',
       ended_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000 + 3 * 60 * 60 * 1000).toISOString(),
+      highlight: {
+        horse_name: 'Thunderbolt',
+        tokens: 980_421,
+        colors: { body: '#2E4057', mane: '#0B1A2A', tail: '#0B1A2A', saddle: '#D4AF37' },
+        hat: { id: 'party_hat', variant: 1, obtained_at: new Date().toISOString() },
+      },
     },
+    // Finished with no highlight — no sprite, no winner text, just the date.
     {
       race_id: 'r6',
-      name: 'Pre-launch Demo',
+      name: 'Pre-launch Demo (no finishers)',
       join_code: 'PQR678',
       start_time: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(),
       end_time: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000 + 1 * 60 * 60 * 1000).toISOString(),
       status: 'finished',
       ended_at: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000 + 50 * 60 * 1000).toISOString(),
-    },
-    {
-      race_id: 'r7',
-      name: 'New Year Derby',
-      join_code: 'STU901',
-      start_time: '2026-01-01T10:00:00Z',
-      end_time: '2026-01-01T14:00:00Z',
-      status: 'finished',
-      ended_at: '2026-01-01T14:00:00Z',
     },
   ],
 };

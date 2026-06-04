@@ -178,32 +178,60 @@ html, body {
   list-style: none;
   padding: 0;
   margin: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 12px;
-}
-.race-card a {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 14px 16px;
+  gap: 10px;
+}
+.race-row a {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+  padding: 12px 16px;
   background: var(--panel);
   border: 2px solid var(--border);
   border-radius: 6px;
   color: var(--text);
   text-decoration: none;
 }
-.race-card a:hover { border-color: var(--accent); }
-.race-card-name { font-weight: bold; }
-.race-card-meta {
+.race-row a:hover { border-color: var(--accent); }
+.race-row-sprite {
+  flex: 0 0 auto;
+  width: 56px;
+  height: 40px;
   display: flex;
-  justify-content: space-between;
-  gap: 12px;
+  align-items: flex-end;
+}
+.race-row-sprite .horse-sprite {
+  width: 100%;
+  height: 100%;
+}
+.race-row-ident {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1 1 200px;
+}
+.race-row-name { font-weight: bold; }
+.race-row-code {
   font-size: 0.75rem;
-  color: var(--muted);
+  color: var(--accent);
   letter-spacing: 0.05em;
 }
-.race-card-code { color: var(--accent); }
+.race-row-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  margin-left: auto;
+  text-align: right;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.race-row-countdown { font-weight: bold; color: var(--text); }
+.race-row-winner,
+.race-row-leader { color: var(--text); }
 
 /* ── Race view ─────────────────────────────────────── */
 
