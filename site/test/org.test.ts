@@ -3,10 +3,10 @@ import type { ListOrgRacesResponse, RaceSummary } from '@token-derby/shared';
 
 // Mock the api module so renderOrg's fetchOrgRaces resolves with our fixture
 // without touching the network or the global fetch.
-const fetchOrgRaces = vi.fn<[], Promise<ListOrgRacesResponse>>();
+const fetchOrgRaces = vi.fn<() => Promise<ListOrgRacesResponse>>();
 vi.mock('../src/api.js', async () => {
   const actual = await vi.importActual<typeof import('../src/api.js')>('../src/api.js');
-  return { ...actual, fetchOrgRaces: (...args: any[]) => fetchOrgRaces(...(args as [])) };
+  return { ...actual, fetchOrgRaces: () => fetchOrgRaces() };
 });
 
 import { renderOrg } from '../src/render/org.js';
