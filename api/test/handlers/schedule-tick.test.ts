@@ -76,4 +76,26 @@ describe('schedule-tick', () => {
     await runTick();
     expect((await listRacesByOrgId(org_id)).length).toBe(0);
   });
+
+  it('isolates failures: a bad schedule does not block a good one', async () => {
+    const badUser = await makeUser('TickBad');
+    const badOrg = await createOrg(badUser, 'TickBadOrg');
+    // Invalid IANA tz stored directly (bypasses handler validation) -> the tz
+    // helpers throw for this schedule, exercising the per-schedule try/catch.
+    await putSchedule({ ...baseSchedule(badOrg), tz: 'Not/AZone' });
+
+    const goodUser = await makeUser('TickGood');
+    const goodOrg = await createOrg(goodUser, 'TickGoodOrg');
+    await putSchedule(baseSchedule(goodOrg)); // tz UTC, Mon–Fri 09:00–17:30
+
+    // Monday 10:00 UTC — inside the good schedule's window.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2024-07-01T10:00:00Z'));
+
+    await runTick();
+
+    // Bad schedule created nothing; good schedule still materialised its race.
+    expect((await listRacesByOrgId(badOrg)).length).toBe(0);
+    expect((await listRacesByOrgId(goodOrg)).length).toBe(1);
+  });
 });
