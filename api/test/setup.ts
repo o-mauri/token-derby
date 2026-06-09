@@ -29,6 +29,7 @@ beforeAll(async () => {
       { AttributeName: 'member_user_id', AttributeType: 'S' },
       { AttributeName: 'org_id', AttributeType: 'S' },
       { AttributeName: 'start_time', AttributeType: 'S' },
+      { AttributeName: 'schedule_marker', AttributeType: 'S' },
     ],
     KeySchema: [
       { AttributeName: 'pk', KeyType: 'HASH' },
@@ -65,6 +66,14 @@ beforeAll(async () => {
         KeySchema: [
           { AttributeName: 'org_id', KeyType: 'HASH' },
           { AttributeName: 'start_time', KeyType: 'RANGE' },
+        ],
+        Projection: { ProjectionType: 'ALL' },
+      },
+      {
+        IndexName: 'SchedulesIndex',
+        KeySchema: [
+          { AttributeName: 'schedule_marker', KeyType: 'HASH' },
+          { AttributeName: 'org_id', KeyType: 'RANGE' },
         ],
         Projection: { ProjectionType: 'ALL' },
       },

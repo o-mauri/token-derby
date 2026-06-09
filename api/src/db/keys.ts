@@ -50,6 +50,12 @@ export function parseStableHorseId(sk: string): string | null {
   return sk.startsWith(STABLE_HORSE_SK_PREFIX) ? sk.slice(STABLE_HORSE_SK_PREFIX.length) : null;
 }
 
+export const SCHEDULE_SK = 'SCHEDULE';
+
+export function orgScheduleKey(org_id: string) {
+  return { pk: `${ORG_PK_PREFIX}${org_id}`, sk: SCHEDULE_SK };
+}
+
 export const POINT_SK_PREFIX = 'POINT#';
 
 // 12 digits comfortably exceeds any realistic per-race heartbeat count and
