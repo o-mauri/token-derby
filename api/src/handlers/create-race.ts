@@ -1,14 +1,11 @@
 import type { APIGatewayProxyHandlerV2 } from 'aws-lambda';
-import type { CreateRaceRequest, CreateRaceResponse, RaceCreatedEvent } from '@token-derby/shared';
-import { DEFAULT_MAX_PARTICIPANTS, ORG_NAME_PATTERN, parseSemver } from '@token-derby/shared';
-import { generateRaceId, generateJoinCode, generateAdminCode } from '../lib/codes.js';
-import { putRace, getRaceByJoinCode, listRacesByOrgId } from '../db/races.js';
+import type { CreateRaceRequest, CreateRaceResponse } from '@token-derby/shared';
+import { ORG_NAME_PATTERN, parseSemver } from '@token-derby/shared';
 import { getOrganisationByName, isMember } from '../db/organisations.js';
 import { ok, err, parseJson } from '../lib/http.js';
 import { readCliVersion, meetsMinimumCliVersion, versionMismatchMessage } from '../lib/version.js';
 import { authenticate } from '../lib/auth.js';
-import { sendOrgWebhook } from '../lib/webhook.js';
-import { randomUUID } from 'node:crypto';
+import { createRace } from '../lib/create-race.js';
 
 export const handler: APIGatewayProxyHandlerV2 = async (event) => {
   const cli_version = readCliVersion(event);
@@ -46,7 +43,6 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
   if (Number.isNaN(start_ms) || Number.isNaN(end_ms)) {
     return err('BAD_REQUEST', 'start_time and end_time must be valid ISO 8601 datetimes');
   }
-
   if (end_ms <= start_ms) {
     return err('BAD_REQUEST', 'end_time must be after start_time');
   }
@@ -61,81 +57,28 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
     if (!(await isMember(org.org_id, auth.user_id))) {
       return err('NOT_ORG_MEMBER', `You are not a member of "${org.org_name}"`);
     }
-
-    // Orgs run one race at a time: reject windows that overlap an existing
-    // org race. Races ended early count up to their ended_at, not their
-    // scheduled end. Best-effort (check-then-write) — two simultaneous
-    // creates could both pass, which is acceptable at this scale.
-    const existing = await listRacesByOrgId(org.org_id);
-    const clash = existing.find((r) => {
-      const otherStart = new Date(r.start_time).getTime();
-      const otherEnd = new Date(r.ended_at ?? r.end_time).getTime();
-      return start_ms < otherEnd && end_ms > otherStart;
-    });
-    if (clash) {
-      return err(
-        'RACE_OVERLAP',
-        `"${org.org_name}" already has a race in that window: "${clash.name}" (${clash.join_code}). One race per org at a time.`,
-      );
-    }
   }
 
-  const join_code = await findUniqueJoinCode();
-  const race_id = generateRaceId();
-  const admin_code = generateAdminCode();
-  const created_at = new Date().toISOString();
-  const max_participants = body.max_participants ?? DEFAULT_MAX_PARTICIPANTS;
+  const result = await createRace({
+    name: body.name,
+    start_time: body.start_time,
+    end_time: body.end_time,
+    tz: body.tz,
+    max_participants: body.max_participants,
+    counts_input: body.counts_input,
+    creator_user_id: auth.user_id,
+    creator_user_name: auth.display_name,
+    cli_version,
+    org: org
+      ? { org_id: org.org_id, org_name: org.org_name, webhook_url: org.webhook_url, webhook_secret: org.webhook_secret }
+      : null,
+  });
+  if (!result.ok) return err(result.code, result.message);
 
-  await putRace(
-    {
-      race_id,
-      name: body.name,
-      start_time: body.start_time,
-      end_time: body.end_time,
-      tz: body.tz,
-      max_participants,
-      join_code,
-      created_at,
-      cli_version,
-      creator_user_id: auth.user_id,
-      creator_user_name: auth.display_name,
-      ...(org ? { org_id: org.org_id, organisation_name: org.org_name } : {}),
-      ...(body.counts_input ? { counts_input: true } : {}),
-    },
-    admin_code,
-  );
-
-  if (org) {
-    const payload: RaceCreatedEvent = {
-      event: 'race.created',
-      delivery_id: randomUUID(),
-      sent_at: created_at,
-      organisation: { org_id: org.org_id, org_name: org.org_name },
-      race: {
-        race_id,
-        name: body.name,
-        join_code,
-        start_time: body.start_time,
-        end_time: body.end_time,
-        tz: body.tz,
-        max_participants,
-        created_at,
-        creator_user_id: auth.user_id,
-        creator_user_name: auth.display_name,
-      },
-    };
-    await sendOrgWebhook(org, 'race.created', payload);
-  }
-
-  const response: CreateRaceResponse = { race_id, join_code, admin_code };
+  const response: CreateRaceResponse = {
+    race_id: result.race_id,
+    join_code: result.join_code,
+    admin_code: result.admin_code,
+  };
   return ok(response);
 };
-
-async function findUniqueJoinCode(): Promise<string> {
-  for (let i = 0; i < 10; i++) {
-    const code = generateJoinCode();
-    const existing = await getRaceByJoinCode(code);
-    if (!existing) return code;
-  }
-  throw new Error('Could not generate unique join code after 10 attempts');
-}
