@@ -86,12 +86,12 @@ export class TokenDerbyStack extends cdk.Stack {
     const apiDir = path.resolve(__dirname, '..', '..', 'api', 'src', 'handlers');
     const commonEnv = { TABLE_NAME, NODE_OPTIONS: '--enable-source-maps' };
 
-    const makeFn = (name: string, fileBase: string) => {
+    const makeFn = (name: string, fileBase: string, opts?: { timeout?: cdk.Duration }) => {
       const fn = new NodejsFunction(this, name, {
         runtime: lambda.Runtime.NODEJS_22_X,
         entry: path.join(apiDir, `${fileBase}.ts`),
         handler: 'handler',
-        timeout: cdk.Duration.seconds(10),
+        timeout: opts?.timeout ?? cdk.Duration.seconds(10),
         memorySize: 256,
         environment: commonEnv,
         bundling: {
@@ -121,7 +121,7 @@ export class TokenDerbyStack extends cdk.Stack {
     const setOrgScheduleFn = makeFn('SetOrgScheduleFn', 'set-org-schedule');
     const getOrgScheduleFn = makeFn('GetOrgScheduleFn', 'get-org-schedule');
     const deleteOrgScheduleFn = makeFn('DeleteOrgScheduleFn', 'delete-org-schedule');
-    const scheduleTickFn = makeFn('ScheduleTickFn', 'schedule-tick');
+    const scheduleTickFn = makeFn('ScheduleTickFn', 'schedule-tick', { timeout: cdk.Duration.seconds(120) });
 
     new events.Rule(this, 'ScheduleTickRule', {
       schedule: events.Schedule.rate(cdk.Duration.minutes(1)),
