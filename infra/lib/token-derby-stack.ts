@@ -13,6 +13,8 @@ import * as targets from 'aws-cdk-lib/aws-route53-targets';
 import { HttpApi, HttpMethod, CorsHttpMethod } from 'aws-cdk-lib/aws-apigatewayv2';
 import { HttpLambdaIntegration } from 'aws-cdk-lib/aws-apigatewayv2-integrations';
 import * as apigatewayv2 from 'aws-cdk-lib/aws-apigatewayv2';
+import * as events from 'aws-cdk-lib/aws-events';
+import * as eventsTargets from 'aws-cdk-lib/aws-events-targets';
 import * as path from 'path';
 
 const DOMAIN_NAME = 'token-derby.mauricode.co.uk';
@@ -74,6 +76,12 @@ export class TokenDerbyStack extends cdk.Stack {
       sortKey: { name: 'start_time', type: dynamodb.AttributeType.STRING },
     });
 
+    table.addGlobalSecondaryIndex({
+      indexName: 'SchedulesIndex',
+      partitionKey: { name: 'schedule_marker', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'org_id', type: dynamodb.AttributeType.STRING },
+    });
+
     // ── Lambda factory ─────────────────────────────────────────────────
     const apiDir = path.resolve(__dirname, '..', '..', 'api', 'src', 'handlers');
     const commonEnv = { TABLE_NAME, NODE_OPTIONS: '--enable-source-maps' };
@@ -110,6 +118,16 @@ export class TokenDerbyStack extends cdk.Stack {
     const setOrgWebhookFn = makeFn('SetOrgWebhookFn', 'set-org-webhook');
     const getOrgWebhookFn = makeFn('GetOrgWebhookFn', 'get-org-webhook');
     const deleteOrgWebhookFn = makeFn('DeleteOrgWebhookFn', 'delete-org-webhook');
+    const setOrgScheduleFn = makeFn('SetOrgScheduleFn', 'set-org-schedule');
+    const getOrgScheduleFn = makeFn('GetOrgScheduleFn', 'get-org-schedule');
+    const deleteOrgScheduleFn = makeFn('DeleteOrgScheduleFn', 'delete-org-schedule');
+    const scheduleTickFn = makeFn('ScheduleTickFn', 'schedule-tick');
+
+    new events.Rule(this, 'ScheduleTickRule', {
+      schedule: events.Schedule.rate(cdk.Duration.minutes(1)),
+      targets: [new eventsTargets.LambdaFunction(scheduleTickFn)],
+    });
+
     const initJockeyFn = makeFn('InitJockeyFn', 'init-jockey');
     const getJockeyFn = makeFn('GetJockeyFn', 'get-jockey');
     const updateJockeyFn = makeFn('UpdateJockeyFn', 'update-jockey');
@@ -155,6 +173,21 @@ export class TokenDerbyStack extends cdk.Stack {
       path: '/api/organisations/{org_name}/webhook',
       methods: [HttpMethod.DELETE],
       integration: new HttpLambdaIntegration('DeleteOrgWebhookInt', deleteOrgWebhookFn),
+    });
+    httpApi.addRoutes({
+      path: '/api/organisations/{org_name}/schedule',
+      methods: [HttpMethod.PUT],
+      integration: new HttpLambdaIntegration('SetOrgScheduleInt', setOrgScheduleFn),
+    });
+    httpApi.addRoutes({
+      path: '/api/organisations/{org_name}/schedule',
+      methods: [HttpMethod.GET],
+      integration: new HttpLambdaIntegration('GetOrgScheduleInt', getOrgScheduleFn),
+    });
+    httpApi.addRoutes({
+      path: '/api/organisations/{org_name}/schedule',
+      methods: [HttpMethod.DELETE],
+      integration: new HttpLambdaIntegration('DeleteOrgScheduleInt', deleteOrgScheduleFn),
     });
     httpApi.addRoutes({ path: '/api/jockey/init', methods: [HttpMethod.POST], integration: new HttpLambdaIntegration('InitJockeyInt', initJockeyFn) });
     httpApi.addRoutes({ path: '/api/jockey/me', methods: [HttpMethod.GET], integration: new HttpLambdaIntegration('GetJockeyInt', getJockeyFn) });
