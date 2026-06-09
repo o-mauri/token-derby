@@ -20,3 +20,11 @@ export function activeRacesDir(): string {
 export function claudeProjectsDir(): string {
   return process.env.TOKEN_DERBY_CLAUDE_DIR ?? path.join(os.homedir(), '.claude', 'projects');
 }
+
+export function geminiTmpDir(): string {
+  return process.env.TOKEN_DERBY_GEMINI_DIR ?? path.join(os.homedir(), '.gemini', 'tmp');
+}
+
+export function sourcesFile(): string {
+  return path.join(homeDir(), 'sources.json');
+}

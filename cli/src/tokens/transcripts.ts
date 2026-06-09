@@ -22,6 +22,14 @@ import { claudeProjectsDir } from '../paths.js';
 // passive context that don't represent work done in the race.
 export type TokenTotals = { input: number; output: number };
 
+// How deep to recurse below each project dir. Subagents and dynamic workflows
+// write their OWN transcripts nested under the session, e.g.
+//   <project>/<session>/subagents/agent-*.jsonl                    (Agent/Task subagents)
+//   <project>/<session>/subagents/workflows/wf_<id>/agent-*.jsonl  (dynamic workflows)
+// These are real Claude Code output and should count; a shallow scan misses the
+// workflow tier. Headroom is left for agents that themselves spawn agents.
+const MAX_PROJECT_DEPTH = 8;
+
 export async function sumTokens(): Promise<TokenTotals> {
   const root = claudeProjectsDir();
   const files = await listJsonlFiles(root);
@@ -50,7 +58,7 @@ async function listJsonlFiles(root: string): Promise<string[]> {
     const projectDir = path.join(root, project);
     const stat = await fs.stat(projectDir);
     if (!stat.isDirectory()) continue;
-    await collectJsonl(projectDir, 3, out);
+    await collectJsonl(projectDir, MAX_PROJECT_DEPTH, out);
   }
   return out;
 }

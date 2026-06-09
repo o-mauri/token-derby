@@ -4,7 +4,7 @@ import type { GetRaceResponse, HeartbeatResponse } from '@token-derby/shared';
 import { StatusScreen } from '../ui/StatusScreen.js';
 import { describeAchievement, type RecentEvent } from '@token-derby/shared';
 import { runHeartbeatLoop } from './heartbeat-loop.js';
-import { sumTokensForRace } from '../tokens/transcripts.js';
+import { sumRaceReading } from '../tokens/race-tokens.js';
 import { RaceScoreTracker, type RaceScoreState } from '../tokens/race-score.js';
 import * as endpoints from '../api/endpoints.js';
 import { ApiError } from '../api/client.js';
@@ -53,7 +53,7 @@ export function RunRace({ active, initialState, pendingMode, ownUserName }: RunR
     const scanWithTimeout = async (): Promise<number | null> => {
       try {
         return await Promise.race([
-          sumTokensForRace(active),
+          sumRaceReading(active),
           new Promise<never>((_, reject) => setTimeout(() => reject(new Error('scan timeout')), 10_000)),
         ]);
       } catch {
@@ -183,7 +183,7 @@ export async function buildInitialState(args: {
   serverLastSeq: number;
 }): Promise<{ initialState: RaceScoreState; pendingMode: boolean }> {
   let diskNow = 0;
-  try { diskNow = await sumTokensForRace(args.active); } catch { diskNow = 0; }
+  try { diskNow = await sumRaceReading(args.active); } catch { diskNow = 0; }
   return {
     initialState: { ackedReading: diskNow, lastGoodReading: diskNow, seq: args.serverLastSeq },
     pendingMode: args.raceStatus === 'pending',

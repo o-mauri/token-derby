@@ -44,4 +44,22 @@ describe('sumTokens (fail-loud)', () => {
     await fs.mkdir(path.join(proj, 'broken.jsonl'));
     await expect(sumTokens()).rejects.toThrow();
   });
+
+  it('counts subagent and dynamic-workflow agent transcripts nested under the session', async () => {
+    const root = await tmpProjects();
+    const session = path.join(root, 'proj', 'sess');
+    // Main session transcript.
+    await fs.mkdir(path.join(root, 'proj'), { recursive: true });
+    await fs.writeFile(path.join(root, 'proj', 'sess.jsonl'), line(111) + '\n');
+    // Plain Agent/Task subagent.
+    await fs.mkdir(path.join(session, 'subagents'), { recursive: true });
+    await fs.writeFile(path.join(session, 'subagents', 'agent-aplain.jsonl'), line(222) + '\n');
+    // Dynamic workflow agent (one tier deeper, under subagents/workflows/wf_<id>/).
+    const wf = path.join(session, 'subagents', 'workflows', 'wf_abc123');
+    await fs.mkdir(wf, { recursive: true });
+    await fs.writeFile(path.join(wf, 'agent-awf.jsonl'), line(444) + '\n');
+
+    const t = await sumTokens();
+    expect(t.output).toBe(777); // 111 main + 222 subagent + 444 workflow
+  });
 });

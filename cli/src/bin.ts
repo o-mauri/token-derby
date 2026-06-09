@@ -8,6 +8,7 @@ import { endCommand } from './commands/end.js';
 import { initCommand } from './commands/init.js';
 import { updateCommand } from './commands/update.js';
 import { rollCommand } from './commands/roll.js';
+import { sourcesCommand } from './commands/sources.js';
 import { orgCreateCommand } from './commands/org-create.js';
 import { orgJoinCommand } from './commands/org-join.js';
 import { orgListCommand } from './commands/org-list.js';
@@ -61,9 +62,20 @@ Cosmetics:
   token-derby roll                        Spend a pending roll to try for a hat.
                                           Earn rolls by leveling up horses.
 
+Custom models:
+  Claude (incl. subagents & workflows) and the Gemini CLI are counted
+  automatically. To also count self-hosted models on Modal/vLLM servers
+  (e.g. solaris/qwen), register their /metrics endpoints:
+  token-derby sources                     List configured vLLM token sources
+  token-derby sources add <name> <url>    Add a vLLM server (base URL; /metrics is appended)
+  token-derby sources remove <name>       Remove a source
+  token-derby sources test                Show local totals + ping vLLM endpoints
+
 Environment:
   TOKEN_DERBY_API_BASE                    Override API base URL (default: production)
   TOKEN_DERBY_HOME                        Override identity/stable directory
+  TOKEN_DERBY_GEMINI_DIR                  Override Gemini sessions dir (default: ~/.gemini/tmp)
+  TOKEN_DERBY_VLLM_URLS                   vLLM sources as "name=url,name2=url2"
 `;
 
 async function main(): Promise<number> {
@@ -125,6 +137,7 @@ async function main(): Promise<number> {
   if (cmd === 'join')   return joinCommand(argv[1]);
   if (cmd === 'end')    return endCommand(argv[1]);
   if (cmd === 'roll')      return rollCommand();
+  if (cmd === 'sources')   return sourcesCommand(argv.slice(1));
 
   console.error(`Unknown command: ${cmd}`);
   console.error(HELP);
