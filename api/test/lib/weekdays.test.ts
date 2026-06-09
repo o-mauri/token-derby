@@ -23,4 +23,10 @@ describe('parseWeekdays', () => {
   it('returns null for empty input', () => {
     expect(parseWeekdays('')).toBeNull();
   });
+  it('returns null for a multi-hyphen token', () => {
+    expect(parseWeekdays('mon-tue-wed')).toBeNull();
+  });
+  it('returns null for an empty range bound', () => {
+    expect(parseWeekdays('mon--fri')).toBeNull();
+  });
 });

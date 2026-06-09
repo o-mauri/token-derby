@@ -8,7 +8,9 @@ export function parseWeekdays(spec: string): number[] | null {
   const set = new Set<number>();
   for (const tok of tokens) {
     if (tok.includes('-')) {
-      const [a, b] = tok.split('-');
+      const parts = tok.split('-');
+      if (parts.length !== 2) return null;
+      const [a, b] = parts;
       const ai = ORDER.indexOf(a as (typeof ORDER)[number]);
       const bi = ORDER.indexOf(b as (typeof ORDER)[number]);
       if (ai < 0 || bi < 0 || ai > bi) return null;
