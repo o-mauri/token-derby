@@ -173,3 +173,19 @@ export type StableHorse = {
   equipped_hat?: number | null;   // number = equipped index into hats[]; null = explicitly unequipped; undefined = pre-feature stable horses
   last_rolled_level?: number;         // high-water mark for pending rolls
 };
+
+// One repeating race schedule per org. Stored on the org's SCHEDULE row.
+export type RaceSchedule = {
+  org_id: string;
+  weekdays: number[];        // ISO weekdays, 1=Mon .. 7=Sun
+  start_local: string;       // "HH:MM" 24h, local to `tz`
+  end_local: string;         // "HH:MM" 24h, local to `tz`
+  tz: string;                // IANA, e.g. "Europe/London"
+  race_name?: string;        // optional name for created races
+  max_participants?: number;
+  counts_input?: boolean;
+  created_at: string;
+  creator_user_id: string;   // stamped onto each scheduled race
+  creator_user_name: string; // stamped onto each scheduled race
+  last_materialised_date?: string; // local YYYY-MM-DD of the last race created (idempotency)
+};
