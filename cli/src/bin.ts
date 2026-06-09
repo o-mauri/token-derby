@@ -15,6 +15,9 @@ import { orgInfoCommand } from './commands/org-info.js';
 import { orgWebhookSetCommand } from './commands/org-webhook-set.js';
 import { orgWebhookGetCommand } from './commands/org-webhook-get.js';
 import { orgWebhookClearCommand } from './commands/org-webhook-clear.js';
+import { orgScheduleSetCommand } from './commands/org-schedule-set.js';
+import { orgScheduleGetCommand } from './commands/org-schedule-get.js';
+import { orgScheduleClearCommand } from './commands/org-schedule-clear.js';
 import { CLI_VERSION } from './version.js';
 import { loadIdentity } from './identity/identity.js';
 
@@ -48,6 +51,13 @@ Organisations:
                                           Show the org's configured webhook URL (or "no webhook").
   token-derby organisation webhook clear <name>
                                           Remove the webhook for this org.
+  token-derby organisation schedule set <name> --days mon-fri --start 09:00 --end 17:30 --tz Europe/London
+                                          Configure a repeating race schedule. Races auto-start
+                                          at the daily start time. Only the org creator can run this.
+  token-derby organisation schedule get <name>
+                                          Show the org's configured schedule (or "no schedule").
+  token-derby organisation schedule clear <name>
+                                          Remove the repeating schedule for this org.
 
 Races:
   token-derby create [--organisation <name>]
@@ -113,8 +123,17 @@ async function main(): Promise<number> {
       console.error('Try: organisation webhook set <name> <url> | organisation webhook get <name> | organisation webhook clear <name>');
       return 2;
     }
+    if (sub === 'schedule') {
+      const action = argv[2];
+      if (action === 'set')   return orgScheduleSetCommand(argv[3], argv.slice(4));
+      if (action === 'get')   return orgScheduleGetCommand(argv[3]);
+      if (action === 'clear') return orgScheduleClearCommand(argv[3]);
+      console.error(`Unknown schedule action: ${action ?? '(none)'}`);
+      console.error('Try: organisation schedule set <name> ... | organisation schedule get <name> | organisation schedule clear <name>');
+      return 2;
+    }
     console.error(`Unknown organisation subcommand: ${sub ?? '(none)'}`);
-    console.error('Try: organisation create | organisation join <token> | organisation info <name> | organisation list | organisation webhook <set|get|clear> ...');
+    console.error('Try: organisation create | organisation join <token> | organisation info <name> | organisation list | organisation webhook <set|get|clear> ... | organisation schedule <set|get|clear> ...');
     return 2;
   }
 
