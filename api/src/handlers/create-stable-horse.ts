@@ -1,11 +1,10 @@
 import type { APIGatewayProxyHandlerV2 } from 'aws-lambda';
 import type { CreateStableHorseRequest, CreateStableHorseResponse, StableHorse } from '@token-derby/shared';
+import { HORSE_NAME_MAX_LENGTH } from '@token-derby/shared';
 import { authenticate } from '../lib/auth.js';
 import { putStableHorse } from '../db/stable.js';
 import { generateHorseId } from '../lib/codes.js';
 import { ok, err, parseJson } from '../lib/http.js';
-
-const HORSE_NAME_MAX_LENGTH = 40;
 
 export const handler: APIGatewayProxyHandlerV2 = async (event) => {
   const auth = await authenticate(event);

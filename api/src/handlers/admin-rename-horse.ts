@@ -1,15 +1,15 @@
 import type { APIGatewayProxyHandlerV2 } from 'aws-lambda';
 import type { AdminRenameHorseRequest } from '@token-derby/shared';
+import { HORSE_NAME_MAX_LENGTH } from '@token-derby/shared';
 import { requireAdmin } from '../lib/admin-auth.js';
 import { loadAdminConfig } from '../lib/admin-config.js';
 import { getStableHorse, updateStableHorse } from '../db/stable.js';
 import { ok, err, parseJson } from '../lib/http.js';
 
-const HORSE_NAME_MAX_LENGTH = 40;
-
 export const handler: APIGatewayProxyHandlerV2 = async (event) => {
   const cfg = await loadAdminConfig();
-  if (!requireAdmin(event, cfg.sessionSecret).ok) return err('UNAUTHENTICATED', 'Admin session required');
+  const auth = requireAdmin(event, cfg.sessionSecret);
+  if (!auth.ok) return err('UNAUTHENTICATED', 'Admin session required');
 
   const user_id = event.pathParameters?.user_id;
   const stable_horse_id = event.pathParameters?.stable_horse_id;
