@@ -148,9 +148,13 @@ export class TokenDerbyStack extends cdk.Stack {
     const adminLoginFn = makeFn('AdminLoginFn', 'admin-login');
     const adminListUsersFn = makeFn('AdminListUsersFn', 'admin-list-users');
     const adminListOrgsFn = makeFn('AdminListOrgsFn', 'admin-list-organisations');
+    const adminRenameUserFn = makeFn('AdminRenameUserFn', 'admin-rename-user');
+    const adminRenameHorseFn = makeFn('AdminRenameHorseFn', 'admin-rename-horse');
+    const adminRemoveHatFn = makeFn('AdminRemoveHatFn', 'admin-remove-hat');
+    const adminDeleteHorseFn = makeFn('AdminDeleteHorseFn', 'admin-delete-horse');
 
     const adminSsmArn = `arn:aws:ssm:${this.region}:${this.account}:parameter/token-derby/admin/*`;
-    for (const fn of [adminLoginFn, adminListUsersFn, adminListOrgsFn]) {
+    for (const fn of [adminLoginFn, adminListUsersFn, adminListOrgsFn, adminRenameUserFn, adminRenameHorseFn, adminRemoveHatFn, adminDeleteHorseFn]) {
       fn.addToRolePolicy(new cdk.aws_iam.PolicyStatement({
         actions: ['ssm:GetParameter'],
         resources: [adminSsmArn],
@@ -221,6 +225,10 @@ export class TokenDerbyStack extends cdk.Stack {
     httpApi.addRoutes({ path: '/api/admin/login', methods: [HttpMethod.POST], integration: new HttpLambdaIntegration('AdminLoginInt', adminLoginFn) });
     httpApi.addRoutes({ path: '/api/admin/users', methods: [HttpMethod.GET], integration: new HttpLambdaIntegration('AdminListUsersInt', adminListUsersFn) });
     httpApi.addRoutes({ path: '/api/admin/organisations', methods: [HttpMethod.GET], integration: new HttpLambdaIntegration('AdminListOrgsInt', adminListOrgsFn) });
+    httpApi.addRoutes({ path: '/api/admin/users/{user_id}', methods: [HttpMethod.PUT], integration: new HttpLambdaIntegration('AdminRenameUserInt', adminRenameUserFn) });
+    httpApi.addRoutes({ path: '/api/admin/users/{user_id}/horses/{stable_horse_id}', methods: [HttpMethod.PUT], integration: new HttpLambdaIntegration('AdminRenameHorseInt', adminRenameHorseFn) });
+    httpApi.addRoutes({ path: '/api/admin/users/{user_id}/horses/{stable_horse_id}/hats/{index}', methods: [HttpMethod.DELETE], integration: new HttpLambdaIntegration('AdminRemoveHatInt', adminRemoveHatFn) });
+    httpApi.addRoutes({ path: '/api/admin/users/{user_id}/horses/{stable_horse_id}', methods: [HttpMethod.DELETE], integration: new HttpLambdaIntegration('AdminDeleteHorseInt', adminDeleteHorseFn) });
 
     // API throttling (rate-limit guardrails, not hard security)
     const defaultStage = httpApi.defaultStage!.node.defaultChild as apigatewayv2.CfnStage;
