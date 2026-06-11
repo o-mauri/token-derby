@@ -7,6 +7,7 @@ import {
   STABLE_HORSE_SK_PREFIX,
 } from './keys.js';
 import type { CollectedHat, StableHorse } from '@token-derby/shared';
+import { adjustEquippedAfterRemoval } from '../lib/hat-removal.js';
 
 /**
  * Create a stable horse, atomically reserving the name within the user's
@@ -283,4 +284,45 @@ export async function equipHat(
     ConditionExpression: 'attribute_exists(pk)',
     ExpressionAttributeValues: { ':idx': hat_index },
   }));
+}
+
+/**
+ * Remove the hat at `index` from a stable horse's hats[], fixing up the
+ * equipped_hat index. Caller is responsible for range-checking `index`.
+ */
+export async function removeStableHorseHat(
+  user_id: string,
+  stable_horse_id: string,
+  index: number,
+): Promise<StableHorse> {
+  const existing = await getStableHorse(user_id, stable_horse_id);
+  if (!existing) throw new Error('stable horse not found');
+
+  const hats = [...(existing.hats ?? [])];
+  hats.splice(index, 1);
+  const nextEquipped = adjustEquippedAfterRemoval(existing.equipped_hat, index);
+
+  if (nextEquipped === null) {
+    await ddb.send(new UpdateCommand({
+      TableName: TABLE,
+      Key: stableHorseKey(user_id, stable_horse_id),
+      UpdateExpression: 'SET hats = :h REMOVE equipped_hat',
+      ConditionExpression: 'attribute_exists(pk)',
+      ExpressionAttributeValues: { ':h': hats },
+    }));
+  } else {
+    await ddb.send(new UpdateCommand({
+      TableName: TABLE,
+      Key: stableHorseKey(user_id, stable_horse_id),
+      UpdateExpression: 'SET hats = :h, equipped_hat = :e',
+      ConditionExpression: 'attribute_exists(pk)',
+      ExpressionAttributeValues: { ':h': hats, ':e': nextEquipped },
+    }));
+  }
+
+  return {
+    ...existing,
+    hats,
+    equipped_hat: nextEquipped === null ? undefined : nextEquipped,
+  };
 }
