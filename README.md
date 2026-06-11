@@ -56,10 +56,14 @@ them once per AWS account:
 # 1. Hash your chosen password locally (prints "saltHex:hashHex"):
 npx tsx -e "import('./api/src/lib/admin-auth.js').then(m => console.log(m.hashPassword(process.argv[1])))" 'YOUR_PASSWORD'
 
-# 2. Store the three parameters as SecureStrings:
-aws ssm put-parameter --type SecureString --name /token-derby/admin/username       --value 'omar'
-aws ssm put-parameter --type SecureString --name /token-derby/admin/password-hash  --value 'SALT:HASH_FROM_STEP_1'
-aws ssm put-parameter --type SecureString --name /token-derby/admin/session-secret --value "$(openssl rand -hex 32)"
+# 2. Store the three parameters as SecureStrings.
+#    IMPORTANT: use the same account/region the stack deploys into — region
+#    eu-west-2 (hardcoded in infra/bin/token-derby.ts), and the same profile you
+#    deploy with (the Makefile uses --profile personal). The Lambdas read SSM in
+#    their own region (eu-west-2); params written elsewhere → login 500s.
+aws ssm put-parameter --profile personal --region eu-west-2 --type SecureString --name /token-derby/admin/username       --value 'omar'
+aws ssm put-parameter --profile personal --region eu-west-2 --type SecureString --name /token-derby/admin/password-hash  --value 'SALT:HASH_FROM_STEP_1'
+aws ssm put-parameter --profile personal --region eu-west-2 --type SecureString --name /token-derby/admin/session-secret --value "$(openssl rand -hex 32)"
 ```
 
 The three admin Lambdas read these at cold start (cached). To rotate a value,
