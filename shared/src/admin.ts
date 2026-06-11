@@ -40,3 +40,11 @@ export type AdminOrg = {
 export type AdminOrgsResponse = {
   organisations: AdminOrg[];
 };
+
+export type AdminRenameUserRequest = {
+  display_name: string;
+};
+
+export type AdminRenameHorseRequest = {
+  name: string;
+};

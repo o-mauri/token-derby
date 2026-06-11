@@ -11,6 +11,7 @@ export type ErrorCode =
   | 'RACE_OVERLAP'
   | 'ORG_NAME_TAKEN'
   | 'ORG_NOT_FOUND'
+  | 'USER_NOT_FOUND'
   | 'NOT_ORG_MEMBER'
   | 'NOT_ORG_OWNER'
   | 'UNAUTHENTICATED'
@@ -33,6 +34,7 @@ export const ERROR_STATUS: Record<ErrorCode, number> = {
   NOT_ORG_OWNER: 403,
   RACE_NOT_FOUND: 404,
   ORG_NOT_FOUND: 404,
+  USER_NOT_FOUND: 404,
   STABLE_HORSE_NOT_FOUND: 404,
   RACE_FULL: 409,
   RACE_OVERLAP: 409,
