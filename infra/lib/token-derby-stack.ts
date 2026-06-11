@@ -18,6 +18,7 @@ import * as eventsTargets from 'aws-cdk-lib/aws-events-targets';
 import * as path from 'path';
 
 const DOMAIN_NAME = 'token-derby.mauricode.co.uk';
+const ADMIN_DOMAIN_NAME = 'admin.token-derby.mauricode.co.uk';
 const HOSTED_ZONE_DOMAIN = 'mauricode.co.uk';
 const TABLE_NAME = 'token-derby';
 
@@ -32,6 +33,12 @@ export class TokenDerbyStack extends cdk.Stack {
 
     const certificate = new acm.DnsValidatedCertificate(this, 'Certificate', {
       domainName: DOMAIN_NAME,
+      hostedZone,
+      region: 'us-east-1',
+    });
+
+    const adminCertificate = new acm.DnsValidatedCertificate(this, 'AdminCertificate', {
+      domainName: ADMIN_DOMAIN_NAME,
       hostedZone,
       region: 'us-east-1',
     });
@@ -138,11 +145,23 @@ export class TokenDerbyStack extends cdk.Stack {
     const rollHatFn = makeFn('RollHatFn', 'roll-hat');
     const equipHatFn = makeFn('EquipHatFn', 'equip-hat');
 
+    const adminLoginFn = makeFn('AdminLoginFn', 'admin-login');
+    const adminListUsersFn = makeFn('AdminListUsersFn', 'admin-list-users');
+    const adminListOrgsFn = makeFn('AdminListOrgsFn', 'admin-list-organisations');
+
+    const adminSsmArn = `arn:aws:ssm:${this.region}:${this.account}:parameter/token-derby/admin/*`;
+    for (const fn of [adminLoginFn, adminListUsersFn, adminListOrgsFn]) {
+      fn.addToRolePolicy(new cdk.aws_iam.PolicyStatement({
+        actions: ['ssm:GetParameter'],
+        resources: [adminSsmArn],
+      }));
+    }
+
     // ── HTTP API Gateway ───────────────────────────────────────────────
     const httpApi = new HttpApi(this, 'TokenDerbyApi', {
       apiName: 'token-derby-api',
       corsPreflight: {
-        allowOrigins: [`https://${DOMAIN_NAME}`, 'http://localhost:5173'],
+        allowOrigins: [`https://${DOMAIN_NAME}`, `https://${ADMIN_DOMAIN_NAME}`, 'http://localhost:5173'],
         allowMethods: [CorsHttpMethod.GET, CorsHttpMethod.POST, CorsHttpMethod.PUT, CorsHttpMethod.DELETE, CorsHttpMethod.OPTIONS],
         allowHeaders: ['content-type', 'authorization', 'x-user-id', 'x-user-token', 'x-cli-version'],
       },
@@ -198,6 +217,10 @@ export class TokenDerbyStack extends cdk.Stack {
     httpApi.addRoutes({ path: '/api/jockey/me/horses/{stable_horse_id}', methods: [HttpMethod.DELETE], integration: new HttpLambdaIntegration('DeleteStableHorseInt', deleteStableHorseFn) });
     httpApi.addRoutes({ path: '/api/jockey/me/horses/{stable_horse_id}/roll',  methods: [HttpMethod.POST], integration: new HttpLambdaIntegration('RollHatInt',  rollHatFn) });
     httpApi.addRoutes({ path: '/api/jockey/me/horses/{stable_horse_id}/equip', methods: [HttpMethod.POST], integration: new HttpLambdaIntegration('EquipHatInt', equipHatFn) });
+
+    httpApi.addRoutes({ path: '/api/admin/login', methods: [HttpMethod.POST], integration: new HttpLambdaIntegration('AdminLoginInt', adminLoginFn) });
+    httpApi.addRoutes({ path: '/api/admin/users', methods: [HttpMethod.GET], integration: new HttpLambdaIntegration('AdminListUsersInt', adminListUsersFn) });
+    httpApi.addRoutes({ path: '/api/admin/organisations', methods: [HttpMethod.GET], integration: new HttpLambdaIntegration('AdminListOrgsInt', adminListOrgsFn) });
 
     // API throttling (rate-limit guardrails, not hard security)
     const defaultStage = httpApi.defaultStage!.node.defaultChild as apigatewayv2.CfnStage;
@@ -261,6 +284,58 @@ export class TokenDerbyStack extends cdk.Stack {
       recordName: DOMAIN_NAME,
       target: route53.RecordTarget.fromAlias(new targets.CloudFrontTarget(distribution)),
     });
+
+    // ── Admin subdomain: its own bucket + CloudFront, /api/* → same API ──
+    const adminBucket = new s3.Bucket(this, 'AdminSiteBucket', {
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      autoDeleteObjects: true,
+    });
+
+    const adminDistribution = new cloudfront.Distribution(this, 'AdminDistribution', {
+      defaultBehavior: {
+        origin: origins.S3BucketOrigin.withOriginAccessControl(adminBucket),
+        viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+        cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
+      },
+      additionalBehaviors: {
+        '/api/*': {
+          origin: apiOrigin,
+          viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+          allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
+          cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
+          originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
+        },
+      },
+      domainNames: [ADMIN_DOMAIN_NAME],
+      certificate: adminCertificate as unknown as acm.ICertificate,
+      defaultRootObject: 'index.html',
+      errorResponses: [
+        { httpStatus: 403, responseHttpStatus: 200, responsePagePath: '/index.html' },
+        { httpStatus: 404, responseHttpStatus: 200, responsePagePath: '/index.html' },
+      ],
+    });
+
+    new s3deploy.BucketDeployment(this, 'DeployAdminSite', {
+      sources: [s3deploy.Source.asset(path.resolve(__dirname, '..', '..', 'admin', 'dist'))],
+      destinationBucket: adminBucket,
+      distribution: adminDistribution,
+      distributionPaths: ['/*'],
+      cacheControl: [
+        s3deploy.CacheControl.setPublic(),
+        s3deploy.CacheControl.maxAge(cdk.Duration.seconds(0)),
+        s3deploy.CacheControl.mustRevalidate(),
+      ],
+    });
+
+    new route53.ARecord(this, 'AdminAliasRecord', {
+      zone: hostedZone,
+      recordName: ADMIN_DOMAIN_NAME,
+      target: route53.RecordTarget.fromAlias(new targets.CloudFrontTarget(adminDistribution)),
+    });
+
+    new cdk.CfnOutput(this, 'AdminSiteUrl', { value: `https://${ADMIN_DOMAIN_NAME}` });
+    new cdk.CfnOutput(this, 'AdminDistributionId', { value: adminDistribution.distributionId });
 
     // ── Outputs ────────────────────────────────────────────────────────
     new cdk.CfnOutput(this, 'SiteUrl', { value: `https://${DOMAIN_NAME}` });
