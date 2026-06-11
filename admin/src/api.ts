@@ -2,6 +2,7 @@ import type {
   AdminLoginResponse,
   AdminUsersResponse,
   AdminOrgsResponse,
+  StableHorse,
 } from '@token-derby/shared';
 import { getToken } from './auth.js';
 
@@ -72,4 +73,53 @@ export function fetchUsers(fetchImpl: FetchFn = fetch): Promise<AdminUsersRespon
 
 export function fetchOrganisations(fetchImpl: FetchFn = fetch): Promise<AdminOrgsResponse> {
   return authedGet<AdminOrgsResponse>('/api/admin/organisations', fetchImpl);
+}
+
+async function authedSend<T>(
+  method: string,
+  url: string,
+  body: unknown,
+  fetchImpl: FetchFn,
+): Promise<T> {
+  const token = getToken();
+  if (!token) throw new ApiError('UNAUTHENTICATED', 'Not signed in', 401);
+  const headers: Record<string, string> = { authorization: `Bearer ${token}` };
+  const init: RequestInit = { method, headers };
+  if (body !== undefined) {
+    headers['content-type'] = 'application/json';
+    init.body = JSON.stringify(body);
+  }
+  let res: Response;
+  try {
+    res = await fetchImpl(url, init);
+  } catch (e: any) {
+    throw new ApiError('NETWORK_ERROR', e?.message ?? 'fetch failed', 0);
+  }
+  return parse<T>(res);
+}
+
+const u = (s: string) => encodeURIComponent(s);
+
+export function renameUser(
+  userId: string, name: string, fetchImpl: FetchFn = fetch,
+): Promise<{ user_id: string; display_name: string }> {
+  return authedSend('PUT', `/api/admin/users/${u(userId)}`, { display_name: name }, fetchImpl);
+}
+
+export function renameHorse(
+  userId: string, horseId: string, name: string, fetchImpl: FetchFn = fetch,
+): Promise<StableHorse> {
+  return authedSend('PUT', `/api/admin/users/${u(userId)}/horses/${u(horseId)}`, { name }, fetchImpl);
+}
+
+export function removeHat(
+  userId: string, horseId: string, index: number, fetchImpl: FetchFn = fetch,
+): Promise<StableHorse> {
+  return authedSend('DELETE', `/api/admin/users/${u(userId)}/horses/${u(horseId)}/hats/${index}`, undefined, fetchImpl);
+}
+
+export function deleteHorse(
+  userId: string, horseId: string, fetchImpl: FetchFn = fetch,
+): Promise<{ deleted: boolean }> {
+  return authedSend('DELETE', `/api/admin/users/${u(userId)}/horses/${u(horseId)}`, undefined, fetchImpl);
 }
