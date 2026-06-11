@@ -1,0 +1,58 @@
+:root {
+  --bg: #000; --panel: #1a1a1a; --text: #f5e9d3; --muted: #9ca3af;
+  --accent: #d1d5db; --border: #3a3a3a; --green: #7bed9f; --legendary: #fbbf24;
+  --pixel-font: "VT323", "Courier New", ui-monospace, monospace;
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font-family: var(--pixel-font); font-size: 20px; line-height: 1.25;
+  min-height: 100vh; -webkit-font-smoothing: none;
+}
+#app { min-height: 100vh; display: flex; flex-direction: column; }
+
+/* login */
+.login { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px; padding: 32px; text-align: center; }
+.login h1 { margin: 0; color: var(--accent); font-size: clamp(2rem, 6vw, 3rem); letter-spacing: 0.08em; display: flex; align-items: center; gap: 0.4em; }
+.login form { display: flex; flex-direction: column; gap: 12px; width: 260px; }
+.login input { background: var(--panel); color: var(--text); border: 2px solid var(--border); padding: 12px 16px; font: inherit; font-size: 1.1rem; }
+.login input:focus { outline: none; border-color: var(--accent); }
+.login button { background: var(--accent); color: var(--bg); border: none; padding: 12px 24px; font: inherit; font-weight: bold; cursor: pointer; }
+.login button:hover { filter: brightness(1.1); }
+.login .err { color: #ff6b6b; min-height: 1.2em; font-size: 0.9rem; }
+
+/* dashboard */
+.wrap { max-width: 1100px; width: 100%; margin: 0 auto; padding: 20px 24px 60px; }
+.topbar { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--panel); padding: 10px 0 14px; flex-wrap: wrap; gap: 8px; }
+.topbar h1 { margin: 0; color: var(--accent); font-size: 1.6rem; letter-spacing: 0.08em; display: flex; align-items: center; gap: 0.4em; }
+.topbar .who { color: var(--muted); font-size: 0.95rem; }
+.topbar .who b { color: var(--text); }
+.topbar .who button { background: none; border: none; color: var(--accent); font: inherit; cursor: pointer; border-bottom: 1px dashed var(--border); margin-left: 14px; padding: 0; }
+
+.section { margin-top: 32px; }
+.section > h2 { color: var(--accent); text-transform: uppercase; letter-spacing: 0.12em; font-size: 1rem; margin: 0 0 12px; }
+.section > h2 .count { color: var(--muted); font-size: 0.8rem; margin-left: 8px; letter-spacing: 0.05em; }
+
+table { width: 100%; border-collapse: collapse; background: var(--panel); border: 2px solid var(--border); border-radius: 6px; overflow: hidden; }
+thead th { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; text-align: left; padding: 9px 14px; border-bottom: 1px solid var(--border); font-weight: normal; }
+tbody td { padding: 10px 14px; font-size: 0.95rem; }
+tbody tr:nth-child(even) { background: rgba(255,255,255,0.03); }
+tr.user-row { cursor: pointer; }
+tr.user-row:hover { background: rgba(209,213,219,0.08); }
+.caret { color: var(--muted); display: inline-block; width: 1em; }
+.muted { color: var(--muted); }
+.win { color: var(--green); }
+
+.horses-cell { background: #0d0d0d; padding: 0; }
+.horses { display: flex; flex-direction: column; gap: 8px; padding: 12px 16px 14px; }
+.hcard { display: flex; align-items: center; gap: 14px; background: var(--panel); border: 1px solid var(--border); border-radius: 5px; padding: 8px 12px; flex-wrap: wrap; }
+.swatch { display: inline-block; width: 14px; height: 14px; border-radius: 3px; border: 1px solid #000; }
+.hname { min-width: 150px; font-size: 1.05rem; }
+.hstats { display: flex; gap: 18px; flex-wrap: wrap; margin-left: auto; }
+.chip { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.chip b { color: var(--text); font-weight: normal; font-size: 0.95rem; }
+.lvl { display: inline-block; padding: 1px 7px; font-size: 0.62rem; color: #67e8f9; border: 1px solid #67e8f9; border-radius: 3px; letter-spacing: 0.04em; }
+.hats { color: var(--legendary); font-size: 0.8rem; }
+
+.error { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 32px; text-align: center; }
+.error h2 { color: #ff6b6b; margin: 0; }
