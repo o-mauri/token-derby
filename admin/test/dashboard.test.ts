@@ -33,6 +33,12 @@ function deps(over: Partial<Parameters<typeof renderDashboard>[1]> = {}) {
   return {
     fetchUsers: vi.fn(async () => users),
     fetchOrganisations: vi.fn(async () => orgs),
+    mutations: {
+      renameUser: vi.fn(async (id: string, name: string) => ({ user_id: id, display_name: name })),
+      renameHorse: vi.fn(async (_u: string, _h: string, name: string) => ({ ...users.users[0].horses[0], name })),
+      removeHat: vi.fn(async () => users.users[0].horses[0]),
+      deleteHorse: vi.fn(async () => {}),
+    },
     onSignOut: vi.fn(),
     onUnauthorized: vi.fn(),
     ...over,
@@ -55,8 +61,6 @@ describe('renderDashboard', () => {
     (root.querySelector('tr.user-row') as HTMLElement).click();
     expect(root.textContent).toContain('Thunderbolt');
     expect(root.textContent).toContain('1.9M');
-    (root.querySelector('tr.user-row') as HTMLElement).click();
-    expect(root.textContent).not.toContain('Thunderbolt');
   });
 
   it('calls onUnauthorized when a fetch returns 401', async () => {
@@ -79,7 +83,7 @@ describe('renderDashboard', () => {
     const onSignOut = vi.fn();
     renderDashboard(root, deps({ onSignOut }));
     await flush();
-    (root.querySelector('.who button') as HTMLElement).click();
+    (root.querySelector('.who .signout') as HTMLElement).click();
     expect(onSignOut).toHaveBeenCalled();
   });
 
@@ -92,14 +96,26 @@ describe('renderDashboard', () => {
     };
     renderDashboard(root, deps({ fetchUsers: vi.fn(async () => twoUsers) }));
     await flush();
-    const rows = root.querySelectorAll('tr.user-row');
-    expect(rows.length).toBe(2);
-    (rows[0] as HTMLElement).click();
-    (rows[1] as HTMLElement).click();
+    expect(root.querySelectorAll('tr.user-row').length).toBe(2);
+    (root.querySelectorAll('tr.user-row')[0] as HTMLElement).click();
+    (root.querySelectorAll('tr.user-row')[1] as HTMLElement).click();
     expect(root.textContent).toContain('Thunderbolt');
     expect(root.textContent).toContain('Comet');
-    (rows[0] as HTMLElement).click(); // collapse first only
+    (root.querySelectorAll('tr.user-row')[0] as HTMLElement).click(); // collapse first only
     expect(root.textContent).not.toContain('Thunderbolt');
     expect(root.textContent).toContain('Comet');
+  });
+
+  it('the Edit toggle reveals edit controls and flips aria-pressed', async () => {
+    renderDashboard(root, deps());
+    await flush();
+    (root.querySelector('tr.user-row') as HTMLElement).click();        // expand a user
+    expect(root.querySelector('[data-action="edit-user-name"]')).toBeNull();  // off by default
+    const editBtn = root.querySelector('.edit-toggle') as HTMLElement;
+    editBtn.click();                                                    // turn edit mode on
+    expect(editBtn.getAttribute('aria-pressed')).toBe('true');
+    expect(editBtn.textContent).toBe('Done');
+    expect(root.querySelector('[data-action="edit-user-name"]')).toBeTruthy();
+    expect(root.querySelector('[data-action="delete-horse"]')).toBeTruthy();
   });
 });

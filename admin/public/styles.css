@@ -56,3 +56,32 @@ tr.user-row:hover { background: rgba(209,213,219,0.08); }
 
 .error { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 32px; text-align: center; }
 .error h2 { color: #ff6b6b; margin: 0; }
+
+/* edit mode */
+.topbar .who .edit-toggle { background: none; border: 1px solid var(--border); color: var(--accent); font: inherit; cursor: pointer; border-radius: 4px; padding: 2px 12px; margin-right: 6px; }
+.topbar .who .edit-toggle[aria-pressed="true"] { background: var(--accent); color: #000; font-weight: bold; }
+.detail { padding: 4px 2px; }
+.jockey-edit { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px dashed var(--border); }
+.jockey-edit .lbl { color: var(--muted); text-transform: uppercase; font-size: .7rem; letter-spacing: .1em; }
+.editable { display: inline-flex; align-items: center; gap: 6px; }
+.editable .val { font-size: 1.1rem; }
+.pencil { cursor: pointer; color: var(--muted); border: 1px solid var(--border); border-radius: 4px; padding: 0 6px; font-size: .8rem; }
+.pencil:hover { color: var(--accent); border-color: var(--accent); }
+.inline-input { background: #000; color: var(--text); border: 2px solid var(--accent); font: inherit; font-size: 1.05rem; padding: 4px 8px; width: 160px; }
+.mini { font-size: .8rem; padding: 3px 10px; border-radius: 4px; cursor: pointer; font-family: inherit; }
+.mini.save { background: var(--accent); color: #000; border: none; font-weight: bold; }
+.mini.cancel { background: none; color: var(--muted); border: 1px solid var(--border); }
+.hcard-top { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.hcard-actions { margin-left: 14px; }
+.btn-danger { font-size: .72rem; color: #ff6b6b; background: none; border: 1px solid #5a2a2a; border-radius: 4px; padding: 3px 9px; cursor: pointer; font-family: inherit; text-transform: uppercase; letter-spacing: .05em; }
+.btn-danger:hover { background: #2a1414; border-color: #ff6b6b; }
+.hats-toggle { margin-top: 10px; color: var(--legendary); font-size: .85rem; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+.hats-panel { margin-top: 8px; border-top: 1px dashed var(--border); padding-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+.hat-row { display: flex; align-items: center; gap: 12px; padding: 5px 8px; background: #111; border: 1px solid #242424; border-radius: 4px; }
+.hat-name { min-width: 150px; font-size: 1rem; }
+.rarity { font-size: .6rem; font-weight: 700; letter-spacing: .1em; padding: 1px 7px; border-radius: 3px; color: #000; text-transform: uppercase; }
+.r-common { background: #9ca3af; } .r-rare { background: #60a5fa; } .r-epic { background: #c084fc; } .r-legendary { background: var(--legendary); }
+.hat-when { color: var(--muted); font-size: .75rem; margin-left: auto; }
+.hat-eq { color: #67e8f9; font-size: .65rem; border: 1px solid #67e8f9; border-radius: 3px; padding: 0 5px; }
+.hat-remove { color: #ff6b6b; background: none; border: 1px solid #5a2a2a; border-radius: 4px; cursor: pointer; font-family: inherit; font-size: .8rem; padding: 1px 8px; }
+.hat-remove:hover { background: #2a1414; border-color: #ff6b6b; }

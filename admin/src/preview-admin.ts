@@ -24,6 +24,12 @@ if (root) {
   renderDashboard(root, {
     fetchUsers: async () => users,
     fetchOrganisations: async () => organisations,
+    mutations: {
+      renameUser: async (id, name) => ({ user_id: id, display_name: name }),
+      renameHorse: async (_u, hid, name) => ({ ...users.users[0].horses[0], stable_horse_id: hid, name }),
+      removeHat: async (_u, hid) => ({ ...users.users[0].horses[0], stable_horse_id: hid, hats: [], equipped_hat: undefined }),
+      deleteHorse: async () => {},
+    },
     onSignOut: () => alert('sign out (preview)'),
     onUnauthorized: () => {},
   });
