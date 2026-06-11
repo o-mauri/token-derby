@@ -46,6 +46,30 @@ npx cdk bootstrap aws://<account>/us-east-1
 npx cdk deploy
 ```
 
+## Admin dashboard
+
+The admin dashboard at `admin.token-derby.mauricode.co.uk` reads its single
+owner credential from SSM SecureString parameters (never committed). Provision
+them once per AWS account:
+
+```bash
+# 1. Hash your chosen password locally (prints "saltHex:hashHex"):
+npx tsx -e "import('./api/src/lib/admin-auth.js').then(m => console.log(m.hashPassword(process.argv[1])))" 'YOUR_PASSWORD'
+
+# 2. Store the three parameters as SecureStrings:
+aws ssm put-parameter --type SecureString --name /token-derby/admin/username       --value 'omar'
+aws ssm put-parameter --type SecureString --name /token-derby/admin/password-hash  --value 'SALT:HASH_FROM_STEP_1'
+aws ssm put-parameter --type SecureString --name /token-derby/admin/session-secret --value "$(openssl rand -hex 32)"
+```
+
+The three admin Lambdas read these at cold start (cached). To rotate a value,
+overwrite the parameter; the change takes effect on the next Lambda cold start.
+
+The Lambdas are granted `ssm:GetParameter`, which is sufficient for `SecureString`
+parameters encrypted with the default `aws/ssm` managed key (as created above). If
+you instead encrypt them with a customer-managed KMS key, also grant the Lambdas
+`kms:Decrypt` on that key.
+
 ## API (base: `https://token-derby.mauricode.co.uk/api`)
 
 ```
