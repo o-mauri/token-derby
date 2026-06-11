@@ -6,7 +6,8 @@ import { ok, err } from '../lib/http.js';
 
 export const handler: APIGatewayProxyHandlerV2 = async (event) => {
   const cfg = await loadAdminConfig();
-  if (!requireAdmin(event, cfg.sessionSecret).ok) return err('UNAUTHENTICATED', 'Admin session required');
+  const auth = requireAdmin(event, cfg.sessionSecret);
+  if (!auth.ok) return err('UNAUTHENTICATED', 'Admin session required');
 
   const user_id = event.pathParameters?.user_id;
   const stable_horse_id = event.pathParameters?.stable_horse_id;
