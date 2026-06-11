@@ -89,9 +89,10 @@ export function renderDashboard(root: HTMLElement, deps: DashboardDeps): void {
 
   root.querySelector('.signout')!.addEventListener('click', () => deps.onSignOut());
 
+  let unauthorizedHandled = false;
   const unauthorized = (e: unknown) => {
     if (e && typeof e === 'object' && (e as { status?: number }).status === 401) {
-      deps.onUnauthorized();
+      if (!unauthorizedHandled) { unauthorizedHandled = true; deps.onUnauthorized(); }
       return true;
     }
     return false;
@@ -100,8 +101,10 @@ export function renderDashboard(root: HTMLElement, deps: DashboardDeps): void {
   void (async () => {
     try {
       const { users } = await deps.fetchUsers();
-      root.querySelector('#users-section .count')!.textContent = `· ${users.length} total`;
-      const body = root.querySelector('#users-body')!;
+      const usersCount = root.querySelector('#users-section .count');
+      const body = root.querySelector('#users-body');
+      if (!usersCount || !body) return;
+      usersCount.textContent = `· ${users.length} total`;
       body.innerHTML = `
         <table>
           <thead><tr><th style="width:34px"></th><th>Jockey</th><th>Horses</th><th>Races</th><th>Wins</th><th>Podiums</th><th>XP</th><th>Joined</th></tr></thead>
@@ -124,22 +127,27 @@ export function renderDashboard(root: HTMLElement, deps: DashboardDeps): void {
       });
     } catch (e) {
       if (unauthorized(e)) return;
-      root.querySelector('#users-body')!.innerHTML = `<p class="muted">Failed to load users.</p>`;
+      const usersBody = root.querySelector('#users-body');
+      if (usersBody) usersBody.innerHTML = `<p class="muted">Failed to load users.</p>`;
     }
   })();
 
   void (async () => {
     try {
       const { organisations } = await deps.fetchOrganisations();
-      root.querySelector('#orgs-section .count')!.textContent = `· ${organisations.length} total`;
-      root.querySelector('#orgs-body')!.innerHTML = `
+      const orgsCount = root.querySelector('#orgs-section .count');
+      const orgsBody = root.querySelector('#orgs-body');
+      if (!orgsCount || !orgsBody) return;
+      orgsCount.textContent = `· ${organisations.length} total`;
+      orgsBody.innerHTML = `
         <table>
           <thead><tr><th>Organisation</th><th>Members</th><th>Created by</th><th>Created</th></tr></thead>
           <tbody>${organisations.map(orgRowHtml).join('')}</tbody>
         </table>`;
     } catch (e) {
       if (unauthorized(e)) return;
-      root.querySelector('#orgs-body')!.innerHTML = `<p class="muted">Failed to load organisations.</p>`;
+      const orgsBody = root.querySelector('#orgs-body');
+      if (orgsBody) orgsBody.innerHTML = `<p class="muted">Failed to load organisations.</p>`;
     }
   })();
 }
