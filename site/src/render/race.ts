@@ -1,5 +1,4 @@
 import type { GetRaceResponse } from '@token-derby/shared';
-import { ACHIEVEMENT_DESCRIPTIONS, overtakeDescription, type RecentEvent } from '@token-derby/shared';
 import { fetchRace, ApiError } from '../api.js';
 import { runPollLoop } from '../poll.js';
 import { reconcileHorses } from './reconcile.js';
@@ -9,7 +8,7 @@ import { formatDuration, predictTimeLeftSeconds, type CountdownAnchor } from '..
 import { appendSample, trimWindow, computePace, type Sample } from './pace.js';
 import { startAutoScroll } from './autoscroll.js';
 import { horseFaceSvg } from '../horse-face.js';
-import { renderAchievementToast } from './toast.js';
+import { createTicker, collectFreshItems } from './ticker.js';
 import { applyInitialTvMode, isTvMode, setTvMode } from './tv-mode.js';
 
 const POLL_INTERVAL_MS = 60_000;
@@ -42,10 +41,9 @@ export function renderRace(root: HTMLElement, joinCode: string): () => void {
   root.appendChild(frame);
 
   const track = frame.querySelector<HTMLElement>('.track')!;
-  const toastContainer = root.ownerDocument.createElement('div');
-  toastContainer.className = 'achievement-toast-container';
-  frame.appendChild(toastContainer);
-  // Watermark per horse_id — only show events with at > last shown.
+  const ticker = createTicker(root.ownerDocument);
+  frame.appendChild(ticker.el);
+  // Watermark per horse_id — only surface events with at > last shown.
   const shownAt = new Map<string, number>();
   const nameEl = frame.querySelector<HTMLElement>('.race-name')!;
   const statusEl = frame.querySelector<HTMLElement>('.race-status')!;
@@ -69,6 +67,7 @@ export function renderRace(root: HTMLElement, joinCode: string): () => void {
   });
 
   const ctrl = new AbortController();
+  ctrl.signal.addEventListener('abort', () => ticker.destroy(), { once: true });
   const buffers = new Map<string, Sample[]>();
   startAutoScroll({ signal: ctrl.signal, target: track });
 
@@ -124,16 +123,9 @@ export function renderRace(root: HTMLElement, joinCode: string): () => void {
 
     reconcileHorses(track, race, now, paceByHorseId);
 
-    // Surface achievement toasts for any horse that has new recent_events.
-    for (const horse of race.horses) {
-      const watermark = shownAt.get(horse.horse_id) ?? 0;
-      const fresh = (horse.recent_events ?? []).filter(e => e.at > watermark);
-      if (fresh.length === 0) continue;
-      shownAt.set(horse.horse_id, Math.max(...fresh.map(e => e.at)));
-      for (const ev of fresh) {
-        showToast(root.ownerDocument, toastContainer, horse.name, ev);
-      }
-    }
+    // Feed this tick's new achievements into the rolling ticker. An empty
+    // batch leaves the previous batch looping rather than blanking the bar.
+    ticker.setBatch(collectFreshItems(race, shownAt));
 
     if (race.status === 'pending') {
       updatePendingBanner(frame, race, now);
@@ -167,21 +159,4 @@ export function renderRace(root: HTMLElement, joinCode: string): () => void {
   });
 
   return () => ctrl.abort();
-}
-
-function showToast(doc: Document, container: HTMLElement, horseName: string, event: RecentEvent): void {
-  const node = renderAchievementToast(doc, {
-    horseName,
-    name: event.name,
-    description: event.name === 'Overtake!'
-      ? overtakeDescription(Math.floor(event.xp / 3))
-      : ACHIEVEMENT_DESCRIPTIONS[event.name],
-    xp: event.xp,
-  });
-  const offset = container.querySelectorAll<HTMLElement>('.achievement-toast').length;
-  node.style.bottom = `${1 + offset * 5}rem`;
-  container.appendChild(node);
-  setTimeout(() => {
-    if (node.parentNode === container) container.removeChild(node);
-  }, 10_000);
 }

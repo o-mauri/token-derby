@@ -10,6 +10,7 @@
   --track-gap: 0px;
   --horse-height: 60px;
   --sprite-scale: 2;
+  --ticker-h: 2.6rem;
   --pixel-font: "VT323", "Courier New", ui-monospace, monospace;
 }
 
@@ -330,6 +331,10 @@ html, body {
 .lane {
   position: relative;
   height: var(--horse-height);
+  /* Never let a crowded field compress lanes below the sprite height — the
+     track scrolls (autoscroll drives it in TV mode) instead of squashing
+     horses on top of each other. */
+  flex: 0 0 var(--horse-height);
   background: var(--lane) url('img/track-1.png') repeat-x center / auto 100%;
   image-rendering: pixelated;
   border-radius: 4px;
@@ -352,11 +357,17 @@ html, body {
 }
 .horse {
   position: absolute;
-  top: 20%;
-  transform: translate(-50%, -50%);
+  /* Sprite scales with the lane (height:80% of the lane) so lanes can be any
+     height. Vertical placement is driven entirely by `top` — the body-bob
+     keyframes then only nudge ±1px without re-specifying the base position.
+     The drawn hooves sit ~at the box bottom (≈ top + 80%), so top:-30% lands
+     the FEET on the lane's vertical centre with the body above (verified by
+     outlined-box screenshot). */
+  top: -30%;
+  transform: translate(-50%, 0);
   transition: left 3s linear;
-  width: calc(var(--sprite-scale) * 32px);
-  height: calc(var(--sprite-scale) * 24px);
+  height: 80%;
+  aspect-ratio: 32 / 24;
   z-index: 1;
 }
 .horse-sprite { width: 100%; height: 100%; display: block; }
@@ -682,9 +693,9 @@ html, body {
 
 /* ── Body bob ───────────────────────── */
 @keyframes body-bob {
-  0%, 100% { transform: translate(-50%, -50%); }
-  25%      { transform: translate(-50%, calc(-50% - 1px)); }
-  75%      { transform: translate(-50%, calc(-50% + 0.5px)); }
+  0%, 100% { transform: translate(-50%, 0); }
+  25%      { transform: translate(-50%, -1px); }
+  75%      { transform: translate(-50%, 0.5px); }
 }
 
 /* ── Apply to live / pending horses ── */
@@ -942,7 +953,7 @@ html, body {
 
 body.tv {
   --sprite-scale: 3;
-  --horse-height: 90px;
+  --horse-height: 66px;
   --track-gap: 0px;
   font-size: 18px;
 }
@@ -1005,35 +1016,70 @@ body.tv .race-header .meta .btn {
   color: #fff;
 }
 
-/* ── Achievement toasts ─────────────────────────────── */
+/* ── Achievement ticker ─────────────────────────────── */
 
-.achievement-toast {
-  display: flex;
+.achievement-ticker {
   position: fixed;
-  left: 50%;
-  align-items: stretch;
-  background: rgba(20, 20, 20, 0.92);
-  color: #fff;
-  border: 1px solid #ffd166;
-  border-radius: 8px;
-  padding: 0.5rem 0.75rem;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--ticker-h);
+  overflow: hidden;
   z-index: 9999;
-  transform: translateX(-50%);
-  animation: achievementToastIn 0.25s ease-out;
+  background: linear-gradient(180deg, rgba(12, 12, 12, 0.94), rgba(20, 20, 20, 0.98));
+  border-top: 2px solid #ffd166;
+  box-shadow: 0 -4px 18px rgba(0, 0, 0, 0.45);
+  white-space: nowrap;
+  transition: opacity 0.3s ease;
 }
-.achievement-toast-xp {
-  font-size: 1.4rem;
+.achievement-ticker.is-empty { opacity: 0; pointer-events: none; }
+
+/* The track is wider than the viewport; ticker.ts translates it leftward. */
+.achievement-ticker-track {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  height: 100%;
+  width: max-content;
+  will-change: transform;
+}
+
+.achievement-ticker-item {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  height: 100%;
+  padding: 0 1.5rem 0 0;
+  font-size: 1.05rem;
+  line-height: var(--ticker-h);
+  color: #fff;
+}
+.achievement-ticker-xp {
   font-weight: bold;
   color: #ffd166;
-  align-self: center;
-  padding-right: 0.75rem;
-  border-right: 1px solid rgba(255, 255, 255, 0.2);
-  margin-right: 0.75rem;
 }
-.achievement-toast-title { font-weight: bold; }
-.achievement-toast-desc { color: #ccc; font-size: 0.9rem; }
-@keyframes achievementToastIn {
-  from { opacity: 0; transform: translate(-50%, 20px); }
-  to   { opacity: 1; transform: translate(-50%, 0); }
+.achievement-ticker-horse { font-weight: bold; }
+.achievement-ticker-name { color: #ffd166; }
+.achievement-ticker-desc { color: #aaa; }
+
+/* Bullet between achievements within a pass. */
+.achievement-ticker-sep {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  height: 100%;
+  padding: 0 1.5rem;
+  color: #ffd166;
+  opacity: 0.55;
 }
+
+/* Loop seam — a blank break marking the end of one pass and start of the next. */
+.achievement-ticker-gap {
+  flex: 0 0 auto;
+  height: 100%;
+}
+
+/* Reserve room so the ticker sits below the race instead of over the last lane.
+   Only while it's actually showing achievements. */
+.race:has(.achievement-ticker:not(.is-empty)) { padding-bottom: var(--ticker-h); }

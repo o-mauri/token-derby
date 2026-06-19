@@ -1,9 +1,11 @@
-// Standalone preview of the race view with achievement toasts stacked on top.
+// Standalone preview of the race view with the rolling achievement ticker.
 // Loaded by /preview-toasts.html — not part of the main app bundle.
+//
+// The example achievements are attached to the snapshot as recent_events so the
+// race's own ticker surfaces them through the real onSnapshot → collectFreshItems
+// path (and the bottom-space reservation kicks in just like a live race).
 import { renderRace } from './render/race.js';
-import { renderAchievementToast } from './render/toast.js';
-import type { GetRaceResponse, HorseView, AchievementName } from '@token-derby/shared';
-import { ACHIEVEMENT_DESCRIPTIONS, overtakeDescription } from '@token-derby/shared';
+import type { GetRaceResponse, HorseView, RecentEvent } from '@token-derby/shared';
 
 const COLORS_A = { body: '#8B4513', mane: '#000000', tail: '#000000', saddle: '#C0392B' };
 const COLORS_B = { body: '#FFFFFF', mane: '#000000', tail: '#000000', saddle: '#1B4F72' };
@@ -15,6 +17,16 @@ const COLORS_F = { body: '#16A34A', mane: '#FFFFFF', tail: '#FFFFFF', saddle: '#
 const JOIN_CODE = 'PRVTST';
 const RACE_START_MS = Date.now() - 2 * 60 * 60 * 1000;
 const RACE_END_MS   = Date.now() + 6 * 60 * 60 * 1000;
+
+// One example event per horse so the ticker has a full, varied batch to roll.
+const EVENTS: Record<string, RecentEvent[]> = {
+  Stormbringer: [{ at: 1, name: 'Stampede!', xp: 2 }],
+  Pegasus:      [{ at: 1, name: 'Took the lead!', xp: 5 }, { at: 2, name: 'Pulled Away!', xp: 3 }],
+  Cloudrunner:  [{ at: 1, name: 'Overtake!', xp: 9 }],
+  Thunderbolt:  [{ at: 1, name: 'Pacesetter!', xp: 3 }],
+  Embers:       [{ at: 1, name: 'Comeback!', xp: 5 }],
+  Misty:        [{ at: 1, name: 'Racer!', xp: 1 }],
+};
 
 function horse(
   joinOrder: number,
@@ -37,6 +49,7 @@ function horse(
     user_id: `user-${id}`,
     user_name,
     xp,
+    recent_events: EVENTS[name],
   };
 }
 
@@ -56,7 +69,7 @@ function snapshot(now: number): GetRaceResponse {
 
   return {
     race_id: 'preview-toasts',
-    name: 'Preview Derby — Toasts',
+    name: 'Preview Derby — Ticker',
     start_time: new Date(RACE_START_MS).toISOString(),
     end_time: new Date(RACE_END_MS).toISOString(),
     tz: 'UTC',
@@ -83,38 +96,3 @@ window.fetch = (async (input: RequestInfo | URL) => {
 
 const app = document.getElementById('app')!;
 renderRace(app, JOIN_CODE);
-
-// One example toast per achievement, mounted directly into the race's toast
-// container after first paint. Bypasses the 10s auto-dismiss so the design
-// can be reviewed at a glance.
-type Example = { horseName: string; name: AchievementName; xp: number };
-
-const EXAMPLES: Example[] = [
-  { horseName: 'Stormbringer', name: 'Stampede!',      xp: 2 },
-  { horseName: 'Pegasus',      name: 'Took the lead!', xp: 5 },
-  { horseName: 'Cloudrunner',  name: 'Overtake!',      xp: 9 },
-  { horseName: 'Thunderbolt',  name: 'Pacesetter!',    xp: 3 },
-  { horseName: 'Embers',       name: 'Comeback!',      xp: 5 },
-  { horseName: 'Misty',        name: 'Racer!',         xp: 1 },
-  { horseName: 'Pegasus',      name: 'Pulled Away!',   xp: 3 },
-];
-
-function describe(name: AchievementName, xp: number): string {
-  if (name === 'Overtake!') return overtakeDescription(Math.floor(xp / 3));
-  return ACHIEVEMENT_DESCRIPTIONS[name];
-}
-
-requestAnimationFrame(() => {
-  const container = app.querySelector<HTMLElement>('.achievement-toast-container');
-  if (!container) return;
-  EXAMPLES.forEach((ex, i) => {
-    const node = renderAchievementToast(document, {
-      horseName: ex.horseName,
-      name: ex.name,
-      description: describe(ex.name, ex.xp),
-      xp: ex.xp,
-    });
-    node.style.bottom = `${1 + i * 5}rem`;
-    container.appendChild(node);
-  });
-});
