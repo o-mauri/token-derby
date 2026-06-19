@@ -10,6 +10,8 @@
   --track-gap: 0px;
   --horse-height: 60px;
   --sprite-scale: 2;
+  --label-col: 124px;
+  --label-mid: 23%;  /* vertical centre of the name-tag — aligned with the horse's middle */
   --ticker-h: 2.6rem;
   --pixel-font: "VT323", "Courier New", ui-monospace, monospace;
 }
@@ -329,24 +331,99 @@ html, body {
 }
 
 .lane {
-  position: relative;
-  height: var(--horse-height);
   /* Never let a crowded field compress lanes below the sprite height — the
      track scrolls (autoscroll drives it in TV mode) instead of squashing
      horses on top of each other. */
   flex: 0 0 var(--horse-height);
+  height: var(--horse-height);
+  display: flex;
+  align-items: stretch;
+}
+/* Fixed name-tag column at the start of every lane — names/levels/tokens all
+   line up here instead of floating in front of / behind the moving horse. */
+.lane-info {
+  flex: 0 0 var(--label-col);
+  position: relative;
+  pointer-events: none;
+}
+/* Bordered chip, vertically aligned with the horse's middle (not the lane
+   centre line), giving each lane a distinct edge. */
+.lane-info-box {
+  position: absolute;
+  top: var(--label-mid);
+  left: 4px;
+  right: 6px;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 2px 6px;
+  background: #1d1d24;          /* slightly lifted off the page's pure black */
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+  line-height: 1.1;
+  letter-spacing: 0.02em;
+}
+/* Each row clips; .row-scroll marquees its content when it overflows. */
+.horse-name-row {
+  overflow: hidden;
+  white-space: nowrap;
+}
+.row-scroll {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  will-change: transform;
+}
+.row-scroll.is-scrolling {
+  animation: label-marquee 7s ease-in-out infinite;
+}
+@keyframes label-marquee {
+  0%, 16%   { transform: translateX(0); }
+  46%, 54%  { transform: translateX(var(--shift, 0)); }
+  84%, 100% { transform: translateX(0); }
+}
+/* Row 2 stacks its views in one cell and cross-fades between them. */
+.horse-stats-row {
+  display: grid;
+  align-items: center;
+  overflow: hidden;
+}
+.stat-view {
+  grid-area: 1 / 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  animation: stat-cycle 15s ease-in-out infinite;
+}
+.stat-view:nth-child(2) { animation-delay: -12s; }  /* level    — 2nd */
+.stat-view:nth-child(3) { animation-delay: -9s; }   /* tokens   — 3rd */
+.stat-view:nth-child(4) { animation-delay: -6s; }   /* pace     — 4th */
+.stat-view:nth-child(5) { animation-delay: -3s; }   /* position — 5th */
+@keyframes stat-cycle {
+  0%   { opacity: 1; }
+  16%  { opacity: 1; }
+  20%  { opacity: 0; }
+  96%  { opacity: 0; }
+  100% { opacity: 1; }
+}
+/* The running strip (dirt + rails) begins to the right of the label column. */
+.lane-track {
+  position: relative;
+  flex: 1 1 auto;
   background: var(--lane) url('img/track-1.png') repeat-x center / auto 100%;
   image-rendering: pixelated;
   border-radius: 4px;
 }
-.lane::before {
+.lane-track::before {
   content: "";
   position: absolute;
   left: 0; top: 0; bottom: 0;
   width: 4px;
   background: #fff;
 }
-.lane::after {
+.lane-track::after {
   content: "";
   position: absolute;
   right: 0; top: 0; bottom: 0;
@@ -420,59 +497,25 @@ html, body {
 }
 
 
-.horse-info {
-  position: absolute;
-  top: 50%;
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  white-space: nowrap;
-  pointer-events: none;
-  letter-spacing: 0.02em;
-  line-height: 1.1;
-  background: rgba(0, 0, 0, 0.82);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 2px 5px;
-}
-.horse.info-front .horse-info {
-  left: calc(100% + 6px);
-  transform: translateY(-50%);
-  align-items: flex-start;
-  text-align: left;
-}
-.horse.info-back .horse-info {
-  right: calc(100% + 6px);
-  transform: translateY(-50%);
-  align-items: flex-end;
-  text-align: right;
-}
-
-.horse-name-row,
-.horse-stats-row {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-.horse.info-back .horse-name-row,
-.horse.info-back .horse-stats-row {
-  flex-direction: row-reverse;
-}
 .horse-label {
   color: var(--text);
-  font-size: 0.62rem;
+  font-family: "Bitcount Prop Single", var(--pixel-font);
+  font-size: 0.56rem;
   font-weight: 600;
 }
 .horse-level {
   display: inline-block;
   margin-left: 0;
-  padding: 0 5px;
+  padding: 0 6px;
+  font-family: "Barlow Semi Condensed", var(--pixel-font);
+  font-weight: 600;
   font-size: 0.5rem;
+  text-transform: uppercase;
   color: #fff;
   background: #2563eb;
   border-radius: 999px;
-  letter-spacing: 0.03em;
-  line-height: 1.4;
+  letter-spacing: 0.02em;
+  line-height: 1.45;
 }
 .user-label {
   color: var(--text);
@@ -489,6 +532,14 @@ html, body {
   font-size: 0.55rem;
   font-weight: bold;
 }
+.horse-position {
+  font-size: 0.6rem;
+  font-weight: bold;
+  color: #aab0b8;            /* everything past 3rd — light grey */
+}
+.horse-position.pos-1 { color: #ffd700; }  /* gold   */
+.horse-position.pos-2 { color: #c8ccd2; }  /* silver */
+.horse-position.pos-3 { color: #cd7f32; }  /* bronze */
 
 /* ── Pending state extras ─────────────────────────── */
 
@@ -954,6 +1005,7 @@ html, body {
 body.tv {
   --sprite-scale: 3;
   --horse-height: 66px;
+  --label-col: 168px;
   --track-gap: 0px;
   font-size: 18px;
 }
@@ -972,15 +1024,16 @@ body.tv .track {
 }
 body.tv .track::-webkit-scrollbar { display: none; }
 
-body.tv .horse-info { gap: 1px; padding: 3px 8px; }
+body.tv .lane-info-box { gap: 1px; padding: 3px 7px; }
 body.tv .horse-label {
-  font-size: 0.9rem;
+  font-size: 0.82rem;
   letter-spacing: 0.05em;
 }
 body.tv .horse-level { font-size: 0.7rem; padding: 1px 8px; }
 body.tv .user-label { font-size: 0.75rem; }
 body.tv .horse-tokens { font-size: 0.78rem; }
 body.tv .horse-pace { font-size: 0.85rem; }
+body.tv .horse-position { font-size: 0.85rem; }
 
 body.tv .pending-banner { padding: 24px; font-size: 1.75rem; }
 

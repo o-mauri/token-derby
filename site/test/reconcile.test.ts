@@ -105,7 +105,7 @@ describe('reconcileHorses', () => {
       horse('a', 500, 'Alpha', '2026-04-22T09:00:00Z', { user_name: 'Alice' }),
     ] });
     reconcileHorses(track, r, new Date('2026-04-22T13:00:00Z'));
-    expect(track.querySelector('.user-label')?.textContent).toBe('(Alice)');
+    expect(track.querySelector('.user-label')?.textContent).toBe('Alice');
   });
 
   it('omits the .user-label when user_name is missing (legacy horses)', () => {

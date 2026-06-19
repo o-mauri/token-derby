@@ -6,6 +6,13 @@ import { buildHatGroup } from '../hat-svg.js';
 
 const tokenFmt = new Intl.NumberFormat('en-US');
 
+// 1 → "1st", 2 → "2nd", 3 → "3rd", 4 → "4th", 11 → "11th", 21 → "21st" …
+function ordinal(n: number): string {
+  const v = n % 100;
+  const suffix = v >= 11 && v <= 13 ? 'th' : (['th', 'st', 'nd', 'rd'][n % 10] ?? 'th');
+  return `${n}${suffix}`;
+}
+
 export function reconcileHorses(
   track: HTMLElement,
   race: GetRaceResponse,
@@ -47,6 +54,79 @@ function createLane(doc: Document, horse: HorseView): HTMLElement {
   lane.className = 'lane';
   lane.dataset.horseId = horse.horse_id;
 
+  // ── Fixed name-tag at the start of the lane ──
+  // Each row clips to the (narrow) tag width; .row-scroll marquees its content
+  // when it overflows (see updateLane). The tag is a bordered chip aligned with
+  // the horse's vertical middle.
+  const info = doc.createElement('div');
+  info.className = 'lane-info';
+
+  const box = doc.createElement('div');
+  box.className = 'lane-info-box';
+
+  // ── Row 1: the horse name, on its own ──
+  const nameRow = doc.createElement('div');
+  nameRow.className = 'horse-name-row';
+  const nameScroll = doc.createElement('div');
+  nameScroll.className = 'row-scroll';
+  const nameLabel = doc.createElement('span');
+  nameLabel.className = 'horse-label';
+  nameLabel.textContent = horse.name;
+  nameScroll.appendChild(nameLabel);
+  nameRow.appendChild(nameScroll);
+  box.appendChild(nameRow);
+
+  // ── Row 2: rotator that flips between owner+level / tokens / pace / position ──
+  const statsRow = doc.createElement('div');
+  statsRow.className = 'horse-stats-row';
+  const makeView = (): HTMLElement => {
+    const view = doc.createElement('div');
+    view.className = 'stat-view';
+    const scroll = doc.createElement('div');
+    scroll.className = 'row-scroll';
+    view.appendChild(scroll);
+    statsRow.appendChild(view);
+    return scroll;
+  };
+
+  // View 1 — owner name (view kept even for legacy horses so cycle timing holds)
+  const ownerView = makeView();
+  if (horse.user_name) {
+    const userLabel = doc.createElement('span');
+    userLabel.className = 'user-label';
+    userLabel.textContent = horse.user_name;
+    ownerView.appendChild(userLabel);
+  }
+
+  // View 2 — level chip
+  const levelChip = doc.createElement('span');
+  levelChip.className = 'horse-level';
+  levelChip.textContent = `Lvl. ${levelFromXp(horse.xp + (horse.live_xp ?? 0))}`;
+  makeView().appendChild(levelChip);
+
+  // View 3 — current tokens
+  const tokens = doc.createElement('span');
+  tokens.className = 'horse-tokens';
+  makeView().appendChild(tokens);
+
+  // View 4 — token pace
+  const pace = doc.createElement('span');
+  pace.className = 'horse-pace';
+  makeView().appendChild(pace);
+
+  // View 5 — current race position
+  const position = doc.createElement('span');
+  position.className = 'horse-position';
+  makeView().appendChild(position);
+
+  box.appendChild(statsRow);
+  info.appendChild(box);
+  lane.appendChild(info);
+
+  // ── Running strip (dirt + rails) to the right of the labels ──
+  const trackStrip = doc.createElement('div');
+  trackStrip.className = 'lane-track';
+
   const wrap = doc.createElement('div');
   wrap.className = 'horse';
   wrap.dataset.horseId = horse.horse_id;
@@ -55,49 +135,10 @@ function createLane(doc: Document, horse: HorseView): HTMLElement {
   wrap.style.setProperty('--tail', horse.colors.tail);
   wrap.style.setProperty('--saddle', horse.colors.saddle);
 
-  const info = doc.createElement('div');
-  info.className = 'horse-info';
-
-  const nameRow = doc.createElement('div');
-  nameRow.className = 'horse-name-row';
-
-  const nameLabel = doc.createElement('span');
-  nameLabel.className = 'horse-label';
-  nameLabel.textContent = horse.name;
-  nameRow.appendChild(nameLabel);
-
-  const levelChip = doc.createElement('span');
-  levelChip.className = 'horse-level';
-  levelChip.textContent = `Lvl. ${levelFromXp(horse.xp + (horse.live_xp ?? 0))}`;
-  nameRow.appendChild(levelChip);
-
-  if (horse.user_name) {
-    const userLabel = doc.createElement('span');
-    userLabel.className = 'user-label';
-    userLabel.textContent = `(${horse.user_name})`;
-    nameRow.appendChild(userLabel);
-  }
-
-  info.appendChild(nameRow);
-
-  const statsRow = doc.createElement('div');
-  statsRow.className = 'horse-stats-row';
-
-  const tokens = doc.createElement('span');
-  tokens.className = 'horse-tokens';
-  statsRow.appendChild(tokens);
-
-  const pace = doc.createElement('span');
-  pace.className = 'horse-pace';
-  statsRow.appendChild(pace);
-
-  info.appendChild(statsRow);
-
   const dust = doc.createElement('span');
   dust.className = 'horse-dust';
   wrap.appendChild(dust);
 
-  wrap.appendChild(info);
   const horseSvg = buildHorseSvg(doc);
   if (horse.equipped_hat) {
     const hat = hatById(horse.equipped_hat.id);
@@ -106,7 +147,9 @@ function createLane(doc: Document, horse: HorseView): HTMLElement {
     }
   }
   wrap.appendChild(horseSvg);
-  lane.appendChild(wrap);
+
+  trackStrip.appendChild(wrap);
+  lane.appendChild(trackStrip);
   return lane;
 }
 
@@ -122,17 +165,39 @@ function updateLane(
   wrap.style.left = `${x}%`;
   wrap.classList.toggle('live', pct > 0 && pct < 1);
   wrap.classList.toggle('pending', pct === 0);
-  wrap.classList.toggle('info-front', x < 25);
-  wrap.classList.toggle('info-back', x >= 25);
 
-  const tokensEl = wrap.querySelector<HTMLElement>('.horse-tokens')!;
+  // Labels live in the fixed lane-info column, not on the moving horse.
+  const tokensEl = lane.querySelector<HTMLElement>('.horse-tokens')!;
   tokensEl.textContent = `${tokenFmt.format(horse.current_tokens)} tok`;
 
-  const paceEl = wrap.querySelector<HTMLElement>('.horse-pace')!;
+  const paceEl = lane.querySelector<HTMLElement>('.horse-pace')!;
   paceEl.textContent = pace === null ? '—' : `+${tokenFmt.format(pace)}/min`;
 
-  const levelEl = wrap.querySelector<HTMLElement>('.horse-level');
+  const levelEl = lane.querySelector<HTMLElement>('.horse-level');
   if (levelEl) {
     levelEl.textContent = `Lvl. ${levelFromXp(horse.xp + (horse.live_xp ?? 0))}`;
+  }
+
+  // Race position by tokens (competition ranking: ties share a place).
+  const posEl = lane.querySelector<HTMLElement>('.horse-position');
+  if (posEl) {
+    const rank = 1 + allHorses.filter((h) => h.current_tokens > horse.current_tokens).length;
+    posEl.textContent = ordinal(rank);
+    posEl.className = 'horse-position' + (rank <= 3 ? ` pos-${rank}` : '');
+  }
+
+  // Marquee any row whose content overflows the narrow name-tag: pause at the
+  // start, scroll through the whole thing, scroll back (see .row-scroll CSS).
+  for (const scroll of Array.from(lane.querySelectorAll<HTMLElement>('.row-scroll'))) {
+    const row = scroll.parentElement;
+    if (!row) continue;
+    const overflow = scroll.scrollWidth - row.clientWidth;
+    if (overflow > 1) {
+      scroll.style.setProperty('--shift', `${-overflow}px`);
+      scroll.classList.add('is-scrolling');
+    } else {
+      scroll.classList.remove('is-scrolling');
+      scroll.style.removeProperty('--shift');
+    }
   }
 }
