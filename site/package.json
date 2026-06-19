@@ -8,7 +8,8 @@
     "build": "tsup && node scripts/copy-public.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
-    "dev": "npx serve dist"
+    "dev": "npx serve dist",
+    "dev:live": "node scripts/serve-live.mjs"
   },
   "devDependencies": {
     "@token-derby/shared": "*",
