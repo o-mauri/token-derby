@@ -67,6 +67,7 @@ export function renderRace(root: HTMLElement, joinCode: string): () => void {
   });
 
   const ctrl = new AbortController();
+  let finishedTeardown: (() => void) | null = null;
   ctrl.signal.addEventListener('abort', () => ticker.destroy(), { once: true });
   const buffers = new Map<string, Sample[]>();
   startAutoScroll({ signal: ctrl.signal, target: track });
@@ -134,7 +135,10 @@ export function renderRace(root: HTMLElement, joinCode: string): () => void {
     }
 
     if (race.status === 'finished') {
-      renderFinishedOverlay(frame, race);
+      if (!finishedTeardown) {
+        finishedTeardown = renderFinishedOverlay(frame, race);
+        ctrl.abort(); // stop polling, ticker, autoscroll, countdown — race is over
+      }
     }
   };
 
@@ -158,5 +162,5 @@ export function renderRace(root: HTMLElement, joinCode: string): () => void {
     abortSignal: ctrl.signal,
   });
 
-  return () => ctrl.abort();
+  return () => { ctrl.abort(); finishedTeardown?.(); };
 }

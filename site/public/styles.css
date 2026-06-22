@@ -687,8 +687,47 @@ html, body {
   padding: 8px 16px;
   font: inherit;
   cursor: pointer;
+  /* Pinned to a corner so it stays reachable even when a chart face is
+     covering the whole screen. */
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 100;
 }
 .podium .dismiss:hover { filter: brightness(1.1); }
+
+/* Rotating detail panel: standings + charts share one grid cell so the
+   container sizes to the tallest face and faces can crossfade in place. */
+.detail-cycle { display: grid; width: min(960px, 94vw); }
+.detail-cycle > .detail-face { grid-area: 1 / 1; opacity: 0; transition: opacity 0.6s ease; pointer-events: none; }
+.detail-cycle > .detail-face.is-active { opacity: 1; pointer-events: auto; }
+@media (prefers-reduced-motion: reduce) { .detail-cycle > .detail-face { transition: none; } }
+
+.chart-face { display: flex; flex-direction: column; gap: 8px; }
+.chart-title { color: var(--accent); letter-spacing: 0.08em; text-transform: uppercase; font-size: 0.9rem; }
+.chart-svg { width: 100%; height: auto; background: #0c0c0c; border: 1px solid #222; }
+.chart-grid { stroke: #222; stroke-width: 1; }
+.chart-line { stroke-linejoin: round; stroke-linecap: round; }
+.chart-axis { fill: #888; font-size: 10px; }
+.chart-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 0.85rem; color: #ccc; }
+.legend-item { display: inline-flex; align-items: center; gap: 5px; }
+.legend-chip { width: 10px; height: 10px; display: inline-block; }
+
+/* When the panel flips to a chart, take over the whole viewport (the podium and
+   standings sit behind it). The standings face stays under the podium in-flow. */
+.detail-cycle > .chart-face {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  justify-content: center;
+  gap: 18px;
+  padding: clamp(20px, 4vw, 64px);
+  background: #0a0a0a;
+}
+.chart-face .chart-title { font-size: 1.4rem; text-align: center; }
+.chart-face .chart-svg { height: 64vh; border: none; }
+.chart-face .chart-legend { justify-content: center; gap: 8px 20px; font-size: 1.05rem; }
+.chart-face .legend-chip { width: 14px; height: 14px; }
 
 /* ── Confetti ─────────────────────────────────────── */
 

@@ -1,6 +1,26 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderFinishedOverlay } from '../src/render/finished.js';
 import type { GetRaceResponse, HorseView } from '@token-derby/shared';
+
+function fakeWin() {
+  let cb: (() => void) | null = null; let cleared = false;
+  return {
+    win: { setInterval: (fn: () => void) => { cb = fn; return 7; }, clearInterval: () => { cleared = true; } } as unknown as Window,
+    tick: () => cb && cb(),
+    wasCleared: () => cleared,
+  };
+}
+
+function makeFinishedRaceWithManyHorses(): GetRaceResponse {
+  return race([
+    horse('a', 1, 'Alpha',   1000, 0, 80),
+    horse('b', 2, 'Bravo',    800, 0, 65),
+    horse('c', 3, 'Charlie',  500, 0, 50),
+    horse('d', 4, 'Delta',    200, 0, 25),
+    horse('e', 5, 'Echo',      50, 0, 10),
+    horse('f', 6, 'Foxtrot',   10, 0,  5),
+  ]);
+}
 
 function race(horses: HorseView[]): GetRaceResponse {
   return {
@@ -50,7 +70,10 @@ beforeEach(() => {
   track = document.createElement('div');
   track.className = 'race';
   document.body.appendChild(track);
+  vi.stubGlobal('fetch', vi.fn(async () =>
+    new Response('{"start_ms":0,"end_ms":1,"horses":[]}', { status: 200, headers: { 'content-type': 'application/json' } })));
 });
+afterEach(() => { vi.unstubAllGlobals(); });
 
 describe('renderFinishedOverlay', () => {
   it('renders 1st/2nd/3rd in <ol> with podium cards', () => {
@@ -189,5 +212,42 @@ describe('renderFinishedOverlay', () => {
     ]));
     expect(track.textContent).toContain('+12 from achievements');
     expect(track.textContent).toContain('+8 from achievements');
+  });
+
+  it('mounts a rotating detail panel with chart faces once series loads', async () => {
+    const raceEl = document.createElement('div');
+    const raceData = makeFinishedRaceWithManyHorses();
+    const series = {
+      start_ms: Date.parse(raceData.start_time), end_ms: Date.parse(raceData.end_time),
+      horses: raceData.horses.map((h) => ({ horse_id: h.horse_id, points: [{ t: Date.parse(raceData.start_time) + 60_000, d: 30 }] })),
+    };
+    const { win } = fakeWin();
+    const teardown = renderFinishedOverlay(raceEl, raceData, { fetchSeries: async () => series, win });
+    await Promise.resolve(); await Promise.resolve(); // let the fetch microtasks flush
+
+    const cycle = raceEl.querySelector('.detail-cycle')!;
+    expect(cycle).not.toBeNull();
+    // standings face + 2 chart faces
+    expect(cycle.querySelectorAll('.detail-face').length).toBe(3);
+    teardown();
+  });
+
+  it('returns a teardown that clears the cycler timer', async () => {
+    const raceEl = document.createElement('div');
+    const raceData = makeFinishedRaceWithManyHorses();
+    // Provide data points so buildChartFaces produces ≥2 chart faces.
+    // standings face + 2 chart faces = 3 panels → cycler starts a timer.
+    const series = {
+      start_ms: Date.parse(raceData.start_time), end_ms: Date.parse(raceData.end_time),
+      horses: raceData.horses.map((h) => ({ horse_id: h.horse_id, points: [{ t: Date.parse(raceData.start_time) + 60_000, d: 30 }] })),
+    };
+    const { win, wasCleared } = fakeWin();
+    const teardown = renderFinishedOverlay(raceEl, raceData, { fetchSeries: async () => series, win });
+    await Promise.resolve(); await Promise.resolve(); // flush fetch microtasks
+    teardown();
+    // cycler timer must have been cleared
+    expect(wasCleared()).toBe(true);
+    // calling teardown a second time must not throw (abort is idempotent)
+    expect(() => teardown()).not.toThrow();
   });
 });

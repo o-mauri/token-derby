@@ -1,7 +1,7 @@
 // Standalone preview of the post-race overlay with dummy data.
 // Loaded by /preview.html — not part of the main app bundle.
 import { renderFinishedOverlay } from './render/finished.js';
-import type { GetRaceResponse, HorseView } from '@token-derby/shared';
+import type { GetRaceResponse, GetRaceSeriesResponse, HorseView, SeriesPoint } from '@token-derby/shared';
 
 const COLORS_A = { body: '#8B4513', mane: '#000000', tail: '#000000', saddle: '#C0392B' };
 const COLORS_B = { body: '#FFFFFF', mane: '#000000', tail: '#000000', saddle: '#1B4F72' };
@@ -64,7 +64,46 @@ const race: GetRaceResponse = {
     horse(4, 'Thunderbolt',  'Dan',   2880, 1000, 35, COLORS_D),
     horse(5, 'Embers',       'Eve',   1240, 655,  29, COLORS_E),
     horse(6, 'Misty',        'Frank', 412,  10,   26, COLORS_F),
+    // Ranks 7–15 — a fuller field so the charts/standings show a larger race.
+    ...[
+      { name: 'Comet',   user: 'Grace',    tokens: 380, body: '#FF4D4D' },
+      { name: 'Blaze',   user: 'Heidi',    tokens: 345, body: '#FF9F1C' },
+      { name: 'Shadow',  user: 'Ivan',     tokens: 310, body: '#FFD23F' },
+      { name: 'Dash',    user: 'Judy',     tokens: 278, body: '#2EC4B6' },
+      { name: 'Nova',    user: 'Mallory',  tokens: 248, body: '#00A8E8' },
+      { name: 'Rocket',  user: 'Niaj',     tokens: 210, body: '#C77DFF' },
+      { name: 'Ziggy',   user: 'Olivia',   tokens: 170, body: '#FF66C4' },
+      { name: 'Tornado', user: 'Peggy',    tokens: 120, body: '#9EF01A' },
+      { name: 'Bandit',  user: 'Quentin',  tokens: 70,  body: '#C0C0C0' },
+    ].map((h, i) =>
+      horse(7 + i, h.name, h.user, h.tokens, 100 + i * 40, 22,
+        { body: h.body, mane: '#000000', tail: '#000000', saddle: '#333333' })),
   ],
+};
+
+// Dummy per-horse token series spanning the race window, so the rotating
+// chart panel (cumulative + tokens/min) has data without a live API.
+const START = Date.parse(race.start_time);
+const END = Date.parse(race.end_time);
+const SAMPLES = 32;
+
+function seriesFor(h: HorseView, seed: number): SeriesPoint[] {
+  // Spiky, non-negative weights with occasional idle dips, normalised so the
+  // cumulative line lands on the horse's final token total.
+  const weights = Array.from({ length: SAMPLES }, (_, i) =>
+    Math.max(0, Math.sin(i * 0.6 + seed) * Math.cos(i * 0.27 + seed * 1.3) + 0.45));
+  const sum = weights.reduce((a, b) => a + b, 0) || 1;
+  const total = h.final_tokens ?? h.current_tokens;
+  return weights.map((w, i) => ({
+    t: START + Math.round(((i + 1) / SAMPLES) * (END - START)),
+    d: Math.round((w / sum) * total),
+  }));
+}
+
+const series: GetRaceSeriesResponse = {
+  start_ms: START,
+  end_ms: END,
+  horses: race.horses.map((h, i) => ({ horse_id: h.horse_id, points: seriesFor(h, i) })),
 };
 
 const app = document.getElementById('app')!;
@@ -75,17 +114,22 @@ heading.className = 'preview-header';
 heading.innerHTML = `
   <h1 style="margin:0 0 6px 0">Token Derby — End of Race preview</h1>
   <p style="margin:0;color:var(--muted);font-size:0.9em">
-    Dummy race rendered to show the post-race overlay. Click <strong>Reload</strong> to replay the bar animation.
+    Dummy race rendered to show the post-race overlay. The panel below the podium
+    auto-crossfades through standings → cumulative tokens → tokens/min. Click
+    <strong>Reload</strong> to replay the bar animation.
   </p>
   <button id="reload" type="button" style="margin-top:8px;padding:6px 14px;cursor:pointer">Reload</button>
 `;
 app.appendChild(heading);
 
+let teardown: (() => void) | null = null;
+
 function show(): void {
-  // Strip any old overlay/confetti so we can replay the animation.
+  // Tear down any prior overlay's cycler/timer, then strip old overlay/confetti.
+  teardown?.();
   app.querySelectorAll('.podium, .confetti').forEach(el => el.remove());
   app.classList.remove('finished');
-  renderFinishedOverlay(app, race);
+  teardown = renderFinishedOverlay(app, race, { fetchSeries: async () => series });
 }
 
 document.getElementById('reload')!.addEventListener('click', show);
