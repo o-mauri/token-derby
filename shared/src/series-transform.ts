@@ -34,7 +34,8 @@ export function bucketSeries(
     const idx = Math.min(Math.max(Math.floor((p.t - startMs) / bucketMs), 0), maxBuckets - 1);
     sums.set(idx, (sums.get(idx) ?? 0) + p.d);
   }
-  return [...sums.keys()]
-    .sort((a, b) => a - b)
-    .map((idx) => ({ t: startMs + (idx + 1) * bucketMs, d: sums.get(idx)! }));
+  return Array.from({ length: maxBuckets }, (_, idx) => ({
+    t: startMs + (idx + 1) * bucketMs,
+    d: sums.get(idx) ?? 0,
+  }));
 }

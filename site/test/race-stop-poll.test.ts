@@ -28,6 +28,7 @@ describe('renderRace polling lifecycle', () => {
 
     await vi.advanceTimersByTimeAsync(0);      // first poll fires
     const afterFirst = calls;
+    expect(afterFirst).toBeGreaterThan(0);     // confirm first poll actually fired
     await vi.advanceTimersByTimeAsync(120_000); // two minutes of would-be polls
     expect(calls).toBe(afterFirst);            // no further polls after finished
   });
