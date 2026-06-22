@@ -1,57 +1,46 @@
 import { describe, it, expect } from 'vitest';
-import { toCumulative, toThroughput, bucketSeries } from '../src/series-transform.js';
+import { resampleToTicks } from '../src/series-transform.js';
 
-describe('toCumulative', () => {
-  it('returns running totals', () => {
-    expect(toCumulative([{ t: 1, d: 10 }, { t: 2, d: 5 }, { t: 3, d: 20 }]))
-      .toEqual([{ t: 1, total: 10 }, { t: 2, total: 15 }, { t: 3, total: 35 }]);
-  });
-  it('handles empty input', () => {
-    expect(toCumulative([])).toEqual([]);
-  });
-});
+const MIN = 60_000;
 
-describe('toThroughput', () => {
-  it('computes tokens per minute from the gap to the previous point', () => {
-    // first point: 120 tokens over 60s since start => 120/min
-    // second point: 300 tokens over 120s => 150/min
-    const out = toThroughput([{ t: 60_000, d: 120 }, { t: 180_000, d: 300 }], 0);
-    expect(out[0]).toEqual({ t: 60_000, perMin: 120 });
-    expect(out[1]).toEqual({ t: 180_000, perMin: 150 });
+describe('resampleToTicks', () => {
+  it('starts from a zero anchor at the window start', () => {
+    const out = resampleToTicks([], 0, 2 * MIN);
+    expect(out[0]).toEqual({ t: 0, total: 0, perMin: 0 });
   });
-  it('handles empty input', () => {
-    expect(toThroughput([], 0)).toEqual([]);
-  });
-});
 
-describe('bucketSeries', () => {
-  it('passes through when at or under the cap', () => {
-    const pts = [{ t: 1, d: 1 }, { t: 2, d: 2 }];
-    expect(bucketSeries(pts, 0, 10, 5)).toEqual(pts);
+  it('emits an anchor plus one point per tick', () => {
+    // 5-minute window, 1-minute ticks => 5 ticks + 1 anchor
+    const out = resampleToTicks([], 0, 5 * MIN);
+    expect(out).toHaveLength(6);
   });
-  it('downsamples to at most maxBuckets while preserving total tokens', () => {
-    const pts = Array.from({ length: 100 }, (_, i) => ({ t: i * 100, d: 1 }));
-    const out = bucketSeries(pts, 0, 100 * 100, 10);
-    expect(out.length).toBeLessThanOrEqual(10);
-    expect(out.reduce((s, p) => s + p.d, 0)).toBe(100);
+
+  it('accumulates deltas within a tick and reports tokens/min for that minute', () => {
+    // One burst of 120 tokens in the first minute, then idle.
+    const out = resampleToTicks([{ t: 30_000, d: 120 }], 0, 3 * MIN);
+    expect(out[1]).toEqual({ t: 1 * MIN, total: 120, perMin: 120 });
+    // idle ticks carry the cumulative total forward and show 0 pace
+    expect(out[2]).toEqual({ t: 2 * MIN, total: 120, perMin: 0 });
+    expect(out[3]).toEqual({ t: 3 * MIN, total: 120, perMin: 0 });
   });
-  it('emits uniform-gap buckets and zero-fills silent intervals', () => {
-    // 10 points clustered at the start of a 10000ms window, then silence
-    const startMs = 0;
-    const endMs = 10_000;
-    const maxBuckets = 10;
-    const pts = Array.from({ length: 20 }, (_, i) => ({ t: i * 10, d: 5 }));
-    const out = bucketSeries(pts, startMs, endMs, maxBuckets);
-    // must emit exactly maxBuckets points
-    expect(out.length).toBe(maxBuckets);
-    // consecutive t values must differ by exactly bucketMs
-    const bucketMs = Math.ceil((endMs - startMs) / maxBuckets);
-    for (let i = 1; i < out.length; i++) {
-      expect(out[i].t - out[i - 1].t).toBe(bucketMs);
-    }
-    // the silence (later buckets) must have d === 0
-    expect(out.some((p) => p.d === 0)).toBe(true);
-    // total tokens preserved
-    expect(out.reduce((s, p) => s + p.d, 0)).toBe(pts.reduce((s, p) => s + p.d, 0));
+
+  it('sums multiple points that fall in the same tick', () => {
+    const out = resampleToTicks([{ t: 10_000, d: 30 }, { t: 50_000, d: 70 }], 0, 1 * MIN);
+    expect(out[1]).toEqual({ t: 1 * MIN, total: 100, perMin: 100 });
+  });
+
+  it('keeps the cumulative total monotonic across active and idle ticks', () => {
+    const out = resampleToTicks(
+      [{ t: 30_000, d: 50 }, { t: 150_000, d: 25 }], // minute 1 and minute 3
+      0, 4 * MIN,
+    );
+    expect(out.map((p) => p.total)).toEqual([0, 50, 50, 75, 75]);
+    expect(out.map((p) => p.perMin)).toEqual([0, 50, 0, 25, 0]);
+  });
+
+  it('normalises pace to per-minute when ticks are wider than a minute', () => {
+    // 2-minute ticks: 200 tokens in the first tick => 100 tokens/min.
+    const out = resampleToTicks([{ t: 30_000, d: 200 }], 0, 2 * MIN, 2 * MIN);
+    expect(out[1]).toEqual({ t: 2 * MIN, total: 200, perMin: 100 });
   });
 });
