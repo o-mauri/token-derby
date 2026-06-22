@@ -1,15 +1,36 @@
-import type { GetRaceResponse, HorseView } from '@token-derby/shared';
+import type { GetRaceResponse, GetRaceSeriesResponse, HorseView } from '@token-derby/shared';
 import { levelInfo, levelFromXp } from '@token-derby/shared';
+import { fetchRaceSeries } from '../api.js';
+import { buildChartFaces } from './race-chart.js';
+import { startCycler } from './panel-cycler.js';
 
 const CONFETTI_COLORS = ['#ffd166', '#7bed9f', '#a68bd8', '#ff6b6b', '#4db8ff', '#ffffff'];
 const CONFETTI_COUNT = 40;
+const FLIP_INTERVAL_MS = 8_000;
 
-export function renderFinishedOverlay(raceEl: HTMLElement, race: GetRaceResponse): void {
-  if (raceEl.querySelector('.podium')) return;
+type FinishedOptions = {
+  fetchSeries?: (joinCode: string) => Promise<GetRaceSeriesResponse>;
+  win?: Window;
+  intervalMs?: number;
+};
+
+export function renderFinishedOverlay(
+  raceEl: HTMLElement,
+  race: GetRaceResponse,
+  opts: FinishedOptions = {},
+): () => void {
+  if (raceEl.querySelector('.podium')) return () => {};
 
   raceEl.classList.add('finished');
   raceEl.appendChild(buildConfetti(raceEl.ownerDocument));
-  raceEl.appendChild(buildPodium(raceEl.ownerDocument, race));
+
+  const ctrl = new AbortController();
+  const overlay = buildPodium(raceEl.ownerDocument, race, ctrl);
+  raceEl.appendChild(overlay);
+
+  void mountDetailCycle(overlay, race, ctrl.signal, opts);
+
+  return () => ctrl.abort();
 }
 
 function buildConfetti(doc: Document): HTMLElement {
@@ -26,7 +47,7 @@ function buildConfetti(doc: Document): HTMLElement {
   return wrap;
 }
 
-function buildPodium(doc: Document, race: GetRaceResponse): HTMLElement {
+function buildPodium(doc: Document, race: GetRaceResponse, ctrl: AbortController): HTMLElement {
   const sorted = [...race.horses].sort((a, b) => (a.rank ?? 99) - (b.rank ?? 99));
   const top: HorseView[] = sorted.slice(0, 3);
   const rest: HorseView[] = sorted.slice(3);
@@ -44,19 +65,23 @@ function buildPodium(doc: Document, race: GetRaceResponse): HTMLElement {
     overlay.appendChild(list);
   }
 
+  // Rotating detail panel: standings is face 1; charts are appended later.
+  const cycle = doc.createElement('div');
+  cycle.className = 'detail-cycle';
   if (rest.length > 0) {
-    overlay.appendChild(buildStandingsTable(doc, rest));
+    const standings = buildStandingsTable(doc, rest);
+    standings.classList.add('detail-face');
+    cycle.appendChild(standings);
   }
+  overlay.appendChild(cycle);
 
   const dismissBtn = doc.createElement('button');
   dismissBtn.className = 'dismiss';
   dismissBtn.type = 'button';
   dismissBtn.textContent = 'Dismiss';
-  dismissBtn.addEventListener('click', () => overlay.remove());
+  dismissBtn.addEventListener('click', () => { overlay.remove(); ctrl.abort(); });
   overlay.appendChild(dismissBtn);
 
-  // Trigger the bar fill animation on the next frame so the CSS transition
-  // animates from `startPct` → `targetPct`.
   scheduleBarAnimation(overlay);
 
   return overlay;
@@ -219,4 +244,30 @@ function scheduleBarAnimation(overlay: HTMLElement): void {
   } else {
     queueMicrotask(apply);
   }
+}
+
+async function mountDetailCycle(
+  overlay: HTMLElement,
+  race: GetRaceResponse,
+  signal: AbortSignal,
+  opts: FinishedOptions,
+): Promise<void> {
+  const cycle = overlay.querySelector<HTMLElement>('.detail-cycle');
+  if (!cycle) return;
+  const fetchSeries = opts.fetchSeries ?? fetchRaceSeries;
+  const win = opts.win ?? window;
+  try {
+    const series = await fetchSeries(race.join_code);
+    if (signal.aborted) return;
+    for (const face of buildChartFaces(overlay.ownerDocument, series, race.horses)) {
+      cycle.appendChild(face);
+    }
+  } catch {
+    // leave the standings face static if the series can't be loaded
+  }
+  if (signal.aborted) return;
+  const faces = [...cycle.querySelectorAll<HTMLElement>('.detail-face')];
+  if (faces.length === 0) return;
+  const cycler = startCycler({ panels: faces, intervalMs: opts.intervalMs ?? FLIP_INTERVAL_MS, win });
+  signal.addEventListener('abort', () => cycler.destroy(), { once: true });
 }
