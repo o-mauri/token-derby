@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { fetchRace, fetchOrgRaces, ApiError } from '../src/api.js';
+import { fetchRace, fetchOrgRaces, fetchRaceSeries, ApiError } from '../src/api.js';
 
 function fakeFetch(status: number, body: unknown) {
   return vi.fn().mockResolvedValue({
@@ -62,5 +62,19 @@ describe('fetchOrgRaces', () => {
       code: 'ORG_NOT_FOUND',
       status: 404,
     });
+  });
+});
+
+describe('fetchRaceSeries', () => {
+  it('GETs the series endpoint and parses JSON', async () => {
+    const body = { start_ms: 1, end_ms: 2, horses: [{ horse_id: 'h1', points: [{ t: 1, d: 5 }] }] };
+    let calledUrl = '';
+    const fakeFetch = (async (url: string) => {
+      calledUrl = url;
+      return new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
+    }) as unknown as typeof fetch;
+    const out = await fetchRaceSeries('ABC 12', fakeFetch);
+    expect(calledUrl).toBe('/api/races/ABC%2012/series');
+    expect(out).toEqual(body);
   });
 });

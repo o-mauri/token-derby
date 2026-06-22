@@ -1,4 +1,4 @@
-import type { GetRaceResponse, ListOrgRacesResponse } from '@token-derby/shared';
+import type { GetRaceResponse, GetRaceSeriesResponse, ListOrgRacesResponse } from '@token-derby/shared';
 
 export type ApiErrorCode =
   | 'RACE_NOT_FOUND'
@@ -49,6 +49,16 @@ export function fetchRace(
   fetchImpl: FetchFn = fetch,
 ): Promise<GetRaceResponse> {
   return getJson<GetRaceResponse>(`/api/races/${encodeURIComponent(joinCode)}`, fetchImpl);
+}
+
+export function fetchRaceSeries(
+  joinCode: string,
+  fetchImpl: FetchFn = fetch,
+): Promise<GetRaceSeriesResponse> {
+  return getJson<GetRaceSeriesResponse>(
+    `/api/races/${encodeURIComponent(joinCode)}/series`,
+    fetchImpl,
+  );
 }
 
 export function fetchOrgRaces(
