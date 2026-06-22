@@ -42,9 +42,11 @@ function buildFace(
   const sy = (v: number) => scale(v, 0, maxV, H - PAD_B, PAD_T);
 
   for (const { h, vals } of valuesByHorse) {
-    if (vals.length === 0) continue;
-    const pts: [number, number][] = vals.map((p) => [sx(p.t), sy(p.v)]);
     const stroke = h.colors.body;
+    // No-data horse: draw a flat baseline at y=0 spanning the full window.
+    const pts: [number, number][] = vals.length === 0
+      ? [[sx(series.start_ms), sy(0)], [sx(series.end_ms), sy(0)]]
+      : vals.map((p) => [sx(p.t), sy(p.v)]);
     if (mode === 'cumulative') {
       svg.appendChild(el(doc, 'path', { d: smoothPath(pts), fill: 'none', stroke, 'stroke-width': '2', class: 'chart-line' }));
     } else {
