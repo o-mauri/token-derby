@@ -50,7 +50,7 @@ describe('getSeries handler', () => {
     ));
     if (joined.statusCode !== 200) throw new Error(`join: ${joined.body}`);
     const { horse_id, heartbeat_token } = JSON.parse(joined.body);
-    await hbHandler(evt(
+    const hb: any = await hbHandler(evt(
       { seq: 1, delta: 50 },
       'POST /races/{join_code}/horses/{horse_id}/heartbeat',
       `/races/${join_code}/horses/${horse_id}/heartbeat`,
@@ -58,6 +58,7 @@ describe('getSeries handler', () => {
       undefined,
       heartbeat_token,
     ));
+    if (hb.statusCode !== 200) throw new Error(`heartbeat: ${hb.body}`);
     return { join_code, horse_id };
   }
 
@@ -71,6 +72,59 @@ describe('getSeries handler', () => {
     const horse = body.horses.find((h: any) => h.horse_id === horse_id);
     expect(horse.points.length).toBeGreaterThanOrEqual(1);
     expect(horse.points[0].d).toBe(50);
+  });
+
+  it('returns empty points array for a horse with no heartbeats', async () => {
+    const user1 = await makeUser('GS_EmptyUser1');
+    const user2 = await makeUser('GS_EmptyUser2');
+    const horse1 = await makeHorse(user1, 'ActiveHorse', COLORS);
+    const horse2 = await makeHorse(user2, 'SilentHorse', COLORS);
+    const created: any = await createHandler(evt({
+      name: 'Empty Points Test',
+      start_time: new Date(Date.now() - 60_000).toISOString(),
+      end_time: new Date(Date.now() + 3_600_000).toISOString(),
+      tz: 'UTC',
+    }, 'POST /races', '/races', undefined, user1));
+    if (created.statusCode !== 200) throw new Error(`createRace: ${created.body}`);
+    const { join_code } = JSON.parse(created.body);
+
+    // Join horse1 (user1) and send a heartbeat for it
+    const joined1: any = await joinHandler(evt(
+      { stable_horse_id: horse1.stable_horse_id },
+      'POST /races/{join_code}/join',
+      `/races/${join_code}/join`,
+      { join_code },
+      user1,
+    ));
+    if (joined1.statusCode !== 200) throw new Error(`join1: ${joined1.body}`);
+    const { horse_id: horse_id1, heartbeat_token: hbt1 } = JSON.parse(joined1.body);
+    const hb: any = await hbHandler(evt(
+      { seq: 1, delta: 42 },
+      'POST /races/{join_code}/horses/{horse_id}/heartbeat',
+      `/races/${join_code}/horses/${horse_id1}/heartbeat`,
+      { join_code, horse_id: horse_id1 },
+      undefined,
+      hbt1,
+    ));
+    if (hb.statusCode !== 200) throw new Error(`heartbeat: ${hb.body}`);
+
+    // Join horse2 (user2) but send NO heartbeat for it
+    const joined2: any = await joinHandler(evt(
+      { stable_horse_id: horse2.stable_horse_id },
+      'POST /races/{join_code}/join',
+      `/races/${join_code}/join`,
+      { join_code },
+      user2,
+    ));
+    if (joined2.statusCode !== 200) throw new Error(`join2: ${joined2.body}`);
+    const { horse_id: horse_id2 } = JSON.parse(joined2.body);
+
+    const res: any = await getSeriesHandler(evt(undefined, 'GET /races/{join_code}/series', `/races/${join_code}/series`, { join_code }));
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    const silentHorse = body.horses.find((h: any) => h.horse_id === horse_id2);
+    expect(silentHorse).toBeDefined();
+    expect(silentHorse.points).toEqual([]);
   });
 
   it('404s for an unknown race', async () => {

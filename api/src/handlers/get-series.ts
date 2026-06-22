@@ -6,6 +6,7 @@ import { listHorses } from '../db/horses.js';
 import { listSeriesPoints } from '../db/series.js';
 import { ok, err } from '../lib/http.js';
 
+// Server-side bucketing cap: limits series points to at most 180 per horse so long races stay bounded in response size.
 const MAX_POINTS = 180;
 
 export const handler: APIGatewayProxyHandlerV2 = async (event) => {
