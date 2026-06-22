@@ -46,6 +46,15 @@ export type SeriesPoint = {
   d: number; // applied delta (tokens)
 };
 
+export type GetRaceSeriesResponse = {
+  start_ms: number; // race window start (epoch ms)
+  end_ms: number;   // race window end (epoch ms)
+  horses: Array<{
+    horse_id: string;
+    points: SeriesPoint[]; // time-ordered; may be empty
+  }>;
+};
+
 export type EndRaceResponse = {
   ok: true;
 };
