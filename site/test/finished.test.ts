@@ -232,13 +232,19 @@ describe('renderFinishedOverlay', () => {
   it('returns a teardown that clears the cycler timer', async () => {
     const raceEl = document.createElement('div');
     const raceData = makeFinishedRaceWithManyHorses();
-    const series = { start_ms: 0, end_ms: 1, horses: raceData.horses.map((h) => ({ horse_id: h.horse_id, points: [] })) };
+    // Provide data points so buildChartFaces produces ≥2 chart faces.
+    // standings face + 2 chart faces = 3 panels → cycler starts a timer.
+    const series = {
+      start_ms: Date.parse(raceData.start_time), end_ms: Date.parse(raceData.end_time),
+      horses: raceData.horses.map((h) => ({ horse_id: h.horse_id, points: [{ t: Date.parse(raceData.start_time) + 60_000, d: 30 }] })),
+    };
     const { win, wasCleared } = fakeWin();
     const teardown = renderFinishedOverlay(raceEl, raceData, { fetchSeries: async () => series, win });
-    await Promise.resolve(); await Promise.resolve();
+    await Promise.resolve(); await Promise.resolve(); // flush fetch microtasks
     teardown();
-    // single face (standings only, no data) → cycler starts no timer, nothing to clear, but teardown must not throw
+    // cycler timer must have been cleared
+    expect(wasCleared()).toBe(true);
+    // calling teardown a second time must not throw (abort is idempotent)
     expect(() => teardown()).not.toThrow();
-    void wasCleared;
   });
 });

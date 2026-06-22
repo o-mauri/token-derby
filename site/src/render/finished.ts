@@ -262,8 +262,11 @@ async function mountDetailCycle(
     for (const face of buildChartFaces(overlay.ownerDocument, series, race.horses)) {
       cycle.appendChild(face);
     }
-  } catch {
-    // leave the standings face static if the series can't be loaded
+  } catch (err) {
+    // Series fetch/render failed — leave the standings face static.
+    if (typeof process === 'undefined' || process.env.NODE_ENV !== 'production') {
+      console.warn('[finished] series load failed', err);
+    }
   }
   if (signal.aborted) return;
   const faces = [...cycle.querySelectorAll<HTMLElement>('.detail-face')];
