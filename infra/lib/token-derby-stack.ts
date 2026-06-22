@@ -113,6 +113,7 @@ export class TokenDerbyStack extends cdk.Stack {
 
     const createRaceFn = makeFn('CreateRaceFn', 'create-race');
     const getRaceFn = makeFn('GetRaceFn', 'get-race');
+    const getSeriesFn = makeFn('GetSeriesFn', 'get-series');
     const joinRaceFn = makeFn('JoinRaceFn', 'join-race');
     const heartbeatFn = makeFn('HeartbeatFn', 'heartbeat');
     const endRaceFn = makeFn('EndRaceFn', 'end-race');
@@ -173,6 +174,7 @@ export class TokenDerbyStack extends cdk.Stack {
 
     httpApi.addRoutes({ path: '/api/races', methods: [HttpMethod.POST], integration: new HttpLambdaIntegration('CreateRaceInt', createRaceFn) });
     httpApi.addRoutes({ path: '/api/races/{join_code}', methods: [HttpMethod.GET], integration: new HttpLambdaIntegration('GetRaceInt', getRaceFn) });
+    httpApi.addRoutes({ path: '/api/races/{join_code}/series', methods: [HttpMethod.GET], integration: new HttpLambdaIntegration('GetSeriesInt', getSeriesFn) });
     httpApi.addRoutes({ path: '/api/races/{join_code}/join', methods: [HttpMethod.POST], integration: new HttpLambdaIntegration('JoinRaceInt', joinRaceFn) });
     httpApi.addRoutes({ path: '/api/races/{join_code}/horses/{horse_id}/heartbeat', methods: [HttpMethod.POST], integration: new HttpLambdaIntegration('HeartbeatInt', heartbeatFn) });
     httpApi.addRoutes({ path: '/api/races/admin/{admin_code}', methods: [HttpMethod.DELETE], integration: new HttpLambdaIntegration('EndRaceInt', endRaceFn) });
