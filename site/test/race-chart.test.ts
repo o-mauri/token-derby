@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildChartFaces } from '../src/render/race-chart.js';
+import { buildChartFaces, lineColor } from '../src/render/race-chart.js';
 import type { GetRaceSeriesResponse, HorseView } from '@token-derby/shared';
 
 function makeColors(body: string) {
@@ -88,33 +88,34 @@ describe('buildChartFaces', () => {
     expect(legendItems[1]!.textContent).toBe('Beta');
     expect(legendItems[2]!.textContent).toBe('Charlie');
 
-    // Lines should appear in rank order: strokes match colorA, colorB, colorC
+    // Lines are coloured by the distinct palette in rank order, not by horse colour.
     const lines = cumulative!.querySelectorAll('svg path.chart-line');
-    expect(lines[0]!.getAttribute('stroke')).toBe(colorA.body);
-    expect(lines[1]!.getAttribute('stroke')).toBe(colorB.body);
-    expect(lines[2]!.getAttribute('stroke')).toBe(colorC.body);
+    expect(lines[0]!.getAttribute('stroke')).toBe(lineColor(0));
+    expect(lines[1]!.getAttribute('stroke')).toBe(lineColor(1));
+    expect(lines[2]!.getAttribute('stroke')).toBe(lineColor(2));
   });
 
-  it('propagates each horse color.body to stroke and legend chip background', () => {
-    const colorA = makeColors('#aabbcc');
-    const colorB = makeColors('#112233');
-    const coloredHorses = [horse('a', 'Alpha', 1, colorA), horse('b', 'Beta', 2, colorB)];
+  it('assigns distinct palette colours by rank, independent of horse colour', () => {
+    // Both horses share the SAME body colour — their lines must still differ.
+    const same = makeColors('#123456');
+    const coloredHorses = [horse('a', 'Alpha', 1, same), horse('b', 'Beta', 2, same)];
     const faces = buildChartFaces(document, series, coloredHorses);
     const [cumulative, throughput] = faces;
 
-    // Cumulative paths
     const paths = cumulative!.querySelectorAll('svg path.chart-line');
-    expect(paths[0]!.getAttribute('stroke')).toBe(colorA.body);
-    expect(paths[1]!.getAttribute('stroke')).toBe(colorB.body);
+    expect(paths[0]!.getAttribute('stroke')).toBe(lineColor(0));
+    expect(paths[1]!.getAttribute('stroke')).toBe(lineColor(1));
+    expect(paths[0]!.getAttribute('stroke')).not.toBe(paths[1]!.getAttribute('stroke'));
+    // Not driven by the (identical) horse colour:
+    expect(paths[0]!.getAttribute('stroke')).not.toBe(same.body);
 
-    // Throughput polylines
     const polylines = throughput!.querySelectorAll('svg polyline.chart-line');
-    expect(polylines[0]!.getAttribute('stroke')).toBe(colorA.body);
-    expect(polylines[1]!.getAttribute('stroke')).toBe(colorB.body);
+    expect(polylines[0]!.getAttribute('stroke')).toBe(lineColor(0));
+    expect(polylines[1]!.getAttribute('stroke')).toBe(lineColor(1));
 
-    // Legend chips
+    // Legend chips follow the same palette, by rank.
     const chips = cumulative!.querySelectorAll('.chart-legend .legend-chip');
-    expect((chips[0] as HTMLElement).style.background).toBe(colorA.body);
-    expect((chips[1] as HTMLElement).style.background).toBe(colorB.body);
+    expect((chips[0] as HTMLElement).style.background).toBe(lineColor(0));
+    expect((chips[1] as HTMLElement).style.background).toBe(lineColor(1));
   });
 });

@@ -3,7 +3,21 @@ import { toCumulative, toThroughput } from '@token-derby/shared';
 import { scale, smoothPath } from './chart-paths.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
-const W = 340, H = 180, PAD_L = 34, PAD_R = 14, PAD_T = 14, PAD_B = 30;
+const W = 600, H = 300, PAD_L = 40, PAD_R = 16, PAD_T = 20, PAD_B = 36;
+
+// Distinct, well-separated line colours assigned by finishing rank — so every
+// horse is tellable apart on the graph regardless of its own (possibly similar)
+// stable colours. Cycles if a race has more horses than the palette.
+export const LINE_PALETTE = [
+  '#e6194b', '#3cb44b', '#ffe119', '#4363d8', '#f58231',
+  '#911eb4', '#42d4f4', '#f032e6', '#bfef45', '#fabed4',
+  '#469990', '#dcbeff', '#9a6324', '#fffac8', '#800000',
+  '#aaffc3', '#808000', '#ffd8b1', '#a9a9a9', '#ffffff',
+];
+
+export function lineColor(rankIndex: number): string {
+  return LINE_PALETTE[rankIndex % LINE_PALETTE.length]!;
+}
 
 type Mode = 'cumulative' | 'throughput';
 
@@ -41,8 +55,8 @@ function buildFace(
   const sx = (t: number) => scale(t, series.start_ms, series.end_ms, PAD_L, W - PAD_R);
   const sy = (v: number) => scale(v, 0, maxV, H - PAD_B, PAD_T);
 
-  for (const { h, vals } of valuesByHorse) {
-    const stroke = h.colors.body;
+  valuesByHorse.forEach(({ vals }, i) => {
+    const stroke = lineColor(i);
     // No-data horse: draw a flat baseline at y=0 spanning the full window.
     const pts: [number, number][] = vals.length === 0
       ? [[sx(series.start_ms), sy(0)], [sx(series.end_ms), sy(0)]]
@@ -52,7 +66,7 @@ function buildFace(
     } else {
       svg.appendChild(el(doc, 'polyline', { points: pts.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' '), fill: 'none', stroke, 'stroke-width': '1.7', class: 'chart-line' }));
     }
-  }
+  });
   // axis labels
   const axis = (x: number, y: number, text: string) => {
     const t = el(doc, 'text', { x: `${x}`, y: `${y}`, class: 'chart-axis' });
@@ -74,16 +88,16 @@ function buildFace(
 
   const legend = doc.createElement('div');
   legend.className = 'chart-legend';
-  for (const h of ranked) {
+  ranked.forEach((h, i) => {
     const item = doc.createElement('span');
     item.className = 'legend-item';
     const chip = doc.createElement('span');
     chip.className = 'legend-chip';
-    chip.style.background = h.colors.body;
+    chip.style.background = lineColor(i);
     item.appendChild(chip);
     item.appendChild(doc.createTextNode(h.name));
     legend.appendChild(item);
-  }
+  });
   face.appendChild(legend);
   return face;
 }
