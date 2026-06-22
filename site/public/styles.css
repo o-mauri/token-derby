@@ -564,10 +564,17 @@ html, body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  /* `safe center` keeps tall standings (many racers) from clipping at the top
+     of the scroll container so the whole list — and the dismiss button — stay
+     reachable. */
+  justify-content: safe center;
   gap: 24px;
+  padding: 24px 24px calc(var(--ticker-h) + 24px);
+  overflow-y: auto;
   animation: fade-in 1s ease-out forwards;
-  z-index: 10;
+  /* Sit above the achievement ticker (z-index 9999) so the dismiss button is
+     never covered by it. */
+  z-index: 10000;
 }
 @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
 
