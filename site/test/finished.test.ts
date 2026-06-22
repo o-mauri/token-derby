@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderFinishedOverlay } from '../src/render/finished.js';
 import type { GetRaceResponse, HorseView } from '@token-derby/shared';
 
@@ -70,7 +70,10 @@ beforeEach(() => {
   track = document.createElement('div');
   track.className = 'race';
   document.body.appendChild(track);
+  vi.stubGlobal('fetch', vi.fn(async () =>
+    new Response('{"start_ms":0,"end_ms":1,"horses":[]}', { status: 200, headers: { 'content-type': 'application/json' } })));
 });
+afterEach(() => { vi.unstubAllGlobals(); });
 
 describe('renderFinishedOverlay', () => {
   it('renders 1st/2nd/3rd in <ol> with podium cards', () => {
