@@ -1,5 +1,5 @@
 import type { GetRaceSeriesResponse, HorseView, SeriesPoint } from '@token-derby/shared';
-import { toCumulative, toThroughput } from '@token-derby/shared';
+import { resampleToTicks } from '@token-derby/shared';
 import { scale, smoothPath } from './chart-paths.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -31,11 +31,16 @@ function fmtClock(ms: number): string {
   return new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-// Series values for a horse in the chosen mode, as {t, v} pairs.
-function valuesFor(mode: Mode, points: readonly SeriesPoint[], startMs: number): { t: number; v: number }[] {
-  return mode === 'cumulative'
-    ? toCumulative(points).map((p) => ({ t: p.t, v: p.total }))
-    : toThroughput(points, startMs).map((p) => ({ t: p.t, v: p.perMin }));
+// Resample a horse onto the shared 1-minute tick grid and pull the values for
+// the chosen mode, as {t, v} pairs. Idle ticks carry the cumulative total
+// forward and report 0 pace, so all horses line up on the same x-grid.
+function valuesFor(
+  mode: Mode, points: readonly SeriesPoint[], startMs: number, endMs: number,
+): { t: number; v: number }[] {
+  return resampleToTicks(points, startMs, endMs).map((p) => ({
+    t: p.t,
+    v: mode === 'cumulative' ? p.total : p.perMin,
+  }));
 }
 
 function buildFace(
@@ -44,7 +49,7 @@ function buildFace(
   const byId = new Map(series.horses.map((h) => [h.horse_id, h.points]));
   const ranked = [...horses].sort((a, b) => (a.rank ?? 99) - (b.rank ?? 99));
 
-  const valuesByHorse = ranked.map((h) => ({ h, vals: valuesFor(mode, byId.get(h.horse_id) ?? [], series.start_ms) }));
+  const valuesByHorse = ranked.map((h) => ({ h, vals: valuesFor(mode, byId.get(h.horse_id) ?? [], series.start_ms, series.end_ms) }));
   const maxV = Math.max(1, ...valuesByHorse.flatMap((x) => x.vals.map((p) => p.v)));
 
   const svg = el(doc, 'svg', { viewBox: `0 0 ${W} ${H}`, class: 'chart-svg' });
@@ -57,10 +62,9 @@ function buildFace(
 
   valuesByHorse.forEach(({ vals }, i) => {
     const stroke = lineColor(i);
-    // No-data horse: draw a flat baseline at y=0 spanning the full window.
-    const pts: [number, number][] = vals.length === 0
-      ? [[sx(series.start_ms), sy(0)], [sx(series.end_ms), sy(0)]]
-      : vals.map((p) => [sx(p.t), sy(p.v)]);
+    // Idle horses resample to an all-zero tick series, so this is naturally a
+    // flat baseline at y=0 spanning the window — no special-casing needed.
+    const pts: [number, number][] = vals.map((p) => [sx(p.t), sy(p.v)]);
     if (mode === 'cumulative') {
       svg.appendChild(el(doc, 'path', { d: smoothPath(pts), fill: 'none', stroke, 'stroke-width': '2', class: 'chart-line' }));
     } else {

@@ -82,22 +82,29 @@ const race: GetRaceResponse = {
 };
 
 // Dummy per-horse token series spanning the race window, so the rotating
-// chart panel (cumulative + tokens/min) has data without a live API.
+// chart panel (cumulative + tokens/min) has data without a live API. Points are
+// emitted roughly once a minute with idle gaps (no point) to exercise the
+// client-side 1-minute tick resampling: cumulative carries flat through idle
+// stretches and pace drops to 0.
 const START = Date.parse(race.start_time);
 const END = Date.parse(race.end_time);
-const SAMPLES = 32;
+const MINUTES = Math.max(1, Math.round((END - START) / 60_000));
 
 function seriesFor(h: HorseView, seed: number): SeriesPoint[] {
-  // Spiky, non-negative weights with occasional idle dips, normalised so the
-  // cumulative line lands on the horse's final token total.
-  const weights = Array.from({ length: SAMPLES }, (_, i) =>
-    Math.max(0, Math.sin(i * 0.6 + seed) * Math.cos(i * 0.27 + seed * 1.3) + 0.45));
+  // Per-minute activity weight; a slow wave gates whole stretches to idle (0).
+  const weights = Array.from({ length: MINUTES }, (_, m) => {
+    const active = Math.sin(m * 0.06 + seed * 1.7) > -0.25;
+    const burst = Math.max(0, Math.sin(m * 0.4 + seed) * Math.cos(m * 0.13 + seed));
+    return active ? burst : 0;
+  });
   const sum = weights.reduce((a, b) => a + b, 0) || 1;
   const total = h.final_tokens ?? h.current_tokens;
-  return weights.map((w, i) => ({
-    t: START + Math.round(((i + 1) / SAMPLES) * (END - START)),
-    d: Math.round((w / sum) * total),
-  }));
+  const points: SeriesPoint[] = [];
+  weights.forEach((w, m) => {
+    if (w <= 0) return; // idle minute — no point recorded
+    points.push({ t: START + m * 60_000 + 30_000, d: Math.round((w / sum) * total) });
+  });
+  return points;
 }
 
 const series: GetRaceSeriesResponse = {

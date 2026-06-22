@@ -1,13 +1,9 @@
 import type { APIGatewayProxyHandlerV2 } from 'aws-lambda';
 import type { GetRaceSeriesResponse } from '@token-derby/shared';
-import { bucketSeries } from '@token-derby/shared';
 import { getRaceByJoinCode } from '../db/races.js';
 import { listHorses } from '../db/horses.js';
 import { listSeriesPoints } from '../db/series.js';
 import { ok, err } from '../lib/http.js';
-
-// Server-side bucketing cap: limits series points to at most 180 per horse so long races stay bounded in response size.
-const MAX_POINTS = 180;
 
 export const handler: APIGatewayProxyHandlerV2 = async (event) => {
   const join_code = event.pathParameters?.join_code;
@@ -19,11 +15,14 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
   const start_ms = new Date(race.start_time).getTime();
   const end_ms = new Date(race.ended_at ?? race.end_time).getTime();
 
+  // Return the raw recorded deltas (already at most ~1 per minute, since the CLI
+  // heartbeats every 60s and only writes a point when delta > 0). The client
+  // resamples these onto a uniform 1-minute tick grid for rendering.
   const horses = await listHorses(race.race_id);
   const series = await Promise.all(
     horses.map(async (h) => ({
       horse_id: h.horse_id,
-      points: bucketSeries(await listSeriesPoints(race.race_id, h.horse_id), start_ms, end_ms, MAX_POINTS),
+      points: await listSeriesPoints(race.race_id, h.horse_id),
     })),
   );
 
