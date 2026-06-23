@@ -30,16 +30,38 @@ export type TokenTotals = { input: number; output: number };
 // workflow tier. Headroom is left for agents that themselves spawn agents.
 const MAX_PROJECT_DEPTH = 8;
 
-export async function sumTokens(): Promise<TokenTotals> {
+// A "conversation" is one top-level session: <project>/<session>. The main
+// session transcript and everything nested under <session>/subagents/** roll
+// up into the same id.
+function conversationId(file: string, root: string): string {
+  const rel = path.relative(root, file);
+  const parts = rel.split(path.sep);
+  if (parts.length < 2) return rel.replace(/\.jsonl$/, '');
+  const project = parts[0];
+  const session = parts[1].replace(/\.jsonl$/, '');
+  return `${project}/${session}`;
+}
+
+export async function sumTokensByConversation(): Promise<Map<string, TokenTotals>> {
   const root = claudeProjectsDir();
-  const files = await listJsonlFiles(root);
-  let input = 0;
-  let output = 0;
+  const files = await listJsonlFiles(root); // throws on missing root → fail-loud
+  const byConv = new Map<string, TokenTotals>();
   for (const file of files) {
     const t = await sumFile(file);
-    input += t.input;
-    output += t.output;
+    const id = conversationId(file, root);
+    const acc = byConv.get(id) ?? { input: 0, output: 0 };
+    acc.input += t.input;
+    acc.output += t.output;
+    byConv.set(id, acc);
   }
+  return byConv;
+}
+
+export async function sumTokens(): Promise<TokenTotals> {
+  const byConv = await sumTokensByConversation();
+  let input = 0;
+  let output = 0;
+  for (const t of byConv.values()) { input += t.input; output += t.output; }
   return { input, output };
 }
 
