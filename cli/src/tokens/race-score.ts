@@ -64,6 +64,10 @@ export class RaceScoreTracker {
       const v = reading.secondary[key];
       if (v > 0) this.lastGood[key] = v;
     }
+    // Per-conversation monotonic floor (a conv never moves down). This replaces
+    // the old aggregate never-anchor-down floor; the two coincide under the
+    // monotonic cumulative reads the CLIs produce in normal use. (Flag off →
+    // nextBeat sums all conversations, matching the previous scalar behavior.)
     for (const [id, v] of reading.primaryByConv) {
       const prev = this.primaryConvLast[id] ?? 0;
       if (v > prev) this.primaryConvLast[id] = v; // monotonic; never anchor a conv down

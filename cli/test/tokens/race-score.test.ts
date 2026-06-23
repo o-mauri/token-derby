@@ -25,6 +25,13 @@ describe('RaceScoreTracker — secondaries (scalar, unchanged)', () => {
     t.recordReading(reading({}, 530, 0));
     expect(t.nextBeat().components.codex).toBe(530);
   });
+
+  it('never lowers a secondary lastGood on a transient 0 read', () => {
+    const t = new RaceScoreTracker(baseState(), 'claude');
+    t.recordReading(reading({}, 500, 0)); // codex = 500
+    t.recordReading(reading({}, 0, 0));   // codex momentarily 0 → must keep 500
+    expect(t.nextBeat().components.codex).toBe(500);
+  });
 });
 
 describe('RaceScoreTracker — primary top-N + forfeit', () => {
