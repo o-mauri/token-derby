@@ -1,7 +1,7 @@
 import { PutCommand, QueryCommand, UpdateCommand, GetCommand } from '@aws-sdk/lib-dynamodb';
 import { ddb, TABLE } from './client.js';
 import { horseKey, parseHorseId, RACE_PK_PREFIX, HORSE_SK_PREFIX } from './keys.js';
-import type { Horse, RecentEvent } from '@token-derby/shared';
+import type { Horse, RecentEvent, ModelKey } from '@token-derby/shared';
 import type { AchievementState } from '../lib/evaluate-achievements.js';
 
 export async function putHorse(race_id: string, horse: Horse, heartbeat_token: string): Promise<void> {
@@ -131,6 +131,7 @@ export type HorseHeartbeatRecord = {
   current_tokens: number;
   last_heartbeat: string;
   last_seq: number;
+  primary_model?: ModelKey;
   live_xp: number;
   last_rank: number | undefined;
   racer_streak_ms: number;
@@ -161,6 +162,7 @@ export async function getHorseForHeartbeat(
     current_tokens: Number(Item.current_tokens ?? 0),
     last_heartbeat: String(Item.last_heartbeat ?? ''),
     last_seq: Number(Item.last_seq ?? 0),
+    primary_model: Item.primary_model as ModelKey | undefined,
     live_xp: Number(Item.live_xp ?? 0),
     last_rank: Item.last_rank == null ? undefined : Number(Item.last_rank),
     racer_streak_ms: Number(Item.racer_streak_ms ?? 0),

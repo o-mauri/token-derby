@@ -5,6 +5,7 @@ import { handler as joinHandler } from '../../src/handlers/join-race.js';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { listHorses } from '../../src/db/horses.js';
 import { makeUser, makeHorse, type TestUser } from '../helpers/auth-helper.js';
+import type { ModelKey } from '@token-derby/shared';
 
 const COLORS = { body: '#8B4513', mane: '#000', tail: '#000', saddle: '#C0392B' };
 
@@ -29,6 +30,35 @@ async function setup(cliVersion = '2.6.0') {
     headers: { 'content-type': 'application/json', 'x-cli-version': cliVersion, 'x-user-id': user.user_id, 'x-user-token': user.secret_token },
     requestContext: {} as any, isBase64Encoded: false,
     body: JSON.stringify({ stable_horse_id: horse.stable_horse_id }),
+  });
+  const { horse_id, heartbeat_token } = JSON.parse(joinRes.body);
+  return { join_code, race_id, horse_id, heartbeat_token };
+}
+
+/** Like setup() but locks a specific primary_model at join time. */
+async function setupWithPrimary(primary_model: ModelKey | undefined, cliVersion = '2.6.0') {
+  const user = await makeUser('HB_PM_User');
+  const horse = await makeHorse(user, 'HB_PM_Gary', COLORS);
+  const createRes: any = await createHandler({
+    version: '2.0', routeKey: 'POST /races', rawPath: '/races', rawQueryString: '',
+    headers: { 'content-type': 'application/json', 'x-cli-version': cliVersion, 'x-user-id': user.user_id, 'x-user-token': user.secret_token },
+    requestContext: {} as any, isBase64Encoded: false,
+    body: JSON.stringify({
+      name: 'HB PM Test',
+      start_time: new Date(Date.now() - 60_000).toISOString(),
+      end_time: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      tz: 'UTC',
+    }),
+  });
+  const { join_code, race_id } = JSON.parse(createRes.body);
+  const joinBody: Record<string, unknown> = { stable_horse_id: horse.stable_horse_id };
+  if (primary_model !== undefined) joinBody.primary_model = primary_model;
+  const joinRes: any = await joinHandler({
+    version: '2.0', routeKey: 'POST /races/{join_code}/join', rawPath: `/races/${join_code}/join`, rawQueryString: '',
+    pathParameters: { join_code },
+    headers: { 'content-type': 'application/json', 'x-cli-version': cliVersion, 'x-user-id': user.user_id, 'x-user-token': user.secret_token },
+    requestContext: {} as any, isBase64Encoded: false,
+    body: JSON.stringify(joinBody),
   });
   const { horse_id, heartbeat_token } = JSON.parse(joinRes.body);
   return { join_code, race_id, horse_id, heartbeat_token };
@@ -305,6 +335,41 @@ describe('heartbeat handler', () => {
     const res: any = await hbHandler(hbEvent(join_code, 'h-nv', 'tok', { seq: 1, delta: 0 }, null));
     expect(res.statusCode).toBe(426);
     expect(JSON.parse(res.body).code).toBe('VERSION_MISMATCH');
+  });
+
+  // --- multi-model weighting ---
+
+  it('weights components by the horse primary before the rate cap', async () => {
+    // Join with primary_model='codex'; rate cap disabled via TOKEN_DERBY_MAX_RATE=1B
+    const { join_code, race_id, horse_id, heartbeat_token } = await setupWithPrimary('codex');
+    // raw weighted = codex:5000*1 + claude:1000*0.1 + gemini:0*0.1 = 5100
+    const res: any = await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, {
+      seq: 1,
+      components: { claude: 1000, codex: 5000, gemini: 0 },
+    }));
+    expect(res.statusCode).toBe(200);
+    const horses = await listHorses(race_id);
+    const own = horses.find(h => h.horse_id === horse_id);
+    expect(own?.current_tokens).toBe(5100);
+  });
+
+  it('accepts a legacy bare delta (primary defaults to claude for legacy horses)', async () => {
+    // Join without primary_model; server defaults to 'claude'
+    const { join_code, race_id, horse_id, heartbeat_token } = await setupWithPrimary(undefined);
+    const res: any = await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, {
+      seq: 1,
+      delta: 250,
+    }));
+    expect(res.statusCode).toBe(200);
+    const horses = await listHorses(race_id);
+    const own = horses.find(h => h.horse_id === horse_id);
+    expect(own?.current_tokens).toBe(250);
+  });
+
+  it('rejects a heartbeat with neither components nor a delta', async () => {
+    const { join_code, horse_id, heartbeat_token } = await setupWithPrimary('claude');
+    const res: any = await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { seq: 1 }));
+    expect(res.statusCode).toBe(400);
   });
 
   it('does not accrue XP during the warm-up window', async () => {
