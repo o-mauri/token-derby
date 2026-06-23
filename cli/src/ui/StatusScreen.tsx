@@ -18,11 +18,11 @@ export function TokenBreakdown(props: {
       <Text bold>Tokens by model (since join)</Text>
       {MODEL_KEYS.map(m => (
         <Text key={m}>
-          {`  ${MODEL_LABELS[m].padEnd(8)} ${perSource[m].toLocaleString().padStart(12)}  `}
+          {`  ${MODEL_LABELS[m].padEnd(10)} ${perSource[m].toLocaleString().padStart(12)}  `}
           <Text dimColor>{m === primaryModel ? '(primary)' : '(10%)'}</Text>
         </Text>
       ))}
-      <Text>{`  ${'Race score'.padEnd(8)} ${Math.round(raceScore).toLocaleString().padStart(12)}`}</Text>
+      <Text>{`  ${'Race score'.padEnd(10)} ${Math.round(raceScore).toLocaleString().padStart(12)}`}</Text>
     </Box>
   );
 }
