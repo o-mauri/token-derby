@@ -1,19 +1,43 @@
 import React from 'react';
 import { render } from 'ink';
 import type { HorseColors, StableHorse } from '@token-derby/shared';
+import { isModelKey, type ModelKey } from '@token-derby/shared';
 import { HorsePicker } from '../ui/HorsePicker.js';
+import { PrimaryPicker } from '../ui/PrimaryPicker.js';
 import { joinRace, getRace, listStable, listOrganisations } from '../api/endpoints.js';
 import { ApiError } from '../api/client.js';
 import { saveActiveRace, type ActiveRace } from '../stable/active-race.js';
 import { RunRace, buildInitialState } from '../runtime/run-race.js';
 import { loadIdentity } from '../identity/identity.js';
 
-export async function joinCommand(joinCode: string | undefined): Promise<number> {
+/** Parse `--primary <model>` or `--primary=<model>` from argv. Throws on a bad value. */
+export function parsePrimaryFlag(argv: string[]): ModelKey | null {
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i]!;
+    let value: string | undefined;
+    if (a === '--primary') value = argv[i + 1];
+    else if (a.startsWith('--primary=')) value = a.slice('--primary='.length);
+    else continue;
+    if (!isModelKey(value)) throw new Error(`--primary must be one of claude, codex, gemini (got ${value ?? ''})`);
+    return value;
+  }
+  return null;
+}
+
+export async function joinCommand(joinCode: string | undefined, argv: string[] = []): Promise<number> {
   if (!joinCode) {
     console.error('Usage: token-derby join <join-code>');
     return 2;
   }
   const code = joinCode.toUpperCase();
+
+  let primaryFlag: ModelKey | null;
+  try {
+    primaryFlag = parsePrimaryFlag(argv);
+  } catch (e) {
+    console.error((e as Error).message);
+    return 2;
+  }
 
   const identity = await loadIdentity();
   if (!identity) {
@@ -90,9 +114,16 @@ export async function joinCommand(joinCode: string | undefined): Promise<number>
     chosenColors = picked.colors;
   }
 
+  let chosenPrimary: ModelKey = 'claude';
+  if (!ownHorse) {
+    if (primaryFlag) chosenPrimary = primaryFlag;
+    else if (process.stdout.isTTY) chosenPrimary = await pickPrimary();
+    // else: leave as 'claude' (non-interactive default)
+  }
+
   let joinResp;
   try {
-    joinResp = await joinRace(code, { stable_horse_id: chosenStableHorseId });
+    joinResp = await joinRace(code, { stable_horse_id: chosenStableHorseId, primary_model: chosenPrimary });
   } catch (e) {
     if (e instanceof ApiError) {
       if (e.code === 'RACE_FULL') console.error('This race is full.');
@@ -119,10 +150,13 @@ export async function joinCommand(joinCode: string | undefined): Promise<number>
     horse_name: chosenName,
     horse_colors: chosenColors,
     joined_at: ownHorse?.joined_at ?? new Date().toISOString(),
-    ackedReading: 0,
-    lastGoodReading: 0,
-    seq: ownHorse?.last_seq ?? 0,
     last_heartbeat_at: new Date(0).toISOString(),
+    primary_model: joinResp.primary_model,
+    score: {
+      acked: { claude: 0, codex: 0, gemini: 0 },
+      lastGood: { claude: 0, codex: 0, gemini: 0 },
+      seq: ownHorse?.last_seq ?? 0,
+    },
     ...(race.counts_input ? { counts_input: true } : {}),
   };
   await saveActiveRace(active);
@@ -140,6 +174,16 @@ async function pickHorse(horses: StableHorse[]): Promise<StableHorse | null> {
         horses,
         onPick: (h: StableHorse) => { app.unmount(); resolve(h); },
         onCancel: () => { app.unmount(); resolve(null); },
+      }),
+    );
+  });
+}
+
+async function pickPrimary(): Promise<ModelKey> {
+  return new Promise(resolve => {
+    const app = render(
+      React.createElement(PrimaryPicker, {
+        onPick: (m: ModelKey) => { app.unmount(); resolve(m); },
       }),
     );
   });

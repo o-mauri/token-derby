@@ -141,7 +141,7 @@ async function main(): Promise<number> {
     const orgName = parseFlag(argv.slice(1), '--organisation');
     return createRaceCommand(orgName);
   }
-  if (cmd === 'join')   return joinCommand(argv[1]);
+  if (cmd === 'join')   return joinCommand(argv[1], argv.slice(2));
   if (cmd === 'end')    return endCommand(argv[1]);
   if (cmd === 'roll')      return rollCommand();
 
