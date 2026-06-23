@@ -16,15 +16,20 @@ function num(v: unknown): number {
   return typeof v === 'number' && Number.isFinite(v) ? v : 0;
 }
 
+export async function sumGeminiByConversation(): Promise<Map<string, TokenTotals>> {
+  const files = await listChatFiles(geminiTmpDir()); // throws on missing root → fail-loud
+  const byConv = new Map<string, TokenTotals>();
+  for (const file of files) {
+    byConv.set(file, await sumGeminiFile(file)); // one chat file = one conversation
+  }
+  return byConv;
+}
+
 export async function sumGeminiTokens(): Promise<TokenTotals> {
-  const files = await listChatFiles(geminiTmpDir());
+  const byConv = await sumGeminiByConversation();
   let input = 0;
   let output = 0;
-  for (const file of files) {
-    const t = await sumGeminiFile(file);
-    input += t.input;
-    output += t.output;
-  }
+  for (const t of byConv.values()) { input += t.input; output += t.output; }
   return { input, output };
 }
 
