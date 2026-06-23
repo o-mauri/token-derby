@@ -47,6 +47,25 @@ The CLI sums `message.usage.output_tokens` across every `*.jsonl` under `~/.clau
 
 Races can optionally also count *fresh input tokens* — i.e. `input_tokens + cache_creation_input_tokens` (your new context this turn) in addition to output. `cache_read_input_tokens` is never counted, since those reflect passive context size rather than work. The race creator opts in at `token-derby create` time; thresholds for Stampede!, Pulled Away!, and the heartbeat rate cap scale 10× in these races so the achievement cadence stays comparable.
 
+## Other models (Codex, Gemini)
+
+At join you pick one **primary** model — Claude, Codex, or Gemini — counted 1:1.
+The other two count at **10%**. The choice is locked for the whole race and can't
+be changed, even by rejoining.
+
+- **Codex CLI** — counted from `~/.codex/sessions/**/rollout-*.jsonl` (and
+  `archived_sessions/`). Fresh input = `input_tokens − cached_input_tokens`;
+  output = `output_tokens` (reasoning included). The last cumulative
+  `token_count` per session is used.
+- **Gemini CLI** — counted from `~/.gemini/tmp/<project>/chats/session-*.jsonl`.
+  Fresh input = `input − cached`; output = `output` (thoughts included).
+
+Pick at join with `token-derby join <code> --primary codex` (or the interactive
+picker). Overrides: `TOKEN_DERBY_CODEX_DIR`, `TOKEN_DERBY_GEMINI_DIR`.
+
+All of this counts **real** tokens you actually generated. Please don't point it
+at usage you didn't produce.
+
 ## Files
 
 - `~/.token-derby/stable.json` — saved horses
