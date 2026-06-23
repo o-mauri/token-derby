@@ -29,13 +29,7 @@ export async function sumGeminiTokens(): Promise<TokenTotals> {
 }
 
 async function listChatFiles(root: string): Promise<string[]> {
-  let entries: string[];
-  try {
-    entries = await fs.readdir(root);
-  } catch (e: any) {
-    if (e?.code === 'ENOENT') return [];
-    throw e;
-  }
+  const entries = await fs.readdir(root); // throws ENOENT if the Gemini root is absent → fail-loud
   const out: string[] = [];
   for (const entry of entries) {
     const chatsDir = path.join(root, entry, 'chats');

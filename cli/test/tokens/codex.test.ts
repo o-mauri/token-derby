@@ -38,8 +38,13 @@ async function writeRollout(root: string, rel: string, lines: string[]): Promise
 }
 
 describe('sumCodexTokens', () => {
-  it('returns zero when the codex dir does not exist', async () => {
+  it('throws when the codex dir does not exist (fail-loud for a missing primary)', async () => {
     process.env.TOKEN_DERBY_CODEX_DIR = path.join(os.tmpdir(), 'td-cdx-missing-' + Math.random());
+    await expect(sumCodexTokens()).rejects.toThrow();
+  });
+
+  it('returns zero when the codex dir exists but has no sessions yet', async () => {
+    await tmpCodex(); // creates the root dir, no rollout files
     expect(await sumCodexTokens()).toEqual({ input: 0, output: 0 });
   });
 

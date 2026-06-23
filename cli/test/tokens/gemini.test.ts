@@ -23,8 +23,13 @@ async function writeJson(root: string, projectHash: string, file: string, messag
 }
 
 describe('sumGeminiTokens', () => {
-  it('returns zero when the gemini dir does not exist', async () => {
+  it('throws when the gemini dir does not exist (fail-loud for a missing primary)', async () => {
     process.env.TOKEN_DERBY_GEMINI_DIR = path.join(os.tmpdir(), 'td-gem-missing-' + Math.random());
+    await expect(sumGeminiTokens()).rejects.toThrow();
+  });
+
+  it('returns zero when the gemini dir exists but has no chats yet', async () => {
+    await tmpGemini(); // creates the root dir, no project/chats
     expect(await sumGeminiTokens()).toEqual({ input: 0, output: 0 });
   });
 

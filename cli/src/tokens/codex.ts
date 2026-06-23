@@ -18,6 +18,7 @@ function num(v: unknown): number {
 
 export async function sumCodexTokens(): Promise<TokenTotals> {
   const root = codexSessionsDir();
+  await fs.stat(root); // throws ENOENT if the Codex home is absent → fail-loud (matches Claude/Gemini)
   const files = [
     ...(await collectRollouts(path.join(root, 'sessions'))),
     ...(await collectRollouts(path.join(root, 'archived_sessions'))),
