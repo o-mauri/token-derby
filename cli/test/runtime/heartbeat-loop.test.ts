@@ -6,7 +6,7 @@ afterEach(() => vi.useRealTimers());
 
 it('re-sends the identical snapshot on retry, re-prepares after success', async () => {
   let n = 0;
-  const prepareBeat = vi.fn(async () => ({ seq: ++n, delta: n * 10, reading: n * 100 }));
+  const prepareBeat = vi.fn(async () => ({ seq: ++n, components: { claude: n * 10, codex: 0, gemini: 0 }, readings: { claude: n * 100, codex: 0, gemini: 0 } }));
   const sent: any[] = [];
   const sendBeat = vi.fn(async (snap: any) => {
     sent.push(snap);
@@ -29,7 +29,7 @@ it('re-sends the identical snapshot on retry, re-prepares after success', async 
 });
 
 it('stops and calls onFinished when race_status is finished', async () => {
-  const prepareBeat = vi.fn(async () => ({ seq: 1, delta: 0, reading: 0 }));
+  const prepareBeat = vi.fn(async () => ({ seq: 1, components: { claude: 0, codex: 0, gemini: 0 }, readings: { claude: 0, codex: 0, gemini: 0 } }));
   const onFinished = vi.fn();
   const sendBeat = vi.fn(async (snap: any) => ({ race_status: 'finished', horses: [], race: {}, server_time: '', time_left_seconds: 0, last_seq: snap.seq } as any));
   const ctrl = new AbortController();
@@ -41,7 +41,7 @@ it('stops and calls onFinished when race_status is finished', async () => {
 
 describe('runHeartbeatLoop', () => {
   it('sends an immediate first heartbeat', async () => {
-    const prepareBeat = vi.fn(async () => ({ seq: 1, delta: 0, reading: 0 }));
+    const prepareBeat = vi.fn(async () => ({ seq: 1, components: { claude: 0, codex: 0, gemini: 0 }, readings: { claude: 0, codex: 0, gemini: 0 } }));
     const onSuccess = vi.fn();
     const sendBeat = vi.fn(async (snap: any) => ({ race_status: 'live', horses: [], race: {}, server_time: '', time_left_seconds: 100, last_seq: snap.seq } as any));
     const ctrl = new AbortController();
@@ -52,7 +52,7 @@ describe('runHeartbeatLoop', () => {
   });
 
   it('sends another heartbeat after intervalMs', async () => {
-    const prepareBeat = vi.fn(async () => ({ seq: 1, delta: 0, reading: 0 }));
+    const prepareBeat = vi.fn(async () => ({ seq: 1, components: { claude: 0, codex: 0, gemini: 0 }, readings: { claude: 0, codex: 0, gemini: 0 } }));
     const sendBeat = vi.fn(async (snap: any) => ({ race_status: 'live', horses: [], race: {}, server_time: '', time_left_seconds: 100, last_seq: snap.seq } as any));
     const ctrl = new AbortController();
     runHeartbeatLoop({ prepareBeat, sendBeat, onSuccess: () => {}, onError: () => {}, onFinished: () => {}, intervalMs: 60_000, retryDelaysMs: [1_000], abortSignal: ctrl.signal });
@@ -64,7 +64,7 @@ describe('runHeartbeatLoop', () => {
 
   it('retries with backoff after a failure', async () => {
     let callCount = 0;
-    const prepareBeat = vi.fn(async () => ({ seq: ++callCount, delta: 0, reading: 0 }));
+    const prepareBeat = vi.fn(async () => ({ seq: ++callCount, components: { claude: 0, codex: 0, gemini: 0 }, readings: { claude: 0, codex: 0, gemini: 0 } }));
     const sendBeat = vi.fn()
       .mockRejectedValueOnce(new Error('boom'))
       .mockRejectedValueOnce(new Error('still'))
@@ -88,7 +88,7 @@ describe('runHeartbeatLoop', () => {
   });
 
   it('caps retry delay at the last value', async () => {
-    const prepareBeat = vi.fn(async () => ({ seq: 1, delta: 0, reading: 0 }));
+    const prepareBeat = vi.fn(async () => ({ seq: 1, components: { claude: 0, codex: 0, gemini: 0 }, readings: { claude: 0, codex: 0, gemini: 0 } }));
     const sendBeat = vi.fn().mockRejectedValue(new Error('always'));
     const ctrl = new AbortController();
     runHeartbeatLoop({ prepareBeat, sendBeat, onSuccess: () => {}, onError: () => {}, onFinished: () => {}, intervalMs: 60_000, retryDelaysMs: [1_000, 2_000], abortSignal: ctrl.signal });
@@ -104,7 +104,7 @@ describe('runHeartbeatLoop', () => {
 
   it('after success, resumes on the normal interval rather than backoff', async () => {
     let callCount = 0;
-    const prepareBeat = vi.fn(async () => ({ seq: ++callCount, delta: 0, reading: 0 }));
+    const prepareBeat = vi.fn(async () => ({ seq: ++callCount, components: { claude: 0, codex: 0, gemini: 0 }, readings: { claude: 0, codex: 0, gemini: 0 } }));
     const sendBeat = vi.fn()
       .mockRejectedValueOnce(new Error('boom'))
       .mockImplementation(async (snap: any) => ({ race_status: 'live', horses: [], race: {}, server_time: '', time_left_seconds: 100, last_seq: snap.seq } as any));
@@ -121,7 +121,7 @@ describe('runHeartbeatLoop', () => {
   });
 
   it('stops sending after abortSignal aborts', async () => {
-    const prepareBeat = vi.fn(async () => ({ seq: 1, delta: 0, reading: 0 }));
+    const prepareBeat = vi.fn(async () => ({ seq: 1, components: { claude: 0, codex: 0, gemini: 0 }, readings: { claude: 0, codex: 0, gemini: 0 } }));
     const sendBeat = vi.fn(async (snap: any) => ({ race_status: 'live', horses: [], race: {}, server_time: '', time_left_seconds: 100, last_seq: snap.seq } as any));
     const ctrl = new AbortController();
     runHeartbeatLoop({ prepareBeat, sendBeat, onSuccess: () => {}, onError: () => {}, onFinished: () => {}, intervalMs: 60_000, retryDelaysMs: [1_000], abortSignal: ctrl.signal });

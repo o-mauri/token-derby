@@ -1,9 +1,31 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import type { GetRaceResponse, HorseColors, HorseView } from '@token-derby/shared';
-import { levelInfo } from '@token-derby/shared';
+import { levelInfo, MODEL_KEYS, type ModelKey } from '@token-derby/shared';
 import { HorseSprite } from './HorseSprite.js';
 import { MINI_SPRITE } from './sprite.js';
+
+const MODEL_LABELS: Record<ModelKey, string> = { claude: 'Claude', codex: 'Codex', gemini: 'Gemini' };
+
+export function TokenBreakdown(props: {
+  primaryModel: ModelKey;
+  perSource: Record<ModelKey, number>;
+  raceScore: number;
+}) {
+  const { primaryModel, perSource, raceScore } = props;
+  return (
+    <Box flexDirection="column" marginTop={1}>
+      <Text bold>Tokens by model (since join)</Text>
+      {MODEL_KEYS.map(m => (
+        <Text key={m}>
+          {`  ${MODEL_LABELS[m].padEnd(8)} ${perSource[m].toLocaleString().padStart(12)}  `}
+          <Text dimColor>{m === primaryModel ? '(primary)' : '(10%)'}</Text>
+        </Text>
+      ))}
+      <Text>{`  ${'Race score'.padEnd(8)} ${Math.round(raceScore).toLocaleString().padStart(12)}`}</Text>
+    </Box>
+  );
+}
 
 type Props = {
   race: GetRaceResponse | null;
@@ -14,10 +36,12 @@ type Props = {
   lastHeartbeatAgoSec: number | null;
   lastHeartbeatOk: boolean;
   stalled?: boolean;
+  primaryModel?: ModelKey;
+  perSource?: Record<ModelKey, number>;
 };
 
 export function StatusScreen(props: Props) {
-  const { race, ownHorseId, ownHorseName, ownColors, ownUserName, lastHeartbeatAgoSec, lastHeartbeatOk, stalled } = props;
+  const { race, ownHorseId, ownHorseName, ownColors, ownUserName, lastHeartbeatAgoSec, lastHeartbeatOk, stalled, primaryModel, perSource } = props;
 
   if (!race) {
     return (
@@ -71,6 +95,14 @@ export function StatusScreen(props: Props) {
           <Text color="yellow">⚠ Can't read token usage — try restarting this terminal. Your race continues.</Text>
         )}
       </Box>
+
+      {primaryModel && perSource && (
+        <TokenBreakdown
+          primaryModel={primaryModel}
+          perSource={perSource}
+          raceScore={own?.current_tokens ?? 0}
+        />
+      )}
 
       <Box marginTop={1}>
         <Text dimColor>Press Ctrl+C to crash out of the race.</Text>
