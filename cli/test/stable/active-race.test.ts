@@ -24,7 +24,13 @@ const sample: ActiveRace = {
   joined_at: '2026-06-23T00:00:00.000Z',
   last_heartbeat_at: '1970-01-01T00:00:00.000Z',
   primary_model: 'codex',
-  score: { acked: { claude: 0, codex: 0, gemini: 0 }, lastGood: { claude: 0, codex: 0, gemini: 0 }, seq: 0 },
+  score: {
+    acked: { claude: 0, codex: 0, gemini: 0 },
+    lastGood: { claude: 0, codex: 0, gemini: 0 },
+    primaryConvAcked: {},
+    primaryCounted: 0,
+    seq: 0,
+  },
 };
 
 describe('active-race persistence', () => {
@@ -40,12 +46,20 @@ describe('active-race persistence', () => {
     await tmpHome();
     await saveActiveRace({
       ...sample,
-      score: { acked: { claude: 1234, codex: 0, gemini: 0 }, lastGood: { claude: 1300, codex: 0, gemini: 0 }, seq: 7 },
+      score: {
+        acked: { claude: 1234, codex: 0, gemini: 0 },
+        lastGood: { claude: 1300, codex: 0, gemini: 0 },
+        primaryConvAcked: { 'proj/sess': 1300 },
+        primaryCounted: 1300,
+        seq: 7,
+      },
     });
     const loaded = await loadActiveRace('ABCDEF');
     expect(loaded?.score.acked.claude).toBe(1234);
     expect(loaded?.score.lastGood.claude).toBe(1300);
     expect(loaded?.score.seq).toBe(7);
+    expect(loaded?.score.primaryConvAcked).toEqual({ 'proj/sess': 1300 });
+    expect(loaded?.score.primaryCounted).toBe(1300);
   });
 
   it('returns null when missing, and lists/deletes', async () => {

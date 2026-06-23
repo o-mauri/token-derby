@@ -155,6 +155,8 @@ export async function joinCommand(joinCode: string | undefined, argv: string[] =
     score: {
       acked: { claude: 0, codex: 0, gemini: 0 },
       lastGood: { claude: 0, codex: 0, gemini: 0 },
+      primaryConvAcked: {},
+      primaryCounted: 0,
       seq: ownHorse?.last_seq ?? 0,
     },
     ...(race.counts_input ? { counts_input: true } : {}),
