@@ -35,4 +35,30 @@ describe('TokenBreakdown', () => {
     expect(out).toMatch(/310,000/);
     expect(out).toMatch(/52,000/);
   });
+
+  it('tags the primary row top 5/beat when capped', () => {
+    const { lastFrame } = render(
+      <TokenBreakdown
+        primaryModel="codex"
+        perSource={{ claude: 1_240_000, codex: 310_000, gemini: 52_000 }}
+        raceScore={439_200}
+        primaryCapped={true}
+      />,
+    );
+    expect(lastFrame()!).toMatch(/top 5\/beat/);
+  });
+
+  it('tags the primary row just (primary) when not capped', () => {
+    const { lastFrame } = render(
+      <TokenBreakdown
+        primaryModel="codex"
+        perSource={{ claude: 1_240_000, codex: 310_000, gemini: 52_000 }}
+        raceScore={1_602_000}
+        primaryCapped={false}
+      />,
+    );
+    const out = lastFrame()!;
+    expect(out).toMatch(/\(primary\)/);
+    expect(out).not.toMatch(/top 5\/beat/);
+  });
 });

@@ -4,8 +4,9 @@ import type { GetRaceResponse, HeartbeatResponse } from '@token-derby/shared';
 import { StatusScreen } from '../ui/StatusScreen.js';
 import { describeAchievement, type RecentEvent } from '@token-derby/shared';
 import { runHeartbeatLoop } from './heartbeat-loop.js';
-import { readAllSources, type SourceReading } from '../tokens/race-tokens.js';
-import { type ModelKey } from '@token-derby/shared';
+import { readAllSources, type AllSources } from '../tokens/race-tokens.js';
+import { primaryConversationCap } from '../tokens/primary-cap.js';
+import { MODEL_KEYS, type ModelKey } from '@token-derby/shared';
 import { RaceScoreTracker, type RaceScoreState } from '../tokens/race-score.js';
 import * as endpoints from '../api/endpoints.js';
 import { ApiError } from '../api/client.js';
@@ -29,7 +30,7 @@ export function RunRace({ active, initialState, pendingMode, ownUserName }: RunR
   const [achievements, setAchievements] = useState<Array<{ key: string; event: RecentEvent }>>([]);
   const shownAchievementAtRef = useRef<number>(0);
 
-  const trackerRef = useRef(new RaceScoreTracker(initialState));
+  const trackerRef = useRef(new RaceScoreTracker(initialState, active.primary_model));
   const pendingRef = useRef(pendingMode);
   const ctrl = useRef(new AbortController());
   const [stalled, setStalled] = useState(false);
@@ -53,7 +54,7 @@ export function RunRace({ active, initialState, pendingMode, ownUserName }: RunR
   useEffect(() => {
     const tracker = trackerRef.current;
 
-    const scanWithTimeout = async (): Promise<SourceReading | null> => {
+    const scanWithTimeout = async (): Promise<AllSources | null> => {
       try {
         return await Promise.race([
           readAllSources(active, active.primary_model),
@@ -70,13 +71,12 @@ export function RunRace({ active, initialState, pendingMode, ownUserName }: RunR
         tracker.recordReading(reading);
         if (pendingRef.current) tracker.reprime();
         setStalled(tracker.stalled);
-        const live = tracker.readings();
-        const base = baselineRef.current;
-        setPerSource({
-          claude: Math.max(0, live.claude - base.claude),
-          codex: Math.max(0, live.codex - base.codex),
-          gemini: Math.max(0, live.gemini - base.gemini),
-        });
+        const since = tracker.secondarySinceJoin(baselineRef.current);
+        const ps: Record<ModelKey, number> = { claude: 0, codex: 0, gemini: 0 };
+        for (const k of MODEL_KEYS) {
+          ps[k] = k === active.primary_model ? tracker.primaryCounted() : since[k];
+        }
+        setPerSource(ps);
         return tracker.nextBeat();
       },
       sendBeat: async (snapshot) => {
@@ -150,6 +150,7 @@ export function RunRace({ active, initialState, pendingMode, ownUserName }: RunR
         stalled={stalled}
         primaryModel={active.primary_model}
         perSource={perSource}
+        primaryCapped={primaryConversationCap() !== Infinity}
       />
       {achievements.length > 0 && (
         <Box flexDirection="column" marginTop={1}>
@@ -194,12 +195,21 @@ export async function buildInitialState(args: {
   raceStatus: 'pending' | 'live';
   serverLastSeq: number;
 }): Promise<{ initialState: RaceScoreState; pendingMode: boolean }> {
-  let now: SourceReading = { claude: 0, codex: 0, gemini: 0 };
+  let now: AllSources | null = null;
   try {
-    now = (await readAllSources(args.active, args.active.primary_model)) ?? now;
-  } catch { /* leave zeros */ }
+    now = await readAllSources(args.active, args.active.primary_model);
+  } catch { /* leave null → zeros */ }
+  const secondary = now?.secondary ?? { claude: 0, codex: 0, gemini: 0 };
+  const primaryConvAcked: Record<string, number> = {};
+  if (now) for (const [id, v] of now.primaryByConv) primaryConvAcked[id] = v;
   return {
-    initialState: { acked: now, lastGood: now, seq: args.serverLastSeq },
+    initialState: {
+      acked: { ...secondary },
+      lastGood: { ...secondary },
+      primaryConvAcked,
+      primaryCounted: 0,
+      seq: args.serverLastSeq,
+    },
     pendingMode: args.raceStatus === 'pending',
   };
 }

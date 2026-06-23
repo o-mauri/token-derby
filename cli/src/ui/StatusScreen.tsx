@@ -11,15 +11,17 @@ export function TokenBreakdown(props: {
   primaryModel: ModelKey;
   perSource: Record<ModelKey, number>;
   raceScore: number;
+  primaryCapped?: boolean;
 }) {
-  const { primaryModel, perSource, raceScore } = props;
+  const { primaryModel, perSource, raceScore, primaryCapped } = props;
+  const primaryTag = primaryCapped ? '(primary · top 5/beat)' : '(primary)';
   return (
     <Box flexDirection="column" marginTop={1}>
       <Text bold>Tokens by model (since join)</Text>
       {MODEL_KEYS.map(m => (
         <Text key={m}>
           {`  ${MODEL_LABELS[m].padEnd(10)} ${perSource[m].toLocaleString().padStart(12)}  `}
-          <Text dimColor>{m === primaryModel ? '(primary)' : '(10%)'}</Text>
+          <Text dimColor>{m === primaryModel ? primaryTag : '(10%)'}</Text>
         </Text>
       ))}
       <Text>{`  ${'Race score'.padEnd(10)} ${Math.round(raceScore).toLocaleString().padStart(12)}`}</Text>
@@ -38,10 +40,11 @@ type Props = {
   stalled?: boolean;
   primaryModel?: ModelKey;
   perSource?: Record<ModelKey, number>;
+  primaryCapped?: boolean;
 };
 
 export function StatusScreen(props: Props) {
-  const { race, ownHorseId, ownHorseName, ownColors, ownUserName, lastHeartbeatAgoSec, lastHeartbeatOk, stalled, primaryModel, perSource } = props;
+  const { race, ownHorseId, ownHorseName, ownColors, ownUserName, lastHeartbeatAgoSec, lastHeartbeatOk, stalled, primaryModel, perSource, primaryCapped } = props;
 
   if (!race) {
     return (
@@ -101,6 +104,7 @@ export function StatusScreen(props: Props) {
           primaryModel={primaryModel}
           perSource={perSource}
           raceScore={own?.current_tokens ?? weightedTotal(primaryModel, perSource)}
+          primaryCapped={primaryCapped}
         />
       )}
 
