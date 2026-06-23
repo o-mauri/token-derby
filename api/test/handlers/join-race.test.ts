@@ -8,6 +8,7 @@ import { listHorses } from '../../src/db/horses.js';
 import { setRaceEnded } from '../../src/db/races.js';
 import { equipHat as dbEquipHat, applyRollResult } from '../../src/db/stable.js';
 import { makeUser, makeHorse, type TestUser } from '../helpers/auth-helper.js';
+import { CURRENT_CLI_VERSION } from '../helpers/cli-version.js';
 
 const COLORS = { body: '#8B4513', mane: '#000', tail: '#000', saddle: '#C0392B' };
 
@@ -17,7 +18,7 @@ function authedEvent(
   path: string,
   body?: unknown,
   pathParameters?: Record<string, string>,
-  cliVersion: string | null = '2.9.0',
+  cliVersion: string | null = CURRENT_CLI_VERSION,
 ): APIGatewayProxyEventV2 {
   const headers: Record<string, string> = {};
   if (cliVersion) headers['x-cli-version'] = cliVersion;
@@ -39,7 +40,7 @@ function authedEvent(
   };
 }
 
-async function createTestRace(creator: TestUser, overrides: Record<string, any> = {}, cliVersion = '2.9.0') {
+async function createTestRace(creator: TestUser, overrides: Record<string, any> = {}, cliVersion = CURRENT_CLI_VERSION) {
   const res: any = await createHandler(authedEvent(creator, 'POST', '/races', {
     name: 'Join Test',
     start_time: new Date(Date.now() - 60_000).toISOString(),
@@ -51,7 +52,7 @@ async function createTestRace(creator: TestUser, overrides: Record<string, any> 
   return JSON.parse(res.body);
 }
 
-function joinEvent(joinCode: string, user: TestUser | null, body: unknown, cliVersion: string | null = '2.9.0') {
+function joinEvent(joinCode: string, user: TestUser | null, body: unknown, cliVersion: string | null = CURRENT_CLI_VERSION) {
   return authedEvent(user, 'POST', `/races/${joinCode}/join`, body, { join_code: joinCode }, cliVersion);
 }
 

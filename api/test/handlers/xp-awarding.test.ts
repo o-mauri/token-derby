@@ -9,6 +9,7 @@ import { listHorses } from '../../src/db/horses.js';
 import { finaliseRace } from '../../src/lib/finalise-race.js';
 import { getRaceById } from '../../src/db/races.js';
 import { makeUser, makeHorse, type TestUser } from '../helpers/auth-helper.js';
+import { CURRENT_CLI_VERSION } from '../helpers/cli-version.js';
 
 const COLORS = { body: '#8B4513', mane: '#000', tail: '#000', saddle: '#C0392B' };
 
@@ -25,7 +26,7 @@ function authedEvent(
   pathParameters?: Record<string, string>,
   bearer?: string,
 ): APIGatewayProxyEventV2 {
-  const headers: Record<string, string> = { 'x-cli-version': '2.9.0' };
+  const headers: Record<string, string> = { 'x-cli-version': CURRENT_CLI_VERSION };
   if (user) {
     headers['x-user-id'] = user.user_id;
     headers['x-user-token'] = user.secret_token;

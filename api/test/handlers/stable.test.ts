@@ -5,6 +5,7 @@ import { handler as updateStableHorse } from '../../src/handlers/update-stable-h
 import { handler as deleteStableHorse } from '../../src/handlers/delete-stable-horse.js';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { makeUser, type TestUser } from '../helpers/auth-helper.js';
+import { CURRENT_CLI_VERSION } from '../helpers/cli-version.js';
 
 const COLORS = { body: '#8B4513', mane: '#000', tail: '#000', saddle: '#C0392B' };
 
@@ -16,7 +17,7 @@ function authedEvent(
   pathParameters?: Record<string, string>,
 ): APIGatewayProxyEventV2 {
   const headers: Record<string, string> = {
-    'x-cli-version': '2.9.0',
+    'x-cli-version': CURRENT_CLI_VERSION,
     'x-user-id': user.user_id,
     'x-user-token': user.secret_token,
   };
@@ -125,7 +126,7 @@ describe('stable handlers', () => {
   it('UNAUTHENTICATED when X-User-Token is missing', async () => {
     const noAuth: APIGatewayProxyEventV2 = {
       version: '2.0', routeKey: 'GET /jockey/me/horses', rawPath: '/jockey/me/horses', rawQueryString: '',
-      headers: { 'x-cli-version': '2.9.0', 'x-user-id': '00000000-0000-0000-0000-000000000000' },
+      headers: { 'x-cli-version': CURRENT_CLI_VERSION, 'x-user-id': '00000000-0000-0000-0000-000000000000' },
       requestContext: {} as any, isBase64Encoded: false,
     };
     const res: any = await listStable(noAuth);
@@ -136,7 +137,7 @@ describe('stable handlers', () => {
     const noUser: APIGatewayProxyEventV2 = {
       version: '2.0', routeKey: 'GET /jockey/me/horses', rawPath: '/jockey/me/horses', rawQueryString: '',
       headers: {
-        'x-cli-version': '2.9.0',
+        'x-cli-version': CURRENT_CLI_VERSION,
         'x-user-id': '00000000-0000-0000-0000-000000000000',
         'x-user-token': 'any-token-here',
       },

@@ -2,8 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { handler as initJockey } from '../../src/handlers/init-jockey.js';
 import { handler as getJockey } from '../../src/handlers/get-jockey.js';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
+import { CURRENT_CLI_VERSION, OUTDATED_CLI_VERSION } from '../helpers/cli-version.js';
 
-function initEvent(body: unknown, cliVersion: string | null = '2.9.0'): APIGatewayProxyEventV2 {
+function initEvent(body: unknown, cliVersion: string | null = CURRENT_CLI_VERSION): APIGatewayProxyEventV2 {
   const headers: Record<string, string> = { 'content-type': 'application/json' };
   if (cliVersion) headers['x-cli-version'] = cliVersion;
   return {
@@ -25,7 +26,7 @@ function meEvent(userId: string, token: string): APIGatewayProxyEventV2 {
     rawPath: '/jockey/me',
     rawQueryString: '',
     headers: {
-      'x-cli-version': '2.9.0',
+      'x-cli-version': CURRENT_CLI_VERSION,
       'x-user-id': userId,
       'x-user-token': token,
     },
@@ -67,8 +68,8 @@ describe('init-jockey handler', () => {
     expect(res.statusCode).toBe(400);
   });
 
-  it('rejects CLI versions older than 2.0.0', async () => {
-    const res: any = await initJockey(initEvent({ display_name: 'A' }, '1.5.0'));
+  it('rejects CLI versions older than the API minimum', async () => {
+    const res: any = await initJockey(initEvent({ display_name: 'A' }, OUTDATED_CLI_VERSION));
     expect(res.statusCode).toBe(426);
   });
 

@@ -4,6 +4,7 @@ import { handler as joinOrg } from '../../src/handlers/join-organisation.js';
 import { handler as listOrgs } from '../../src/handlers/list-organisations.js';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { makeUser, type TestUser } from '../helpers/auth-helper.js';
+import { CURRENT_CLI_VERSION } from '../helpers/cli-version.js';
 
 function postEvent(path: string, body: unknown, user: TestUser): APIGatewayProxyEventV2 {
   return {
@@ -13,7 +14,7 @@ function postEvent(path: string, body: unknown, user: TestUser): APIGatewayProxy
     rawQueryString: '',
     headers: {
       'content-type': 'application/json',
-      'x-cli-version': '2.9.0',
+      'x-cli-version': CURRENT_CLI_VERSION,
       'x-user-id': user.user_id,
       'x-user-token': user.secret_token,
     },
@@ -30,7 +31,7 @@ function getEvent(user: TestUser): APIGatewayProxyEventV2 {
     rawPath: '/organisations',
     rawQueryString: '',
     headers: {
-      'x-cli-version': '2.9.0',
+      'x-cli-version': CURRENT_CLI_VERSION,
       'x-user-id': user.user_id,
       'x-user-token': user.secret_token,
     },

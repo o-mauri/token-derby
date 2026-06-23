@@ -3,6 +3,7 @@ import { handler as createOrg } from '../../src/handlers/create-organisation.js'
 import { handler as getOrg } from '../../src/handlers/get-organisation.js';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { makeUser, type TestUser } from '../helpers/auth-helper.js';
+import { CURRENT_CLI_VERSION } from '../helpers/cli-version.js';
 
 function createEvent(name: string, user: TestUser): APIGatewayProxyEventV2 {
   return {
@@ -12,7 +13,7 @@ function createEvent(name: string, user: TestUser): APIGatewayProxyEventV2 {
     rawQueryString: '',
     headers: {
       'content-type': 'application/json',
-      'x-cli-version': '2.9.0',
+      'x-cli-version': CURRENT_CLI_VERSION,
       'x-user-id': user.user_id,
       'x-user-token': user.secret_token,
     },
@@ -30,7 +31,7 @@ function infoEvent(org_name: string, user: TestUser): APIGatewayProxyEventV2 {
     rawQueryString: '',
     pathParameters: { org_name },
     headers: {
-      'x-cli-version': '2.9.0',
+      'x-cli-version': CURRENT_CLI_VERSION,
       'x-user-id': user.user_id,
       'x-user-token': user.secret_token,
     },

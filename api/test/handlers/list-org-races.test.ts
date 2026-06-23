@@ -13,6 +13,7 @@ import { makeUser, makeHorse, type TestUser } from '../helpers/auth-helper.js';
 import { ddb, TABLE } from '../../src/db/client.js';
 import { horseKey } from '../../src/db/keys.js';
 import { UpdateCommand } from '@aws-sdk/lib-dynamodb';
+import { CURRENT_CLI_VERSION } from '../helpers/cli-version.js';
 
 const HCOLORS = { body: '#abc', mane: '#111', tail: '#222', saddle: '#333' };
 
@@ -33,7 +34,7 @@ async function joinHorse(join_code: string, user: TestUser, horseName: string, e
       pathParameters: { stable_horse_id: stable.stable_horse_id },
       headers: {
         'content-type': 'application/json',
-        'x-cli-version': '2.9.0',
+        'x-cli-version': CURRENT_CLI_VERSION,
         'x-user-id': user.user_id,
         'x-user-token': user.secret_token,
       },
@@ -51,7 +52,7 @@ async function joinHorse(join_code: string, user: TestUser, horseName: string, e
     pathParameters: { join_code },
     headers: {
       'content-type': 'application/json',
-      'x-cli-version': '2.9.0',
+      'x-cli-version': CURRENT_CLI_VERSION,
       'x-user-id': user.user_id,
       'x-user-token': user.secret_token,
     },
@@ -73,7 +74,7 @@ async function makeMember(name: string, join_token: string): Promise<TestUser> {
     rawQueryString: '',
     headers: {
       'content-type': 'application/json',
-      'x-cli-version': '2.9.0',
+      'x-cli-version': CURRENT_CLI_VERSION,
       'x-user-id': user.user_id,
       'x-user-token': user.secret_token,
     },
@@ -106,7 +107,7 @@ function createOrgEvent(name: string, user: TestUser): APIGatewayProxyEventV2 {
     rawQueryString: '',
     headers: {
       'content-type': 'application/json',
-      'x-cli-version': '2.9.0',
+      'x-cli-version': CURRENT_CLI_VERSION,
       'x-user-id': user.user_id,
       'x-user-token': user.secret_token,
     },
@@ -124,7 +125,7 @@ function createRaceEvent(body: any, user: TestUser): APIGatewayProxyEventV2 {
     rawQueryString: '',
     headers: {
       'content-type': 'application/json',
-      'x-cli-version': '2.9.0',
+      'x-cli-version': CURRENT_CLI_VERSION,
       'x-user-id': user.user_id,
       'x-user-token': user.secret_token,
     },

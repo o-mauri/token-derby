@@ -5,8 +5,9 @@ import { handler as setHandler } from '../../src/handlers/set-org-schedule.js';
 import { handler as getHandler } from '../../src/handlers/get-org-schedule.js';
 import { handler as delHandler } from '../../src/handlers/delete-org-schedule.js';
 import { makeUser, type TestUser } from '../helpers/auth-helper.js';
+import { CURRENT_CLI_VERSION } from '../helpers/cli-version.js';
 
-function ev(method: string, orgName: string, body: unknown, user: TestUser | null, cliVersion: string | null = '2.9.0'): APIGatewayProxyEventV2 {
+function ev(method: string, orgName: string, body: unknown, user: TestUser | null, cliVersion: string | null = CURRENT_CLI_VERSION): APIGatewayProxyEventV2 {
   const headers: Record<string, string> = { 'content-type': 'application/json' };
   if (cliVersion) headers['x-cli-version'] = cliVersion;
   if (user) { headers['x-user-id'] = user.user_id; headers['x-user-token'] = user.secret_token; }

@@ -3,11 +3,12 @@ import { handler } from '../../src/handlers/create-organisation.js';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { getOrganisationByName, isMember } from '../../src/db/organisations.js';
 import { makeUser, type TestUser } from '../helpers/auth-helper.js';
+import { CURRENT_CLI_VERSION } from '../helpers/cli-version.js';
 
 function event(
   body: unknown,
   user: TestUser | null,
-  cliVersion: string | null = '2.9.0',
+  cliVersion: string | null = CURRENT_CLI_VERSION,
 ): APIGatewayProxyEventV2 {
   const headers: Record<string, string> = { 'content-type': 'application/json' };
   if (cliVersion) headers['x-cli-version'] = cliVersion;

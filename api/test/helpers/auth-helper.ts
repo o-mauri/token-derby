@@ -2,12 +2,13 @@ import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { handler as initJockeyHandler } from '../../src/handlers/init-jockey.js';
 import { handler as createStableHorseHandler } from '../../src/handlers/create-stable-horse.js';
 import type { HorseColors, StableHorse } from '@token-derby/shared';
+import { CURRENT_CLI_VERSION } from './cli-version.js';
 
 export type TestUser = { user_id: string; display_name: string; secret_token: string };
 
 const DEFAULT_COLORS: HorseColors = { body: '#8B4513', mane: '#000', tail: '#000', saddle: '#C0392B' };
 
-export async function makeUser(display_name: string, cliVersion = '2.9.0'): Promise<TestUser> {
+export async function makeUser(display_name: string, cliVersion = CURRENT_CLI_VERSION): Promise<TestUser> {
   const event: APIGatewayProxyEventV2 = {
     version: '2.0',
     routeKey: 'POST /jockey/init',
@@ -37,7 +38,7 @@ export async function makeHorse(
     rawQueryString: '',
     headers: {
       'content-type': 'application/json',
-      'x-cli-version': '2.9.0',
+      'x-cli-version': CURRENT_CLI_VERSION,
       'x-user-id': user.user_id,
       'x-user-token': user.secret_token,
     },

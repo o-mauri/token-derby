@@ -11,6 +11,7 @@ import { handler as createOrgHandler } from '../../src/handlers/create-organisat
 import { handler as createRaceHandler } from '../../src/handlers/create-race.js';
 import { getRaceByJoinCode } from '../../src/db/races.js';
 import { makeUser } from '../helpers/auth-helper.js';
+import { CURRENT_CLI_VERSION } from '../helpers/cli-version.js';
 
 function findHorse(horses: Horse[], name: string): Horse {
   const h = horses.find(h => h.name === name);
@@ -192,7 +193,7 @@ describe('finaliseRace webhook delivery', () => {
     const orgName = 'FrOrg1';
     await createOrgHandler({
       version: '2.0', routeKey: 'POST /organisations', rawPath: '/organisations', rawQueryString: '',
-      headers: { 'content-type': 'application/json', 'x-cli-version': '2.9.0', 'x-user-id': owner.user_id, 'x-user-token': owner.secret_token },
+      headers: { 'content-type': 'application/json', 'x-cli-version': CURRENT_CLI_VERSION, 'x-user-id': owner.user_id, 'x-user-token': owner.secret_token },
       requestContext: {} as any,
       body: JSON.stringify({ name: orgName }),
       isBase64Encoded: false,
@@ -217,7 +218,7 @@ describe('finaliseRace webhook delivery', () => {
 
     const createRes: any = await createRaceHandler({
       version: '2.0', routeKey: 'POST /races', rawPath: '/races', rawQueryString: '',
-      headers: { 'content-type': 'application/json', 'x-cli-version': '2.9.0', 'x-user-id': owner.user_id, 'x-user-token': owner.secret_token },
+      headers: { 'content-type': 'application/json', 'x-cli-version': CURRENT_CLI_VERSION, 'x-user-id': owner.user_id, 'x-user-token': owner.secret_token },
       requestContext: {} as any,
       body: JSON.stringify({
         name: 'FrRace1',

@@ -4,6 +4,7 @@ import { handler as joinOrg } from '../../src/handlers/join-organisation.js';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { isMember } from '../../src/db/organisations.js';
 import { makeUser, type TestUser } from '../helpers/auth-helper.js';
+import { CURRENT_CLI_VERSION } from '../helpers/cli-version.js';
 
 function eventFor(
   path: string,
@@ -17,7 +18,7 @@ function eventFor(
     rawQueryString: '',
     headers: {
       'content-type': 'application/json',
-      'x-cli-version': '2.9.0',
+      'x-cli-version': CURRENT_CLI_VERSION,
       'x-user-id': user.user_id,
       'x-user-token': user.secret_token,
     },

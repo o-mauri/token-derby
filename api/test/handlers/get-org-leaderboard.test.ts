@@ -6,12 +6,13 @@ import { putStableHorse } from '../../src/db/stable.js';
 import { makeUser, type TestUser } from '../helpers/auth-helper.js';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import type { StableHorse } from '@token-derby/shared';
+import { CURRENT_CLI_VERSION } from '../helpers/cli-version.js';
 
 function createEvent(name: string, user: TestUser): APIGatewayProxyEventV2 {
   return {
     version: '2.0', routeKey: 'POST /organisations', rawPath: '/organisations', rawQueryString: '',
     headers: {
-      'content-type': 'application/json', 'x-cli-version': '2.9.0',
+      'content-type': 'application/json', 'x-cli-version': CURRENT_CLI_VERSION,
       'x-user-id': user.user_id, 'x-user-token': user.secret_token,
     },
     requestContext: {} as any, body: JSON.stringify({ name }), isBase64Encoded: false,
