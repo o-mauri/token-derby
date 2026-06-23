@@ -76,3 +76,4 @@ at usage you didn't produce.
 - `TOKEN_DERBY_API_BASE` — override the API base URL (default: `https://token-derby.mauricode.co.uk/api`)
 - `TOKEN_DERBY_HOME` — override the data directory (default: `~/.token-derby`)
 - `TOKEN_DERBY_CLAUDE_DIR` — override the transcripts directory (default: `~/.claude/projects`)
+- `TOKEN_DERBY_PRIMARY_TOP5` — when set (`1`/`true`), only your **5 most-active conversations per heartbeat** count toward your **primary** model's score; the rest are not counted that beat. Off by default (every conversation counts). Secondary models are unaffected.
