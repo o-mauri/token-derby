@@ -35,11 +35,9 @@ const MAX_PROJECT_DEPTH = 8;
 // up into the same id.
 function conversationId(file: string, root: string): string {
   const rel = path.relative(root, file);
-  const parts = rel.split(path.sep);
-  if (parts.length < 2) return rel.replace(/\.jsonl$/, '');
-  const project = parts[0];
-  const session = parts[1].replace(/\.jsonl$/, '');
-  return `${project}/${session}`;
+  const [project, session] = rel.split(path.sep);
+  if (project === undefined || session === undefined) return rel.replace(/\.jsonl$/, '');
+  return `${project}/${session.replace(/\.jsonl$/, '')}`;
 }
 
 export async function sumTokensByConversation(): Promise<Map<string, TokenTotals>> {
