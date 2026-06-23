@@ -7,7 +7,7 @@ import { makeUser, type TestUser } from '../helpers/auth-helper.js';
 function event(
   body: unknown,
   user: TestUser | null,
-  cliVersion: string | null = '2.6.0',
+  cliVersion: string | null = '2.9.0',
 ): APIGatewayProxyEventV2 {
   const headers: Record<string, string> = { 'content-type': 'application/json' };
   if (cliVersion) headers['x-cli-version'] = cliVersion;

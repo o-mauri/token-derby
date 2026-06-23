@@ -12,7 +12,7 @@ const runTick = () => (tick as unknown as () => Promise<void>)();
 async function createOrg(user: TestUser, name: string): Promise<string> {
   const ev: APIGatewayProxyEventV2 = {
     version: '2.0', routeKey: 'POST /organisations', rawPath: '/organisations', rawQueryString: '',
-    headers: { 'content-type': 'application/json', 'x-cli-version': '2.6.0', 'x-user-id': user.user_id, 'x-user-token': user.secret_token },
+    headers: { 'content-type': 'application/json', 'x-cli-version': '2.9.0', 'x-user-id': user.user_id, 'x-user-token': user.secret_token },
     requestContext: {} as any, body: JSON.stringify({ name }), isBase64Encoded: false,
   };
   const res: any = await createOrgHandler(ev);

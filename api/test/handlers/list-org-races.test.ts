@@ -33,7 +33,7 @@ async function joinHorse(join_code: string, user: TestUser, horseName: string, e
       pathParameters: { stable_horse_id: stable.stable_horse_id },
       headers: {
         'content-type': 'application/json',
-        'x-cli-version': '2.6.0',
+        'x-cli-version': '2.9.0',
         'x-user-id': user.user_id,
         'x-user-token': user.secret_token,
       },
@@ -51,7 +51,7 @@ async function joinHorse(join_code: string, user: TestUser, horseName: string, e
     pathParameters: { join_code },
     headers: {
       'content-type': 'application/json',
-      'x-cli-version': '2.6.0',
+      'x-cli-version': '2.9.0',
       'x-user-id': user.user_id,
       'x-user-token': user.secret_token,
     },
@@ -73,7 +73,7 @@ async function makeMember(name: string, join_token: string): Promise<TestUser> {
     rawQueryString: '',
     headers: {
       'content-type': 'application/json',
-      'x-cli-version': '2.6.0',
+      'x-cli-version': '2.9.0',
       'x-user-id': user.user_id,
       'x-user-token': user.secret_token,
     },
@@ -106,7 +106,7 @@ function createOrgEvent(name: string, user: TestUser): APIGatewayProxyEventV2 {
     rawQueryString: '',
     headers: {
       'content-type': 'application/json',
-      'x-cli-version': '2.6.0',
+      'x-cli-version': '2.9.0',
       'x-user-id': user.user_id,
       'x-user-token': user.secret_token,
     },
@@ -124,7 +124,7 @@ function createRaceEvent(body: any, user: TestUser): APIGatewayProxyEventV2 {
     rawQueryString: '',
     headers: {
       'content-type': 'application/json',
-      'x-cli-version': '2.6.0',
+      'x-cli-version': '2.9.0',
       'x-user-id': user.user_id,
       'x-user-token': user.secret_token,
     },

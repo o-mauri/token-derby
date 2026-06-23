@@ -14,7 +14,7 @@ function rollEvent(user: TestUser, stable_horse_id: string): APIGatewayProxyEven
     pathParameters: { stable_horse_id },
     headers: {
       'content-type': 'application/json',
-      'x-cli-version': '2.6.0',
+      'x-cli-version': '2.9.0',
       'x-user-id': user.user_id,
       'x-user-token': user.secret_token,
     },

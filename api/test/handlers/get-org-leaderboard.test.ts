@@ -11,7 +11,7 @@ function createEvent(name: string, user: TestUser): APIGatewayProxyEventV2 {
   return {
     version: '2.0', routeKey: 'POST /organisations', rawPath: '/organisations', rawQueryString: '',
     headers: {
-      'content-type': 'application/json', 'x-cli-version': '2.6.0',
+      'content-type': 'application/json', 'x-cli-version': '2.9.0',
       'x-user-id': user.user_id, 'x-user-token': user.secret_token,
     },
     requestContext: {} as any, body: JSON.stringify({ name }), isBase64Encoded: false,

@@ -11,7 +11,7 @@ import { createHmac } from 'node:crypto';
 function event(
   body: unknown,
   user: TestUser | null,
-  cliVersion: string | null = '2.6.0',
+  cliVersion: string | null = '2.9.0',
 ): APIGatewayProxyEventV2 {
   const headers: Record<string, string> = { 'content-type': 'application/json' };
   if (cliVersion) headers['x-cli-version'] = cliVersion;
@@ -39,7 +39,7 @@ function orgEvent(body: unknown, user: TestUser): APIGatewayProxyEventV2 {
     rawQueryString: '',
     headers: {
       'content-type': 'application/json',
-      'x-cli-version': '2.6.0',
+      'x-cli-version': '2.9.0',
       'x-user-id': user.user_id,
       'x-user-token': user.secret_token,
     },
@@ -217,10 +217,10 @@ describe('createRace handler', () => {
       start_time: '2026-04-22T09:00:00Z',
       end_time: '2026-04-22T17:00:00Z',
       tz: 'UTC',
-    }, user, '2.6.3'));
+    }, user, '2.9.3'));
     const body = JSON.parse(res.body);
     const race = await getRaceByJoinCode(body.join_code);
-    expect(race?.cli_version).toBe('2.6.3');
+    expect(race?.cli_version).toBe('2.9.3');
   });
 
   it('rejects CLI versions older than the minimum with VERSION_MISMATCH', async () => {
@@ -381,7 +381,7 @@ describe('createRace handler', () => {
     const orgName = 'WebhookOrg1';
     const orgRes: any = await createOrgHandler({
       version: '2.0', routeKey: 'POST /organisations', rawPath: '/organisations', rawQueryString: '',
-      headers: { 'content-type': 'application/json', 'x-cli-version': '2.6.0', 'x-user-id': owner.user_id, 'x-user-token': owner.secret_token },
+      headers: { 'content-type': 'application/json', 'x-cli-version': '2.9.0', 'x-user-id': owner.user_id, 'x-user-token': owner.secret_token },
       requestContext: {} as any,
       body: JSON.stringify({ name: orgName }),
       isBase64Encoded: false,
@@ -411,7 +411,7 @@ describe('createRace handler', () => {
 
     const createRaceRes: any = await handler({
       version: '2.0', routeKey: 'POST /races', rawPath: '/races', rawQueryString: '',
-      headers: { 'content-type': 'application/json', 'x-cli-version': '2.6.0', 'x-user-id': owner.user_id, 'x-user-token': owner.secret_token },
+      headers: { 'content-type': 'application/json', 'x-cli-version': '2.9.0', 'x-user-id': owner.user_id, 'x-user-token': owner.secret_token },
       requestContext: {} as any,
       body: JSON.stringify({
         name: 'WhRace1',
@@ -444,7 +444,7 @@ describe('createRace handler', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const res: any = await handler({
       version: '2.0', routeKey: 'POST /races', rawPath: '/races', rawQueryString: '',
-      headers: { 'content-type': 'application/json', 'x-cli-version': '2.6.0', 'x-user-id': user.user_id, 'x-user-token': user.secret_token },
+      headers: { 'content-type': 'application/json', 'x-cli-version': '2.9.0', 'x-user-id': user.user_id, 'x-user-token': user.secret_token },
       requestContext: {} as any,
       body: JSON.stringify({
         name: 'NoOrgRace',

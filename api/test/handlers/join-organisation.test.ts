@@ -17,7 +17,7 @@ function eventFor(
     rawQueryString: '',
     headers: {
       'content-type': 'application/json',
-      'x-cli-version': '2.6.0',
+      'x-cli-version': '2.9.0',
       'x-user-id': user.user_id,
       'x-user-token': user.secret_token,
     },
