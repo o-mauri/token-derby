@@ -1,7 +1,7 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import type { GetRaceResponse, HorseColors, HorseView } from '@token-derby/shared';
-import { levelInfo, MODEL_KEYS, type ModelKey } from '@token-derby/shared';
+import { levelInfo, MODEL_KEYS, weightedTotal, type ModelKey } from '@token-derby/shared';
 import { HorseSprite } from './HorseSprite.js';
 import { MINI_SPRITE } from './sprite.js';
 
@@ -100,7 +100,7 @@ export function StatusScreen(props: Props) {
         <TokenBreakdown
           primaryModel={primaryModel}
           perSource={perSource}
-          raceScore={own?.current_tokens ?? 0}
+          raceScore={own?.current_tokens ?? weightedTotal(primaryModel, perSource)}
         />
       )}
 

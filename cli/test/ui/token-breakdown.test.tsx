@@ -21,4 +21,18 @@ describe('TokenBreakdown', () => {
     expect(out).toMatch(/Race score/);
     expect(out).toMatch(/439,200/);
   });
+
+  it('renders formatted per-source counts for each model', () => {
+    const { lastFrame } = render(
+      <TokenBreakdown
+        primaryModel="claude"
+        perSource={{ claude: 1_240_000, codex: 310_000, gemini: 52_000 }}
+        raceScore={1_396_200}
+      />,
+    );
+    const out = lastFrame()!;
+    expect(out).toMatch(/1,240,000/);
+    expect(out).toMatch(/310,000/);
+    expect(out).toMatch(/52,000/);
+  });
 });
