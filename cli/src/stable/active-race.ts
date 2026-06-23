@@ -1,6 +1,7 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import type { HorseColors } from '@token-derby/shared';
+import type { HorseColors, ModelKey } from '@token-derby/shared';
+import type { RaceScoreState } from '../tokens/race-score.js';
 import { activeRaceFile, activeRacesDir } from '../paths.js';
 
 export type ActiveRace = {
@@ -12,9 +13,8 @@ export type ActiveRace = {
   horse_colors: HorseColors;
   joined_at: string;
   last_heartbeat_at: string;
-  ackedReading: number;
-  lastGoodReading: number;
-  seq: number;
+  primary_model: ModelKey;
+  score: RaceScoreState;
   counts_input?: boolean;
 };
 
