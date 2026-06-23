@@ -4,7 +4,8 @@ import type { GetRaceResponse, HeartbeatResponse } from '@token-derby/shared';
 import { StatusScreen } from '../ui/StatusScreen.js';
 import { describeAchievement, type RecentEvent } from '@token-derby/shared';
 import { runHeartbeatLoop } from './heartbeat-loop.js';
-import { sumTokensForRace } from '../tokens/transcripts.js';
+import { readAllSources, type SourceReading } from '../tokens/race-tokens.js';
+import { type ModelKey } from '@token-derby/shared';
 import { RaceScoreTracker, type RaceScoreState } from '../tokens/race-score.js';
 import * as endpoints from '../api/endpoints.js';
 import { ApiError } from '../api/client.js';
@@ -32,6 +33,8 @@ export function RunRace({ active, initialState, pendingMode, ownUserName }: RunR
   const pendingRef = useRef(pendingMode);
   const ctrl = useRef(new AbortController());
   const [stalled, setStalled] = useState(false);
+  const baselineRef = useRef(initialState.acked);
+  const [perSource, setPerSource] = useState<Record<ModelKey, number>>({ claude: 0, codex: 0, gemini: 0 });
 
   // Re-render every second so the "Ns ago" counter updates.
   useEffect(() => {
@@ -50,14 +53,14 @@ export function RunRace({ active, initialState, pendingMode, ownUserName }: RunR
   useEffect(() => {
     const tracker = trackerRef.current;
 
-    const scanWithTimeout = async (): Promise<number | null> => {
+    const scanWithTimeout = async (): Promise<SourceReading | null> => {
       try {
         return await Promise.race([
-          sumTokensForRace(active),
+          readAllSources(active, active.primary_model),
           new Promise<never>((_, reject) => setTimeout(() => reject(new Error('scan timeout')), 10_000)),
         ]);
       } catch {
-        return null; // fail-loud scan OR timeout → "no reading this beat"
+        return null;
       }
     };
 
@@ -65,20 +68,27 @@ export function RunRace({ active, initialState, pendingMode, ownUserName }: RunR
       prepareBeat: async () => {
         const reading = await scanWithTimeout();
         tracker.recordReading(reading);
-        if (pendingRef.current) tracker.reprime(); // no credit while pending
+        if (pendingRef.current) tracker.reprime();
         setStalled(tracker.stalled);
+        const live = tracker.readings();
+        const base = baselineRef.current;
+        setPerSource({
+          claude: Math.max(0, live.claude - base.claude),
+          codex: Math.max(0, live.codex - base.codex),
+          gemini: Math.max(0, live.gemini - base.gemini),
+        });
         return tracker.nextBeat();
       },
       sendBeat: async (snapshot) => {
         return endpoints.heartbeat(active.join_code, active.horse_id, active.heartbeat_token, {
-          seq: snapshot.seq, delta: snapshot.delta,
+          seq: snapshot.seq, components: snapshot.components,
         });
       },
       onSuccess: (resp, snapshot) => {
         tracker.ack(snapshot, resp.last_seq);
         const updated: ActiveRace = {
           ...active,
-          ...tracker.toState(),
+          score: tracker.toState(),
           last_heartbeat_at: new Date().toISOString(),
         };
         void saveActiveRace(updated);
@@ -138,6 +148,8 @@ export function RunRace({ active, initialState, pendingMode, ownUserName }: RunR
         lastHeartbeatAgoSec={lastHeartbeatAgoSec}
         lastHeartbeatOk={lastHbOk}
         stalled={stalled}
+        primaryModel={active.primary_model}
+        perSource={perSource}
       />
       {achievements.length > 0 && (
         <Box flexDirection="column" marginTop={1}>
@@ -182,10 +194,12 @@ export async function buildInitialState(args: {
   raceStatus: 'pending' | 'live';
   serverLastSeq: number;
 }): Promise<{ initialState: RaceScoreState; pendingMode: boolean }> {
-  let diskNow = 0;
-  try { diskNow = await sumTokensForRace(args.active); } catch { diskNow = 0; }
+  let now: SourceReading = { claude: 0, codex: 0, gemini: 0 };
+  try {
+    now = (await readAllSources(args.active, args.active.primary_model)) ?? now;
+  } catch { /* leave zeros */ }
   return {
-    initialState: { ackedReading: diskNow, lastGoodReading: diskNow, seq: args.serverLastSeq },
+    initialState: { acked: now, lastGood: now, seq: args.serverLastSeq },
     pendingMode: args.raceStatus === 'pending',
   };
 }

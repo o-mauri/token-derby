@@ -7,6 +7,7 @@ import { appendSeriesPoint } from '../db/series.js';
 import { evaluateAchievements } from '../lib/evaluate-achievements.js';
 import { computeStatus, timeLeftSeconds } from '../lib/status.js';
 import { clampDelta } from '../lib/rate-cap.js';
+import { resolveHeartbeatDelta } from '../lib/weighting.js';
 import { rankHorses } from '../lib/rank-horses.js';
 import { finaliseRace } from '../lib/finalise-race.js';
 import { ok, err, parseJson } from '../lib/http.js';
@@ -27,12 +28,8 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
   if (!token) return err('INVALID_TOKEN', 'Authorization: Bearer required');
 
   const body = parseJson<HeartbeatRequest>(event.body);
-  if (
-    !body ||
-    typeof body.seq !== 'number' || !Number.isFinite(body.seq) || body.seq < 1 ||
-    typeof body.delta !== 'number' || !Number.isFinite(body.delta) || body.delta < 0
-  ) {
-    return err('BAD_REQUEST', 'seq (>=1) and delta (>=0) required');
+  if (!body || typeof body.seq !== 'number' || !Number.isFinite(body.seq) || body.seq < 1) {
+    return err('BAD_REQUEST', 'seq (>=1) required');
   }
 
   let race = await getRaceByJoinCode(join_code);
@@ -52,6 +49,12 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
   const horse = await getHorseForHeartbeat(race.race_id, horse_id, token);
   if (!horse) return err('INVALID_TOKEN', 'heartbeat token does not match');
 
+  const primary = horse.primary_model ?? 'claude';
+  const rawDelta = resolveHeartbeatDelta(body, primary);
+  if (rawDelta === null) {
+    return err('BAD_REQUEST', 'components or delta (>=0) required');
+  }
+
   const now = new Date();
   const race_status = computeStatus(race, now);
 
@@ -67,7 +70,7 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
       const prevMs = Date.parse(horse.last_heartbeat);
       return Number.isFinite(prevMs) ? now.getTime() - prevMs : 0;
     })();
-    const applied = clampDelta({ delta: body.delta, elapsedMs, counts_input: race.counts_input });
+    const applied = clampDelta({ delta: rawDelta, elapsedMs, counts_input: race.counts_input });
     const newTokens = prevTokens + applied;
 
     const allHorsesBefore = await listHorses(race.race_id);

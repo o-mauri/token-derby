@@ -8,6 +8,7 @@ import { listHorses } from '../../src/db/horses.js';
 import { setRaceEnded } from '../../src/db/races.js';
 import { equipHat as dbEquipHat, applyRollResult } from '../../src/db/stable.js';
 import { makeUser, makeHorse, type TestUser } from '../helpers/auth-helper.js';
+import { CURRENT_CLI_VERSION } from '../helpers/cli-version.js';
 
 const COLORS = { body: '#8B4513', mane: '#000', tail: '#000', saddle: '#C0392B' };
 
@@ -17,7 +18,7 @@ function authedEvent(
   path: string,
   body?: unknown,
   pathParameters?: Record<string, string>,
-  cliVersion: string | null = '2.6.0',
+  cliVersion: string | null = CURRENT_CLI_VERSION,
 ): APIGatewayProxyEventV2 {
   const headers: Record<string, string> = {};
   if (cliVersion) headers['x-cli-version'] = cliVersion;
@@ -39,7 +40,7 @@ function authedEvent(
   };
 }
 
-async function createTestRace(creator: TestUser, overrides: Record<string, any> = {}, cliVersion = '2.6.0') {
+async function createTestRace(creator: TestUser, overrides: Record<string, any> = {}, cliVersion = CURRENT_CLI_VERSION) {
   const res: any = await createHandler(authedEvent(creator, 'POST', '/races', {
     name: 'Join Test',
     start_time: new Date(Date.now() - 60_000).toISOString(),
@@ -51,7 +52,7 @@ async function createTestRace(creator: TestUser, overrides: Record<string, any> 
   return JSON.parse(res.body);
 }
 
-function joinEvent(joinCode: string, user: TestUser | null, body: unknown, cliVersion: string | null = '2.6.0') {
+function joinEvent(joinCode: string, user: TestUser | null, body: unknown, cliVersion: string | null = CURRENT_CLI_VERSION) {
   return authedEvent(user, 'POST', `/races/${joinCode}/join`, body, { join_code: joinCode }, cliVersion);
 }
 
@@ -255,5 +256,57 @@ describe('joinRace handler', () => {
     const horses = await listHorses(race_id);
     expect(horses).toHaveLength(1);
     expect(horses[0]?.equipped_hat).toBeUndefined();
+  });
+
+  // --- multi-model primary lock ---
+  it('rejects an invalid primary_model', async () => {
+    const creator = await makeUser('PM_Reject_C');
+    const joiner = await makeUser('PM_Reject_J');
+    const horse = await makeHorse(joiner, 'Bolt', COLORS);
+    const { join_code } = await createTestRace(creator);
+    const res: any = await joinHandler(joinEvent(join_code, joiner, { stable_horse_id: horse.stable_horse_id, primary_model: 'gpt' }));
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('stores the chosen primary on a fresh join and returns it', async () => {
+    const creator = await makeUser('PM_Fresh_C');
+    const joiner = await makeUser('PM_Fresh_J');
+    const horse = await makeHorse(joiner, 'Bolt', COLORS);
+    const { join_code, race_id } = await createTestRace(creator);
+    const res: any = await joinHandler(joinEvent(join_code, joiner, { stable_horse_id: horse.stable_horse_id, primary_model: 'codex' }));
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body).primary_model).toBe('codex');
+    // verify persistence: the race-horse stored in DB has primary_model 'codex'
+    const horses = await listHorses(race_id);
+    expect(horses[0]?.primary_model).toBe('codex');
+  });
+
+  it('defaults to claude when primary_model is omitted', async () => {
+    const creator = await makeUser('PM_Default_C');
+    const joiner = await makeUser('PM_Default_J');
+    const horse = await makeHorse(joiner, 'Bolt', COLORS);
+    const { join_code } = await createTestRace(creator);
+    const res: any = await joinHandler(joinEvent(join_code, joiner, { stable_horse_id: horse.stable_horse_id }));
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body).primary_model).toBe('claude');
+  });
+
+  it('ignores a new primary_model on resume and returns the locked value', async () => {
+    const creator = await makeUser('PM_Resume_C');
+    const joiner = await makeUser('PM_Resume_J');
+    const horse = await makeHorse(joiner, 'Bolt', COLORS);
+    const { join_code, race_id } = await createTestRace(creator);
+    // Initial join with gemini
+    const first: any = await joinHandler(joinEvent(join_code, joiner, { stable_horse_id: horse.stable_horse_id, primary_model: 'gemini' }));
+    expect(first.statusCode).toBe(200);
+    expect(JSON.parse(first.body).primary_model).toBe('gemini');
+    // Resume with codex — should be ignored, locked value 'gemini' returned
+    const second: any = await joinHandler(joinEvent(join_code, joiner, { stable_horse_id: horse.stable_horse_id, primary_model: 'codex' }));
+    expect(second.statusCode).toBe(200);
+    expect(JSON.parse(second.body).primary_model).toBe('gemini'); // locked, not 'codex'
+    // Still only one horse in the race
+    const horses = await listHorses(race_id);
+    expect(horses).toHaveLength(1);
+    expect(horses[0]?.primary_model).toBe('gemini');
   });
 });

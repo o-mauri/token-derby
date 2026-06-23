@@ -1,4 +1,4 @@
-import type { CollectedHat, HatId, HorseColors, HorseView, Race, RaceStatus, RaceSummary, RaceView, OrganisationSummary, StableHorse, RaceSchedule } from './types.js';
+import type { CollectedHat, HatId, HorseColors, HorseView, Race, RaceStatus, RaceSummary, RaceView, OrganisationSummary, StableHorse, RaceSchedule, ModelKey } from './types.js';
 
 export type CreateRaceRequest = {
   name: string;
@@ -20,16 +20,19 @@ export type GetRaceResponse = RaceView;
 
 export type JoinRaceRequest = {
   stable_horse_id: string;
+  primary_model?: ModelKey;   // omitted ⇒ server locks 'claude'
 };
 
 export type JoinRaceResponse = {
   horse_id: string;
   heartbeat_token: string;
+  primary_model: ModelKey;    // the locked value (fresh join or resume)
 };
 
 export type HeartbeatRequest = {
   seq: number;
-  delta: number;
+  components?: Record<ModelKey, number>;  // per-source deltas (each ≥ 0)
+  delta?: number;                         // legacy single delta (pre-multi-model CLIs)
 };
 
 export type HeartbeatResponse = {

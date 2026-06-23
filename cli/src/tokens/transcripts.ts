@@ -43,14 +43,6 @@ export async function sumTokens(): Promise<TokenTotals> {
   return { input, output };
 }
 
-// Total tokens for a race in the race's chosen mode. When race.counts_input
-// is true, the race counts fresh-input + cache-creation + output; otherwise
-// it counts output only. cache_read is never included.
-export async function sumTokensForRace(race: { counts_input?: boolean }): Promise<number> {
-  const { input, output } = await sumTokens();
-  return race.counts_input ? input + output : output;
-}
-
 async function listJsonlFiles(root: string): Promise<string[]> {
   const projects = await fs.readdir(root); // throws (e.g. ENOENT) — caller treats as "no reading"
   const out: string[] = [];

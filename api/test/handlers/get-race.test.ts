@@ -5,6 +5,7 @@ import { handler as joinHandler } from '../../src/handlers/join-race.js';
 import { handler as hbHandler } from '../../src/handlers/heartbeat.js';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { makeUser, makeHorse, type TestUser } from '../helpers/auth-helper.js';
+import { CURRENT_CLI_VERSION } from '../helpers/cli-version.js';
 
 const COLORS = { body: '#fff', mane: '#000', tail: '#000', saddle: '#f00' };
 
@@ -17,7 +18,7 @@ function evt(
   bearer?: string,
 ): APIGatewayProxyEventV2 {
   const headers: Record<string, string> = {
-    'x-cli-version': '2.6.0',
+    'x-cli-version': CURRENT_CLI_VERSION,
   };
   if (user) {
     headers['x-user-id'] = user.user_id;

@@ -4,12 +4,13 @@ import { handler as createOrgHandler } from '../../src/handlers/create-organisat
 import { handler } from '../../src/handlers/set-org-webhook.js';
 import { getOrganisationByName } from '../../src/db/organisations.js';
 import { makeUser, type TestUser } from '../helpers/auth-helper.js';
+import { CURRENT_CLI_VERSION } from '../helpers/cli-version.js';
 
 function event(
   orgName: string,
   body: unknown,
   user: TestUser | null,
-  cliVersion: string | null = '2.6.0',
+  cliVersion: string | null = CURRENT_CLI_VERSION,
 ): APIGatewayProxyEventV2 {
   const headers: Record<string, string> = { 'content-type': 'application/json' };
   if (cliVersion) headers['x-cli-version'] = cliVersion;
@@ -38,7 +39,7 @@ async function createOrg(user: TestUser, name: string): Promise<string> {
     rawQueryString: '',
     headers: {
       'content-type': 'application/json',
-      'x-cli-version': '2.6.0',
+      'x-cli-version': CURRENT_CLI_VERSION,
       'x-user-id': user.user_id,
       'x-user-token': user.secret_token,
     },

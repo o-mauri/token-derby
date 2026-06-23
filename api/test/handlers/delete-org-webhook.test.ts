@@ -5,9 +5,10 @@ import { handler as setHandler } from '../../src/handlers/set-org-webhook.js';
 import { handler } from '../../src/handlers/delete-org-webhook.js';
 import { getOrganisationByName } from '../../src/db/organisations.js';
 import { makeUser, type TestUser } from '../helpers/auth-helper.js';
+import { CURRENT_CLI_VERSION } from '../helpers/cli-version.js';
 
 function event(orgName: string, user: TestUser | null): APIGatewayProxyEventV2 {
-  const headers: Record<string, string> = { 'x-cli-version': '2.6.0' };
+  const headers: Record<string, string> = { 'x-cli-version': CURRENT_CLI_VERSION };
   if (user) {
     headers['x-user-id'] = user.user_id;
     headers['x-user-token'] = user.secret_token;
@@ -32,7 +33,7 @@ async function createOrg(user: TestUser, name: string): Promise<void> {
     rawQueryString: '',
     headers: {
       'content-type': 'application/json',
-      'x-cli-version': '2.6.0',
+      'x-cli-version': CURRENT_CLI_VERSION,
       'x-user-id': user.user_id,
       'x-user-token': user.secret_token,
     },
@@ -51,7 +52,7 @@ async function setWebhook(user: TestUser, orgName: string, url: string): Promise
     rawQueryString: '',
     headers: {
       'content-type': 'application/json',
-      'x-cli-version': '2.6.0',
+      'x-cli-version': CURRENT_CLI_VERSION,
       'x-user-id': user.user_id,
       'x-user-token': user.secret_token,
     },

@@ -3,6 +3,7 @@ import { handler as equipHandler } from '../../src/handlers/equip-hat.js';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { makeUser, makeHorse, type TestUser } from '../helpers/auth-helper.js';
 import { getStableHorse, applyRollResult } from '../../src/db/stable.js';
+import { CURRENT_CLI_VERSION } from '../helpers/cli-version.js';
 
 function equipEvent(user: TestUser, stable_horse_id: string, body: unknown): APIGatewayProxyEventV2 {
   return {
@@ -13,7 +14,7 @@ function equipEvent(user: TestUser, stable_horse_id: string, body: unknown): API
     pathParameters: { stable_horse_id },
     headers: {
       'content-type': 'application/json',
-      'x-cli-version': '2.6.0',
+      'x-cli-version': CURRENT_CLI_VERSION,
       'x-user-id': user.user_id,
       'x-user-token': user.secret_token,
     },

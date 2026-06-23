@@ -6,13 +6,14 @@ import { putSchedule } from '../../src/db/schedules.js';
 import { listRacesByOrgId } from '../../src/db/races.js';
 import { makeUser, type TestUser } from '../helpers/auth-helper.js';
 import type { RaceSchedule } from '@token-derby/shared';
+import { CURRENT_CLI_VERSION } from '../helpers/cli-version.js';
 
 const runTick = () => (tick as unknown as () => Promise<void>)();
 
 async function createOrg(user: TestUser, name: string): Promise<string> {
   const ev: APIGatewayProxyEventV2 = {
     version: '2.0', routeKey: 'POST /organisations', rawPath: '/organisations', rawQueryString: '',
-    headers: { 'content-type': 'application/json', 'x-cli-version': '2.6.0', 'x-user-id': user.user_id, 'x-user-token': user.secret_token },
+    headers: { 'content-type': 'application/json', 'x-cli-version': CURRENT_CLI_VERSION, 'x-user-id': user.user_id, 'x-user-token': user.secret_token },
     requestContext: {} as any, body: JSON.stringify({ name }), isBase64Encoded: false,
   };
   const res: any = await createOrgHandler(ev);
