@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { sumCodexTokens } from '../../src/tokens/codex.js';
+import { sumCodexTokens, sumCodexByConversation } from '../../src/tokens/codex.js';
 
 const dirs: string[] = [];
 async function tmpCodex(): Promise<string> {
@@ -77,5 +77,34 @@ describe('sumCodexTokens', () => {
     const root = await tmpCodex();
     await writeRollout(root, 'sessions/2026/06/23/rollout-c.jsonl', [tokenCountEvent(50, 80, 12)]);
     expect(await sumCodexTokens()).toEqual({ input: 0, output: 12 });
+  });
+});
+
+describe('sumCodexByConversation', () => {
+  it('keys each rollout file as its own conversation (last token_count per file)', async () => {
+    const root = await tmpCodex();
+    await writeRollout(root, 'sessions/2026/06/23/rollout-a.jsonl', [tokenCountEvent(100, 40, 30), tokenCountEvent(500, 200, 150)]);
+    await writeRollout(root, 'archived_sessions/2026/06/22/rollout-b.jsonl', [tokenCountEvent(200, 50, 20)]);
+    const map = await sumCodexByConversation();
+    expect(map.size).toBe(2);
+    const vals = [...map.values()];
+    // a: input 500-200=300 out 150 ; b: input 200-50=150 out 20
+    expect(vals).toEqual(expect.arrayContaining([{ input: 300, output: 150 }, { input: 150, output: 20 }]));
+  });
+
+  it('sumCodexTokens equals the sum of the by-conversation map', async () => {
+    const root = await tmpCodex();
+    await writeRollout(root, 'sessions/2026/06/23/rollout-a.jsonl', [tokenCountEvent(300, 100, 80)]);
+    await writeRollout(root, 'sessions/2026/06/23/rollout-b.jsonl', [tokenCountEvent(10, 0, 5)]);
+    const total = await sumCodexTokens();
+    const map = await sumCodexByConversation();
+    let input = 0, output = 0;
+    for (const t of map.values()) { input += t.input; output += t.output; }
+    expect({ input, output }).toEqual(total);
+  });
+
+  it('throws when the codex dir does not exist (fail-loud)', async () => {
+    process.env.TOKEN_DERBY_CODEX_DIR = path.join(os.tmpdir(), 'td-cdx-missing-' + Math.random());
+    await expect(sumCodexByConversation()).rejects.toThrow();
   });
 });

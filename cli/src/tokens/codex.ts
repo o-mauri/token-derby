@@ -16,20 +16,25 @@ function num(v: unknown): number {
   return typeof v === 'number' && Number.isFinite(v) ? v : 0;
 }
 
-export async function sumCodexTokens(): Promise<TokenTotals> {
+export async function sumCodexByConversation(): Promise<Map<string, TokenTotals>> {
   const root = codexSessionsDir();
   await fs.stat(root); // throws ENOENT if the Codex home is absent → fail-loud (matches Claude/Gemini)
   const files = [
     ...(await collectRollouts(path.join(root, 'sessions'))),
     ...(await collectRollouts(path.join(root, 'archived_sessions'))),
   ];
+  const byConv = new Map<string, TokenTotals>();
+  for (const file of files) {
+    byConv.set(file, await lastTokenCount(file)); // one rollout file = one conversation
+  }
+  return byConv;
+}
+
+export async function sumCodexTokens(): Promise<TokenTotals> {
+  const byConv = await sumCodexByConversation();
   let input = 0;
   let output = 0;
-  for (const file of files) {
-    const t = await lastTokenCount(file);
-    input += t.input;
-    output += t.output;
-  }
+  for (const t of byConv.values()) { input += t.input; output += t.output; }
   return { input, output };
 }
 
