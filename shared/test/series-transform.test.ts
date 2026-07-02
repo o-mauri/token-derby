@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resampleToTicks } from '../src/series-transform.js';
+import { resampleToTicks, trailingPace, PACE_WINDOW_MS } from '../src/series-transform.js';
 
 const MIN = 60_000;
 
@@ -42,5 +42,42 @@ describe('resampleToTicks', () => {
     // 2-minute ticks: 200 tokens in the first tick => 100 tokens/min.
     const out = resampleToTicks([{ t: 30_000, d: 200 }], 0, 2 * MIN, 2 * MIN);
     expect(out[1]).toEqual({ t: 2 * MIN, total: 200, perMin: 100 });
+  });
+});
+
+describe('trailingPace', () => {
+  const now = 100 * MIN;
+
+  it('sums deltas within the window and divides by its minutes', () => {
+    // 15-min window ending at `now`: 3000 tokens over the window => 200/min.
+    const pts = [{ t: now - 10 * MIN, d: 1500 }, { t: now - 2 * MIN, d: 1500 }];
+    expect(trailingPace(pts, now, PACE_WINDOW_MS)).toBe(200);
+  });
+
+  it('ignores points older than the window', () => {
+    const pts = [
+      { t: now - 20 * MIN, d: 9000 }, // outside the 15-min window → ignored
+      { t: now - 5 * MIN, d: 1500 },
+    ];
+    expect(trailingPace(pts, now, PACE_WINDOW_MS)).toBe(100); // 1500 / 15
+  });
+
+  it('includes a point exactly on the window boundary', () => {
+    const pts = [{ t: now - PACE_WINDOW_MS, d: 1500 }];
+    expect(trailingPace(pts, now, PACE_WINDOW_MS)).toBe(100);
+  });
+
+  it('returns 0 when there are no points in the window', () => {
+    expect(trailingPace([], now, PACE_WINDOW_MS)).toBe(0);
+    expect(trailingPace([{ t: now - 30 * MIN, d: 500 }], now, PACE_WINDOW_MS)).toBe(0);
+  });
+
+  it('divides by the clamped window early in a race (not the full 15 min)', () => {
+    // Race only 3 minutes old: caller passes a 3-min window, so 600 tokens => 200/min.
+    expect(trailingPace([{ t: now - 1 * MIN, d: 600 }], now, 3 * MIN)).toBe(200);
+  });
+
+  it('returns null when the window is under a minute (too little race to measure)', () => {
+    expect(trailingPace([{ t: now, d: 50 }], now, 30_000)).toBeNull();
   });
 });

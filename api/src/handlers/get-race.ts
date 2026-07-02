@@ -1,11 +1,16 @@
 import type { APIGatewayProxyHandlerV2 } from 'aws-lambda';
 import type { GetRaceResponse, Horse, RaceStatus } from '@token-derby/shared';
+import { PACE_WINDOW_MS, trailingPace } from '@token-derby/shared';
 import { getRaceByJoinCode } from '../db/races.js';
 import { listHorses } from '../db/horses.js';
+import { listRecentSeriesPoints } from '../db/series.js';
 import { computeStatus, timeLeftSeconds } from '../lib/status.js';
 import { finaliseRace } from '../lib/finalise-race.js';
 import { rankHorses } from '../lib/rank-horses.js';
 import { ok, err } from '../lib/http.js';
+
+// Last ~30 points comfortably cover the 15-min window (heartbeats are ≤1/min).
+const RECENT_POINTS_LIMIT = 30;
 
 export const handler: APIGatewayProxyHandlerV2 = async (event) => {
   const join_code = event.pathParameters?.join_code;
@@ -26,6 +31,20 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
     horses = await listHorses(race.race_id);
   }
 
+  const ranked = rankHorses(horses);
+
+  // Trailing 15-min pace, computed from the series points. Live races only —
+  // meaningless before a race starts or after it ends. The window is clamped to
+  // the race's age so a young race isn't deflated over a full 15 minutes.
+  if (status === 'live') {
+    const windowMs = Math.min(PACE_WINDOW_MS, now.getTime() - new Date(race.start_time).getTime());
+    await Promise.all(ranked.map(async (h) => {
+      const points = await listRecentSeriesPoints(race.race_id, h.horse_id, RECENT_POINTS_LIMIT);
+      const pace = trailingPace(points, now.getTime(), windowMs);
+      if (pace !== null) h.pace_15m = pace;
+    }));
+  }
+
   const response: GetRaceResponse = {
     race_id: race.race_id,
     name: race.name,
@@ -37,7 +56,7 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
     created_at: race.created_at,
     ended_at: race.ended_at,
     status,
-    horses: rankHorses(horses),
+    horses: ranked,
     server_time: now.toISOString(),
     time_left_seconds: timeLeftSeconds(race, now),
     ...(race.org_id ? { org_id: race.org_id } : {}),

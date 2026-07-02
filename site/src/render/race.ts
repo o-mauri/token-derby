@@ -5,17 +5,15 @@ import { reconcileHorses } from './reconcile.js';
 import { updatePendingBanner, removePendingBanner } from './pending.js';
 import { renderFinishedOverlay } from './finished.js';
 import { formatDuration, predictTimeLeftSeconds, type CountdownAnchor } from '../time.js';
-import { appendSample, trimWindow, computePace, type Sample } from './pace.js';
 import { startAutoScroll } from './autoscroll.js';
 import { horseFaceSvg } from '../horse-face.js';
 import { createTicker, collectFreshItems } from './ticker.js';
-import { applyInitialTvMode, isTvMode, setTvMode } from './tv-mode.js';
 
 const POLL_INTERVAL_MS = 60_000;
 const TIMER_TICK_MS = 1_000;
 
 export function renderRace(root: HTMLElement, joinCode: string): () => void {
-  applyInitialTvMode();
+  root.ownerDocument.body.classList.add('tv'); // TV is the only mode
   root.innerHTML = '';
 
   const frame = root.ownerDocument.createElement('section');
@@ -27,7 +25,6 @@ export function renderRace(root: HTMLElement, joinCode: string): () => void {
         <span>Status: <b class="race-status">—</b></span>
         <span>Time left: <b class="race-time-left">—</b></span>
         <span>Join code: <b>${joinCode}</b></span>
-        <button type="button" class="btn tv-toggle" aria-pressed="false" title="Toggle TV mode">TV: OFF</button>
         <button type="button" class="btn home-btn">← Home</button>
       </div>
     </header>
@@ -54,22 +51,10 @@ export function renderRace(root: HTMLElement, joinCode: string): () => void {
     window.dispatchEvent(new PopStateEvent('popstate'));
   });
 
-  const tvBtn = frame.querySelector<HTMLButtonElement>('.tv-toggle')!;
-  const refreshTvBtn = () => {
-    const on = isTvMode();
-    tvBtn.textContent = `TV: ${on ? 'ON' : 'OFF'}`;
-    tvBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
-  };
-  refreshTvBtn();
-  tvBtn.addEventListener('click', () => {
-    setTvMode(!isTvMode());
-    refreshTvBtn();
-  });
 
   const ctrl = new AbortController();
   let finishedTeardown: (() => void) | null = null;
   ctrl.signal.addEventListener('abort', () => ticker.destroy(), { once: true });
-  const buffers = new Map<string, Sample[]>();
   startAutoScroll({ signal: ctrl.signal, target: track });
 
   const crowd = frame.querySelector<HTMLElement>('.crowd');
@@ -103,23 +88,11 @@ export function renderRace(root: HTMLElement, joinCode: string): () => void {
     countdownAnchor = { atMs: nowMs, timeLeftSeconds: race.time_left_seconds };
     timeLeftEl.textContent = formatDuration(race.time_left_seconds);
 
+    // Pace is computed server-side (trailing 15-min, from the series points) and
+    // arrives on each horse; undefined for pending/finished → renders as '—'.
     const paceByHorseId = new Map<string, number | null>();
-    if (race.status !== 'finished') {
-      const seen = new Set<string>();
-      for (const horse of race.horses) {
-        seen.add(horse.horse_id);
-        const prev = buffers.get(horse.horse_id) ?? [];
-        const next = trimWindow(appendSample(prev, nowMs, horse.current_tokens), nowMs);
-        buffers.set(horse.horse_id, next);
-        paceByHorseId.set(horse.horse_id, computePace(next));
-      }
-      for (const id of Array.from(buffers.keys())) {
-        if (!seen.has(id)) buffers.delete(id);
-      }
-    } else {
-      for (const horse of race.horses) {
-        paceByHorseId.set(horse.horse_id, computePace(buffers.get(horse.horse_id) ?? []));
-      }
+    for (const horse of race.horses) {
+      paceByHorseId.set(horse.horse_id, horse.pace_15m ?? null);
     }
 
     reconcileHorses(track, race, now, paceByHorseId);

@@ -7,6 +7,27 @@ export type TickPoint = {
 };
 
 export const TICK_MS = 60_000; // 1 minute
+export const PACE_WINDOW_MS = 15 * 60_000; // trailing pace window: 15 minutes
+
+/**
+ * Instantaneous token pace (tokens/min) over the trailing `windowMs`, computed
+ * from raw series points. Sums the deltas whose timestamp is within the window
+ * and divides by the window's minutes. Callers should clamp `windowMs` to the
+ * race's age (`min(PACE_WINDOW_MS, now - raceStart)`) so a young race isn't
+ * deflated by dividing partial output over the full 15 minutes. Returns null
+ * when the window is under a minute — too little elapsed race to measure.
+ */
+export function trailingPace(
+  points: readonly SeriesPoint[],
+  nowMs: number,
+  windowMs: number = PACE_WINDOW_MS,
+): number | null {
+  if (windowMs < 60_000) return null;
+  const cutoff = nowMs - windowMs;
+  let sum = 0;
+  for (const p of points) if (p.t >= cutoff) sum += p.d;
+  return Math.round(sum / (windowMs / 60_000));
+}
 
 /**
  * Resample a horse's raw, irregularly-spaced token points onto a uniform tick

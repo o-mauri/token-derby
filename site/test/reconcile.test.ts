@@ -164,6 +164,22 @@ describe('reconcileHorses', () => {
     expect(track.querySelector('.horse-pace')?.textContent).toBe('+1,234/min');
   });
 
+  it('shows tokens in a permanent row under the name, not in the rotator', () => {
+    const r = race({ horses: [horse('a', 12_847, 'Alpha', '2026-04-22T09:00:00Z')] });
+    reconcileHorses(track, r, new Date('2026-04-22T13:00:00Z'));
+
+    // Tokens is no longer one of the cycling stat views…
+    expect(track.querySelector('.horse-stats-row .horse-tokens')).toBeNull();
+    // …it lives in its own always-visible row, directly under the name row.
+    const tokensRow = track.querySelector<HTMLElement>('.horse-tokens-row');
+    expect(tokensRow).toBeTruthy();
+    expect(tokensRow!.querySelector('.horse-tokens')?.textContent).toBe('12,847 tok');
+    expect(tokensRow!.previousElementSibling?.classList.contains('horse-name-row')).toBe(true);
+
+    // The rotator now cycles the remaining four views: owner, level, pace, position.
+    expect(track.querySelectorAll('.horse-stats-row .stat-view')).toHaveLength(4);
+  });
+
   it('does not add a .crashed CSS class even when heartbeats are stale', () => {
     const r = race({ horses: [
       horse('a', 500, 'Alpha', '2026-04-22T09:00:00Z', { last_heartbeat: '2026-04-22T08:00:00Z' }),

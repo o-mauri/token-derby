@@ -146,6 +146,37 @@ describe('getRace handler', () => {
     expect(JSON.parse(getRes.body).primary_top5).toBe(true);
   });
 
+  it('exposes a trailing pace_15m for a live horse with recent tokens', async () => {
+    const creator = await makeUser('GR_PaceCreator');
+    // Start 5 min ago so the pace window is comfortably over the 1-min floor.
+    const { join_code } = await setupRace(creator, {
+      start_time: new Date(Date.now() - 5 * 60_000).toISOString(),
+    });
+    const userA = await makeUser('GR_PaceA');
+    const a = await joinH(join_code, userA, 'PaceAlpha');
+    await hb(join_code, a.horse_id, a.heartbeat_token, 600);
+
+    const res: any = await getRaceHandler(evt(null, `/races/${join_code}`, 'GET /races/{join_code}', { join_code }));
+    const body = JSON.parse(res.body);
+    const horse = body.horses.find((h: any) => h.name === 'PaceAlpha');
+    expect(typeof horse.pace_15m).toBe('number');
+    expect(horse.pace_15m).toBeGreaterThan(0); // 600 tokens over a ~5-min window
+  });
+
+  it('omits pace_15m for a pending race', async () => {
+    const creator = await makeUser('GR_PacePending');
+    const { join_code } = await setupRace(creator, {
+      start_time: new Date(Date.now() + 60_000).toISOString(),
+    });
+    const userA = await makeUser('GR_PacePendA');
+    const a = await joinH(join_code, userA, 'PendPace');
+    await hb(join_code, a.horse_id, a.heartbeat_token, 0);
+
+    const res: any = await getRaceHandler(evt(null, `/races/${join_code}`, 'GET /races/{join_code}', { join_code }));
+    const body = JSON.parse(res.body);
+    expect(body.horses[0].pace_15m).toBeUndefined();
+  });
+
   it('returns pending status when race start_time is in the future', async () => {
     const creator = await makeUser('GR_Creator4');
     const { join_code } = await setupRace(creator, {

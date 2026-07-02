@@ -76,7 +76,18 @@ function createLane(doc: Document, horse: HorseView): HTMLElement {
   nameRow.appendChild(nameScroll);
   box.appendChild(nameRow);
 
-  // ── Row 2: rotator that flips between owner+level / tokens / pace / position ──
+  // ── Row 2: total tokens, always visible (pulled out of the rotation) ──
+  const tokensRow = doc.createElement('div');
+  tokensRow.className = 'horse-tokens-row';
+  const tokensScroll = doc.createElement('div');
+  tokensScroll.className = 'row-scroll';
+  const tokens = doc.createElement('span');
+  tokens.className = 'horse-tokens';
+  tokensScroll.appendChild(tokens);
+  tokensRow.appendChild(tokensScroll);
+  box.appendChild(tokensRow);
+
+  // ── Row 3: rotator that flips between owner / level / pace / position ──
   const statsRow = doc.createElement('div');
   statsRow.className = 'horse-stats-row';
   const makeView = (): HTMLElement => {
@@ -104,17 +115,12 @@ function createLane(doc: Document, horse: HorseView): HTMLElement {
   levelChip.textContent = `Lvl. ${levelFromXp(horse.xp + (horse.live_xp ?? 0))}`;
   makeView().appendChild(levelChip);
 
-  // View 3 — current tokens
-  const tokens = doc.createElement('span');
-  tokens.className = 'horse-tokens';
-  makeView().appendChild(tokens);
-
-  // View 4 — token pace
+  // View 3 — token pace
   const pace = doc.createElement('span');
   pace.className = 'horse-pace';
   makeView().appendChild(pace);
 
-  // View 5 — current race position
+  // View 4 — current race position
   const position = doc.createElement('span');
   position.className = 'horse-position';
   makeView().appendChild(position);

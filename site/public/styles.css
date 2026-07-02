@@ -357,18 +357,26 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: 0;
-  padding: 2px 6px;
+  padding: 1px 6px;
   background: #1d1d24;          /* slightly lifted off the page's pure black */
   border: 1px solid var(--border);
   border-radius: 4px;
   overflow: hidden;
-  line-height: 1.1;
+  line-height: 1.0;
   letter-spacing: 0.02em;
 }
 /* Each row clips; .row-scroll marquees its content when it overflows. */
 .horse-name-row {
   overflow: hidden;
   white-space: nowrap;
+}
+/* Total tokens: permanent (no longer part of the rotator), sits under the name.
+   Negative margins pull the lower two rows up so the three rows sit tight
+   (the pixel glyphs don't fill their line box, so a small overlap never clips). */
+.horse-tokens-row {
+  overflow: hidden;
+  white-space: nowrap;
+  margin-top: -2px;
 }
 .row-scroll {
   display: inline-flex;
@@ -389,22 +397,22 @@ html, body {
   display: grid;
   align-items: center;
   overflow: hidden;
+  margin-top: -2px;
 }
 .stat-view {
   grid-area: 1 / 1;
   min-width: 0;
   overflow: hidden;
   white-space: nowrap;
-  animation: stat-cycle 15s ease-in-out infinite;
+  animation: stat-cycle 12s ease-in-out infinite;
 }
-.stat-view:nth-child(2) { animation-delay: -12s; }  /* level    — 2nd */
-.stat-view:nth-child(3) { animation-delay: -9s; }   /* tokens   — 3rd */
-.stat-view:nth-child(4) { animation-delay: -6s; }   /* pace     — 4th */
-.stat-view:nth-child(5) { animation-delay: -3s; }   /* position — 5th */
+.stat-view:nth-child(2) { animation-delay: -9s; }   /* level    — 2nd */
+.stat-view:nth-child(3) { animation-delay: -6s; }   /* pace     — 3rd */
+.stat-view:nth-child(4) { animation-delay: -3s; }   /* position — 4th */
 @keyframes stat-cycle {
   0%   { opacity: 1; }
-  16%  { opacity: 1; }
-  20%  { opacity: 0; }
+  21%  { opacity: 1; }
+  25%  { opacity: 0; }
   96%  { opacity: 0; }
   100% { opacity: 1; }
 }
@@ -500,40 +508,41 @@ html, body {
 .horse-label {
   color: var(--text);
   font-family: "Bitcount Prop Single", var(--pixel-font);
-  font-size: 0.56rem;
+  font-size: 0.53rem;
   font-weight: 600;
 }
 .horse-level {
   display: inline-block;
   margin-left: 0;
-  padding: 0 6px;
+  padding: 0 4px;
   font-family: "Barlow Semi Condensed", var(--pixel-font);
   font-weight: 600;
-  font-size: 0.5rem;
+  font-size: 0.32rem;
   text-transform: uppercase;
   color: #fff;
   background: #2563eb;
   border-radius: 999px;
   letter-spacing: 0.02em;
-  line-height: 1.45;
+  line-height: 1.4;
 }
 .user-label {
   color: var(--text);
   opacity: 0.6;
-  font-size: 0.55rem;
+  font-size: 0.52rem;
 }
 .horse-tokens {
-  color: var(--text);
-  font-size: 0.55rem;
-  opacity: 0.85;
+  color: #fbbf24;              /* amber — reads as coins, distinct from the cream name/grey pace */
+  font-size: 0.53rem;
+  font-weight: 600;
+  opacity: 1;
 }
 .horse-pace {
   color: var(--accent);
-  font-size: 0.55rem;
+  font-size: 0.52rem;
   font-weight: bold;
 }
 .horse-position {
-  font-size: 0.6rem;
+  font-size: 0.55rem;
   font-weight: bold;
   color: #aab0b8;            /* everything past 3rd — light grey */
 }
@@ -1075,7 +1084,7 @@ body.tv .horse-label {
   font-size: 0.82rem;
   letter-spacing: 0.05em;
 }
-body.tv .horse-level { font-size: 0.7rem; padding: 1px 8px; }
+body.tv .horse-level { font-size: 0.5rem; padding: 1px 6px; }
 body.tv .user-label { font-size: 0.75rem; }
 body.tv .horse-tokens { font-size: 0.78rem; }
 body.tv .horse-pace { font-size: 0.85rem; }

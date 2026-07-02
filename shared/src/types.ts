@@ -71,6 +71,9 @@ export type Race = {
 
 export type HorseView = Horse & {
   rank: number;
+  // Trailing 15-minute token pace (tokens/min), computed server-side from the
+  // series points. Present only for live races; absent for pending/finished.
+  pace_15m?: number;
 };
 
 export type RaceHighlight = {
