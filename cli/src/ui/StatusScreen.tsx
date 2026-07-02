@@ -38,13 +38,14 @@ type Props = {
   lastHeartbeatAgoSec: number | null;
   lastHeartbeatOk: boolean;
   stalled?: boolean;
+  stallReason?: string | null;
   primaryModel?: ModelKey;
   perSource?: Record<ModelKey, number>;
   primaryCapped?: boolean;
 };
 
 export function StatusScreen(props: Props) {
-  const { race, ownHorseId, ownHorseName, ownColors, ownUserName, lastHeartbeatAgoSec, lastHeartbeatOk, stalled, primaryModel, perSource, primaryCapped } = props;
+  const { race, ownHorseId, ownHorseName, ownColors, ownUserName, lastHeartbeatAgoSec, lastHeartbeatOk, stalled, stallReason, primaryModel, perSource, primaryCapped } = props;
 
   if (!race) {
     return (
@@ -95,7 +96,7 @@ export function StatusScreen(props: Props) {
           </Text>
         </Text>
         {stalled && (
-          <Text color="yellow">⚠ Can't read token usage — try restarting this terminal. Your race continues.</Text>
+          <Text color="yellow">⚠ {stallReason ?? "Can't read token usage"}. Your race continues.</Text>
         )}
       </Box>
 

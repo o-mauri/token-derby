@@ -99,6 +99,16 @@ describe('RaceScoreTracker — primary top-N + forfeit', () => {
     expect(t.stalled).toBe(false);
   });
 
+  it('surfaces the reason of a stall reading, and clears it on recovery', () => {
+    const t = new RaceScoreTracker(baseState(), 'claude', false);
+    for (let i = 0; i < 5; i++) t.recordReading({ stall: "Can't read gemini token usage (ENOENT)" });
+    expect(t.stalled).toBe(true);
+    expect(t.stallReason).toContain('gemini');
+    t.recordReading(reading({ a: 10 })); // a good read recovers
+    expect(t.stalled).toBe(false);
+    expect(t.stallReason).toBeNull();
+  });
+
   it('toState round-trips the new fields', () => {
     const t = new RaceScoreTracker(baseState(), 'claude', false);
     t.recordReading(reading({ a: 100 }, 5, 0));

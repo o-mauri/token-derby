@@ -4,7 +4,7 @@ import type { GetRaceResponse, HeartbeatResponse } from '@token-derby/shared';
 import { StatusScreen } from '../ui/StatusScreen.js';
 import { describeAchievement, type RecentEvent } from '@token-derby/shared';
 import { runHeartbeatLoop } from './heartbeat-loop.js';
-import { readAllSources, type AllSources } from '../tokens/race-tokens.js';
+import { readAllSources, isStall, type BeatReading } from '../tokens/race-tokens.js';
 import { primaryConversationCap } from '../tokens/primary-cap.js';
 import { MODEL_KEYS, type ModelKey } from '@token-derby/shared';
 import { RaceScoreTracker, type RaceScoreState } from '../tokens/race-score.js';
@@ -34,6 +34,7 @@ export function RunRace({ active, initialState, pendingMode, ownUserName }: RunR
   const pendingRef = useRef(pendingMode);
   const ctrl = useRef(new AbortController());
   const [stalled, setStalled] = useState(false);
+  const [stallReason, setStallReason] = useState<string | null>(null);
   const baselineRef = useRef(initialState.acked);
   const [perSource, setPerSource] = useState<Record<ModelKey, number>>({ claude: 0, codex: 0, gemini: 0 });
 
@@ -54,14 +55,14 @@ export function RunRace({ active, initialState, pendingMode, ownUserName }: RunR
   useEffect(() => {
     const tracker = trackerRef.current;
 
-    const scanWithTimeout = async (): Promise<AllSources | null> => {
+    const scanWithTimeout = async (): Promise<BeatReading> => {
       try {
         return await Promise.race([
           readAllSources(active, active.primary_model),
           new Promise<never>((_, reject) => setTimeout(() => reject(new Error('scan timeout')), 10_000)),
         ]);
       } catch {
-        return null;
+        return { stall: 'Token scan timed out' };
       }
     };
 
@@ -69,8 +70,9 @@ export function RunRace({ active, initialState, pendingMode, ownUserName }: RunR
       prepareBeat: async () => {
         const reading = await scanWithTimeout();
         tracker.recordReading(reading);
-        if (pendingRef.current) tracker.reprime();
+        if (pendingRef.current && !isStall(reading)) tracker.reprime();
         setStalled(tracker.stalled);
+        setStallReason(tracker.stalled ? tracker.stallReason : null);
         const since = tracker.secondarySinceJoin(baselineRef.current);
         const ps: Record<ModelKey, number> = { claude: 0, codex: 0, gemini: 0 };
         for (const k of MODEL_KEYS) {
@@ -148,6 +150,7 @@ export function RunRace({ active, initialState, pendingMode, ownUserName }: RunR
         lastHeartbeatAgoSec={lastHeartbeatAgoSec}
         lastHeartbeatOk={lastHbOk}
         stalled={stalled}
+        stallReason={stallReason}
         primaryModel={active.primary_model}
         perSource={perSource}
         primaryCapped={primaryConversationCap(active.primary_top5 ?? false) !== Infinity}
@@ -195,13 +198,15 @@ export async function buildInitialState(args: {
   raceStatus: 'pending' | 'live';
   serverLastSeq: number;
 }): Promise<{ initialState: RaceScoreState; pendingMode: boolean }> {
-  let now: AllSources | null = null;
-  try {
-    now = await readAllSources(args.active, args.active.primary_model);
-  } catch { /* leave null → zeros */ }
-  const secondary = now?.secondary ?? { claude: 0, codex: 0, gemini: 0 };
+  let secondary: Record<ModelKey, number> = { claude: 0, codex: 0, gemini: 0 };
   const primaryConvAcked: Record<string, number> = {};
-  if (now) for (const [id, v] of now.primaryByConv) primaryConvAcked[id] = v;
+  try {
+    const now = await readAllSources(args.active, args.active.primary_model);
+    if (!isStall(now)) {
+      secondary = now.secondary;
+      for (const [id, v] of now.primaryByConv) primaryConvAcked[id] = v;
+    }
+  } catch { /* leave zeros */ }
   return {
     initialState: {
       acked: { ...secondary },

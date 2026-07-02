@@ -4,7 +4,7 @@
 // user Token Derby is meant to be played honestly. 🐎 (See tokens/transcripts.ts.)
 
 import { MODEL_KEYS, type ModelKey } from '@token-derby/shared';
-import type { AllSources } from './race-tokens.js';
+import { isStall, type BeatReading } from './race-tokens.js';
 import { primaryConversationCap } from './primary-cap.js';
 
 export type PerSource<T> = Record<ModelKey, T>;
@@ -38,6 +38,7 @@ export class RaceScoreTracker {
   private counted: number;
   private seq: number;
   private stalls = 0;
+  private lastStall: string | null = null;
   private readonly primary: ModelKey;
   private readonly primaryTop5: boolean;
 
@@ -54,13 +55,19 @@ export class RaceScoreTracker {
 
   /**
    * Record a scan result.
-   * - `null` → stall (warning), anchors untouched.
+   * - `null` or a `{ stall }` reading → stall (warning), anchors untouched. A
+   *   stall reading also captures its cause for the UI.
    * - otherwise → secondaries advance scalar lastGood (never down to 0); the
    *   primary's per-conversation latest readings are updated (monotonic).
    */
-  recordReading(reading: AllSources | null): void {
-    if (reading === null) { this.stalls += 1; return; }
+  recordReading(reading: BeatReading | null): void {
+    if (reading === null || isStall(reading)) {
+      this.stalls += 1;
+      this.lastStall = reading?.stall ?? null;
+      return;
+    }
     this.stalls = 0;
+    this.lastStall = null;
     for (const key of MODEL_KEYS) {
       if (key === this.primary) continue;
       const v = reading.secondary[key];
@@ -128,6 +135,11 @@ export class RaceScoreTracker {
 
   get stalled(): boolean {
     return this.stalls >= STALL_THRESHOLD;
+  }
+
+  /** Human-readable cause of the most recent stall (null once a good read recovers). */
+  get stallReason(): string | null {
+    return this.lastStall;
   }
 
   /** Cumulative primary tokens credited so far (for the UI's primary "since join" row). */
