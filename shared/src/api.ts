@@ -8,6 +8,7 @@ export type CreateRaceRequest = {
   max_participants?: number;
   organisation_name?: string;
   counts_input?: boolean;
+  primary_top5?: boolean;
 };
 
 export type CreateRaceResponse = {
@@ -183,6 +184,7 @@ export type SetOrgScheduleRequest = {
   race_name?: string;
   max_participants?: number;
   counts_input?: boolean;
+  primary_top5?: boolean;
 };
 export type SetOrgScheduleResponse = { schedule: RaceSchedule };
 export type GetOrgScheduleResponse = { schedule: RaceSchedule | null };

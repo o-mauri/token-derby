@@ -74,8 +74,6 @@ Cosmetics:
 Environment:
   TOKEN_DERBY_API_BASE                    Override API base URL (default: production)
   TOKEN_DERBY_HOME                        Override identity/stable directory
-  TOKEN_DERBY_PRIMARY_TOP5                Count only your 5 most-active conversations
-                                          per heartbeat for your primary model (default off)
 `;
 
 async function main(): Promise<number> {

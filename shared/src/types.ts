@@ -63,6 +63,10 @@ export type Race = {
   // instead of just output. Server-side achievement and rate-cap thresholds
   // scale by TOKEN_INPUT_MULTIPLIER for these races.
   counts_input?: boolean;
+  // When true, only each racer's 5 most-active conversations per heartbeat
+  // count toward their PRIMARY model's score (secondaries unaffected). Absent
+  // ⇒ off: every conversation counts. Locked at race creation.
+  primary_top5?: boolean;
 };
 
 export type HorseView = Horse & {
@@ -187,6 +191,7 @@ export type RaceSchedule = {
   race_name?: string;        // optional name for created races
   max_participants?: number;
   counts_input?: boolean;
+  primary_top5?: boolean;    // stamped onto each scheduled race (see Race.primary_top5)
   created_at: string;
   creator_user_id: string;   // stamped onto each scheduled race
   creator_user_name: string; // stamped onto each scheduled race

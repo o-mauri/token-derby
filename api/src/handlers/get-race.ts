@@ -43,6 +43,7 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
     ...(race.org_id ? { org_id: race.org_id } : {}),
     ...(race.organisation_name ? { organisation_name: race.organisation_name } : {}),
     ...(race.counts_input ? { counts_input: true } : {}),
+    ...(race.primary_top5 ? { primary_top5: true } : {}),
   };
   return ok(response);
 };

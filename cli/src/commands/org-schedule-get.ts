@@ -11,6 +11,7 @@ export async function orgScheduleGetCommand(orgName: string | undefined): Promis
     if (resp.schedule) {
       const s = resp.schedule;
       console.log(`Schedule for ${orgName}: days [${s.weekdays.join(',')}] ${s.start_local}–${s.end_local} ${s.tz}`);
+      if (s.primary_top5) console.log('  Primary top-5 conversations cap: ON.');
     } else {
       console.log(`No schedule configured for ${orgName}.`);
     }

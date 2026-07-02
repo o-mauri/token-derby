@@ -19,6 +19,7 @@ export type CreateRaceInput = {
   tz: string;
   max_participants?: number;
   counts_input?: boolean;
+  primary_top5?: boolean;
   creator_user_id: string;
   creator_user_name: string;
   cli_version?: string;
@@ -73,6 +74,7 @@ export async function createRace(input: CreateRaceInput): Promise<CreateRaceResu
       ...(input.cli_version ? { cli_version: input.cli_version } : {}),
       ...(input.org ? { org_id: input.org.org_id, organisation_name: input.org.org_name } : {}),
       ...(input.counts_input ? { counts_input: true } : {}),
+      ...(input.primary_top5 ? { primary_top5: true } : {}),
     },
     admin_code,
   );

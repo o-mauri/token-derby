@@ -30,7 +30,7 @@ export function RunRace({ active, initialState, pendingMode, ownUserName }: RunR
   const [achievements, setAchievements] = useState<Array<{ key: string; event: RecentEvent }>>([]);
   const shownAchievementAtRef = useRef<number>(0);
 
-  const trackerRef = useRef(new RaceScoreTracker(initialState, active.primary_model));
+  const trackerRef = useRef(new RaceScoreTracker(initialState, active.primary_model, active.primary_top5 ?? false));
   const pendingRef = useRef(pendingMode);
   const ctrl = useRef(new AbortController());
   const [stalled, setStalled] = useState(false);
@@ -150,7 +150,7 @@ export function RunRace({ active, initialState, pendingMode, ownUserName }: RunR
         stalled={stalled}
         primaryModel={active.primary_model}
         perSource={perSource}
-        primaryCapped={primaryConversationCap() !== Infinity}
+        primaryCapped={primaryConversationCap(active.primary_top5 ?? false) !== Infinity}
       />
       {achievements.length > 0 && (
         <Box flexDirection="column" marginTop={1}>

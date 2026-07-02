@@ -132,6 +132,33 @@ describe('createRace handler', () => {
     expect(race?.counts_input).toBeUndefined();
   });
 
+  it('persists primary_top5 when requested', async () => {
+    const user = await makeUser('CR_Top5');
+    const res: any = await handler(event({
+      name: 'Top5 Derby',
+      start_time: '2026-04-22T09:00:00Z',
+      end_time: '2026-04-22T17:00:00Z',
+      tz: 'Europe/London',
+      primary_top5: true,
+    }, user));
+    expect(res.statusCode).toBe(200);
+    const race = await getRaceByJoinCode(JSON.parse(res.body).join_code);
+    expect(race?.primary_top5).toBe(true);
+  });
+
+  it('leaves primary_top5 unset by default (off)', async () => {
+    const user = await makeUser('CR_NoTop5');
+    const res: any = await handler(event({
+      name: 'Default Derby',
+      start_time: '2026-04-22T09:00:00Z',
+      end_time: '2026-04-22T17:00:00Z',
+      tz: 'Europe/London',
+    }, user));
+    expect(res.statusCode).toBe(200);
+    const race = await getRaceByJoinCode(JSON.parse(res.body).join_code);
+    expect(race?.primary_top5).toBeUndefined();
+  });
+
   it('rejects missing fields with BAD_REQUEST', async () => {
     const user = await makeUser('CR_BadReq');
     const res: any = await handler(event({ name: 'No times' }, user));

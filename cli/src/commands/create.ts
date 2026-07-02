@@ -43,11 +43,15 @@ export async function createRaceCommand(organisationName?: string): Promise<numb
     const countInputRaw = (await rl.question('Count input tokens (fresh input + cache creation) toward race totals? [y/N]: ')).trim().toLowerCase();
     const counts_input = countInputRaw === 'y' || countInputRaw === 'yes';
 
+    const top5Raw = (await rl.question('Count only each racer\'s 5 most-active conversations toward their primary model\'s score? [y/N]: ')).trim().toLowerCase();
+    const primary_top5 = top5Raw === 'y' || top5Raw === 'yes';
+
     const resp = await createRace({
       name, start_time: start, end_time: end, tz,
       ...(max !== undefined ? { max_participants: max } : {}),
       ...(org ? { organisation_name: org } : {}),
       ...(counts_input ? { counts_input: true } : {}),
+      ...(primary_top5 ? { primary_top5: true } : {}),
     });
 
     console.log('');
@@ -63,6 +67,9 @@ export async function createRaceCommand(organisationName?: string): Promise<numb
     }
     if (counts_input) {
       console.log('  Counting input + output tokens (excluding cache reads).');
+    }
+    if (primary_top5) {
+      console.log('  Primary score counts only each racer\'s top 5 conversations per beat.');
     }
     console.log(`  Share with participants:  token-derby join ${resp.join_code}`);
     return 0;

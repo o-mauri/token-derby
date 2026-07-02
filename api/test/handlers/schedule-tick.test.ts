@@ -78,6 +78,34 @@ describe('schedule-tick', () => {
     expect((await listRacesByOrgId(org_id)).length).toBe(0);
   });
 
+  it('stamps primary_top5 from the schedule onto the created race', async () => {
+    const user = await makeUser('TickTop5');
+    const org_id = await createOrg(user, 'TickTop5Org');
+    await putSchedule({ ...baseSchedule(org_id), primary_top5: true });
+
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2024-07-01T10:00:00Z'));
+    await runTick();
+
+    const races = await listRacesByOrgId(org_id);
+    expect(races.length).toBe(1);
+    expect(races[0]!.primary_top5).toBe(true);
+  });
+
+  it('legacy schedule without primary_top5 → race defaults to off', async () => {
+    const user = await makeUser('TickLegacy');
+    const org_id = await createOrg(user, 'TickLegOrg');
+    await putSchedule(baseSchedule(org_id)); // no primary_top5 prop
+
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2024-07-01T10:00:00Z'));
+    await runTick();
+
+    const races = await listRacesByOrgId(org_id);
+    expect(races.length).toBe(1);
+    expect(races[0]!.primary_top5).toBeUndefined();
+  });
+
   it('isolates failures: a bad schedule does not block a good one', async () => {
     const badUser = await makeUser('TickBad');
     const badOrg = await createOrg(badUser, 'TickBadOrg');

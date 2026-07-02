@@ -64,6 +64,7 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
     ...(body.race_name ? { race_name: body.race_name } : {}),
     ...(body.max_participants !== undefined ? { max_participants: body.max_participants } : {}),
     ...(body.counts_input ? { counts_input: true } : {}),
+    ...(body.primary_top5 ? { primary_top5: true } : {}),
     created_at: new Date().toISOString(),
     creator_user_id: auth.user_id,
     creator_user_name: auth.display_name,

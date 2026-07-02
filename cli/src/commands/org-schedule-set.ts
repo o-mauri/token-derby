@@ -11,7 +11,7 @@ function flag(args: string[], name: string): string | undefined {
   return undefined;
 }
 
-const USAGE = 'Usage: token-derby organisation schedule set <org-name> --days mon-fri --start 09:00 --end 17:30 --tz Europe/London [--name "Daily"] [--max 30] [--counts-input]';
+const USAGE = 'Usage: token-derby organisation schedule set <org-name> --days mon-fri --start 09:00 --end 17:30 --tz Europe/London [--name "Daily"] [--max 30] [--counts-input] [--primary-top5]';
 
 export async function orgScheduleSetCommand(orgName: string | undefined, rest: string[]): Promise<number> {
   if (!orgName) {
@@ -25,6 +25,7 @@ export async function orgScheduleSetCommand(orgName: string | undefined, rest: s
   const name = flag(rest, '--name');
   const maxStr = flag(rest, '--max');
   const counts_input = rest.includes('--counts-input');
+  const primary_top5 = rest.includes('--primary-top5');
 
   if (!daysSpec || !start || !end || !tz) {
     console.error('Required flags: --days, --start, --end, --tz');
@@ -54,9 +55,11 @@ export async function orgScheduleSetCommand(orgName: string | undefined, rest: s
       ...(name ? { race_name: name } : {}),
       ...(max_participants !== undefined ? { max_participants } : {}),
       ...(counts_input ? { counts_input: true } : {}),
+      ...(primary_top5 ? { primary_top5: true } : {}),
     });
     const s = resp.schedule;
     console.log(`Schedule set for ${orgName}: days [${s.weekdays.join(',')}] ${s.start_local}–${s.end_local} ${s.tz}`);
+    if (s.primary_top5) console.log('  Primary score counts only each racer\'s top 5 conversations per beat.');
     return 0;
   } catch (e) {
     if (e instanceof ApiError) {

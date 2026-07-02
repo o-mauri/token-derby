@@ -70,4 +70,18 @@ describe('active-race persistence', () => {
     await deleteActiveRace('ABCDEF');
     expect(await loadActiveRace('ABCDEF')).toBeNull();
   });
+
+  it('round-trips the primary_top5 flag', async () => {
+    await tmpHome();
+    await saveActiveRace({ ...sample, primary_top5: true });
+    const loaded = await loadActiveRace('ABCDEF');
+    expect(loaded?.primary_top5).toBe(true);
+  });
+
+  it('omits primary_top5 when the race did not set it (default off)', async () => {
+    await tmpHome();
+    await saveActiveRace(sample);
+    const loaded = await loadActiveRace('ABCDEF');
+    expect(loaded?.primary_top5).toBeUndefined();
+  });
 });

@@ -137,6 +137,15 @@ describe('getRace handler', () => {
     expect(body.horses[0].crashed).toBeUndefined();
   });
 
+  it('echoes primary_top5 when the race was created with it', async () => {
+    const creator = await makeUser('GR_Top5Creator');
+    const { join_code } = await setupRace(creator, { primary_top5: true });
+
+    const getRes: any = await getRaceHandler(evt(null, `/races/${join_code}`, 'GET /races/{join_code}', { join_code }));
+    expect(getRes.statusCode).toBe(200);
+    expect(JSON.parse(getRes.body).primary_top5).toBe(true);
+  });
+
   it('returns pending status when race start_time is in the future', async () => {
     const creator = await makeUser('GR_Creator4');
     const { join_code } = await setupRace(creator, {

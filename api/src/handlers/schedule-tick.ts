@@ -41,6 +41,7 @@ export const handler: ScheduledHandler = async () => {
         tz: sched.tz,
         max_participants: sched.max_participants,
         counts_input: sched.counts_input,
+        primary_top5: sched.primary_top5,
         creator_user_id: sched.creator_user_id,
         creator_user_name: sched.creator_user_name,
         org: {

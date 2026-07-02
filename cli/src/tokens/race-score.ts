@@ -39,8 +39,9 @@ export class RaceScoreTracker {
   private seq: number;
   private stalls = 0;
   private readonly primary: ModelKey;
+  private readonly primaryTop5: boolean;
 
-  constructor(init: RaceScoreState, primary: ModelKey) {
+  constructor(init: RaceScoreState, primary: ModelKey, primaryTop5: boolean) {
     this.acked = { ...init.acked };
     this.lastGood = { ...init.lastGood };
     this.primaryConvAcked = { ...init.primaryConvAcked };
@@ -48,6 +49,7 @@ export class RaceScoreTracker {
     this.counted = init.primaryCounted;
     this.seq = init.seq;
     this.primary = primary;
+    this.primaryTop5 = primaryTop5;
   }
 
   /**
@@ -88,7 +90,7 @@ export class RaceScoreTracker {
       if (d > 0) pending.push(d);
     }
     pending.sort((a, b) => b - a);
-    const cap = primaryConversationCap();
+    const cap = primaryConversationCap(this.primaryTop5);
     const take = cap === Infinity ? pending.length : Math.min(cap, pending.length);
     let primarySum = 0;
     for (const d of pending.slice(0, take)) primarySum += d;

@@ -160,6 +160,7 @@ export async function joinCommand(joinCode: string | undefined, argv: string[] =
       seq: ownHorse?.last_seq ?? 0,
     },
     ...(race.counts_input ? { counts_input: true } : {}),
+    ...(race.primary_top5 ? { primary_top5: true } : {}),
   };
   await saveActiveRace(active);
 

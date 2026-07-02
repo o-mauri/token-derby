@@ -77,6 +77,19 @@ describe('org schedule handlers', () => {
     expect(res.statusCode).toBe(400);
   });
 
+  it('persists primary_top5 when set, leaves it unset by default', async () => {
+    const user = await makeUser('SchTop5');
+    await createOrg(user, 'SchTop5Org');
+
+    const setRes: any = await setHandler(ev('PUT', 'SchTop5Org', { ...VALID, primary_top5: true }, user));
+    expect(setRes.statusCode).toBe(200);
+    expect(JSON.parse(setRes.body).schedule.primary_top5).toBe(true);
+
+    const setRes2: any = await setHandler(ev('PUT', 'SchTop5Org', VALID, user));
+    expect(setRes2.statusCode).toBe(200);
+    expect(JSON.parse(setRes2.body).schedule.primary_top5).toBeUndefined();
+  });
+
   it('rejects an invalid timezone', async () => {
     const user = await makeUser('SchTz');
     await createOrg(user, 'SchTz1');

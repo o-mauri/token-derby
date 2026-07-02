@@ -16,6 +16,7 @@ export type ActiveRace = {
   primary_model: ModelKey;
   score: RaceScoreState;
   counts_input?: boolean;
+  primary_top5?: boolean;
 };
 
 export async function loadActiveRace(joinCode: string): Promise<ActiveRace | null> {
