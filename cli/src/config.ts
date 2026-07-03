@@ -1,7 +1,12 @@
-export const DEFAULT_API_BASE = 'https://token-derby.mauricode.co.uk/api';
+import { selectedEnv, type EnvName } from './env/env.js';
+
+export const ENVIRONMENTS: Record<EnvName, { apiBase: string }> = {
+  prod: { apiBase: 'https://token-derby.mauricode.co.uk/api' },
+  staging: { apiBase: 'https://token-derby-staging.mauricode.co.uk/api' },
+};
 
 export function apiBase(): string {
-  return process.env.TOKEN_DERBY_API_BASE ?? DEFAULT_API_BASE;
+  return process.env.TOKEN_DERBY_API_BASE ?? ENVIRONMENTS[selectedEnv()].apiBase;
 }
 
 export const HEARTBEAT_INTERVAL_MS = 60_000;
