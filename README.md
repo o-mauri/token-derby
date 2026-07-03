@@ -74,6 +74,38 @@ parameters encrypted with the default `aws/ssm` managed key (as created above). 
 you instead encrypt them with a customer-managed KMS key, also grant the Lambdas
 `kms:Decrypt` on that key.
 
+## Staging environment
+
+A full staging stack runs alongside production in the same AWS account at
+`https://token-derby-staging.mauricode.co.uk`.
+
+Deploy / tear down:
+
+    make deploy-staging      # deploy staging (cdk deploy -c env=staging)
+    make destroy-staging     # tear down staging (table is disposable)
+
+`make deploy` / `make destroy` continue to target production unchanged.
+
+### One-time: seed staging admin secrets
+
+Staging admin login reads `/token-derby-staging/admin/*` in SSM. Seed the three
+parameters once (see `docs/superpowers/specs/2026-07-03-staging-environment-design.md`
+for the exact commands):
+
+- `/token-derby-staging/admin/username`
+- `/token-derby-staging/admin/password-hash` (scrypt `saltHex:hashHex`)
+- `/token-derby-staging/admin/session-secret`
+
+### CLI against staging
+
+    token-derby env staging   # switch the CLI to staging (own identity dir)
+    token-derby env           # show the active environment
+    token-derby env prod      # switch back
+
+Each environment keeps its own identity under `~/.token-derby` (prod) and
+`~/.token-derby-staging` (staging), so switching never touches the other
+account's credentials.
+
 ## API (base: `https://token-derby.mauricode.co.uk/api`)
 
 ```
