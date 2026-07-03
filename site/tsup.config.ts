@@ -5,6 +5,7 @@ export default defineConfig({
     main: 'src/main.ts',
     'preview-finished': 'src/preview-finished.ts',
     'preview-org': 'src/preview-org.ts',
+    'preview-org-manager': 'src/preview-org-manager.ts',
     'preview-race': 'src/preview-race.ts',
     'preview-toasts': 'src/preview-toasts.ts',
   },

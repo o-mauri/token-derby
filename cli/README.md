@@ -41,6 +41,23 @@ token-derby rejoin <join-code>
 token-derby end <admin-code>
 ```
 
+## Organisations
+
+```bash
+# Join an organisation with a join token
+token-derby organisation join <token>
+```
+
+Everything else — creating an organisation, managing members, and configuring
+the schedule or webhook — is done on the web:
+
+```bash
+token-derby web
+```
+
+This opens `token-derby.mauricode.co.uk/org-manager` with a one-time login
+link, signed in as your CLI identity.
+
 ## What's tracked
 
 The CLI sums `message.usage.output_tokens` across every `*.jsonl` under `~/.claude/projects/`. This includes **subagents and dynamic workflows** — their transcripts nest under `<project>/<session>/subagents/…` (and `…/subagents/workflows/wf_<id>/…`), and the scanner recurses into all of them, so a Plan/Workflow that fans out across many agents counts all of that real output. Your "race tokens" are everything generated since the moment you joined. Tokens generated while disconnected are skipped — that window is your crash penalty.
@@ -76,4 +93,4 @@ at usage you didn't produce.
 - `TOKEN_DERBY_API_BASE` — override the API base URL (default: `https://token-derby.mauricode.co.uk/api`)
 - `TOKEN_DERBY_HOME` — override the data directory (default: `~/.token-derby`)
 - `TOKEN_DERBY_CLAUDE_DIR` — override the transcripts directory (default: `~/.claude/projects`)
-- **Top-5 conversations (primary):** a race can be created so that only each racer's **5 most-active conversations per heartbeat** count toward their **primary** model's score (secondaries unaffected). The race creator opts in at `token-derby create` (prompt) or on a schedule with `organisation schedule set … --primary-top5`. Off by default (every conversation counts).
+- **Top-5 conversations (primary):** a race can be created so that only each racer's **5 most-active conversations per heartbeat** count toward their **primary** model's score (secondaries unaffected). The race creator opts in at `token-derby create` (prompt) or, for organisation-scheduled races, via the "Primary top-5 cap" option on the schedule tab of `token-derby web`. Off by default (every conversation counts).

@@ -1191,3 +1191,290 @@ body.tv .race-header .meta .btn {
 /* Reserve room so the ticker sits below the race instead of over the last lane.
    Only while it's actually showing achievements. */
 .race:has(.achievement-ticker:not(.is-empty)) { padding-bottom: var(--ticker-h); }
+
+/* ── Org manager ("/org-manager": create/join orgs, schedule, webhook) ─── */
+
+.muted { color: var(--muted); }
+
+/* Signed-out state (render/login.ts). */
+.org-login {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 32px;
+  text-align: center;
+}
+.org-login h1 {
+  margin: 0;
+  color: var(--accent);
+  font-size: clamp(2rem, 6vw, 3rem);
+  letter-spacing: 0.08em;
+}
+.org-login p { color: var(--muted); margin: 0; max-width: 42ch; }
+.org-login .cmd,
+.cmd {
+  display: inline-block;
+  background: var(--panel);
+  border: 2px solid var(--border);
+  color: var(--accent);
+  padding: 10px 18px;
+  font-size: 1.15rem;
+  letter-spacing: 0.05em;
+  border-radius: 4px;
+}
+
+/* Signed-in shell (org-manager/index.ts): sidebar + tabs + tab body. */
+.org-manager {
+  flex: 1;
+  display: flex;
+  align-items: stretch;
+  min-height: 0;
+}
+.org-side { flex: 0 0 240px; }
+.org-sidebar {
+  height: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px 16px;
+  background: var(--panel);
+  border-right: 2px solid var(--border);
+}
+.org-side-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.75rem;
+}
+.org-logout {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--accent);
+  font: inherit;
+  font-size: 0.75rem;
+  letter-spacing: 0.03em;
+  padding: 3px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.org-logout:hover { border-color: var(--accent); }
+.org-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+}
+.org-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--bg);
+  border: 2px solid var(--border);
+  border-radius: 4px;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+}
+.org-row:hover { border-color: var(--accent); }
+.org-row.selected { border-color: var(--accent); background: rgba(209, 213, 219, 0.08); color: var(--accent); }
+.pill {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 2px 8px;
+  border-radius: 3px;
+  background: var(--border);
+  color: var(--muted);
+}
+.org-row.selected .pill { color: var(--bg); background: var(--accent); }
+
+/* .org-actions is reused both as the stacked sidebar action buttons and the
+   inline save/clear row inside a tab panel. */
+.org-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.org-sidebar .org-actions { flex-direction: column; margin-top: auto; }
+.org-create, .org-join, .org-btn {
+  background: var(--accent);
+  color: var(--bg);
+  border: none;
+  padding: 9px 16px;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: bold;
+  letter-spacing: 0.03em;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.org-create:hover, .org-join:hover, .org-btn:hover { filter: brightness(1.1); }
+.org-sidebar .org-create, .org-sidebar .org-join { width: 100%; }
+
+.org-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 24px;
+  gap: 16px;
+}
+.org-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  border-bottom: 2px solid var(--panel);
+}
+.org-tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  padding: 10px 16px;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.95rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+.org-tab:hover { color: var(--text); }
+.org-tab.on { color: var(--accent); border-bottom-color: var(--accent); }
+.org-tabbody { flex: 1; }
+
+.org-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  max-width: 640px;
+  padding: 20px 24px;
+  background: var(--panel);
+  border: 2px solid var(--border);
+  border-radius: 6px;
+}
+.org-field { display: flex; flex-direction: column; gap: 6px; font-size: 1rem; }
+.label {
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.72rem;
+}
+label.label {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  max-width: 260px;
+}
+label.label:has(input[type="checkbox"]) { flex-direction: row; align-items: center; max-width: none; }
+label.label input {
+  font-family: inherit;
+  text-transform: none;
+  letter-spacing: normal;
+  font-size: 1rem;
+  color: var(--text);
+  background: var(--bg);
+  border: 2px solid var(--border);
+  border-radius: 4px;
+  padding: 7px 10px;
+  width: 100%;
+}
+label.label input[type="checkbox"] { width: auto; }
+label.label input:focus { outline: none; border-color: var(--accent); }
+label.label input:disabled { opacity: 0.5; }
+
+.org-token {
+  display: inline-block;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 5px 12px;
+  margin-right: 8px;
+  color: var(--accent);
+  font-size: 1rem;
+  letter-spacing: 0.04em;
+}
+.org-copy {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--accent);
+  padding: 4px 12px;
+  font: inherit;
+  font-size: 0.8rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.org-copy:hover { border-color: var(--accent); background: rgba(209, 213, 219, 0.08); }
+.warn { color: #fbbf24; font-size: 0.85rem; margin: 4px 0 0; }
+
+.org-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--bg);
+  border: 2px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.org-table th {
+  font-size: 0.72rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  text-align: left;
+  font-weight: normal;
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.org-table td { padding: 10px 14px; font-size: 0.95rem; }
+.org-table tbody tr:nth-child(even) { background: rgba(255, 255, 255, 0.04); }
+
+.org-days { display: flex; flex-wrap: wrap; gap: 10px; }
+.org-day {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.org-day:has(input:checked) { border-color: var(--accent); color: var(--accent); }
+.org-day input[type="checkbox"] { accent-color: var(--accent); }
+
+.org-secret {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 14px;
+  background: #0d0d0d;
+  border: 1px dashed var(--accent);
+  border-radius: 4px;
+  color: var(--accent);
+}
+.org-secret code { font-size: 1rem; letter-spacing: 0.03em; word-break: break-all; }
+
+/* Preview-only scaffolding (site/src/preview-org-manager.ts) — not emitted by
+   the render modules, just labels stacking the extra tab screenshots. */
+.org-preview-section { padding: 8px 24px 24px; border-top: 2px solid var(--panel); }
+.org-preview-heading {
+  margin: 16px 0 12px;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.9rem;
+}
+
+@media (max-width: 720px) {
+  .org-manager { flex-direction: column; }
+  .org-side { flex: 0 0 auto; }
+  .org-sidebar { border-right: none; border-bottom: 2px solid var(--border); }
+  .org-sidebar .org-actions { flex-direction: row; margin-top: 0; }
+  .org-sidebar .org-create, .org-sidebar .org-join { width: auto; flex: 1; }
+}
