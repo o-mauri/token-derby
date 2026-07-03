@@ -1,23 +1,10 @@
 #!/usr/bin/env node
 import * as cdk from 'aws-cdk-lib';
 import { TokenDerbyStack } from '../lib/token-derby-stack';
-
-type EnvName = 'prod' | 'staging';
-
-export interface EnvConfig {
-  envName: EnvName;
-  stackId: string;
-  siteDomain: string;
-  adminDomain: string;
-  tableName: string;
-  apiName: string;
-  ssmPrefix: string;
-  disposable: boolean;
-}
+import type { EnvConfig, EnvName } from '../lib/env-config';
 
 const ENV_CONFIGS: Record<EnvName, EnvConfig> = {
   prod: {
-    envName: 'prod',
     stackId: 'TokenDerbyStack',
     siteDomain: 'token-derby.mauricode.co.uk',
     adminDomain: 'admin.token-derby.mauricode.co.uk',
@@ -27,7 +14,6 @@ const ENV_CONFIGS: Record<EnvName, EnvConfig> = {
     disposable: false,
   },
   staging: {
-    envName: 'staging',
     stackId: 'TokenDerbyStack-staging',
     siteDomain: 'token-derby-staging.mauricode.co.uk',
     adminDomain: 'admin.token-derby-staging.mauricode.co.uk',

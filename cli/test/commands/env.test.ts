@@ -59,4 +59,26 @@ describe('env command', () => {
     expect(errs.join('\n')).toContain('prod');
     expect(errs.join('\n')).toContain('staging');
   });
+
+  it('warns when TOKEN_DERBY_HOME is set and still switches envs', () => {
+    process.env.TOKEN_DERBY_HOME = tmp;
+    const code = envCommand('staging');
+    expect(code).toBe(0);
+    expect(errs.join('\n')).toContain('TOKEN_DERBY_HOME');
+    delete process.env.TOKEN_DERBY_HOME;
+  });
+
+  it('warns when TOKEN_DERBY_API_BASE is set (no-arg print branch)', () => {
+    process.env.TOKEN_DERBY_API_BASE = 'https://example.test/api';
+    const code = envCommand();
+    expect(code).toBe(0);
+    expect(errs.join('\n')).toContain('TOKEN_DERBY_API_BASE');
+    delete process.env.TOKEN_DERBY_API_BASE;
+  });
+
+  it('emits no warnings when neither override is set', () => {
+    envCommand();
+    envCommand('staging');
+    expect(errs.join('\n')).toBe('');
+  });
 });

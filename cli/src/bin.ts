@@ -98,7 +98,7 @@ async function main(): Promise<number> {
   // when no identity exists there yet.
   if (cmd === 'env') return envCommand(argv[1]);
 
-  // Every other command requires an identity. `init` and `update` are the only escape hatches.
+  // Every other command requires an identity. `init`, `update`, and `env` are the only escape hatches.
   const identity = await loadIdentity();
   if (!identity) {
     console.error('Run `token-derby init` to set up your identity before using any other command.');

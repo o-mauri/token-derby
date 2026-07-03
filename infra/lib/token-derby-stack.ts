@@ -16,7 +16,7 @@ import * as apigatewayv2 from 'aws-cdk-lib/aws-apigatewayv2';
 import * as events from 'aws-cdk-lib/aws-events';
 import * as eventsTargets from 'aws-cdk-lib/aws-events-targets';
 import * as path from 'path';
-import type { EnvConfig } from '../bin/token-derby';
+import type { EnvConfig } from './env-config';
 
 const HOSTED_ZONE_DOMAIN = 'mauricode.co.uk';
 
