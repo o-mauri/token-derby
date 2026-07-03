@@ -10,6 +10,7 @@ import { updateCommand } from './commands/update.js';
 import { rollCommand } from './commands/roll.js';
 import { orgCreateCommand } from './commands/org-create.js';
 import { orgJoinCommand } from './commands/org-join.js';
+import { envCommand } from './commands/env.js';
 import { orgListCommand } from './commands/org-list.js';
 import { orgInfoCommand } from './commands/org-info.js';
 import { orgWebhookSetCommand } from './commands/org-webhook-set.js';
@@ -72,8 +73,12 @@ Cosmetics:
                                           Earn rolls by leveling up horses.
 
 Environment:
-  TOKEN_DERBY_API_BASE                    Override API base URL (default: production)
-  TOKEN_DERBY_HOME                        Override identity/stable directory
+  token-derby env                         Show the active environment (prod|staging)
+  token-derby env <prod|staging>          Switch environment. Each env has its own
+                                          identity/stable dir, so switching never
+                                          touches the other env's account.
+  TOKEN_DERBY_API_BASE                    Hard-override API base URL (wins over env)
+  TOKEN_DERBY_HOME                        Hard-override identity/stable directory
 `;
 
 async function main(): Promise<number> {
@@ -89,6 +94,9 @@ async function main(): Promise<number> {
   }
   // `update` runs before the identity gate so a broken or stale install can fix itself.
   if (cmd === 'update') return updateCommand();
+  // `env` runs before the identity gate: switching to a fresh env is exactly
+  // when no identity exists there yet.
+  if (cmd === 'env') return envCommand(argv[1]);
 
   // Every other command requires an identity. `init` and `update` are the only escape hatches.
   const identity = await loadIdentity();
