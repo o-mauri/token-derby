@@ -1,4 +1,4 @@
-.PHONY: install build build-site test dynamodb-up dynamodb-down bootstrap deploy destroy smoke-api
+.PHONY: install build build-site test dynamodb-up dynamodb-down bootstrap deploy deploy-staging destroy destroy-staging smoke-api
 
 # AWS profile for all deployment targets. Override with: make deploy AWS_PROFILE=other
 AWS_PROFILE ?= personal
@@ -34,6 +34,13 @@ deploy: build-site
 
 destroy:
 	cd infra && AWS_PROFILE=$(AWS_PROFILE) npx cdk destroy
+
+# Deploy the staging stack (token-derby-staging.mauricode.co.uk). Builds site first.
+deploy-staging: build-site
+	cd infra && AWS_PROFILE=$(AWS_PROFILE) npx cdk deploy -c env=staging --require-approval never
+
+destroy-staging:
+	cd infra && AWS_PROFILE=$(AWS_PROFILE) npx cdk destroy -c env=staging
 
 # Run end-to-end smoke test against the deployed API
 smoke-api:
