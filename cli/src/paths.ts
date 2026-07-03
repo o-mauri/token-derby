@@ -1,8 +1,12 @@
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { baseDir, selectedEnv } from './env/env.js';
 
 export function homeDir(): string {
-  return process.env.TOKEN_DERBY_HOME ?? path.join(os.homedir(), '.token-derby');
+  const override = process.env.TOKEN_DERBY_HOME;
+  if (override) return override;
+  const dir = selectedEnv() === 'staging' ? '.token-derby-staging' : '.token-derby';
+  return path.join(baseDir(), dir);
 }
 
 export function identityFile(): string {
