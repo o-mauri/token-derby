@@ -166,7 +166,12 @@ export class TokenDerbyStack extends cdk.Stack {
     const httpApi = new HttpApi(this, 'TokenDerbyApi', {
       apiName: 'token-derby-api',
       corsPreflight: {
-        allowOrigins: [`https://${DOMAIN_NAME}`, `https://${ADMIN_DOMAIN_NAME}`, 'http://localhost:5173'],
+        // The API serves public, read-only race data and authenticates writes
+        // with per-request secret tokens (never cookies), so there are no
+        // credentialed cross-origin requests to protect. Allow any origin so
+        // anyone can build their own read-only viewer against it. Safe with
+        // allowCredentials unset (false): the gateway returns a literal `*`.
+        allowOrigins: ['*'],
         allowMethods: [CorsHttpMethod.GET, CorsHttpMethod.POST, CorsHttpMethod.PUT, CorsHttpMethod.DELETE, CorsHttpMethod.OPTIONS],
         allowHeaders: ['content-type', 'authorization', 'x-user-id', 'x-user-token', 'x-cli-version'],
       },
