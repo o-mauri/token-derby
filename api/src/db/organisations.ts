@@ -116,7 +116,7 @@ export async function listOrganisationsForUser(user_id: string): Promise<Organis
   return summaries;
 }
 
-export type OrgMember = { user_id: string; user_name: string };
+export type OrgMember = { user_id: string; user_name: string; joined_at: string };
 
 export async function listOrgMembers(org_id: string): Promise<OrgMember[]> {
   const { Items = [] } = await ddb.send(new QueryCommand({
@@ -126,11 +126,12 @@ export async function listOrgMembers(org_id: string): Promise<OrgMember[]> {
       ':pk': `${ORG_PK_PREFIX}${org_id}`,
       ':mp': MEMBER_SK_PREFIX,
     },
-    ProjectionExpression: 'member_user_id, user_name',
+    ProjectionExpression: 'member_user_id, user_name, joined_at',
   }));
   return Items.map(it => ({
     user_id: String(it.member_user_id ?? ''),
     user_name: String(it.user_name ?? ''),
+    joined_at: String(it.joined_at ?? ''),
   })).filter(m => m.user_id !== '');
 }
 

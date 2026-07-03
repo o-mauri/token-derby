@@ -2,6 +2,8 @@ import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { USER_ID_HEADER, USER_TOKEN_HEADER } from '@token-derby/shared';
 import { getUserById } from '../db/users.js';
+import { bearerToken } from './admin-auth.js';
+import { getWebSession } from '../db/web-sessions.js';
 
 export type AuthenticatedCaller = { user_id: string; display_name: string };
 export type AuthError = { error: string };
@@ -53,4 +55,25 @@ export async function authenticate(
   }
 
   return { user_id: user.user_id, display_name: user.display_name };
+}
+
+export type ResolvedCaller = AuthenticatedCaller & { source: 'cli' | 'web' };
+
+/**
+ * Resolves the caller from EITHER CLI identity headers (X-User-Id/X-User-Token)
+ * or an Authorization: Bearer <web-session> token. The `source` lets handlers
+ * apply the CLI-only version gate to CLI callers only.
+ */
+export async function resolveCaller(
+  event: APIGatewayProxyEventV2,
+): Promise<ResolvedCaller | AuthError> {
+  const token = bearerToken(event);
+  if (token) {
+    const session = await getWebSession(token);
+    if (!session) return { error: 'Invalid or expired web session' };
+    return { user_id: session.user_id, display_name: session.display_name, source: 'web' };
+  }
+  const cli = await authenticate(event);
+  if ('error' in cli) return cli;
+  return { ...cli, source: 'cli' };
 }

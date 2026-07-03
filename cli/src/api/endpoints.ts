@@ -2,18 +2,14 @@ import type {
   CreateRaceRequest, CreateRaceResponse,
   GetRaceResponse, JoinRaceRequest, JoinRaceResponse,
   HeartbeatRequest, HeartbeatResponse, EndRaceResponse,
-  CreateOrganisationRequest, CreateOrganisationResponse,
   JoinOrganisationRequest, JoinOrganisationResponse,
-  ListOrganisationsResponse, GetOrganisationResponse,
+  ListOrganisationsResponse,
   InitJockeyRequest, InitJockeyResponse,
   GetJockeyResponse, UpdateJockeyRequest, UpdateJockeyResponse,
   ListStableResponse, CreateStableHorseRequest, CreateStableHorseResponse,
   UpdateStableHorseRequest, UpdateStableHorseResponse, DeleteStableHorseResponse,
-  SetOrgWebhookRequest, SetOrgWebhookResponse,
-  GetOrgWebhookResponse, DeleteOrgWebhookResponse,
-  SetOrgScheduleRequest, SetOrgScheduleResponse,
-  GetOrgScheduleResponse, DeleteOrgScheduleResponse,
   RollHatResponse, EquipHatRequest, EquipHatResponse,
+  WebSessionCreateResponse,
 } from '@token-derby/shared';
 import { request } from './client.js';
 
@@ -42,20 +38,12 @@ export function endRace(adminCode: string) {
   return request<EndRaceResponse>('DELETE', `/races/admin/${encodeURIComponent(adminCode)}`, undefined, undefined);
 }
 
-export function createOrganisation(body: CreateOrganisationRequest) {
-  return request<CreateOrganisationResponse>('POST', '/organisations', body, undefined);
-}
-
 export function joinOrganisation(body: JoinOrganisationRequest) {
   return request<JoinOrganisationResponse>('POST', '/organisations/join', body, undefined);
 }
 
 export function listOrganisations() {
   return request<ListOrganisationsResponse>('GET', '/organisations', undefined, undefined);
-}
-
-export function getOrganisation(name: string) {
-  return request<GetOrganisationResponse>('GET', `/organisations/${encodeURIComponent(name)}`, undefined, undefined);
 }
 
 export function initJockey(body: InitJockeyRequest) {
@@ -96,64 +84,14 @@ export function deleteStableHorse(stableHorseId: string) {
   );
 }
 
-export function setOrgWebhook(orgName: string, body: SetOrgWebhookRequest) {
-  return request<SetOrgWebhookResponse>(
-    'PUT',
-    `/organisations/${encodeURIComponent(orgName)}/webhook`,
-    body,
-    undefined,
-  );
-}
-
-export function getOrgWebhook(orgName: string) {
-  return request<GetOrgWebhookResponse>(
-    'GET',
-    `/organisations/${encodeURIComponent(orgName)}/webhook`,
-    undefined,
-    undefined,
-  );
-}
-
-export function deleteOrgWebhook(orgName: string) {
-  return request<DeleteOrgWebhookResponse>(
-    'DELETE',
-    `/organisations/${encodeURIComponent(orgName)}/webhook`,
-    undefined,
-    undefined,
-  );
-}
-
-export function setOrgSchedule(orgName: string, body: SetOrgScheduleRequest) {
-  return request<SetOrgScheduleResponse>(
-    'PUT',
-    `/organisations/${encodeURIComponent(orgName)}/schedule`,
-    body,
-    undefined,
-  );
-}
-
-export function getOrgSchedule(orgName: string) {
-  return request<GetOrgScheduleResponse>(
-    'GET',
-    `/organisations/${encodeURIComponent(orgName)}/schedule`,
-    undefined,
-    undefined,
-  );
-}
-
-export function clearOrgSchedule(orgName: string) {
-  return request<DeleteOrgScheduleResponse>(
-    'DELETE',
-    `/organisations/${encodeURIComponent(orgName)}/schedule`,
-    undefined,
-    undefined,
-  );
-}
-
 export function rollHat(stableHorseId: string) {
   return request<RollHatResponse>('POST', `/jockey/me/horses/${encodeURIComponent(stableHorseId)}/roll`, undefined, undefined);
 }
 
 export function equipHat(stableHorseId: string, body: EquipHatRequest) {
   return request<EquipHatResponse>('POST', `/jockey/me/horses/${encodeURIComponent(stableHorseId)}/equip`, body, undefined);
+}
+
+export function createWebSession() {
+  return request<WebSessionCreateResponse>('POST', '/web-sessions', undefined, undefined);
 }

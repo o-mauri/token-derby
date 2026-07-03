@@ -6,18 +6,20 @@ import { putSchedule } from '../db/schedules.js';
 import { isValidTimeZone } from '../lib/tz.js';
 import { ok, err, parseJson } from '../lib/http.js';
 import { readCliVersion, meetsMinimumCliVersion, versionMismatchMessage } from '../lib/version.js';
-import { authenticate } from '../lib/auth.js';
+import { resolveCaller } from '../lib/auth.js';
 
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 export const handler: APIGatewayProxyHandlerV2 = async (event) => {
-  const cli_version = readCliVersion(event);
-  if (!cli_version) return err('BAD_REQUEST', 'X-Cli-Version header required — upgrade your CLI');
-  if (!parseSemver(cli_version)) return err('BAD_REQUEST', `X-Cli-Version must be MAJOR.MINOR.PATCH (got "${cli_version}")`);
-  if (!meetsMinimumCliVersion(cli_version)) return err('VERSION_MISMATCH', versionMismatchMessage());
-
-  const auth = await authenticate(event);
+  const auth = await resolveCaller(event);
   if ('error' in auth) return err('UNAUTHENTICATED', auth.error);
+
+  if (auth.source === 'cli') {
+    const cli_version = readCliVersion(event);
+    if (!cli_version) return err('BAD_REQUEST', 'X-Cli-Version header required — upgrade your CLI');
+    if (!parseSemver(cli_version)) return err('BAD_REQUEST', `X-Cli-Version must be MAJOR.MINOR.PATCH (got "${cli_version}")`);
+    if (!meetsMinimumCliVersion(cli_version)) return err('VERSION_MISMATCH', versionMismatchMessage());
+  }
 
   const raw = event.pathParameters?.org_name;
   if (!raw) return err('BAD_REQUEST', 'org_name path parameter required');

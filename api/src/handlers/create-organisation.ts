@@ -5,22 +5,18 @@ import { generateOrgId, generateOrgJoinToken } from '../lib/codes.js';
 import { putOrganisation, getOrganisationByName, addMember } from '../db/organisations.js';
 import { ok, err, parseJson } from '../lib/http.js';
 import { readCliVersion, meetsMinimumCliVersion, versionMismatchMessage } from '../lib/version.js';
-import { authenticate } from '../lib/auth.js';
+import { resolveCaller } from '../lib/auth.js';
 
 export const handler: APIGatewayProxyHandlerV2 = async (event) => {
-  const cli_version = readCliVersion(event);
-  if (!cli_version) {
-    return err('BAD_REQUEST', 'X-Cli-Version header required — upgrade your CLI');
-  }
-  if (!parseSemver(cli_version)) {
-    return err('BAD_REQUEST', `X-Cli-Version must be MAJOR.MINOR.PATCH (got "${cli_version}")`);
-  }
-  if (!meetsMinimumCliVersion(cli_version)) {
-    return err('VERSION_MISMATCH', versionMismatchMessage());
-  }
-
-  const auth = await authenticate(event);
+  const auth = await resolveCaller(event);
   if ('error' in auth) return err('UNAUTHENTICATED', auth.error);
+
+  if (auth.source === 'cli') {
+    const cli_version = readCliVersion(event);
+    if (!cli_version) return err('BAD_REQUEST', 'X-Cli-Version header required — upgrade your CLI');
+    if (!parseSemver(cli_version)) return err('BAD_REQUEST', `X-Cli-Version must be MAJOR.MINOR.PATCH (got "${cli_version}")`);
+    if (!meetsMinimumCliVersion(cli_version)) return err('VERSION_MISMATCH', versionMismatchMessage());
+  }
 
   const body = parseJson<CreateOrganisationRequest>(event.body);
   if (!body || typeof body.name !== 'string') {

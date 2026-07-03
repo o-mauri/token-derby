@@ -19,3 +19,5 @@ export const generateOrgJoinToken = () => randomUUID();
 export const generateUserId = () => randomUUID();
 export const generateSecretToken = () => randomBytes(SECRET_TOKEN_BYTES).toString('base64url');
 export const generateWebhookSecret = () => randomBytes(32).toString('base64url');
+export const generateWebSessionCode = () => randomUUID();
+export const generateWebSessionToken = () => randomBytes(32).toString('base64url');

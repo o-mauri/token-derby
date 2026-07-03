@@ -4,6 +4,7 @@ import { renderRace } from './render/race.js';
 import { renderOrg } from './render/org.js';
 import { renderOrgLive } from './render/org-live.js';
 import { renderCatalog } from './render/catalog.js';
+import { renderOrgManager } from './org-manager/index.js';
 
 // Legendary hat keyframes are installed lazily on the first buildHatGroup
 // call (see hat-svg.ts), so every entry point — main.ts, preview-race.ts,
@@ -30,6 +31,8 @@ function route() {
     activeCleanup = renderOrgLive(root, r.orgName);
   } else if (r.type === 'catalog') {
     activeCleanup = renderCatalog(root);
+  } else if (r.type === 'org-manager') {
+    activeCleanup = renderOrgManager(root);
   } else {
     root.innerHTML = `
       <section class="error">

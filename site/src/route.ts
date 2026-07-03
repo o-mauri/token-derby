@@ -4,6 +4,7 @@ export type Route =
   | { type: 'org'; orgName: string }
   | { type: 'org-live'; orgName: string }
   | { type: 'catalog' }
+  | { type: 'org-manager' }
   | { type: 'not-found' };
 
 export function parseRoute(pathname: string): Route {
@@ -12,6 +13,8 @@ export function parseRoute(pathname: string): Route {
 
   const raceMatch = trimmed.match(/^\/race\/([A-Za-z0-9]+)$/);
   if (raceMatch) return { type: 'race', joinCode: raceMatch[1]!.toUpperCase() };
+
+  if (trimmed === '/org-manager') return { type: 'org-manager' };
 
   const orgLiveMatch = trimmed.match(/^\/org\/([A-Za-z0-9]{1,12})\/live$/);
   if (orgLiveMatch) return { type: 'org-live', orgName: orgLiveMatch[1]! };

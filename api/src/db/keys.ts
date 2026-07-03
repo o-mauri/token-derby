@@ -74,3 +74,14 @@ export function seriesPointKey(race_id: string, horse_id: string, seq: number) {
     sk: `${seriesPointPrefix(horse_id)}${padSeq(seq)}`,
   };
 }
+
+export const WEB_GRANT_PK_PREFIX = 'WEBGRANT#';
+export const WEB_SESSION_PK_PREFIX = 'WEBSESSION#';
+
+export function webGrantKey(code: string) {
+  return { pk: `${WEB_GRANT_PK_PREFIX}${code}`, sk: 'META' };
+}
+
+export function webSessionKey(token: string) {
+  return { pk: `${WEB_SESSION_PK_PREFIX}${token}`, sk: 'META' };
+}

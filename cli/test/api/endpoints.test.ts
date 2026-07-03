@@ -28,21 +28,6 @@ describe('endpoints', () => {
     expect(init.body).toBe(JSON.stringify({ seq: 1, delta: 42 }));
   });
 
-  it('createOrganisation POSTs to /organisations', async () => {
-    const fetch = vi.fn().mockResolvedValue({
-      ok: true, status: 200,
-      headers: { get: () => 'application/json' },
-      text: async () => JSON.stringify({ org_id: 'o', org_name: 'Acme', org_join_token: 't' }),
-    });
-    (globalThis as any).fetch = fetch;
-    const { createOrganisation } = await import('../../src/api/endpoints.js');
-    const out = await createOrganisation({ name: 'Acme' });
-    expect(out.org_join_token).toBe('t');
-    expect(fetch.mock.calls[0]?.[0]).toMatch(/\/organisations$/);
-    const init = fetch.mock.calls[0]?.[1] as RequestInit;
-    expect(init.method).toBe('POST');
-  });
-
   it('joinOrganisation POSTs to /organisations/join', async () => {
     const fetch = vi.fn().mockResolvedValue({
       ok: true, status: 200,
@@ -67,21 +52,6 @@ describe('endpoints', () => {
     expect(fetch.mock.calls[0]?.[0]).toMatch(/\/organisations$/);
     const init = fetch.mock.calls[0]?.[1] as RequestInit;
     expect(init.method).toBe('GET');
-  });
-
-  it('getOrganisation GETs /organisations/<name> with URL-encoded name', async () => {
-    const fetch = vi.fn().mockResolvedValue({
-      ok: true, status: 200,
-      headers: { get: () => 'application/json' },
-      text: async () => JSON.stringify({
-        org_id: 'o', org_name: 'Acme', org_join_token: 't',
-        created_at: 'now', creator_user_name: 'Alice',
-      }),
-    });
-    (globalThis as any).fetch = fetch;
-    const { getOrganisation } = await import('../../src/api/endpoints.js');
-    await getOrganisation('Acme');
-    expect(fetch.mock.calls[0]?.[0]).toMatch(/\/organisations\/Acme$/);
   });
 
   it('joinRace sends { stable_horse_id } body', async () => {

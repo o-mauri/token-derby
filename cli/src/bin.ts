@@ -8,16 +8,8 @@ import { endCommand } from './commands/end.js';
 import { initCommand } from './commands/init.js';
 import { updateCommand } from './commands/update.js';
 import { rollCommand } from './commands/roll.js';
-import { orgCreateCommand } from './commands/org-create.js';
 import { orgJoinCommand } from './commands/org-join.js';
-import { orgListCommand } from './commands/org-list.js';
-import { orgInfoCommand } from './commands/org-info.js';
-import { orgWebhookSetCommand } from './commands/org-webhook-set.js';
-import { orgWebhookGetCommand } from './commands/org-webhook-get.js';
-import { orgWebhookClearCommand } from './commands/org-webhook-clear.js';
-import { orgScheduleSetCommand } from './commands/org-schedule-set.js';
-import { orgScheduleGetCommand } from './commands/org-schedule-get.js';
-import { orgScheduleClearCommand } from './commands/org-schedule-clear.js';
+import { webCommand } from './commands/web.js';
 import { CLI_VERSION } from './version.js';
 import { loadIdentity } from './identity/identity.js';
 
@@ -39,25 +31,9 @@ Stable management:
   token-derby stable delete <name>        Remove a horse from your stable
 
 Organisations:
-  token-derby organisation create         Create a new organisation (interactive)
   token-derby organisation join <token>   Join an organisation with a join token
-  token-derby organisation info <name>    Show an org's join token (members only)
-  token-derby organisation list           Show organisations you're a member of
-  token-derby organisation webhook set <name> <url>
-                                          Configure an https webhook for race events.
-                                          Prints a secret used to sign each request.
-                                          Only the org creator can run this.
-  token-derby organisation webhook get <name>
-                                          Show the org's configured webhook URL (or "no webhook").
-  token-derby organisation webhook clear <name>
-                                          Remove the webhook for this org.
-  token-derby organisation schedule set <name> --days mon-fri --start 09:00 --end 17:30 --tz Europe/London
-                                          Configure a repeating race schedule. Races auto-start
-                                          at the daily start time. Only the org creator can run this.
-  token-derby organisation schedule get <name>
-                                          Show the org's configured schedule (or "no schedule").
-  token-derby organisation schedule clear <name>
-                                          Remove the repeating schedule for this org.
+  token-derby web                         Open the web org manager (create orgs,
+                                          manage schedules, webhooks, members)
 
 Races:
   token-derby create [--organisation <name>]
@@ -110,30 +86,9 @@ async function main(): Promise<number> {
 
   if (cmd === 'organisation' || cmd === 'org') {
     const sub = argv[1];
-    if (sub === 'create') return orgCreateCommand();
-    if (sub === 'join')   return orgJoinCommand(argv[2]);
-    if (sub === 'info')   return orgInfoCommand(argv[2]);
-    if (sub === 'list')   return orgListCommand();
-    if (sub === 'webhook') {
-      const action = argv[2];
-      if (action === 'set')   return orgWebhookSetCommand(argv[3], argv[4]);
-      if (action === 'get')   return orgWebhookGetCommand(argv[3]);
-      if (action === 'clear') return orgWebhookClearCommand(argv[3]);
-      console.error(`Unknown webhook action: ${action ?? '(none)'}`);
-      console.error('Try: organisation webhook set <name> <url> | organisation webhook get <name> | organisation webhook clear <name>');
-      return 2;
-    }
-    if (sub === 'schedule') {
-      const action = argv[2];
-      if (action === 'set')   return orgScheduleSetCommand(argv[3], argv.slice(4));
-      if (action === 'get')   return orgScheduleGetCommand(argv[3]);
-      if (action === 'clear') return orgScheduleClearCommand(argv[3]);
-      console.error(`Unknown schedule action: ${action ?? '(none)'}`);
-      console.error('Try: organisation schedule set <name> ... | organisation schedule get <name> | organisation schedule clear <name>');
-      return 2;
-    }
-    console.error(`Unknown organisation subcommand: ${sub ?? '(none)'}`);
-    console.error('Try: organisation create | organisation join <token> | organisation info <name> | organisation list | organisation webhook <set|get|clear> ... | organisation schedule <set|get|clear> ...');
+    if (sub === 'join') return orgJoinCommand(argv[2]);
+    console.error(`Organisation management has moved to the web: token-derby web`);
+    console.error(`The only CLI organisation command is: organisation join <token>`);
     return 2;
   }
 
@@ -144,6 +99,7 @@ async function main(): Promise<number> {
   if (cmd === 'join')   return joinCommand(argv[1], argv.slice(2));
   if (cmd === 'end')    return endCommand(argv[1]);
   if (cmd === 'roll')      return rollCommand();
+  if (cmd === 'web')    return webCommand();
 
   console.error(`Unknown command: ${cmd}`);
   console.error(HELP);

@@ -91,7 +91,12 @@ export type GetOrganisationResponse = {
   org_name: string;
   org_join_token: string;
   created_at: string;
+  creator_user_id: string;
   creator_user_name: string;
+};
+
+export type OrgMembersResponse = {
+  members: { user_id: string; user_name: string; joined_at: string }[];
 };
 
 export type ListOrgRacesResponse = {

@@ -50,6 +50,7 @@ export class TokenDerbyStack extends cdk.Stack {
       sortKey: { name: 'sk', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       removalPolicy: cdk.RemovalPolicy.RETAIN,
+      timeToLiveAttribute: 'ttl',
     });
 
     table.addGlobalSecondaryIndex({
@@ -129,6 +130,10 @@ export class TokenDerbyStack extends cdk.Stack {
     const setOrgScheduleFn = makeFn('SetOrgScheduleFn', 'set-org-schedule');
     const getOrgScheduleFn = makeFn('GetOrgScheduleFn', 'get-org-schedule');
     const deleteOrgScheduleFn = makeFn('DeleteOrgScheduleFn', 'delete-org-schedule');
+    const createWebSessionFn = makeFn('CreateWebSessionFn', 'create-web-session');
+    const exchangeWebSessionFn = makeFn('ExchangeWebSessionFn', 'exchange-web-session');
+    const deleteWebSessionFn = makeFn('DeleteWebSessionFn', 'delete-web-session');
+    const listOrgMembersFn = makeFn('ListOrgMembersFn', 'list-org-members');
     const scheduleTickFn = makeFn('ScheduleTickFn', 'schedule-tick', { timeout: cdk.Duration.seconds(120) });
 
     new events.Rule(this, 'ScheduleTickRule', {
@@ -229,6 +234,10 @@ export class TokenDerbyStack extends cdk.Stack {
       methods: [HttpMethod.DELETE],
       integration: new HttpLambdaIntegration('DeleteOrgScheduleInt', deleteOrgScheduleFn),
     });
+    httpApi.addRoutes({ path: '/api/organisations/{org_name}/members', methods: [HttpMethod.GET], integration: new HttpLambdaIntegration('ListOrgMembersInt', listOrgMembersFn) });
+    httpApi.addRoutes({ path: '/api/web-sessions', methods: [HttpMethod.POST], integration: new HttpLambdaIntegration('CreateWebSessionInt', createWebSessionFn) });
+    httpApi.addRoutes({ path: '/api/web-sessions/exchange', methods: [HttpMethod.POST], integration: new HttpLambdaIntegration('ExchangeWebSessionInt', exchangeWebSessionFn) });
+    httpApi.addRoutes({ path: '/api/web-sessions', methods: [HttpMethod.DELETE], integration: new HttpLambdaIntegration('DeleteWebSessionInt', deleteWebSessionFn) });
     httpApi.addRoutes({ path: '/api/jockey/init', methods: [HttpMethod.POST], integration: new HttpLambdaIntegration('InitJockeyInt', initJockeyFn) });
     httpApi.addRoutes({ path: '/api/jockey/me', methods: [HttpMethod.GET], integration: new HttpLambdaIntegration('GetJockeyInt', getJockeyFn) });
     httpApi.addRoutes({ path: '/api/jockey/me', methods: [HttpMethod.PUT], integration: new HttpLambdaIntegration('UpdateJockeyInt', updateJockeyFn) });
