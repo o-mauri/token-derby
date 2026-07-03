@@ -136,6 +136,16 @@ export class TokenDerbyStack extends cdk.Stack {
       targets: [new eventsTargets.LambdaFunction(scheduleTickFn)],
     });
 
+    // Daily sweep that deletes race time-series points older than two weeks, so
+    // the table stays small. Longer timeout: it does a full-table scan + batched
+    // deletes. Older finished races keep their standings; only the graphs go.
+    const pruneSeriesFn = makeFn('PruneSeriesFn', 'prune-series', { timeout: cdk.Duration.seconds(300) });
+
+    new events.Rule(this, 'PruneSeriesRule', {
+      schedule: events.Schedule.rate(cdk.Duration.days(1)),
+      targets: [new eventsTargets.LambdaFunction(pruneSeriesFn)],
+    });
+
     const initJockeyFn = makeFn('InitJockeyFn', 'init-jockey');
     const getJockeyFn = makeFn('GetJockeyFn', 'get-jockey');
     const updateJockeyFn = makeFn('UpdateJockeyFn', 'update-jockey');
