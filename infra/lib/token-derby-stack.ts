@@ -16,15 +16,21 @@ import * as apigatewayv2 from 'aws-cdk-lib/aws-apigatewayv2';
 import * as events from 'aws-cdk-lib/aws-events';
 import * as eventsTargets from 'aws-cdk-lib/aws-events-targets';
 import * as path from 'path';
+import type { EnvConfig } from '../bin/token-derby';
 
-const DOMAIN_NAME = 'token-derby.mauricode.co.uk';
-const ADMIN_DOMAIN_NAME = 'admin.token-derby.mauricode.co.uk';
 const HOSTED_ZONE_DOMAIN = 'mauricode.co.uk';
-const TABLE_NAME = 'token-derby';
+
+interface TokenDerbyStackProps extends cdk.StackProps {
+  config: EnvConfig;
+}
 
 export class TokenDerbyStack extends cdk.Stack {
-  constructor(scope: Construct, id: string, props: cdk.StackProps) {
+  constructor(scope: Construct, id: string, props: TokenDerbyStackProps) {
     super(scope, id, props);
+    const { config } = props;
+    const DOMAIN_NAME = config.siteDomain;
+    const ADMIN_DOMAIN_NAME = config.adminDomain;
+    const TABLE_NAME = config.tableName;
 
     // ── Route 53 + ACM (cert must live in us-east-1 for CloudFront) ────
     const hostedZone = route53.HostedZone.fromLookup(this, 'HostedZone', {
@@ -49,7 +55,7 @@ export class TokenDerbyStack extends cdk.Stack {
       partitionKey: { name: 'pk', type: dynamodb.AttributeType.STRING },
       sortKey: { name: 'sk', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-      removalPolicy: cdk.RemovalPolicy.RETAIN,
+      removalPolicy: config.disposable ? cdk.RemovalPolicy.DESTROY : cdk.RemovalPolicy.RETAIN,
     });
 
     table.addGlobalSecondaryIndex({
@@ -91,7 +97,7 @@ export class TokenDerbyStack extends cdk.Stack {
 
     // ── Lambda factory ─────────────────────────────────────────────────
     const apiDir = path.resolve(__dirname, '..', '..', 'api', 'src', 'handlers');
-    const commonEnv = { TABLE_NAME, NODE_OPTIONS: '--enable-source-maps' };
+    const commonEnv = { TABLE_NAME, NODE_OPTIONS: '--enable-source-maps', ADMIN_SSM_PREFIX: config.ssmPrefix };
 
     const makeFn = (name: string, fileBase: string, opts?: { timeout?: cdk.Duration }) => {
       const fn = new NodejsFunction(this, name, {
@@ -164,7 +170,7 @@ export class TokenDerbyStack extends cdk.Stack {
     const adminRemoveHatFn = makeFn('AdminRemoveHatFn', 'admin-remove-hat');
     const adminDeleteHorseFn = makeFn('AdminDeleteHorseFn', 'admin-delete-horse');
 
-    const adminSsmArn = `arn:aws:ssm:${this.region}:${this.account}:parameter/token-derby/admin/*`;
+    const adminSsmArn = `arn:aws:ssm:${this.region}:${this.account}:parameter${config.ssmPrefix}/*`;
     for (const fn of [adminLoginFn, adminListUsersFn, adminListOrgsFn, adminRenameUserFn, adminRenameHorseFn, adminRemoveHatFn, adminDeleteHorseFn]) {
       fn.addToRolePolicy(new cdk.aws_iam.PolicyStatement({
         actions: ['ssm:GetParameter'],
@@ -174,7 +180,7 @@ export class TokenDerbyStack extends cdk.Stack {
 
     // ── HTTP API Gateway ───────────────────────────────────────────────
     const httpApi = new HttpApi(this, 'TokenDerbyApi', {
-      apiName: 'token-derby-api',
+      apiName: config.apiName,
       corsPreflight: {
         // The API serves public, read-only race data and authenticates writes
         // with per-request secret tokens (never cookies), so there are no
