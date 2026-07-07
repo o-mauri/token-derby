@@ -80,6 +80,9 @@ export type HorseView = Horse & {
   // Trailing 15-minute token pace (tokens/min), computed server-side from the
   // series points. Present only for live races; absent for pending/finished.
   pace_15m?: number;
+  // League fixtures only: the horse's division for the current season (bottom
+  // division for an unscored new entrant). Absent for non-league races.
+  division?: number;
 };
 
 export type RaceHighlight = {
@@ -243,4 +246,39 @@ export type LeagueSeason = {
   fixtures_materialised: number;
   last_materialised_date?: string; // local YYYY-MM-DD
   created_at: string;
+};
+
+// One horse's standing within a division for a season. Stored on
+// LEAGUE#SEASON#<n>#DIV#<d>#HORSE#<stable_horse_id>. Per-round scoring
+// idempotency is guarded by a `scored_rounds` number-set on the stored item —
+// an internal detail stripped before this shape is returned.
+export type LeagueStanding = {
+  org_id: string;
+  season: number;
+  division: number;         // 1 = top flight, league.divisions = bottom/overflow
+  stable_horse_id: string;
+  horse_name: string;
+  user_id: string;
+  user_name: string;
+  points: number;
+  season_tokens: number;    // sum of final_tokens across the season's fixtures
+  entered_at: string;
+};
+
+export type StandingRow = {
+  rank: number;              // 1-based within the division
+  stable_horse_id: string;
+  horse_name: string;
+  user_name: string;
+  points: number;
+  season_tokens: number;
+  zone: 'promote' | 'relegate' | null;
+};
+export type DivisionStandings = { division: number; rows: StandingRow[] };
+export type SeasonStandings = {
+  org_name: string;
+  season: number;
+  round: number;             // fixtures materialised so far this season
+  races_per_season: number;
+  divisions: DivisionStandings[]; // ordered 1..N (top flight first)
 };

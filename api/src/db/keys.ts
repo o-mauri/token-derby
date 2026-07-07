@@ -66,6 +66,14 @@ export function orgLeagueSeasonKey(org_id: string, season: number) {
   return { pk: `${ORG_PK_PREFIX}${org_id}`, sk: `LEAGUE#SEASON#${season}` };
 }
 
+export function orgLeagueStandingKey(org_id: string, season: number, division: number, stable_horse_id: string) {
+  return { pk: `${ORG_PK_PREFIX}${org_id}`, sk: `LEAGUE#SEASON#${season}#DIV#${division}#HORSE#${stable_horse_id}` };
+}
+
+export function orgLeagueStandingsPrefix(org_id: string, season: number) {
+  return { pk: `${ORG_PK_PREFIX}${org_id}`, skPrefix: `LEAGUE#SEASON#${season}#DIV#` };
+}
+
 export const POINT_SK_PREFIX = 'POINT#';
 
 // 12 digits comfortably exceeds any realistic per-race heartbeat count and

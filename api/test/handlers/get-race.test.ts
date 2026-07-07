@@ -3,6 +3,12 @@ import { handler as getRaceHandler } from '../../src/handlers/get-race.js';
 import { handler as createHandler } from '../../src/handlers/create-race.js';
 import { handler as joinHandler } from '../../src/handlers/join-race.js';
 import { handler as hbHandler } from '../../src/handlers/heartbeat.js';
+import { handler as createOrgHandler } from '../../src/handlers/create-organisation.js';
+import { putLeague } from '../../src/db/leagues.js';
+import { ensureStanding } from '../../src/db/league-standings.js';
+import { putRace } from '../../src/db/races.js';
+import { addMember } from '../../src/db/organisations.js';
+import { generateRaceId, generateJoinCode, generateAdminCode } from '../../src/lib/codes.js';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { makeUser, makeHorse, type TestUser } from '../helpers/auth-helper.js';
 import { CURRENT_CLI_VERSION } from '../helpers/cli-version.js';
@@ -190,5 +196,76 @@ describe('getRace handler', () => {
     const body = JSON.parse(res.body);
     expect(body.status).toBe('pending');
     expect(body.horses[0].crashed).toBeUndefined();
+  });
+
+  async function createOrg(user: TestUser, name: string): Promise<string> {
+    const res: any = await createOrgHandler(evt({ name }, '/organisations', 'POST /organisations', undefined, user));
+    if (res.statusCode !== 200) throw new Error(`create-org: ${res.body}`);
+    return JSON.parse(res.body).org_id;
+  }
+
+  it('stamps league tags and per-horse division on a league race view', async () => {
+    const owner = await makeUser('GR_LgOwner');
+    const org_id = await createOrg(owner, 'GRLgOrg');
+    await putLeague({
+      org_id, divisions: 3, racers_per_division: 10, races_per_season: 8, promote_relegate_count: 1,
+      weekdays: [1], start_local: '09:00', end_local: '17:00', tz: 'UTC',
+      current_season: 1, status: 'active', created_at: 'c',
+      creator_user_id: owner.user_id, creator_user_name: owner.display_name,
+    });
+
+    const join_code = generateJoinCode();
+    await putRace({
+      race_id: generateRaceId(),
+      name: 'League Fixture',
+      start_time: new Date(Date.now() - 60_000).toISOString(),
+      end_time: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      tz: 'UTC',
+      max_participants: 20,
+      join_code,
+      created_at: new Date().toISOString(),
+      org_id,
+      organisation_name: 'GRLgOrg',
+      league_id: org_id,
+      league_season: 1,
+      league_round: 1,
+    }, generateAdminCode());
+
+    const now = new Date().toISOString();
+
+    // Horse with a season standing in division 2.
+    const userA = await makeUser('GR_LgA');
+    const horseA = await makeHorse(userA, 'LgHorseA');
+    await addMember(org_id, userA.user_id, userA.display_name, now);
+    const joinResA: any = await joinHandler(evt(
+      { stable_horse_id: horseA.stable_horse_id }, `/races/${join_code}/join`, 'POST /races/{join_code}/join', { join_code }, userA,
+    ));
+    if (joinResA.statusCode !== 200) throw new Error(`join A: ${joinResA.body}`);
+    await ensureStanding({
+      org_id, season: 1, division: 2, stable_horse_id: horseA.stable_horse_id,
+      horse_name: 'LgHorseA', user_id: userA.user_id, user_name: userA.display_name,
+      points: 5, season_tokens: 100, entered_at: now,
+    });
+
+    // Horse with NO standing — should default to the bottom division (3).
+    const userB = await makeUser('GR_LgB');
+    const horseB = await makeHorse(userB, 'LgHorseB');
+    await addMember(org_id, userB.user_id, userB.display_name, now);
+    const joinResB: any = await joinHandler(evt(
+      { stable_horse_id: horseB.stable_horse_id }, `/races/${join_code}/join`, 'POST /races/{join_code}/join', { join_code }, userB,
+    ));
+    if (joinResB.statusCode !== 200) throw new Error(`join B: ${joinResB.body}`);
+
+    const res: any = await getRaceHandler(evt(null, `/races/${join_code}`, 'GET /races/{join_code}', { join_code }));
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.league_id).toBe(org_id);
+    expect(body.league_season).toBe(1);
+    expect(body.league_round).toBe(1);
+
+    const hA = body.horses.find((h: any) => h.stable_horse_id === horseA.stable_horse_id);
+    expect(hA.division).toBe(2);
+    const hB = body.horses.find((h: any) => h.stable_horse_id === horseB.stable_horse_id);
+    expect(hB.division).toBe(3);
   });
 });

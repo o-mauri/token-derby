@@ -3,6 +3,7 @@ import {
   raceMetaKey, horseKey, parseHorseId,
   orgMetaKey, orgMemberKey, parseOrgId, parseMemberUserId,
   seriesPointKey, seriesPointPrefix,
+  orgLeagueStandingKey, orgLeagueStandingsPrefix,
 } from '../../src/db/keys.js';
 
 describe('keys', () => {
@@ -52,5 +53,18 @@ describe('series point keys', () => {
   it('prefix targets exactly one horse', () => {
     expect(seriesPointKey('r', 'horseA', 1).sk.startsWith(seriesPointPrefix('horseA'))).toBe(true);
     expect(seriesPointKey('r', 'horseB', 1).sk.startsWith(seriesPointPrefix('horseA'))).toBe(false);
+  });
+});
+
+describe('league standing keys', () => {
+  it('builds the standing item key', () => {
+    expect(orgLeagueStandingKey('o1', 2, 3, 'sh1')).toEqual({
+      pk: 'ORG#o1', sk: 'LEAGUE#SEASON#2#DIV#3#HORSE#sh1',
+    });
+  });
+  it('builds the season standings query prefix', () => {
+    expect(orgLeagueStandingsPrefix('o1', 2)).toEqual({
+      pk: 'ORG#o1', skPrefix: 'LEAGUE#SEASON#2#DIV#',
+    });
   });
 });

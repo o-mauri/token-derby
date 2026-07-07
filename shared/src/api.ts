@@ -1,4 +1,4 @@
-import type { CollectedHat, HatId, HorseColors, HorseView, Race, RaceStatus, RaceSummary, RaceView, OrganisationSummary, StableHorse, RaceSchedule, League, ModelKey } from './types.js';
+import type { CollectedHat, HatId, HorseColors, HorseView, Race, RaceStatus, RaceSummary, RaceView, OrganisationSummary, StableHorse, RaceSchedule, League, ModelKey, SeasonStandings } from './types.js';
 
 export type CreateRaceRequest = {
   name: string;
@@ -212,3 +212,5 @@ export type SetOrgLeagueRequest = {
 export type SetOrgLeagueResponse = { league: League };
 export type GetOrgLeagueResponse = { league: League | null };
 export type DeleteOrgLeagueResponse = { ok: true };
+
+export type GetLeagueStandingsResponse = { standings: SeasonStandings | null };

@@ -5,6 +5,7 @@ import { awardHorseXp, recordHorseRaceResult } from '../db/stable.js';
 import { setRaceEndedIfAbsent } from '../db/races.js';
 import { getOrganisationById } from '../db/organisations.js';
 import { sendOrgWebhook } from './webhook.js';
+import { scoreLeagueRace } from './score-league-race.js';
 import { randomUUID } from 'node:crypto';
 
 export type FinaliseResult = {
@@ -83,6 +84,12 @@ export async function finaliseRace(race: Race, now: Date): Promise<FinaliseResul
       ]);
     }
   }));
+
+  // League fixtures: award division points into the season standings. Idempotent
+  // per (horse, round), so a re-finalisation or lazy-finalise retry is safe.
+  if (race.league_id) {
+    await scoreLeagueRace(race, stamped);
+  }
 
   const ended_at = await setRaceEndedIfAbsent(race.race_id, now.toISOString());
 

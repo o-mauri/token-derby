@@ -12,6 +12,9 @@ import { handler as createRaceHandler } from '../../src/handlers/create-race.js'
 import { getRaceByJoinCode } from '../../src/db/races.js';
 import { makeUser } from '../helpers/auth-helper.js';
 import { CURRENT_CLI_VERSION } from '../helpers/cli-version.js';
+import { putLeague } from '../../src/db/leagues.js';
+import { listSeasonStandings } from '../../src/db/league-standings.js';
+import type { League } from '@token-derby/shared';
 
 function findHorse(horses: Horse[], name: string): Horse {
   const h = horses.find(h => h.name === name);
@@ -161,6 +164,46 @@ describe('finaliseRace', () => {
     // Total: 65 + 6 + 12 = 83
     expect(alpha.xp_awarded).toBe(83);
     expect(result.newly_finalised).toBe(true);
+  });
+});
+
+describe('finaliseRace league scoring', () => {
+  it('scores league standings when the race carries league fixture tags', async () => {
+    const owner = await makeUser('FrLeagueOwner');
+    const orgRes: any = await createOrgHandler({
+      version: '2.0', routeKey: 'POST /organisations', rawPath: '/organisations', rawQueryString: '',
+      headers: { 'content-type': 'application/json', 'x-cli-version': CURRENT_CLI_VERSION, 'x-user-id': owner.user_id, 'x-user-token': owner.secret_token },
+      requestContext: {} as any,
+      body: JSON.stringify({ name: 'FrLeagueOrg1' }),
+      isBase64Encoded: false,
+    });
+    expect(orgRes.statusCode).toBe(200);
+    const org_id = JSON.parse(orgRes.body).org_id;
+
+    const league: League = {
+      org_id, divisions: 3, racers_per_division: 10, races_per_season: 8, promote_relegate_count: 2,
+      weekdays: [1], start_local: '09:00', end_local: '17:00', tz: 'UTC', current_season: 1,
+      status: 'active', created_at: 'c', creator_user_id: owner.user_id, creator_user_name: 'FrLeagueOwner',
+    };
+    await putLeague(league);
+
+    const horse = makeHorse('LeagueHorse', 900, { user_id: owner.user_id, user_name: 'FrLeagueOwner' });
+    const race = makeRace({ org_id, league_id: org_id, league_season: 1, league_round: 1 });
+    await putRace(race, `admin-${race.race_id}`);
+    await putHorse(race.race_id, horse, `tok-${horse.horse_id}`);
+
+    const result = await finaliseRace(race, new Date());
+    expect(result.newly_finalised).toBe(true);
+
+    const standings = await listSeasonStandings(org_id, 1);
+    expect(standings).toHaveLength(1);
+    // Sole entrant → bottom division (3), field of 1 → 1 point.
+    expect(standings[0]).toMatchObject({
+      division: 3,
+      stable_horse_id: horse.stable_horse_id,
+      points: 1,
+      season_tokens: 900,
+    });
   });
 });
 

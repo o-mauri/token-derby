@@ -4,6 +4,8 @@ import { PACE_WINDOW_MS, trailingPace } from '@token-derby/shared';
 import { getRaceByJoinCode } from '../db/races.js';
 import { listHorses } from '../db/horses.js';
 import { listRecentSeriesPoints } from '../db/series.js';
+import { getLeague } from '../db/leagues.js';
+import { listSeasonStandings } from '../db/league-standings.js';
 import { computeStatus, timeLeftSeconds } from '../lib/status.js';
 import { finaliseRace } from '../lib/finalise-race.js';
 import { rankHorses } from '../lib/rank-horses.js';
@@ -32,6 +34,22 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
   }
 
   const ranked = rankHorses(horses);
+
+  // League fixtures: stamp each horse's division (unscored new entrants default to
+  // the bottom division) so clients can group the field by division.
+  if (race.league_id && race.league_season !== undefined) {
+    const league = await getLeague(race.league_id); // league_id === org_id
+    if (league) {
+      const bottom = league.divisions;
+      const divByHorse = new Map<string, number>();
+      for (const s of await listSeasonStandings(race.league_id, race.league_season)) {
+        divByHorse.set(s.stable_horse_id, s.division);
+      }
+      for (const h of ranked) {
+        if (h.stable_horse_id) h.division = divByHorse.get(h.stable_horse_id) ?? bottom;
+      }
+    }
+  }
 
   // Trailing 15-min pace, computed from the series points. Live races only —
   // meaningless before a race starts or after it ends. The window is clamped to
@@ -63,6 +81,9 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
     ...(race.organisation_name ? { organisation_name: race.organisation_name } : {}),
     ...(race.counts_input ? { counts_input: true } : {}),
     ...(race.primary_top5 ? { primary_top5: true } : {}),
+    ...(race.league_id ? { league_id: race.league_id } : {}),
+    ...(race.league_season !== undefined ? { league_season: race.league_season } : {}),
+    ...(race.league_round !== undefined ? { league_round: race.league_round } : {}),
   };
   return ok(response);
 };

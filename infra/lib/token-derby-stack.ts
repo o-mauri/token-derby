@@ -145,6 +145,7 @@ export class TokenDerbyStack extends cdk.Stack {
     const setOrgLeagueFn = makeFn('SetOrgLeagueFn', 'set-org-league');
     const getOrgLeagueFn = makeFn('GetOrgLeagueFn', 'get-org-league');
     const deleteOrgLeagueFn = makeFn('DeleteOrgLeagueFn', 'delete-org-league');
+    const getOrgLeagueStandingsFn = makeFn('GetOrgLeagueStandingsFn', 'get-org-league-standings');
     const createWebSessionFn = makeFn('CreateWebSessionFn', 'create-web-session');
     const exchangeWebSessionFn = makeFn('ExchangeWebSessionFn', 'exchange-web-session');
     const deleteWebSessionFn = makeFn('DeleteWebSessionFn', 'delete-web-session');
@@ -259,6 +260,11 @@ export class TokenDerbyStack extends cdk.Stack {
       path: '/api/organisations/{org_name}/league',
       methods: [HttpMethod.DELETE],
       integration: new HttpLambdaIntegration('DeleteOrgLeagueInt', deleteOrgLeagueFn),
+    });
+    httpApi.addRoutes({
+      path: '/api/organisations/{org_name}/league/standings',
+      methods: [HttpMethod.GET],
+      integration: new HttpLambdaIntegration('GetOrgLeagueStandingsInt', getOrgLeagueStandingsFn),
     });
     httpApi.addRoutes({ path: '/api/organisations/{org_name}/members', methods: [HttpMethod.GET], integration: new HttpLambdaIntegration('ListOrgMembersInt', listOrgMembersFn) });
     httpApi.addRoutes({ path: '/api/web-sessions', methods: [HttpMethod.POST], integration: new HttpLambdaIntegration('CreateWebSessionInt', createWebSessionFn) });
