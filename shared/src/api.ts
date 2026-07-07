@@ -1,4 +1,4 @@
-import type { CollectedHat, HatId, HorseColors, HorseView, Race, RaceStatus, RaceSummary, RaceView, OrganisationSummary, StableHorse, RaceSchedule, ModelKey } from './types.js';
+import type { CollectedHat, HatId, HorseColors, HorseView, Race, RaceStatus, RaceSummary, RaceView, OrganisationSummary, StableHorse, RaceSchedule, League, ModelKey } from './types.js';
 
 export type CreateRaceRequest = {
   name: string;
@@ -194,3 +194,21 @@ export type SetOrgScheduleRequest = {
 export type SetOrgScheduleResponse = { schedule: RaceSchedule };
 export type GetOrgScheduleResponse = { schedule: RaceSchedule | null };
 export type DeleteOrgScheduleResponse = { ok: true };
+
+export type SetOrgLeagueRequest = {
+  divisions: number;
+  racers_per_division: number;
+  races_per_season: number;
+  promote_relegate_count: number;
+  weekdays: number[];
+  start_local: string;
+  end_local: string;
+  tz: string;
+  race_name?: string;
+  max_participants?: number;
+  counts_input?: boolean;
+  primary_top5?: boolean;
+};
+export type SetOrgLeagueResponse = { league: League };
+export type GetOrgLeagueResponse = { league: League | null };
+export type DeleteOrgLeagueResponse = { ok: true };

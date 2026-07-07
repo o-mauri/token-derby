@@ -30,6 +30,7 @@ beforeAll(async () => {
       { AttributeName: 'org_id', AttributeType: 'S' },
       { AttributeName: 'start_time', AttributeType: 'S' },
       { AttributeName: 'schedule_marker', AttributeType: 'S' },
+      { AttributeName: 'league_marker', AttributeType: 'S' },
     ],
     KeySchema: [
       { AttributeName: 'pk', KeyType: 'HASH' },
@@ -73,6 +74,14 @@ beforeAll(async () => {
         IndexName: 'SchedulesIndex',
         KeySchema: [
           { AttributeName: 'schedule_marker', KeyType: 'HASH' },
+          { AttributeName: 'org_id', KeyType: 'RANGE' },
+        ],
+        Projection: { ProjectionType: 'ALL' },
+      },
+      {
+        IndexName: 'LeaguesIndex',
+        KeySchema: [
+          { AttributeName: 'league_marker', KeyType: 'HASH' },
           { AttributeName: 'org_id', KeyType: 'RANGE' },
         ],
         Projection: { ProjectionType: 'ALL' },

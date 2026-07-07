@@ -96,6 +96,12 @@ export class TokenDerbyStack extends cdk.Stack {
       sortKey: { name: 'org_id', type: dynamodb.AttributeType.STRING },
     });
 
+    table.addGlobalSecondaryIndex({
+      indexName: 'LeaguesIndex',
+      partitionKey: { name: 'league_marker', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'org_id', type: dynamodb.AttributeType.STRING },
+    });
+
     // ── Lambda factory ─────────────────────────────────────────────────
     const apiDir = path.resolve(__dirname, '..', '..', 'api', 'src', 'handlers');
     const commonEnv = { TABLE_NAME, NODE_OPTIONS: '--enable-source-maps', ADMIN_SSM_PREFIX: config.ssmPrefix };
@@ -136,6 +142,9 @@ export class TokenDerbyStack extends cdk.Stack {
     const setOrgScheduleFn = makeFn('SetOrgScheduleFn', 'set-org-schedule');
     const getOrgScheduleFn = makeFn('GetOrgScheduleFn', 'get-org-schedule');
     const deleteOrgScheduleFn = makeFn('DeleteOrgScheduleFn', 'delete-org-schedule');
+    const setOrgLeagueFn = makeFn('SetOrgLeagueFn', 'set-org-league');
+    const getOrgLeagueFn = makeFn('GetOrgLeagueFn', 'get-org-league');
+    const deleteOrgLeagueFn = makeFn('DeleteOrgLeagueFn', 'delete-org-league');
     const createWebSessionFn = makeFn('CreateWebSessionFn', 'create-web-session');
     const exchangeWebSessionFn = makeFn('ExchangeWebSessionFn', 'exchange-web-session');
     const deleteWebSessionFn = makeFn('DeleteWebSessionFn', 'delete-web-session');
@@ -147,15 +156,11 @@ export class TokenDerbyStack extends cdk.Stack {
       targets: [new eventsTargets.LambdaFunction(scheduleTickFn)],
     });
 
-    // Daily sweep that deletes race time-series points older than two weeks, so
-    // the table stays small. Longer timeout: it does a full-table scan + batched
-    // deletes. Older finished races keep their standings; only the graphs go.
-    const pruneSeriesFn = makeFn('PruneSeriesFn', 'prune-series', { timeout: cdk.Duration.seconds(300) });
+    // League fixtures are materialised by the same ScheduleTick Lambda above
+    // (it iterates leagues too) — no separate tick Lambda/rule.
 
-    new events.Rule(this, 'PruneSeriesRule', {
-      schedule: events.Schedule.rate(cdk.Duration.days(1)),
-      targets: [new eventsTargets.LambdaFunction(pruneSeriesFn)],
-    });
+    // Series points expire via DynamoDB TTL (the `ttl` attribute stamped at write
+    // time in api/src/db/series.ts) — no maintenance sweep Lambda needed.
 
     const initJockeyFn = makeFn('InitJockeyFn', 'init-jockey');
     const getJockeyFn = makeFn('GetJockeyFn', 'get-jockey');
@@ -239,6 +244,21 @@ export class TokenDerbyStack extends cdk.Stack {
       path: '/api/organisations/{org_name}/schedule',
       methods: [HttpMethod.DELETE],
       integration: new HttpLambdaIntegration('DeleteOrgScheduleInt', deleteOrgScheduleFn),
+    });
+    httpApi.addRoutes({
+      path: '/api/organisations/{org_name}/league',
+      methods: [HttpMethod.PUT],
+      integration: new HttpLambdaIntegration('SetOrgLeagueInt', setOrgLeagueFn),
+    });
+    httpApi.addRoutes({
+      path: '/api/organisations/{org_name}/league',
+      methods: [HttpMethod.GET],
+      integration: new HttpLambdaIntegration('GetOrgLeagueInt', getOrgLeagueFn),
+    });
+    httpApi.addRoutes({
+      path: '/api/organisations/{org_name}/league',
+      methods: [HttpMethod.DELETE],
+      integration: new HttpLambdaIntegration('DeleteOrgLeagueInt', deleteOrgLeagueFn),
     });
     httpApi.addRoutes({ path: '/api/organisations/{org_name}/members', methods: [HttpMethod.GET], integration: new HttpLambdaIntegration('ListOrgMembersInt', listOrgMembersFn) });
     httpApi.addRoutes({ path: '/api/web-sessions', methods: [HttpMethod.POST], integration: new HttpLambdaIntegration('CreateWebSessionInt', createWebSessionFn) });

@@ -9,6 +9,7 @@ export * from './midrace.js';
 export * from './webhooks.js';
 export * from './hats.js';
 export * from './schedule.js';
+export * from './league.js';
 export * from './admin.js';
 export * from './series-transform.js';
 export * from './web-sessions.js';

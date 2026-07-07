@@ -67,6 +67,12 @@ export type Race = {
   // count toward their PRIMARY model's score (secondaries unaffected). Absent
   // ⇒ off: every conversation counts. Locked at race creation.
   primary_top5?: boolean;
+  // League fixture tags — present only on races materialised for a league.
+  // `league_id` is the org id (one league per org); `league_season`/`league_round`
+  // locate the fixture within its season for scoring and the "round X/N" display.
+  league_id?: string;
+  league_season?: number;
+  league_round?: number;
 };
 
 export type HorseView = Horse & {
@@ -199,4 +205,42 @@ export type RaceSchedule = {
   creator_user_id: string;   // stamped onto each scheduled race
   creator_user_name: string; // stamped onto each scheduled race
   last_materialised_date?: string; // local YYYY-MM-DD of the last race created (idempotency)
+};
+
+export type LeagueStatus = 'active' | 'complete';
+
+// One league config per org. Stored on the org's LEAGUE row. Mutually
+// exclusive with RaceSchedule. The bottom (overflow) division ignores
+// `racers_per_division`.
+export type League = {
+  org_id: string;
+  divisions: number;              // number of divisions (>= 1)
+  racers_per_division: number;    // cap per division (>= 1); bottom division ignores it
+  races_per_season: number;       // fixtures per season (>= 1)
+  promote_relegate_count: number; // >= 0 and < racers_per_division
+  weekdays: number[];             // ISO weekdays, 1=Mon..7=Sun
+  start_local: string;            // "HH:MM" 24h, local to tz
+  end_local: string;              // "HH:MM" 24h, local to tz
+  tz: string;                     // IANA
+  race_name?: string;
+  max_participants?: number;
+  counts_input?: boolean;
+  primary_top5?: boolean;
+  current_season: number;         // 1-based; the season fixtures accrue into
+  status: LeagueStatus;           // 'complete' is transient during rollover
+  created_at: string;
+  creator_user_id: string;
+  creator_user_name: string;
+};
+
+// Per-season state for a league. Stored on the LEAGUE#SEASON#<n> row. Tracks how
+// many fixtures have materialised this season (also the last round number) and the
+// local date of the most recent fixture (per-day idempotency).
+export type LeagueSeason = {
+  org_id: string;
+  season: number;
+  status: 'active' | 'complete';
+  fixtures_materialised: number;
+  last_materialised_date?: string; // local YYYY-MM-DD
+  created_at: string;
 };

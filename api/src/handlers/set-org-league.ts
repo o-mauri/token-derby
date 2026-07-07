@@ -1,15 +1,13 @@
 import type { APIGatewayProxyHandlerV2 } from 'aws-lambda';
-import type { SetOrgScheduleRequest, SetOrgScheduleResponse, RaceSchedule } from '@token-derby/shared';
-import { ORG_NAME_PATTERN, parseSemver } from '@token-derby/shared';
+import type { SetOrgLeagueRequest, SetOrgLeagueResponse, League } from '@token-derby/shared';
+import { ORG_NAME_PATTERN, parseSemver, validateLeagueConfig } from '@token-derby/shared';
 import { getOrganisationByName } from '../db/organisations.js';
-import { putSchedule } from '../db/schedules.js';
-import { getLeague } from '../db/leagues.js';
+import { getSchedule } from '../db/schedules.js';
+import { putLeague } from '../db/leagues.js';
 import { isValidTimeZone } from '../lib/tz.js';
 import { ok, err, parseJson } from '../lib/http.js';
 import { readCliVersion, meetsMinimumCliVersion, versionMismatchMessage } from '../lib/version.js';
 import { resolveCaller } from '../lib/auth.js';
-
-const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 export const handler: APIGatewayProxyHandlerV2 = async (event) => {
   const auth = await resolveCaller(event);
@@ -27,45 +25,34 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
   const org_name = decodeURIComponent(raw);
   if (!ORG_NAME_PATTERN.test(org_name)) return err('BAD_REQUEST', 'Invalid organisation name');
 
-  const body = parseJson<SetOrgScheduleRequest>(event.body);
+  const body = parseJson<SetOrgLeagueRequest>(event.body);
   if (!body) return err('BAD_REQUEST', 'JSON body required');
 
-  if (!Array.isArray(body.weekdays) || body.weekdays.length === 0 ||
-      !body.weekdays.every((d) => Number.isInteger(d) && d >= 1 && d <= 7)) {
-    return err('BAD_REQUEST', 'weekdays must be a non-empty array of integers 1–7 (1=Mon)');
-  }
-  if (typeof body.start_local !== 'string' || !HHMM.test(body.start_local)) {
-    return err('BAD_REQUEST', 'start_local must be "HH:MM" (24h)');
-  }
-  if (typeof body.end_local !== 'string' || !HHMM.test(body.end_local)) {
-    return err('BAD_REQUEST', 'end_local must be "HH:MM" (24h)');
-  }
-  if (body.end_local <= body.start_local) {
-    return err('BAD_REQUEST', 'end_local must be after start_local');
-  }
+  const invalid = validateLeagueConfig(body);
+  if (invalid) return err('BAD_REQUEST', invalid);
   if (typeof body.tz !== 'string' || !isValidTimeZone(body.tz)) {
     return err('BAD_REQUEST', 'tz must be a valid IANA timezone');
-  }
-  if (body.max_participants !== undefined &&
-      (!Number.isInteger(body.max_participants) || body.max_participants < 1)) {
-    return err('BAD_REQUEST', 'max_participants must be a positive integer');
   }
 
   const org = await getOrganisationByName(org_name);
   if (!org) return err('ORG_NOT_FOUND', `No organisation named "${org_name}"`);
   if (org.creator_user_id !== auth.user_id) {
-    return err('NOT_ORG_OWNER', 'Only the organisation creator can manage the race schedule');
+    return err('NOT_ORG_OWNER', 'Only the organisation creator can manage the league');
   }
 
   // Mutual exclusivity: an org runs either a schedule or a league, never both.
-  const existingLeague = await getLeague(org.org_id);
-  if (existingLeague) {
-    return err('LEAGUE_CONFLICT', 'This organisation has a league configured. Delete it before setting a race schedule.');
+  const schedule = await getSchedule(org.org_id);
+  if (schedule) {
+    return err('LEAGUE_CONFLICT', 'This organisation already has a race schedule. Delete it before configuring a league.');
   }
 
   const weekdays = [...new Set(body.weekdays)].sort((a, b) => a - b);
-  const schedule: RaceSchedule = {
+  const league: League = {
     org_id: org.org_id,
+    divisions: body.divisions,
+    racers_per_division: body.racers_per_division,
+    races_per_season: body.races_per_season,
+    promote_relegate_count: body.promote_relegate_count,
     weekdays,
     start_local: body.start_local,
     end_local: body.end_local,
@@ -74,12 +61,14 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
     ...(body.max_participants !== undefined ? { max_participants: body.max_participants } : {}),
     ...(body.counts_input ? { counts_input: true } : {}),
     ...(body.primary_top5 ? { primary_top5: true } : {}),
+    current_season: 1,
+    status: 'active',
     created_at: new Date().toISOString(),
     creator_user_id: auth.user_id,
     creator_user_name: auth.display_name,
   };
-  await putSchedule(schedule);
+  await putLeague(league);
 
-  const response: SetOrgScheduleResponse = { schedule };
+  const response: SetOrgLeagueResponse = { league };
   return ok(response);
 };

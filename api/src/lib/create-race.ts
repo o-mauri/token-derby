@@ -24,6 +24,7 @@ export type CreateRaceInput = {
   creator_user_name: string;
   cli_version?: string;
   org?: CreateRaceOrg | null;
+  league?: { league_id: string; season: number; round: number };
 };
 
 export type CreateRaceResult =
@@ -75,6 +76,9 @@ export async function createRace(input: CreateRaceInput): Promise<CreateRaceResu
       ...(input.org ? { org_id: input.org.org_id, organisation_name: input.org.org_name } : {}),
       ...(input.counts_input ? { counts_input: true } : {}),
       ...(input.primary_top5 ? { primary_top5: true } : {}),
+      ...(input.league
+        ? { league_id: input.league.league_id, league_season: input.league.season, league_round: input.league.round }
+        : {}),
     },
     admin_code,
   );

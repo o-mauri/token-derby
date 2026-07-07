@@ -56,6 +56,16 @@ export function orgScheduleKey(org_id: string) {
   return { pk: `${ORG_PK_PREFIX}${org_id}`, sk: SCHEDULE_SK };
 }
 
+export const LEAGUE_SK = 'LEAGUE';
+
+export function orgLeagueKey(org_id: string) {
+  return { pk: `${ORG_PK_PREFIX}${org_id}`, sk: LEAGUE_SK };
+}
+
+export function orgLeagueSeasonKey(org_id: string, season: number) {
+  return { pk: `${ORG_PK_PREFIX}${org_id}`, sk: `LEAGUE#SEASON#${season}` };
+}
+
 export const POINT_SK_PREFIX = 'POINT#';
 
 // 12 digits comfortably exceeds any realistic per-race heartbeat count and

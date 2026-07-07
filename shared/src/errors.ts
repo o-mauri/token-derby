@@ -17,7 +17,8 @@ export type ErrorCode =
   | 'UNAUTHENTICATED'
   | 'STABLE_HORSE_NOT_FOUND'
   | 'STABLE_HORSE_NAME_TAKEN'
-  | 'INSUFFICIENT_ROLLS';
+  | 'INSUFFICIENT_ROLLS'
+  | 'LEAGUE_CONFLICT';
 
 export type ErrorEnvelope = {
   code: ErrorCode;
@@ -41,6 +42,7 @@ export const ERROR_STATUS: Record<ErrorCode, number> = {
   DUPLICATE_HORSE: 409,
   ORG_NAME_TAKEN: 409,
   STABLE_HORSE_NAME_TAKEN: 409,
+  LEAGUE_CONFLICT: 409,
   RACE_FINISHED: 410,
   VERSION_MISMATCH: 426,
   RATE_LIMITED: 429,
