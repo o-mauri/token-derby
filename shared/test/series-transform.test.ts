@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resampleToTicks, trailingPace, PACE_WINDOW_MS } from '../src/series-transform.js';
+import { resampleToTicks, trailingPace, trailingMovingAverage, PACE_WINDOW_MS } from '../src/series-transform.js';
 
 const MIN = 60_000;
 
@@ -79,5 +79,34 @@ describe('trailingPace', () => {
 
   it('returns null when the window is under a minute (too little race to measure)', () => {
     expect(trailingPace([{ t: now, d: 50 }], now, 30_000)).toBeNull();
+  });
+});
+
+describe('trailingMovingAverage', () => {
+  it('ramps the window up from 1 sample, then holds at maxWindow', () => {
+    // window grows 1,2,3 (=maxWindow) then stays 3:
+    //  i0: mean(10)                = 10
+    //  i1: mean(10,20)             = 15
+    //  i2: mean(10,20,30)          = 20
+    //  i3: mean(20,30,40)          = 30   (drops the oldest, 10)
+    //  i4: mean(30,40,50)          = 40
+    expect(trailingMovingAverage([10, 20, 30, 40, 50], 3)).toEqual([10, 15, 20, 30, 40]);
+  });
+
+  it('with maxWindow 1 returns the input unchanged (each point is its own mean)', () => {
+    expect(trailingMovingAverage([5, 9, 2], 1)).toEqual([5, 9, 2]);
+  });
+
+  it('smooths a spike toward its neighbours instead of dropping it as a gap', () => {
+    // A lone spike at index 1 is spread across the ramp-up window, never a gap.
+    expect(trailingMovingAverage([0, 90, 0, 0], 3)).toEqual([0, 45, 30, 30]);
+  });
+
+  it('returns an empty array for empty input', () => {
+    expect(trailingMovingAverage([], 10)).toEqual([]);
+  });
+
+  it('throws when maxWindow is under 1', () => {
+    expect(() => trailingMovingAverage([1, 2], 0)).toThrow();
   });
 });

@@ -8,6 +8,26 @@ export type TickPoint = {
 
 export const TICK_MS = 60_000; // 1 minute
 export const PACE_WINDOW_MS = 15 * 60_000; // trailing pace window: 15 minutes
+export const PACE_SMOOTH_WINDOW_MIN = 10; // end-of-race pace graph: trailing moving-average window
+
+/**
+ * Trailing simple moving average. `out[i]` is the mean of `values` over the
+ * trailing window ending at `i`. The window ramps up from 1 sample at the start
+ * to `maxWindow` (so the leading points are averaged over however many samples
+ * exist — no gaps) and then stays fixed at `maxWindow`. O(n) via a sliding sum.
+ */
+export function trailingMovingAverage(values: readonly number[], maxWindow: number): number[] {
+  if (maxWindow < 1) throw new Error('maxWindow must be >= 1');
+  const out = new Array<number>(values.length);
+  let sum = 0;
+  for (let i = 0; i < values.length; i++) {
+    sum += values[i]!;
+    if (i >= maxWindow) sum -= values[i - maxWindow]!;
+    const count = Math.min(i + 1, maxWindow);
+    out[i] = sum / count;
+  }
+  return out;
+}
 
 /**
  * Instantaneous token pace (tokens/min) over the trailing `windowMs`, computed

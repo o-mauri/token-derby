@@ -1,5 +1,5 @@
 import type { GetRaceSeriesResponse, HorseView, SeriesPoint } from '@token-derby/shared';
-import { resampleToTicks } from '@token-derby/shared';
+import { resampleToTicks, trailingMovingAverage, PACE_SMOOTH_WINDOW_MIN } from '@token-derby/shared';
 import { scale, smoothPath } from './chart-paths.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -34,13 +34,25 @@ function fmtClock(ms: number): string {
 // Resample a horse onto the shared 1-minute tick grid and pull the values for
 // the chosen mode, as {t, v} pairs. Idle ticks carry the cumulative total
 // forward and report 0 pace, so all horses line up on the same x-grid.
+//
+// Throughput is smoothed with a trailing moving average (window ramps 1..10 min
+// then holds at 10) so the end-of-race pace graph reads as a trend rather than
+// a jagged per-minute sawtooth. The leading start anchor stays at 0 (line begins
+// at the left edge, matching the cumulative face); the ramp-up applies to the
+// real minute ticks after it, so there are no gaps.
 function valuesFor(
   mode: Mode, points: readonly SeriesPoint[], startMs: number, endMs: number,
 ): { t: number; v: number }[] {
-  return resampleToTicks(points, startMs, endMs).map((p) => ({
-    t: p.t,
-    v: mode === 'cumulative' ? p.total : p.perMin,
-  }));
+  const ticks = resampleToTicks(points, startMs, endMs);
+  if (mode === 'cumulative') {
+    return ticks.map((p) => ({ t: p.t, v: p.total }));
+  }
+  const [anchor, ...minuteTicks] = ticks;
+  const smoothed = trailingMovingAverage(minuteTicks.map((p) => p.perMin), PACE_SMOOTH_WINDOW_MIN);
+  return [
+    { t: anchor!.t, v: 0 },
+    ...minuteTicks.map((p, i) => ({ t: p.t, v: smoothed[i]! })),
+  ];
 }
 
 function buildFace(
@@ -86,7 +98,7 @@ function buildFace(
   face.className = 'detail-face chart-face';
   const title = doc.createElement('div');
   title.className = 'chart-title';
-  title.textContent = mode === 'cumulative' ? 'Cumulative tokens' : 'Tokens / min';
+  title.textContent = mode === 'cumulative' ? 'Cumulative tokens' : 'Tokens / min (10-min avg)';
   face.appendChild(title);
   face.appendChild(svg);
 
