@@ -232,6 +232,41 @@ describe('renderFinishedOverlay', () => {
     teardown();
   });
 
+  it('renders page dots + prev/next nav and lets you click through the faces', async () => {
+    const raceEl = document.createElement('div');
+    const raceData = makeFinishedRaceWithManyHorses();
+    const series = {
+      start_ms: Date.parse(raceData.start_time), end_ms: Date.parse(raceData.end_time),
+      horses: raceData.horses.map((h) => ({ horse_id: h.horse_id, points: [{ t: Date.parse(raceData.start_time) + 60_000, d: 30 }] })),
+    };
+    const { win } = fakeWin();
+    const teardown = renderFinishedOverlay(raceEl, raceData, { fetchSeries: async () => series, win });
+    await Promise.resolve(); await Promise.resolve(); // flush fetch microtasks
+
+    const nav = raceEl.querySelector('.detail-nav')!;
+    expect(nav).not.toBeNull();
+    const dots = [...nav.querySelectorAll<HTMLButtonElement>('.facedot')];
+    const faces = [...raceEl.querySelectorAll<HTMLElement>('.detail-cycle .detail-face')];
+    expect(dots.length).toBe(faces.length); // one dot per face (standings + 2 charts)
+
+    const activeFace = () => faces.findIndex((f) => f.classList.contains('is-active'));
+    expect(activeFace()).toBe(0);
+    expect(dots[0]!.getAttribute('aria-current')).toBe('true');
+
+    nav.querySelector<HTMLButtonElement>('[aria-label="Next"]')!.click();
+    expect(activeFace()).toBe(1);
+    expect(dots[1]!.getAttribute('aria-current')).toBe('true');
+    expect(dots[0]!.hasAttribute('aria-current')).toBe(false);
+
+    dots[2]!.click(); // jump via a dot
+    expect(activeFace()).toBe(2);
+
+    nav.querySelector<HTMLButtonElement>('[aria-label="Previous"]')!.click();
+    expect(activeFace()).toBe(1);
+
+    teardown();
+  });
+
   it('returns a teardown that clears the cycler timer', async () => {
     const raceEl = document.createElement('div');
     const raceData = makeFinishedRaceWithManyHorses();

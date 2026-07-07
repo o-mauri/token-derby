@@ -1,4 +1,4 @@
-import type { GetRaceResponse } from '@token-derby/shared';
+import type { GetRaceResponse, HorseView } from '@token-derby/shared';
 import { describeAchievement } from '@token-derby/shared';
 
 export type TickerItem = {
@@ -7,6 +7,38 @@ export type TickerItem = {
   description: string;
   xp: number;
 };
+
+// Leader shows their absolute token count; everyone else shows the (non-negative)
+// gap down to that leader, rendered with a real minus sign (U+2212).
+export function formatOrderValue(isLeader: boolean, tokens: number, leaderTokens: number): string {
+  if (isLeader) return tokens.toLocaleString();
+  return `−${Math.max(0, leaderTokens - tokens).toLocaleString()}`;
+}
+
+export function renderOrderItem(
+  doc: Document,
+  cell: { position: number; horseName: string; valueText: string; isLeader: boolean },
+): HTMLElement {
+  const root = doc.createElement('div');
+  root.className = 'ticker-order';
+
+  const pos = doc.createElement('span');
+  pos.className = 'ticker-order-pos';
+  pos.textContent = `${cell.position}.`;
+  root.appendChild(pos);
+
+  const name = doc.createElement('span');
+  name.className = 'ticker-order-name';
+  name.textContent = cell.horseName;
+  root.appendChild(name);
+
+  const val = doc.createElement('span');
+  val.className = cell.isLeader ? 'ticker-order-val ticker-order-val--leader' : 'ticker-order-val';
+  val.textContent = cell.valueText;
+  root.appendChild(val);
+
+  return root;
+}
 
 // Pull every recent_event newer than the per-horse watermark into a flat,
 // render-ready batch, advancing the watermark in place. Descriptions are
@@ -72,6 +104,60 @@ export function renderTickerSep(doc: Document): HTMLElement {
   return sep;
 }
 
+// A ticker pass is a list of cells. `createTicker` walks them cyclically and
+// appends its own dynamic loop-seam after the last cell (see setCells).
+export type TickerCell =
+  | { kind: 'achievement'; item: TickerItem }
+  | { kind: 'order'; position: number; horseName: string; valueText: string; isLeader: boolean }
+  | { kind: 'label'; text: string; groupClass?: string }
+  | { kind: 'sep' }        // "•" between achievements
+  | { kind: 'groupsep' }   // "│" between order groups (divisions)
+  | { kind: 'sectiongap' }; // fixed wide gap between the order and achievement sections
+
+// A contiguous run of the order, optionally labelled. `horses` MUST already be in
+// display order (leader first) — callers sort. This is the grouping extension
+// point: standard races pass one unlabelled group; League Mode passes one
+// labelled group per division.
+export type OrderGroup = { label?: { text: string; groupClass?: string }; horses: HorseView[] };
+
+// Same ordering the track and finish ranking use: server rank, then tokens desc,
+// then earlier join. The tokens tie-break keeps previews (where every rank is 0)
+// sensible without any server change.
+export function sortByRank(horses: HorseView[]): HorseView[] {
+  return [...horses].sort((a, b) =>
+    (a.rank - b.rank) ||
+    (b.current_tokens - a.current_tokens) ||
+    (a.joined_at < b.joined_at ? -1 : a.joined_at > b.joined_at ? 1 : 0),
+  );
+}
+
+export function singleGroupOrder(horses: HorseView[]): OrderGroup[] {
+  return [{ horses: sortByRank(horses) }];
+}
+
+export function composeOrderCells(groups: OrderGroup[]): TickerCell[] {
+  const cells: TickerCell[] = [];
+  groups.forEach((group, gi) => {
+    if (gi > 0) cells.push({ kind: 'groupsep' });
+    if (group.label) cells.push({ kind: 'label', text: group.label.text, groupClass: group.label.groupClass });
+    const leaderTokens = group.horses[0]?.current_tokens ?? 0;
+    group.horses.forEach((h, i) => {
+      cells.push({
+        kind: 'order',
+        position: i + 1,
+        horseName: h.name,
+        valueText: formatOrderValue(i === 0, h.current_tokens, leaderTokens),
+        isLeader: i === 0,
+      });
+    });
+  });
+  return cells;
+}
+
+export function liveOrderCells(race: GetRaceResponse): TickerCell[] {
+  return composeOrderCells(singleGroupOrder(race.horses));
+}
+
 // The loop seam: a wide blank break marking the end of one pass and the start
 // of the next, so a repeating batch reads as a repeat rather than as distinct
 // achievements. Its width is set dynamically by the ticker.
@@ -82,15 +168,47 @@ export function renderTickerGap(doc: Document): HTMLElement {
   return gap;
 }
 
+export function renderGroupLabel(doc: Document, cell: { text: string; groupClass?: string }): HTMLElement {
+  const el = doc.createElement('span');
+  el.className = cell.groupClass ? `ticker-group-label ${cell.groupClass}` : 'ticker-group-label';
+  el.textContent = cell.text;
+  return el;
+}
+
+export function renderGroupSep(doc: Document): HTMLElement {
+  const el = doc.createElement('span');
+  el.className = 'ticker-group-sep';
+  el.setAttribute('aria-hidden', 'true');
+  el.textContent = '│';
+  return el;
+}
+
+export function renderSectionGap(doc: Document): HTMLElement {
+  const el = doc.createElement('div');
+  el.className = 'ticker-section-gap';
+  el.setAttribute('aria-hidden', 'true');
+  return el;
+}
+
+export function buildCellNode(doc: Document, cell: TickerCell): HTMLElement {
+  switch (cell.kind) {
+    case 'achievement': return renderTickerItem(doc, cell.item);
+    case 'order': return renderOrderItem(doc, cell);
+    case 'label': return renderGroupLabel(doc, cell);
+    case 'sep': return renderTickerSep(doc);
+    case 'groupsep': return renderGroupSep(doc);
+    case 'sectiongap': return renderSectionGap(doc);
+  }
+}
+
 export type Ticker = {
   el: HTMLElement;
   /**
-   * Swap the looping source. Items already on screen keep scrolling off the
-   * left; everything appended from here on comes from `items`, so the ticker
-   * seamlessly transitions from the old batch to the new one while never
-   * stopping. An empty batch is ignored — the current loop keeps running.
+   * Replace the looping content. Items already on screen keep scrolling off the
+   * left; everything appended from here on comes from `cells`. Pass `[]` to let
+   * the ticker drain to empty (e.g. when the race is not live).
    */
-  setBatch(items: TickerItem[]): void;
+  setCells(cells: TickerCell[]): void;
   destroy(): void;
 };
 
@@ -106,7 +224,7 @@ export function createTicker(doc: Document): Ticker {
   track.className = 'achievement-ticker-track';
   el.appendChild(track);
 
-  let batch: TickerItem[] = [];
+  let cells: TickerCell[] = [];
   let cursor = 0;
   let pos = 0; // px the track has scrolled to the left
   let widthSinceSeam = 0; // width emitted since the last loop-seam gap
@@ -120,21 +238,16 @@ export function createTicker(doc: Document): Ticker {
   el.addEventListener('mouseenter', () => { paused = true; });
   el.addEventListener('mouseleave', () => { paused = false; });
 
-  // Each pass emits: item, sep, item, sep, …, item, GAP. So a period is
-  // 2*batch.length slots; the separator after the final item is the wide gap.
+  // Emit one node per call, cycling through `cells` and appending a single
+  // stretchable loop-seam after the final cell so each pass clears the viewport.
   function appendNext(): boolean {
-    if (batch.length === 0) return false;
-    const period = batch.length * 2;
+    if (cells.length === 0) return false;
+    const period = cells.length + 1; // cells + one loop-seam
     const slot = cursor % period;
     cursor++;
-    const itemIndex = slot >> 1;
-    const isItem = (slot & 1) === 0;
-    const isSeam = !isItem && itemIndex === batch.length - 1;
 
-    let node: HTMLElement;
-    if (isItem) node = renderTickerItem(doc, batch[itemIndex]!);
-    else if (isSeam) node = renderTickerGap(doc);
-    else node = renderTickerSep(doc);
+    const isSeam = slot === cells.length;
+    const node: HTMLElement = isSeam ? renderTickerGap(doc) : buildCellNode(doc, cells[slot]!);
 
     track.appendChild(node);
     let width = Math.max(1, node.offsetWidth);
@@ -191,9 +304,8 @@ export function createTicker(doc: Document): Ticker {
 
   return {
     el,
-    setBatch(items: TickerItem[]) {
-      if (items.length === 0) return;
-      batch = items.slice();
+    setCells(next: TickerCell[]) {
+      cells = next.slice();
       cursor = 0;
       widthSinceSeam = 0;
     },

@@ -1478,3 +1478,75 @@ label.label input:disabled { opacity: 0.5; }
   .org-sidebar .org-actions { flex-direction: row; margin-top: 0; }
   .org-sidebar .org-create, .org-sidebar .org-join { width: auto; flex: 1; }
 }
+
+/* Live-order ticker rows — share the achievement-ticker container/track. */
+.ticker-order {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4em;
+  padding: 0 0.9rem;
+  white-space: nowrap;
+}
+.ticker-order-pos { color: var(--muted); }
+.ticker-order-name { color: var(--text); }
+.ticker-order-val {
+  color: #d98a8a;                     /* gap-to-leader */
+  font-variant-numeric: tabular-nums;
+}
+.ticker-order-val--leader { color: #7bed9f; }  /* leader’s absolute tokens */
+
+.ticker-group-label {
+  color: var(--bg);
+  background: var(--accent);
+  padding: 0 0.4rem;
+  font-size: 0.85em;
+  letter-spacing: 0.06em;
+  margin-right: 0.2em;
+}
+.ticker-group-sep {
+  color: #6b4f95;
+  padding: 0 2.4rem;
+}
+.ticker-section-gap {
+  display: inline-block;
+  width: 150px;
+}
+
+/* End-screen detail-cycle nav: prev/next + page dots. */
+.detail-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.9rem;
+  margin-top: 0.6rem;
+}
+.detail-nav-btn {
+  background: var(--panel);
+  color: var(--text);
+  border: 2px solid var(--border);
+  font-family: inherit;
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 0.15rem 0.7rem;
+  cursor: pointer;
+}
+.detail-nav-btn:hover { border-color: var(--accent); }
+.detail-nav-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.facedots {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+.facedot {
+  width: 9px;
+  height: 9px;
+  padding: 0;
+  border: none;
+  background: var(--border);
+  cursor: pointer;
+}
+.facedot.is-active { background: var(--accent); }
+.facedot:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (prefers-reduced-motion: no-preference) {
+  .facedot { transition: background 0.2s ease; }
+}

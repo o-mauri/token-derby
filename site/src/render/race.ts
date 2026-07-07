@@ -7,7 +7,7 @@ import { renderFinishedOverlay } from './finished.js';
 import { formatDuration, predictTimeLeftSeconds, type CountdownAnchor } from '../time.js';
 import { startAutoScroll } from './autoscroll.js';
 import { horseFaceSvg } from '../horse-face.js';
-import { createTicker, collectFreshItems } from './ticker.js';
+import { createTicker, collectFreshItems, liveOrderCells, type TickerCell } from './ticker.js';
 
 const POLL_INTERVAL_MS = 60_000;
 const TIMER_TICK_MS = 1_000;
@@ -42,6 +42,9 @@ export function renderRace(root: HTMLElement, joinCode: string): () => void {
   frame.appendChild(ticker.el);
   // Watermark per horse_id — only surface events with at > last shown.
   const shownAt = new Map<string, number>();
+  // Achievements persist between polls (a poll with no new events keeps showing
+  // the last ones); the live order is recomputed every poll.
+  let lastAchievements: TickerCell[] = [];
   const nameEl = frame.querySelector<HTMLElement>('.race-name')!;
   const statusEl = frame.querySelector<HTMLElement>('.race-status')!;
   const timeLeftEl = frame.querySelector<HTMLElement>('.race-time-left')!;
@@ -97,9 +100,23 @@ export function renderRace(root: HTMLElement, joinCode: string): () => void {
 
     reconcileHorses(track, race, now, paceByHorseId);
 
-    // Feed this tick's new achievements into the rolling ticker. An empty
-    // batch leaves the previous batch looping rather than blanking the bar.
-    ticker.setBatch(collectFreshItems(race, shownAt));
+    // Live races: the order is the steady-state loop; fresh achievements are
+    // appended after a section gap. Non-live races have no order → clear the bar.
+    if (race.status === 'live') {
+      const fresh = collectFreshItems(race, shownAt);
+      if (fresh.length) {
+        lastAchievements = fresh.flatMap((item, i): TickerCell[] =>
+          i === 0 ? [{ kind: 'achievement', item }] : [{ kind: 'sep' }, { kind: 'achievement', item }],
+        );
+      }
+      const cells = liveOrderCells(race);
+      if (lastAchievements.length) {
+        cells.push({ kind: 'sectiongap' }, ...lastAchievements);
+      }
+      ticker.setCells(cells);
+    } else {
+      ticker.setCells([]);
+    }
 
     if (race.status === 'pending') {
       updatePendingBanner(frame, race, now);

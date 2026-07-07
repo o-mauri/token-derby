@@ -2,7 +2,7 @@ import type { GetRaceResponse, GetRaceSeriesResponse, HorseView } from '@token-d
 import { levelInfo, levelFromXp } from '@token-derby/shared';
 import { fetchRaceSeries } from '../api.js';
 import { buildChartFaces } from './race-chart.js';
-import { startCycler } from './panel-cycler.js';
+import { startCycler, type Cycler } from './panel-cycler.js';
 
 const CONFETTI_COLORS = ['#ffd166', '#7bed9f', '#a68bd8', '#ff6b6b', '#4db8ff', '#ffffff'];
 const CONFETTI_COUNT = 40;
@@ -271,6 +271,61 @@ async function mountDetailCycle(
   if (signal.aborted) return;
   const faces = [...cycle.querySelectorAll<HTMLElement>('.detail-face')];
   if (faces.length === 0) return;
-  const cycler = startCycler({ panels: faces, intervalMs: opts.intervalMs ?? FLIP_INTERVAL_MS, win });
+
+  const doc = overlay.ownerDocument;
+  const multi = faces.length > 1;
+
+  // Page dots + prev/next nav, so the viewer can step through faces instead of
+  // waiting for the auto-advance. Built before startCycler so its initial
+  // onChange(0) finds the dots. Only shown when there's more than one face.
+  const dots: HTMLButtonElement[] = [];
+  let cycler: Cycler;
+  const onChange = (index: number) => {
+    dots.forEach((d, i) => {
+      const isActive = i === index;
+      d.classList.toggle('is-active', isActive);
+      if (isActive) d.setAttribute('aria-current', 'true');
+      else d.removeAttribute('aria-current');
+    });
+  };
+
+  if (multi) {
+    const nav = doc.createElement('div');
+    nav.className = 'detail-nav';
+    nav.appendChild(navButton(doc, '‹', 'Previous', () => cycler.prev()));
+    const dotsWrap = doc.createElement('div');
+    dotsWrap.className = 'facedots';
+    faces.forEach((_, i) => {
+      const dot = doc.createElement('button');
+      dot.type = 'button';
+      dot.className = 'facedot';
+      dot.setAttribute('aria-label', `Go to page ${i + 1}`);
+      dot.addEventListener('click', () => cycler.goTo(i));
+      dots.push(dot);
+      dotsWrap.appendChild(dot);
+    });
+    nav.appendChild(dotsWrap);
+    nav.appendChild(navButton(doc, '›', 'Next', () => cycler.next()));
+    cycle.insertAdjacentElement('afterend', nav);
+  }
+
+  cycler = startCycler({
+    panels: faces,
+    intervalMs: opts.intervalMs ?? FLIP_INTERVAL_MS,
+    win,
+    onChange: multi ? onChange : undefined,
+  });
   signal.addEventListener('abort', () => cycler.destroy(), { once: true });
+}
+
+function navButton(
+  doc: Document, glyph: string, label: string, onClick: () => void,
+): HTMLButtonElement {
+  const b = doc.createElement('button');
+  b.type = 'button';
+  b.className = 'detail-nav-btn';
+  b.setAttribute('aria-label', label);
+  b.textContent = glyph;
+  b.addEventListener('click', onClick);
+  return b;
 }
