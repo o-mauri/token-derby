@@ -1,12 +1,15 @@
-import type { League, LeagueStanding, LeagueSeasonResult, PendingStructural } from '@token-derby/shared';
-import { computeNextDivisions, seasonPrizeXp, leagueXpMultiplier, byStanding } from '@token-derby/shared';
+import type { League, LeagueStanding, LeagueSeasonResult, LeagueSeasonEndedEvent, PendingStructural } from '@token-derby/shared';
+import { computeNextDivisions, seasonPrizeXp, leagueXpMultiplier, byStanding, buildSeasonStandings } from '@token-derby/shared';
 import { getLeagueSeason, ensureLeagueSeason, markSeasonComplete } from '../db/league-seasons.js';
 import { listSeasonStandings, ensureStanding, tryMarkPrizeAwarded } from '../db/league-standings.js';
 import { putSeasonResultIfAbsent } from '../db/league-results.js';
 import { commitRollover } from '../db/leagues.js';
 import { listRacesByOrgId } from '../db/races.js';
+import { getOrganisationById } from '../db/organisations.js';
 import { finaliseRace } from './finalise-race.js';
+import { sendOrgWebhook } from './webhook.js';
 import { awardHorseXp } from '../db/stable.js';
+import { randomUUID } from 'node:crypto';
 
 // Roll a league's current season over if its final fixture has ended. Idempotent
 // prep (force-finalise, mark-then-award prizes, put-if-absent seed + summary) then
@@ -121,6 +124,53 @@ export async function rolloverDueLeague(league: League, now: Date): Promise<bool
   // 5. Commit: bump season + apply/clear pending (conditional on still being `season`).
   const applied: PendingStructural | null = pending;
   const committed = await commitRollover(org_id, season, applied);
-  if (committed) await markSeasonComplete(org_id, season);
+  if (committed) {
+    await markSeasonComplete(org_id, season);
+    // Fire the season-ended webhook once — only the tick that won the commit gets
+    // here. Best-effort: a failure here must not affect the (already-committed)
+    // rollover, so it's isolated in its own try/catch.
+    try {
+      const org = await getOrganisationById(org_id);
+      if (org?.webhook_url) {
+        const move = (pred: (from: number, to: number) => boolean) =>
+          standings.flatMap((s) => {
+            const to = nextDivision.get(s.stable_horse_id) ?? s.division;
+            return pred(s.division, to)
+              ? [{ stable_horse_id: s.stable_horse_id, horse_name: s.horse_name, user_name: s.user_name, from_division: s.division, to_division: to }]
+              : [];
+          });
+        const payload: LeagueSeasonEndedEvent = {
+          event: 'league.season.ended',
+          delivery_id: randomUUID(),
+          sent_at: now.toISOString(),
+          organisation: { org_id: org.org_id, org_name: org.org_name },
+          league: {
+            season,
+            next_season: season + 1,
+            races_per_season: league.races_per_season,
+            champion: championStanding
+              ? { stable_horse_id: championStanding.stable_horse_id, horse_name: championStanding.horse_name, user_name: championStanding.user_name, points: championStanding.points }
+              : null,
+            standings: buildSeasonStandings({
+              org_name: org.org_name,
+              divisions: league.divisions,
+              boundaries: league.boundaries,
+              races_per_season: league.races_per_season,
+              season,
+              round: league.races_per_season,
+              standings,
+            }),
+            promoted: move((from, to) => to < from),
+            relegated: move((from, to) => to > from),
+          },
+        };
+        await sendOrgWebhook(org, 'league.season.ended', payload);
+      }
+    } catch (err) {
+      if (typeof process === 'undefined' || process.env.NODE_ENV !== 'production') {
+        console.warn('[rollover] season-ended webhook failed', err);
+      }
+    }
+  }
   return committed;
 }

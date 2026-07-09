@@ -5,7 +5,13 @@ import { ensureLeagueSeason, getLeagueSeason, stampFinalFixtureEnd } from '../..
 import { ensureStanding, listSeasonStandings, tryMarkPrizeAwarded } from '../../src/db/league-standings.js';
 import { getSeasonResult } from '../../src/db/league-results.js';
 import { getStableHorse } from '../../src/db/stable.js';
+import { setOrgWebhook, getOrganisationByName } from '../../src/db/organisations.js';
+import { handler as createOrgHandler } from '../../src/handlers/create-organisation.js';
+import { makeUser } from '../helpers/auth-helper.js';
+import { CURRENT_CLI_VERSION } from '../helpers/cli-version.js';
 import { putHorseForTest } from '../helpers/horse-seed.js';
+import { createServer, type Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import type { League, LeagueStanding } from '@token-derby/shared';
 
 function league(org_id: string, over: Partial<League> = {}): League {
@@ -156,5 +162,53 @@ describe('rolloverDueLeague', () => {
     // and it still completes the rollover (season bumped, next season seeded).
     expect((await getLeague(org))?.current_season).toBe(2);
     expect((await listSeasonStandings(org, 2)).length).toBe(3);
+  });
+});
+
+describe('rolloverDueLeague season-ended webhook', () => {
+  it('emits a league.season.ended webhook on rollover', async () => {
+    const owner = await makeUser('RollWhOwn');
+    const orgName = 'RollWhOrg';
+    await createOrgHandler({
+      version: '2.0', routeKey: 'POST /organisations', rawPath: '/organisations', rawQueryString: '',
+      headers: { 'content-type': 'application/json', 'x-cli-version': CURRENT_CLI_VERSION, 'x-user-id': owner.user_id, 'x-user-token': owner.secret_token },
+      requestContext: {} as any, body: JSON.stringify({ name: orgName }), isBase64Encoded: false,
+    } as any);
+    const org = await getOrganisationByName(orgName);
+    const org_id = org!.org_id;
+
+    const calls: { body: string; headers: Record<string, string> }[] = [];
+    const server: Server = await new Promise(resolve => {
+      const s = createServer((req, res) => {
+        let b = ''; req.on('data', c => { b += c; });
+        req.on('end', () => { calls.push({ body: b, headers: req.headers as any }); res.statusCode = 200; res.end(); });
+      });
+      s.listen(0, '127.0.0.1', () => resolve(s));
+    });
+    const port = (server.address() as AddressInfo).port;
+    await setOrgWebhook(org_id, `http://127.0.0.1:${port}/h`, 'rollwh');
+
+    await putLeague(league(org_id, { current_season: 1, creator_user_id: owner.user_id }));
+    await ensureLeagueSeason(org_id, 1);
+    await stampFinalFixtureEnd(org_id, 1, PAST);
+    // 3 horses in the season-1 pool (division 3): points 30 / 20 / 10.
+    const seeds: Array<[string, number]> = [['a', 30], ['b', 20], ['c', 10]];
+    for (const [id, pts] of seeds) { await putHorseForTest(owner.user_id, id); await ensureStanding(st(org_id, { division: 3, stable_horse_id: id, user_id: owner.user_id, points: pts })); }
+
+    calls.length = 0;
+    expect(await rolloverDueLeague(await getLeague(org_id) as League, AFTER)).toBe(true);
+    await new Promise(r => setTimeout(r, 50));
+
+    const evt = calls.filter(c => c.headers['x-token-derby-event'] === 'league.season.ended');
+    expect(evt).toHaveLength(1);
+    const payload = JSON.parse(evt[0]!.body);
+    expect(payload.event).toBe('league.season.ended');
+    expect(payload.league).toMatchObject({ season: 1, next_season: 2 });
+    expect(payload.league.champion.stable_horse_id).toBe('a');          // pool winner
+    expect(payload.league.standings.divisions).toHaveLength(3);
+    // caps 2/2/overflow → pool winner 'a' seeded into division 1 → promoted 3→1
+    expect(payload.league.promoted.some((m: any) => m.stable_horse_id === 'a' && m.from_division === 3 && m.to_division === 1)).toBe(true);
+
+    await new Promise(r => server.close(() => r(null)));
   });
 });

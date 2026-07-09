@@ -1,6 +1,6 @@
-import type { HorseColors } from './types.js';
+import type { HorseColors, SeasonStandings } from './types.js';
 
-export type WebhookEventType = 'race.created' | 'race.ended';
+export type WebhookEventType = 'race.created' | 'race.ended' | 'league.season.ended';
 
 export type WebhookEnvelope<TBody> = {
   event: WebhookEventType;
@@ -37,6 +37,16 @@ export type RaceEndedResult = {
   user_name: string;
 };
 
+// One finisher's placing within its division for the race just run.
+export type LeagueRaceOrderRow = {
+  position: number;          // 1-based within the division for THIS fixture
+  stable_horse_id: string;
+  horse_name: string;
+  user_name: string;
+  final_tokens: number;
+  points_awarded: number;    // linear league points earned this fixture
+};
+
 export type RaceEndedEvent = WebhookEnvelope<{
   event: 'race.ended';
   race: {
@@ -50,4 +60,35 @@ export type RaceEndedEvent = WebhookEnvelope<{
     ended_at: string;
   };
   results: RaceEndedResult[];
+  // Present only for League fixtures: this race's finish split by division, plus
+  // the season standings after this race.
+  league?: {
+    season: number;
+    round: number;
+    races_per_season: number;
+    race_order: Array<{ division: number; name: string; order: LeagueRaceOrderRow[] }>;
+    standings: SeasonStandings;
+  };
+}>;
+
+// A horse that changed division at rollover.
+export type LeagueMoveRow = {
+  stable_horse_id: string;
+  horse_name: string;
+  user_name: string;
+  from_division: number;
+  to_division: number;
+};
+
+export type LeagueSeasonEndedEvent = WebhookEnvelope<{
+  event: 'league.season.ended';
+  league: {
+    season: number;         // the season that just ended
+    next_season: number;
+    races_per_season: number;
+    champion: { stable_horse_id: string; horse_name: string; user_name: string; points: number } | null;
+    standings: SeasonStandings;   // final standings of the ended season
+    promoted: LeagueMoveRow[];
+    relegated: LeagueMoveRow[];
+  };
 }>;

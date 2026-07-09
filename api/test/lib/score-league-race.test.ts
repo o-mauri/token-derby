@@ -146,3 +146,25 @@ describe('scoreLeagueRace', () => {
     expect(await listSeasonStandings(org_id, 1)).toEqual([]);
   });
 });
+
+describe('scoreLeagueRace return value', () => {
+  it('returns the per-division order + linear points for the fixture', async () => {
+    const owner = await makeUser('ScoreRetOwn');
+    const { org_id } = await createOrg(owner, 'ScoreRetOrg');
+    await putLeague(baseLeague(org_id)); // divisions.length === 3 → bottom pool is division 3
+    const h1 = horse({ horse_id: 'h1', stable_horse_id: 's1', user_id: owner.user_id, user_name: 'Fast', name: 'Fast', final_tokens: 900, joined_at: '2026-07-07T09:00:00Z' });
+    const h2 = horse({ horse_id: 'h2', stable_horse_id: 's2', user_id: owner.user_id, user_name: 'Slow', name: 'Slow', final_tokens: 500, joined_at: '2026-07-07T09:01:00Z' });
+    const result = await scoreLeagueRace(leagueRace(org_id, 1), [h1, h2]);
+    expect(result?.season).toBe(1);
+    expect(result?.round).toBe(1);
+    const div3 = result!.divisions.find(d => d.division === 3)!;
+    expect(div3.order.map(o => o.stable_horse_id)).toEqual(['s1', 's2']); // ranked by tokens
+    expect(div3.order.map(o => o.points_awarded)).toEqual([2, 1]);        // field of 2
+    expect(div3.order[0]).toMatchObject({ position: 1, horse_name: 'Fast', final_tokens: 900 });
+  });
+
+  it('returns null when the race is not a league fixture', async () => {
+    const r = { ...leagueRace('none', 1), league_id: undefined } as Race;
+    expect(await scoreLeagueRace(r, [])).toBeNull();
+  });
+});

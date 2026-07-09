@@ -1,9 +1,11 @@
 import type { Horse, Race, RaceEndedEvent } from '@token-derby/shared';
-import { xpForRaceFinish, raceXpMultiplier } from '@token-derby/shared';
+import { xpForRaceFinish, raceXpMultiplier, buildSeasonStandings } from '@token-derby/shared';
 import { listHorses, setHorseFinalTokens, setHorseXpAwarded } from '../db/horses.js';
 import { awardHorseXp, recordHorseRaceResult } from '../db/stable.js';
 import { setRaceEndedIfAbsent } from '../db/races.js';
 import { getOrganisationById } from '../db/organisations.js';
+import { getLeague } from '../db/leagues.js';
+import { listSeasonStandings } from '../db/league-standings.js';
 import { sendOrgWebhook } from './webhook.js';
 import { scoreLeagueRace } from './score-league-race.js';
 import { randomUUID } from 'node:crypto';
@@ -86,10 +88,8 @@ export async function finaliseRace(race: Race, now: Date): Promise<FinaliseResul
   }));
 
   // League fixtures: award division points into the season standings. Idempotent
-  // per (horse, round), so a re-finalisation or lazy-finalise retry is safe.
-  if (race.league_id) {
-    await scoreLeagueRace(race, stamped);
-  }
+  // per (horse, round). The returned per-division breakdown feeds the webhook.
+  const leagueResult = race.league_id ? await scoreLeagueRace(race, stamped) : null;
 
   const ended_at = await setRaceEndedIfAbsent(race.race_id, now.toISOString());
 
@@ -108,6 +108,34 @@ export async function finaliseRace(race: Race, now: Date): Promise<FinaliseResul
         user_id: h.user_id,
         user_name: h.user_name,
       }));
+      // League fixtures: attach this race's per-division order + the season
+      // standings after this race.
+      let league: RaceEndedEvent['league'];
+      if (leagueResult && race.league_id) {
+        const cfg = await getLeague(race.league_id);
+        if (cfg) {
+          const rows = await listSeasonStandings(race.league_id, leagueResult.season);
+          league = {
+            season: leagueResult.season,
+            round: leagueResult.round,
+            races_per_season: cfg.races_per_season,
+            race_order: leagueResult.divisions.map((d) => ({
+              division: d.division,
+              name: cfg.divisions[d.division - 1]?.name ?? `Division ${d.division}`,
+              order: d.order,
+            })),
+            standings: buildSeasonStandings({
+              org_name: org.org_name,
+              divisions: cfg.divisions,
+              boundaries: cfg.boundaries,
+              races_per_season: cfg.races_per_season,
+              season: leagueResult.season,
+              round: leagueResult.round,
+              standings: rows,
+            }),
+          };
+        }
+      }
       const payload: RaceEndedEvent = {
         event: 'race.ended',
         delivery_id: randomUUID(),
@@ -124,6 +152,7 @@ export async function finaliseRace(race: Race, now: Date): Promise<FinaliseResul
           ended_at,
         },
         results,
+        ...(league ? { league } : {}),
       };
       await sendOrgWebhook(org, 'race.ended', payload);
     }

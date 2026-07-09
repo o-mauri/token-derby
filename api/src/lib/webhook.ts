@@ -13,7 +13,7 @@ export type SendOrgWebhookOptions = { timeoutMs?: number };
 
 export async function sendOrgWebhook(
   org: OrgWithWebhook,
-  event_type: 'race.created' | 'race.ended',
+  event_type: 'race.created' | 'race.ended' | 'league.season.ended',
   payload: object,
   opts: SendOrgWebhookOptions = {},
 ): Promise<void> {

@@ -300,4 +300,57 @@ describe('finaliseRace webhook delivery', () => {
 
     await new Promise(r => server.close(() => r(null)));
   });
+
+  it('includes the league block (per-division order + season standings) for a league fixture', async () => {
+    const owner = await makeUser('FrLgOwner');
+    const orgName = 'FrLgOrg';
+    await createOrgHandler({
+      version: '2.0', routeKey: 'POST /organisations', rawPath: '/organisations', rawQueryString: '',
+      headers: { 'content-type': 'application/json', 'x-cli-version': CURRENT_CLI_VERSION, 'x-user-id': owner.user_id, 'x-user-token': owner.secret_token },
+      requestContext: {} as any, body: JSON.stringify({ name: orgName }), isBase64Encoded: false,
+    });
+    const org = await getOrganisationByName(orgName);
+
+    const calls: { body: string; headers: Record<string, string> }[] = [];
+    const server: Server = await new Promise(resolve => {
+      const s = createServer((req, res) => {
+        let b = ''; req.on('data', c => { b += c; });
+        req.on('end', () => { calls.push({ body: b, headers: req.headers as any }); res.statusCode = 200; res.end(); });
+      });
+      s.listen(0, '127.0.0.1', () => resolve(s));
+    });
+    const port = (server.address() as AddressInfo).port;
+    await setOrgWebhook(org!.org_id, `http://127.0.0.1:${port}/h`, 'lgsecret');
+
+    const league: League = {
+      org_id: org!.org_id,
+      divisions: [{ name: 'Premier', cap: 10 }, { name: 'Championship', cap: 10 }, { name: 'League One', cap: 10 }],
+      boundaries: [2, 2], races_per_season: 8, weekdays: [1], start_local: '09:00', end_local: '17:00', tz: 'UTC',
+      current_season: 1, status: 'active', created_at: 'c', creator_user_id: owner.user_id, creator_user_name: 'omar',
+    };
+    await putLeague(league);
+
+    const race = makeRace({ org_id: org!.org_id, organisation_name: orgName, league_id: org!.org_id, league_season: 1, league_round: 1, name: 'FrLgRace' });
+    await putRace(race, `admin-${race.race_id}`);
+    await putHorse(race.race_id, makeHorse('Alpha', 900, { user_id: owner.user_id, user_name: 'omar' }), `tok-a-${race.race_id}`);
+    await putHorse(race.race_id, makeHorse('Beta', 400, { user_id: owner.user_id, user_name: 'omar' }), `tok-b-${race.race_id}`);
+
+    calls.length = 0;
+    await finaliseRace(race, new Date());
+    await new Promise(r => setTimeout(r, 50));
+
+    const ended = calls.filter(c => c.headers['x-token-derby-event'] === 'race.ended');
+    expect(ended).toHaveLength(1);
+    const payload = JSON.parse(ended[0]!.body);
+    expect(payload.league).toBeTruthy();
+    expect(payload.league).toMatchObject({ season: 1, round: 1, races_per_season: 8 });
+    // both new entrants → bottom division (3); ordered by tokens with linear points
+    const bottom = payload.league.race_order.find((d: any) => d.division === 3);
+    expect(bottom.name).toBe('League One');
+    expect(bottom.order.map((o: any) => o.horse_name)).toEqual(['Alpha', 'Beta']);
+    expect(bottom.order.map((o: any) => o.points_awarded)).toEqual([2, 1]);
+    expect(payload.league.standings.divisions).toHaveLength(3);
+
+    await new Promise(r => server.close(() => r(null)));
+  });
 });
