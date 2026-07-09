@@ -1,4 +1,4 @@
-import type { CollectedHat, HatId, HorseColors, HorseView, Race, RaceStatus, RaceSummary, RaceView, OrganisationSummary, StableHorse, RaceSchedule, League, ModelKey, SeasonStandings } from './types.js';
+import type { CollectedHat, HatId, HorseColors, HorseView, Race, RaceStatus, RaceSummary, RaceView, OrganisationSummary, StableHorse, RaceSchedule, League, DivisionConfig, ModelKey, SeasonStandings } from './types.js';
 
 export type CreateRaceRequest = {
   name: string;
@@ -196,10 +196,9 @@ export type GetOrgScheduleResponse = { schedule: RaceSchedule | null };
 export type DeleteOrgScheduleResponse = { ok: true };
 
 export type SetOrgLeagueRequest = {
-  divisions: number;
-  racers_per_division: number;
+  divisions: DivisionConfig[];
+  boundaries: number[];
   races_per_season: number;
-  promote_relegate_count: number;
   weekdays: number[];
   start_local: string;
   end_local: string;

@@ -5,7 +5,7 @@ import { renderLogin } from './org-manager/render/login.js';
 import { renderSidebar } from './org-manager/render/sidebar.js';
 import { renderOverview } from './org-manager/render/tabs/overview.js';
 import { renderMembers } from './org-manager/render/tabs/members.js';
-import { renderSchedule } from './org-manager/render/tabs/schedule.js';
+import { renderRacing } from './org-manager/render/tabs/racing.js';
 import { renderWebhook } from './org-manager/render/tabs/webhook.js';
 
 const app = document.getElementById('app')!;
@@ -25,7 +25,7 @@ shell.innerHTML = `
     <nav class="org-tabs">
       <button type="button" class="org-tab on">overview</button>
       <button type="button" class="org-tab">members</button>
-      <button type="button" class="org-tab">schedule</button>
+      <button type="button" class="org-tab">racing</button>
       <button type="button" class="org-tab">webhook</button>
     </nav>
     <div class="org-tabbody"></div>
@@ -73,7 +73,31 @@ renderMembers(tabSection('Members tab'), {
   ],
 });
 
-renderSchedule(tabSection('Schedule tab (owner)'), {
+renderRacing(tabSection('Racing tab (owner) — League mode'), {
+  schedule: null,
+  league: {
+    org_id: 'o1',
+    divisions: [{ name: 'Premier', cap: 8 }, { name: 'Championship', cap: 12 }, { name: 'League One', cap: 16 }],
+    boundaries: [2, 3],
+    races_per_season: 8,
+    weekdays: [1, 3, 5],
+    start_local: '19:00',
+    end_local: '21:00',
+    tz: 'Europe/London',
+    race_name: 'Acme League',
+    max_participants: 20,
+    primary_top5: true,
+    current_season: 1,
+    status: 'active',
+    created_at: '2026-05-14T00:00:00Z',
+    creator_user_id: 'u1',
+    creator_user_name: 'omar',
+  },
+  isOwner: true,
+  onSaveSchedule: () => {}, onClearSchedule: () => {}, onSaveLeague: () => {}, onClearLeague: () => {},
+});
+
+renderRacing(tabSection('Racing tab (owner) — Scheduled races mode'), {
   schedule: {
     org_id: 'o1',
     weekdays: [1, 2, 3, 4, 5],
@@ -86,9 +110,9 @@ renderSchedule(tabSection('Schedule tab (owner)'), {
     creator_user_id: 'u1',
     creator_user_name: 'omar',
   },
+  league: null,
   isOwner: true,
-  onSave: () => {},
-  onClear: () => {},
+  onSaveSchedule: () => {}, onClearSchedule: () => {}, onSaveLeague: () => {}, onClearLeague: () => {},
 });
 
 renderWebhook(tabSection('Webhook tab (owner, just saved)'), {

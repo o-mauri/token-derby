@@ -18,7 +18,14 @@ async function createOrg(user: TestUser, name: string): Promise<{ org_id: string
 }
 
 function baseLeague(org_id: string, over: Partial<League> = {}): League {
-  return { org_id, divisions: 3, racers_per_division: 10, races_per_season: 8, promote_relegate_count: 2, weekdays: [1], start_local: '09:00', end_local: '17:00', tz: 'UTC', current_season: 1, status: 'active', created_at: 'c', creator_user_id: 'u', creator_user_name: 'C', ...over };
+  return {
+    org_id,
+    divisions: [{ name: 'Div 1', cap: 10 }, { name: 'Div 2', cap: 10 }, { name: 'Div 3', cap: 10 }],
+    boundaries: [2, 2],
+    races_per_season: 8, weekdays: [1], start_local: '09:00', end_local: '17:00', tz: 'UTC',
+    current_season: 1, status: 'active', created_at: 'c', creator_user_id: 'u', creator_user_name: 'C',
+    ...over,
+  };
 }
 
 function horse(over: Partial<Horse>): Horse {
@@ -42,7 +49,7 @@ describe('scoreLeagueRace', () => {
   it('scores members in the bottom division by linear points (season 1 single pool)', async () => {
     const owner = await makeUser('ScoreOwner');
     const { org_id } = await createOrg(owner, 'ScoreOrg1');
-    await putLeague(baseLeague(org_id)); // divisions:3 → bottom is 3
+    await putLeague(baseLeague(org_id)); // divisions.length === 3 → bottom division is 3
     // owner + one more member each field a horse
     const h1 = horse({ horse_id: 'h1', stable_horse_id: 's1', user_id: owner.user_id, user_name: 'ScoreOwner', final_tokens: 900, joined_at: '2026-07-07T09:00:00Z' });
     const h2 = horse({ horse_id: 'h2', stable_horse_id: 's2', user_id: owner.user_id, user_name: 'ScoreOwner', final_tokens: 500, joined_at: '2026-07-07T09:01:00Z' });
@@ -87,7 +94,7 @@ describe('scoreLeagueRace', () => {
   it('places a new entrant in the bottom division alongside an existing standing in one call', async () => {
     const owner = await makeUser('ScoreMixed');
     const { org_id } = await createOrg(owner, 'MixedOrg');
-    await putLeague(baseLeague(org_id)); // divisions:3 → bottom is 3
+    await putLeague(baseLeague(org_id)); // divisions.length === 3 → bottom division is 3
     // A veteran already seeded in Div 1 (as if from a prior season).
     await ensureStanding({
       org_id, season: 1, division: 1, stable_horse_id: 'vet', horse_name: 'Vet',

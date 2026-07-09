@@ -58,3 +58,24 @@ export async function addStandingPointsForRound(
     if (e?.name !== 'ConditionalCheckFailedException') throw e; // already scored this round
   }
 }
+
+// Claim the season-prize award for one standing row exactly once. Returns true if
+// this call set the mark (caller should then award XP), false if already marked or
+// the row is missing. Mark-then-award ⇒ at-most-once minting.
+export async function tryMarkPrizeAwarded(
+  org_id: string, season: number, division: number, stable_horse_id: string,
+): Promise<boolean> {
+  try {
+    await ddb.send(new UpdateCommand({
+      TableName: TABLE,
+      Key: orgLeagueStandingKey(org_id, season, division, stable_horse_id),
+      UpdateExpression: 'SET prize_awarded = :t',
+      ConditionExpression: 'attribute_exists(pk) AND attribute_not_exists(prize_awarded)',
+      ExpressionAttributeValues: { ':t': true },
+    }));
+    return true;
+  } catch (e: any) {
+    if (e?.name === 'ConditionalCheckFailedException') return false;
+    throw e;
+  }
+}

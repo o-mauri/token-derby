@@ -60,3 +60,36 @@ export async function tryClaimLeagueFixture(
     throw e;
   }
 }
+
+// Stamp the final fixture's end time on the season row (set at final-round
+// materialisation). Idempotent: re-stamping the same value is harmless.
+export async function stampFinalFixtureEnd(org_id: string, season: number, endIso: string): Promise<void> {
+  try {
+    await ddb.send(new UpdateCommand({
+      TableName: TABLE,
+      Key: orgLeagueSeasonKey(org_id, season),
+      UpdateExpression: 'SET final_fixture_end = :e',
+      ConditionExpression: 'attribute_exists(pk)',
+      ExpressionAttributeValues: { ':e': endIso },
+    }));
+  } catch (e: any) {
+    if (e?.name !== 'ConditionalCheckFailedException') throw e;
+  }
+}
+
+// Bookkeeping: mark a rolled-over season complete. Best-effort; the real rollover
+// guard is the conditional current_season bump in commitRollover.
+export async function markSeasonComplete(org_id: string, season: number): Promise<void> {
+  try {
+    await ddb.send(new UpdateCommand({
+      TableName: TABLE,
+      Key: orgLeagueSeasonKey(org_id, season),
+      UpdateExpression: 'SET #s = :c',
+      ConditionExpression: 'attribute_exists(pk)',
+      ExpressionAttributeNames: { '#s': 'status' },
+      ExpressionAttributeValues: { ':c': 'complete' },
+    }));
+  } catch (e: any) {
+    if (e?.name !== 'ConditionalCheckFailedException') throw e;
+  }
+}

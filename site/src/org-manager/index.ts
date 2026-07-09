@@ -5,11 +5,11 @@ import { renderLogin } from './render/login.js';
 import { renderSidebar } from './render/sidebar.js';
 import { renderOverview } from './render/tabs/overview.js';
 import { renderMembers } from './render/tabs/members.js';
-import { renderSchedule } from './render/tabs/schedule.js';
+import { renderRacing } from './render/tabs/racing.js';
 import { renderWebhook } from './render/tabs/webhook.js';
 import type { OrganisationSummary } from '@token-derby/shared';
 
-type Tab = 'overview' | 'members' | 'schedule' | 'webhook';
+type Tab = 'overview' | 'members' | 'racing' | 'webhook';
 
 export function renderOrgManager(root: HTMLElement): () => void {
   let disposed = false;
@@ -65,7 +65,7 @@ export function renderOrgManager(root: HTMLElement): () => void {
       const name = selected;
       mainEl.innerHTML = `
         <nav class="org-tabs">
-          ${(['overview', 'members', 'schedule', 'webhook'] as Tab[]).map((t) =>
+          ${(['overview', 'members', 'racing', 'webhook'] as Tab[]).map((t) =>
             `<button type="button" class="org-tab${t === tab ? ' on' : ''}" data-tab="${t}">${t}</button>`).join('')}
         </nav>
         <div class="org-tabbody"></div>`;
@@ -82,13 +82,26 @@ export function renderOrgManager(root: HTMLElement): () => void {
 
         if (tab === 'overview') renderOverview(bodyEl, { org });
         else if (tab === 'members') renderMembers(bodyEl, { members: (await api.getMembers(name)).members });
-        else if (tab === 'schedule') {
-          // Schedule GET is owner-only server-side; non-owners just see the disabled form.
+        else if (tab === 'racing') {
+          // Schedule + league GETs are owner-only server-side; non-owners see a read-only mode view.
           const schedule = isOwner ? ((await api.getSchedule(name)).schedule ?? null) : null;
-          renderSchedule(bodyEl, {
-            schedule, isOwner,
-            onSave: async (b) => { try { await api.setSchedule(name, b); void drawMain(); } catch (e) { alert(String((e as Error).message)); } },
-            onClear: async () => { try { await api.clearSchedule(name); void drawMain(); } catch (e) { alert(String((e as Error).message)); } },
+          const league = isOwner ? ((await api.getLeague(name)).league ?? null) : null;
+          const guard = async (fn: () => Promise<unknown>) => {
+            try { await fn(); void drawMain(); } catch (e) { alert(String((e as Error).message)); }
+          };
+          renderRacing(bodyEl, {
+            schedule, league, isOwner,
+            // Mutual exclusivity: clear the other mode (after a confirm) before saving the chosen one.
+            onSaveSchedule: (b) => {
+              if (league && !confirm('This will replace the current league with a race schedule. Continue?')) return;
+              void guard(async () => { if (league) await api.clearLeague(name); await api.setSchedule(name, b); });
+            },
+            onClearSchedule: () => void guard(() => api.clearSchedule(name)),
+            onSaveLeague: (b) => {
+              if (schedule && !confirm('This will replace the current race schedule with a league. Continue?')) return;
+              void guard(async () => { if (schedule) await api.clearSchedule(name); await api.setLeague(name, b); });
+            },
+            onClearLeague: () => void guard(() => api.clearLeague(name)),
           });
         }
         else if (tab === 'webhook') {

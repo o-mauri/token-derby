@@ -1,9 +1,9 @@
 import type { APIGatewayProxyHandlerV2 } from 'aws-lambda';
-import type { SetOrgLeagueRequest, SetOrgLeagueResponse, League } from '@token-derby/shared';
+import type { SetOrgLeagueRequest, SetOrgLeagueResponse, League, PendingStructural } from '@token-derby/shared';
 import { ORG_NAME_PATTERN, parseSemver, validateLeagueConfig } from '@token-derby/shared';
 import { getOrganisationByName } from '../db/organisations.js';
 import { getSchedule } from '../db/schedules.js';
-import { putLeague } from '../db/leagues.js';
+import { getLeague, putLeague } from '../db/leagues.js';
 import { isValidTimeZone } from '../lib/tz.js';
 import { ok, err, parseJson } from '../lib/http.js';
 import { readCliVersion, meetsMinimumCliVersion, versionMismatchMessage } from '../lib/version.js';
@@ -47,28 +47,67 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
   }
 
   const weekdays = [...new Set(body.weekdays)].sort((a, b) => a - b);
-  const league: League = {
-    org_id: org.org_id,
-    divisions: body.divisions,
-    racers_per_division: body.racers_per_division,
-    races_per_season: body.races_per_season,
-    promote_relegate_count: body.promote_relegate_count,
+
+  const existing = await getLeague(org.org_id);
+
+  if (!existing) {
+    const league: League = {
+      org_id: org.org_id,
+      divisions: body.divisions,
+      boundaries: body.boundaries,
+      races_per_season: body.races_per_season,
+      weekdays,
+      start_local: body.start_local,
+      end_local: body.end_local,
+      tz: body.tz,
+      ...(body.race_name ? { race_name: body.race_name } : {}),
+      ...(body.max_participants !== undefined ? { max_participants: body.max_participants } : {}),
+      ...(body.counts_input ? { counts_input: true } : {}),
+      ...(body.primary_top5 ? { primary_top5: true } : {}),
+      current_season: 1,
+      status: 'active',
+      created_at: new Date().toISOString(),
+      creator_user_id: auth.user_id,
+      creator_user_name: auth.display_name,
+    };
+    await putLeague(league);
+    const response: SetOrgLeagueResponse = { league };
+    return ok(response);
+  }
+
+  // Existing league: apply live fields now; stage structural changes for next rollover.
+  const structurallyEqual =
+    JSON.stringify(existing.divisions) === JSON.stringify(body.divisions) &&
+    JSON.stringify(existing.boundaries) === JSON.stringify(body.boundaries) &&
+    existing.races_per_season === body.races_per_season;
+
+  const pending: PendingStructural = {};
+  if (JSON.stringify(existing.divisions) !== JSON.stringify(body.divisions)) pending.divisions = body.divisions;
+  if (JSON.stringify(existing.boundaries) !== JSON.stringify(body.boundaries)) pending.boundaries = body.boundaries;
+  if (existing.races_per_season !== body.races_per_season) pending.races_per_season = body.races_per_season;
+
+  const updated: League = {
+    ...existing,
+    // live fields
     weekdays,
     start_local: body.start_local,
     end_local: body.end_local,
     tz: body.tz,
-    ...(body.race_name ? { race_name: body.race_name } : {}),
-    ...(body.max_participants !== undefined ? { max_participants: body.max_participants } : {}),
-    ...(body.counts_input ? { counts_input: true } : {}),
-    ...(body.primary_top5 ? { primary_top5: true } : {}),
-    current_season: 1,
-    status: 'active',
-    created_at: new Date().toISOString(),
-    creator_user_id: auth.user_id,
-    creator_user_name: auth.display_name,
+    // Optional live fields assigned directly (not conditionally spread): an omitted
+    // field becomes `undefined`, which the doc client's removeUndefinedValues + a
+    // full-item putLeague drops from the stored row — i.e. omission CLEARS it. If
+    // putLeague ever moves to a partial UpdateCommand, switch these to conditional
+    // spreads / explicit REMOVE, since SET :x=undefined would not clear them.
+    race_name: body.race_name,
+    max_participants: body.max_participants,
+    counts_input: body.counts_input,
+    primary_top5: body.primary_top5,
+    // structural fields stay as the live (existing) shape; edits are staged
+    ...(structurallyEqual ? {} : { pending_structural: pending }),
   };
-  await putLeague(league);
+  if (structurallyEqual) delete (updated as { pending_structural?: unknown }).pending_structural;
+  await putLeague(updated);
 
-  const response: SetOrgLeagueResponse = { league };
+  const response: SetOrgLeagueResponse = { league: updated };
   return ok(response);
 };

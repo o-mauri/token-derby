@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach, vi } from 'vitest';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { handler as createOrgHandler } from '../../src/handlers/create-organisation.js';
 import { handler as tick } from '../../src/handlers/schedule-tick.js';
-import { putLeague } from '../../src/db/leagues.js';
+import { putLeague, getLeague } from '../../src/db/leagues.js';
 import { getLeagueSeason } from '../../src/db/league-seasons.js';
 import { listRacesByOrgId } from '../../src/db/races.js';
 import { makeUser, type TestUser } from '../helpers/auth-helper.js';
@@ -24,7 +24,10 @@ async function createOrg(user: TestUser, name: string): Promise<string> {
 
 function baseLeague(org_id: string, over: Partial<League> = {}): League {
   return {
-    org_id, divisions: 3, racers_per_division: 10, races_per_season: 8, promote_relegate_count: 2,
+    org_id,
+    divisions: [{ name: 'Div 1', cap: 10 }, { name: 'Div 2', cap: 10 }, { name: 'Div 3', cap: 10 }],
+    boundaries: [2, 2],
+    races_per_season: 8,
     weekdays: [1, 2, 3, 4, 5], start_local: '09:00', end_local: '17:30', tz: 'UTC',
     current_season: 1, status: 'active',
     created_at: '2026-07-01T00:00:00.000Z', creator_user_id: 'u1', creator_user_name: 'Alice',
@@ -96,5 +99,45 @@ describe('league fixture materialisation (via schedule-tick)', () => {
     expect(round2).toBeDefined();
     expect(round2!.name).toBe('Cap League (League Race (2/2))');
     expect(round2).toMatchObject({ league_id: org_id, league_season: 1, league_round: 2 });
+  });
+
+  it('stamps final_fixture_end on the season row when the final fixture is claimed', async () => {
+    const user = await makeUser('LgTickOwn5');
+    const org_id = await createOrg(user, 'LgTickOrg5');
+    await putLeague(baseLeague(org_id, { races_per_season: 1, race_name: 'Final League' }));
+
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-06T10:00:00Z')); // Monday, inside 09:00–17:30
+
+    await runTick();
+    const races = await listRacesByOrgId(org_id);
+    expect(races.length).toBe(1);
+    expect(races[0]!.league_round).toBe(1);
+
+    const seasonRow = await getLeagueSeason(org_id, 1);
+    expect(seasonRow?.final_fixture_end).toBe(races[0]!.end_time);
+  });
+
+  it('rolls the season over on a later tick once now is past final_fixture_end', async () => {
+    const user = await makeUser('LgTickOwn6');
+    const org_id = await createOrg(user, 'LgTickOrg6');
+    await putLeague(baseLeague(org_id, { races_per_season: 1, start_local: '09:00', end_local: '09:05', race_name: 'Roll League' }));
+
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-06T09:00:00Z')); // Monday, inside 09:00–09:05
+    await runTick();
+    const races = await listRacesByOrgId(org_id);
+    expect(races.length).toBe(1);
+    expect((await getLeagueSeason(org_id, 1))?.final_fixture_end).toBe(races[0]!.end_time);
+
+    // Later the same day, past final_fixture_end (09:05) but outside the window too —
+    // materialisation can't run, but the ungated rollover check should still fire.
+    vi.setSystemTime(new Date('2026-07-06T09:10:00Z'));
+    await runTick();
+
+    expect((await getLeague(org_id))?.current_season).toBe(2);
+    expect(await getLeagueSeason(org_id, 2)).not.toBeNull();
+    // No new fixtures materialised by the rollover tick itself.
+    expect((await listRacesByOrgId(org_id)).length).toBe(1);
   });
 });

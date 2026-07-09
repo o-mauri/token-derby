@@ -37,10 +37,12 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
 
   // League fixtures: stamp each horse's division (unscored new entrants default to
   // the bottom division) so clients can group the field by division.
+  let league_division_names: string[] | undefined;
   if (race.league_id && race.league_season !== undefined) {
     const league = await getLeague(race.league_id); // league_id === org_id
     if (league) {
-      const bottom = league.divisions;
+      league_division_names = league.divisions.map((d) => d.name);
+      const bottom = league.divisions.length;
       const divByHorse = new Map<string, number>();
       for (const s of await listSeasonStandings(race.league_id, race.league_season)) {
         divByHorse.set(s.stable_horse_id, s.division);
@@ -84,6 +86,7 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
     ...(race.league_id ? { league_id: race.league_id } : {}),
     ...(race.league_season !== undefined ? { league_season: race.league_season } : {}),
     ...(race.league_round !== undefined ? { league_round: race.league_round } : {}),
+    ...(league_division_names ? { league_division_names } : {}),
   };
   return ok(response);
 };

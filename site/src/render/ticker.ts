@@ -112,7 +112,7 @@ export type TickerCell =
   | { kind: 'label'; text: string; groupClass?: string }
   | { kind: 'sep' }        // "•" between achievements
   | { kind: 'groupsep' }   // "│" between order groups (divisions)
-  | { kind: 'sectiongap' }; // fixed wide gap between the order and achievement sections
+  | { kind: 'sectiongap'; wide?: boolean }; // gap between the order and achievement sections (wide for league)
 
 // A contiguous run of the order, optionally labelled. `horses` MUST already be in
 // display order (leader first) — callers sort. This is the grouping extension
@@ -158,6 +158,28 @@ export function liveOrderCells(race: GetRaceResponse): TickerCell[] {
   return composeOrderCells(singleGroupOrder(race.horses));
 }
 
+// League fixtures group the order by division (top→bottom) with real-name labels
+// and colour chips; standard races fall back to one flat group. Empty divisions
+// are skipped. Uses the OrderGroup extension point.
+export function leagueOrderCells(race: GetRaceResponse): TickerCell[] {
+  const names = race.league_division_names;
+  if (!race.league_id || !names) return composeOrderCells(singleGroupOrder(race.horses));
+  const byDiv = new Map<number, HorseView[]>();
+  for (const h of race.horses) {
+    const d = h.division ?? names.length; // unscored entrant → bottom division
+    const arr = byDiv.get(d) ?? [];
+    arr.push(h);
+    byDiv.set(d, arr);
+  }
+  const groups: OrderGroup[] = [];
+  for (let d = 1; d <= names.length; d++) {
+    const hs = byDiv.get(d);
+    if (!hs || hs.length === 0) continue;
+    groups.push({ label: { text: names[d - 1]!, groupClass: `ticker-div-${((d - 1) % 3) + 1}` }, horses: sortByRank(hs) });
+  }
+  return composeOrderCells(groups);
+}
+
 // The loop seam: a wide blank break marking the end of one pass and the start
 // of the next, so a repeating batch reads as a repeat rather than as distinct
 // achievements. Its width is set dynamically by the ticker.
@@ -183,9 +205,9 @@ export function renderGroupSep(doc: Document): HTMLElement {
   return el;
 }
 
-export function renderSectionGap(doc: Document): HTMLElement {
+export function renderSectionGap(doc: Document, wide = false): HTMLElement {
   const el = doc.createElement('div');
-  el.className = 'ticker-section-gap';
+  el.className = wide ? 'ticker-section-gap ticker-section-gap--wide' : 'ticker-section-gap';
   el.setAttribute('aria-hidden', 'true');
   return el;
 }
@@ -197,7 +219,7 @@ export function buildCellNode(doc: Document, cell: TickerCell): HTMLElement {
     case 'label': return renderGroupLabel(doc, cell);
     case 'sep': return renderTickerSep(doc);
     case 'groupsep': return renderGroupSep(doc);
-    case 'sectiongap': return renderSectionGap(doc);
+    case 'sectiongap': return renderSectionGap(doc, cell.wide);
   }
 }
 
@@ -214,7 +236,8 @@ export type Ticker = {
 
 const SPEED_PX_PER_S = 70;
 const FILL_BUFFER_PX = 96; // keep this much content past the right edge
-const MIN_GAP_PX = 140; // smallest loop-seam gap (used for long batches)
+const MIN_GAP_PX = 140;        // loop-seam floor for a standard (flat) ticker
+const MIN_GAP_PX_LEAGUE = 600; // wider floor for the league order (division groups) so it doesn't tile
 
 export function createTicker(doc: Document): Ticker {
   const el = doc.createElement('div');
@@ -226,6 +249,7 @@ export function createTicker(doc: Document): Ticker {
 
   let cells: TickerCell[] = [];
   let cursor = 0;
+  let seamFloor = MIN_GAP_PX; // widened to MIN_GAP_PX_LEAGUE when the batch has division groups
   let pos = 0; // px the track has scrolled to the left
   let widthSinceSeam = 0; // width emitted since the last loop-seam gap
   let mounted: { node: HTMLElement; width: number }[] = [];
@@ -256,7 +280,7 @@ export function createTicker(doc: Document): Ticker {
       // Stretch the gap so one full pass spans at least the viewport — a short
       // batch fully clears the screen before it repeats, instead of tiling.
       const viewport = el.clientWidth || 0;
-      width = Math.max(MIN_GAP_PX, viewport - widthSinceSeam + MIN_GAP_PX);
+      width = Math.max(seamFloor, viewport - widthSinceSeam + seamFloor);
       node.style.width = `${width}px`;
       widthSinceSeam = 0;
     } else {
@@ -308,6 +332,10 @@ export function createTicker(doc: Document): Ticker {
       cells = next.slice();
       cursor = 0;
       widthSinceSeam = 0;
+      // League batches carry division-group labels — widen the loop seam so the
+      // grouped order gets its ≥600px breathing room. Standard (flat) tickers keep
+      // the original floor, unchanged.
+      seamFloor = next.some((c) => c.kind === 'label') ? MIN_GAP_PX_LEAGUE : MIN_GAP_PX;
     },
     destroy() {
       if (raf !== null) win.cancelAnimationFrame(raf);

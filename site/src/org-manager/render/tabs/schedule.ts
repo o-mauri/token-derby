@@ -8,7 +8,7 @@ export type ScheduleDeps = {
   onClear: () => void;
 };
 
-const DAYS: Array<[string, string]> = [['1', 'Mon'], ['2', 'Tue'], ['3', 'Wed'], ['4', 'Thu'], ['5', 'Fri'], ['6', 'Sat'], ['7', 'Sun']];
+export const DAYS: Array<[string, string]> = [['1', 'Mon'], ['2', 'Tue'], ['3', 'Wed'], ['4', 'Thu'], ['5', 'Fri'], ['6', 'Sat'], ['7', 'Sun']];
 
 export function renderSchedule(root: HTMLElement, deps: ScheduleDeps): void {
   const s = deps.schedule;

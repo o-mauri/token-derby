@@ -1,7 +1,8 @@
-import type { GetRaceResponse, GetRaceSeriesResponse, HorseView } from '@token-derby/shared';
+import type { GetRaceResponse, GetRaceSeriesResponse, HorseView, SeasonStandings } from '@token-derby/shared';
 import { levelInfo, levelFromXp } from '@token-derby/shared';
-import { fetchRaceSeries } from '../api.js';
+import { fetchRaceSeries, fetchOrgLeagueStandings } from '../api.js';
 import { buildChartFaces } from './race-chart.js';
+import { renderLeagueStandings } from './league-standings.js';
 import { startCycler, type Cycler } from './panel-cycler.js';
 
 const CONFETTI_COLORS = ['#ffd166', '#7bed9f', '#a68bd8', '#ff6b6b', '#4db8ff', '#ffffff'];
@@ -10,6 +11,7 @@ const FLIP_INTERVAL_MS = 8_000;
 
 type FinishedOptions = {
   fetchSeries?: (joinCode: string) => Promise<GetRaceSeriesResponse>;
+  fetchStandings?: (orgName: string, season: number) => Promise<{ standings: SeasonStandings | null }>;
   win?: Window;
   intervalMs?: number;
 };
@@ -268,6 +270,21 @@ async function mountDetailCycle(
       console.warn('[finished] series load failed', err);
     }
   }
+  if (race.league_id && race.league_season !== undefined && race.organisation_name) {
+    try {
+      const getStandings = opts.fetchStandings ?? fetchOrgLeagueStandings;
+      const { standings } = await getStandings(race.organisation_name, race.league_season);
+      if (!signal.aborted && standings && standings.divisions.length > 0) {
+        const face = buildSeasonFace(overlay.ownerDocument, standings, race.league_round);
+        cycle.appendChild(face);
+      }
+    } catch (err) {
+      // Best-effort: skip the season face, leave the rest of the end screen intact.
+      if (typeof process === 'undefined' || process.env.NODE_ENV !== 'production') {
+        console.warn('[finished] league standings load failed', err);
+      }
+    }
+  }
   if (signal.aborted) return;
   const faces = [...cycle.querySelectorAll<HTMLElement>('.detail-face')];
   if (faces.length === 0) return;
@@ -328,4 +345,55 @@ function navButton(
   b.textContent = glyph;
   b.addEventListener('click', onClick);
   return b;
+}
+
+// The season-standings end-screen face. On the season finale (this race is the
+// final fixture) it heads with "Final" and crowns the champion — the leader of
+// the highest populated flight — derived straight from the standings.
+function buildSeasonFace(doc: Document, standings: SeasonStandings, round: number | undefined): HTMLElement {
+  const face = doc.createElement('div');
+  face.className = 'detail-face season-face';
+
+  const isFinale = round !== undefined && round === standings.races_per_season;
+
+  const header = doc.createElement('div');
+  header.className = 'season-face-head';
+  header.textContent = isFinale
+    ? `Season ${standings.season} · Final`
+    : `Season ${standings.season} · Round ${standings.round}/${standings.races_per_season}`;
+  face.appendChild(header);
+
+  if (isFinale) {
+    // Champion = leader of the highest populated flight (division 1 in steady
+    // state; the pool winner in season 1).
+    const topDiv = standings.divisions.find((d) => d.rows.length > 0);
+    const champ = topDiv?.rows[0];
+    if (champ) {
+      const banner = doc.createElement('div');
+      banner.className = 'season-champion';
+      const trophy = doc.createElement('span');
+      trophy.className = 'season-champion-trophy';
+      trophy.textContent = '🏆';
+      banner.appendChild(trophy);
+      const text = doc.createElement('div');
+      const label = doc.createElement('div');
+      label.className = 'season-champion-label';
+      label.textContent = `Season ${standings.season} Champion`;
+      const nameEl = doc.createElement('div');
+      nameEl.className = 'season-champion-name';
+      nameEl.appendChild(doc.createTextNode(`${champ.horse_name} `));
+      const sub = doc.createElement('small');
+      sub.textContent = `(${champ.user_name}) · ${topDiv!.name}`;
+      nameEl.appendChild(sub);
+      text.appendChild(label);
+      text.appendChild(nameEl);
+      banner.appendChild(text);
+      face.appendChild(banner);
+    }
+  }
+
+  // Suppress the renderer's own season header — the face-head above already
+  // prints the season/finale line (avoids showing it twice).
+  face.appendChild(renderLeagueStandings(doc, standings, { showSeasonHeader: false }));
+  return face;
 }

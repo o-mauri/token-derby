@@ -1,10 +1,11 @@
 import type { ScheduledHandler } from 'aws-lambda';
 import { listAllSchedules, tryClaimMaterialised } from '../db/schedules.js';
 import { listAllLeagues } from '../db/leagues.js';
-import { ensureLeagueSeason, tryClaimLeagueFixture } from '../db/league-seasons.js';
+import { ensureLeagueSeason, tryClaimLeagueFixture, stampFinalFixtureEnd } from '../db/league-seasons.js';
 import { getOrganisationById } from '../db/organisations.js';
 import { isoWeekdayInTz, localDateInTz, localDateTimeToUtcMs } from '../lib/tz.js';
 import { createRace } from '../lib/create-race.js';
+import { rolloverDueLeague } from '../lib/rollover-league.js';
 import { leagueFixtureName } from '@token-derby/shared';
 
 // Fired every minute by EventBridge. Materialises org races whose current local
@@ -72,6 +73,20 @@ export const handler: ScheduledHandler = async () => {
   const leagues = await listAllLeagues();
   for (const league of leagues) {
     try {
+      // Rollover check runs ungated — a season can end on an off-day or outside
+      // the fixture window, so this can't be gated behind the weekday/window
+      // checks below. Wrapped so a rollover error can't abort materialisation
+      // for this league (and vice-versa): uses the CURRENT league snapshot; a
+      // bumped season is picked up on the next tick, not re-read here.
+      try {
+        const rolled = await rolloverDueLeague(league, now);
+        if (rolled) {
+          console.log('league season rolled over', { org_id: league.org_id, from_season: league.current_season });
+        }
+      } catch (e) {
+        console.warn('league rollover error', { org_id: league.org_id, error: e instanceof Error ? e.message : String(e) });
+      }
+
       const localDate = localDateInTz(now, league.tz);
 
       const weekday = isoWeekdayInTz(now, league.tz);
@@ -97,6 +112,10 @@ export const handler: ScheduledHandler = async () => {
       // nothing to overlap. We accept the rare gap rather than risk double-create.
       const round = await tryClaimLeagueFixture(league.org_id, season, localDate, league.races_per_season);
       if (round === null) continue;
+
+      if (round === league.races_per_season) {
+        await stampFinalFixtureEnd(league.org_id, season, new Date(endMs).toISOString());
+      }
 
       const org = await getOrganisationById(league.org_id);
       if (!org) {

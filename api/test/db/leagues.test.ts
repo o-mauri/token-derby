@@ -5,10 +5,9 @@ import type { League } from '@token-derby/shared';
 function league(org_id: string): League {
   return {
     org_id,
-    divisions: 3,
-    racers_per_division: 10,
+    divisions: [{ name: 'Div 1', cap: 10 }, { name: 'Div 2', cap: 10 }, { name: 'Div 3', cap: 10 }],
+    boundaries: [2, 2],
     races_per_season: 8,
-    promote_relegate_count: 2,
     weekdays: [1, 2, 3, 4, 5],
     start_local: '09:00',
     end_local: '17:30',
@@ -25,7 +24,8 @@ describe('leagues db', () => {
   it('round-trips a league by org', async () => {
     await putLeague(league('org-1'));
     const got = await getLeague('org-1');
-    expect(got).toMatchObject({ org_id: 'org-1', divisions: 3, current_season: 1, status: 'active' });
+    expect(got).toMatchObject({ org_id: 'org-1', current_season: 1, status: 'active' });
+    expect(got?.divisions).toEqual([{ name: 'Div 1', cap: 10 }, { name: 'Div 2', cap: 10 }, { name: 'Div 3', cap: 10 }]);
     // internal storage keys are stripped
     expect((got as any).pk).toBeUndefined();
     expect((got as any).league_marker).toBeUndefined();

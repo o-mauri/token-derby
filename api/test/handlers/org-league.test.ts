@@ -6,6 +6,7 @@ import { handler as deleteLeague } from '../../src/handlers/delete-org-league.js
 import { handler as setSchedule } from '../../src/handlers/set-org-schedule.js';
 import { handler as createOrgHandler } from '../../src/handlers/create-organisation.js';
 import { putSchedule } from '../../src/db/schedules.js';
+import { getLeague as getLeagueRow } from '../../src/db/leagues.js';
 import { makeUser, type TestUser } from '../helpers/auth-helper.js';
 import { CURRENT_CLI_VERSION } from '../helpers/cli-version.js';
 
@@ -27,8 +28,9 @@ async function createOrg(user: TestUser, name: string): Promise<string> {
 }
 
 const VALID_BODY = {
-  divisions: 3, racers_per_division: 10, races_per_season: 8, promote_relegate_count: 2,
-  weekdays: [1, 2, 3, 4, 5], start_local: '09:00', end_local: '17:30', tz: 'UTC',
+  divisions: [{ name: 'Div 1', cap: 10 }, { name: 'Div 2', cap: 10 }, { name: 'Div 3', cap: 10 }],
+  boundaries: [2, 2],
+  races_per_season: 8, weekdays: [1], start_local: '09:00', end_local: '17:00', tz: 'UTC',
 };
 
 function ev(method: string, org_name: string, headers: Record<string, string>, body?: unknown): APIGatewayProxyEventV2 {
@@ -48,17 +50,23 @@ describe('org-league handlers', () => {
     const setRes: any = await setLeague(ev('PUT', 'LeagueOrg1', AUTH(user), VALID_BODY));
     expect(setRes.statusCode).toBe(200);
     const set = JSON.parse(setRes.body);
-    expect(set.league).toMatchObject({ divisions: 3, current_season: 1, status: 'active', creator_user_name: 'LeagueOwner' });
+    expect(set.league).toMatchObject({
+      divisions: [{ name: 'Div 1', cap: 10 }, { name: 'Div 2', cap: 10 }, { name: 'Div 3', cap: 10 }],
+      current_season: 1, status: 'active', creator_user_name: 'LeagueOwner',
+    });
 
     const getRes: any = await getLeague(ev('GET', 'LeagueOrg1', AUTH(user)));
     expect(getRes.statusCode).toBe(200);
-    expect(JSON.parse(getRes.body).league).toMatchObject({ divisions: 3, races_per_season: 8 });
+    expect(JSON.parse(getRes.body).league).toMatchObject({
+      divisions: [{ name: 'Div 1', cap: 10 }, { name: 'Div 2', cap: 10 }, { name: 'Div 3', cap: 10 }],
+      races_per_season: 8,
+    });
   });
 
   it('rejects an invalid config with BAD_REQUEST', async () => {
     const user = await makeUser('LeagueOwner2');
     await createOrg(user, 'LeagueOrg2');
-    const res: any = await setLeague(ev('PUT', 'LeagueOrg2', AUTH(user), { ...VALID_BODY, promote_relegate_count: 10 }));
+    const res: any = await setLeague(ev('PUT', 'LeagueOrg2', AUTH(user), { ...VALID_BODY, boundaries: [99, 2] }));
     expect(res.statusCode).toBe(400);
     expect(JSON.parse(res.body).code).toBe('BAD_REQUEST');
   });
@@ -128,5 +136,83 @@ describe('org-league handlers', () => {
     const res: any = await setSchedule(scheduleEv);
     expect(res.statusCode).toBe(409);
     expect(JSON.parse(res.body).code).toBe('LEAGUE_CONFLICT');
+  });
+
+  it('applies live fields immediately and stages structural edits on an existing league', async () => {
+    const user = await makeUser('LiveEditOwn');
+    const org_id = await createOrg(user, 'LiveEditOrg');
+    const setRes: any = await setLeague(ev('PUT', 'LiveEditOrg', AUTH(user), VALID_BODY));
+    expect(setRes.statusCode).toBe(200);
+
+    const newCaps = [{ name: 'Div 1', cap: 5 }, { name: 'Div 2', cap: 5 }, { name: 'Div 3', cap: 5 }];
+    const edited = { ...VALID_BODY, weekdays: [2, 4], divisions: newCaps, boundaries: [1, 1] };
+    const editRes: any = await setLeague(ev('PUT', 'LiveEditOrg', AUTH(user), edited));
+    expect(editRes.statusCode).toBe(200);
+
+    const row = await getLeagueRow(org_id);
+    expect(row?.weekdays).toEqual([2, 4]);
+    expect(row?.divisions).toEqual(VALID_BODY.divisions);
+    expect(row?.pending_structural?.divisions).toEqual(newCaps);
+    expect(row?.pending_structural?.boundaries).toEqual([1, 1]);
+    expect(row?.current_season).toBe(1);
+  });
+
+  it('clears pending_structural when a later edit restores the live shape', async () => {
+    const user = await makeUser('RestoreOwner');
+    const org_id = await createOrg(user, 'RestoreOrg');
+    await setLeague(ev('PUT', 'RestoreOrg', AUTH(user), VALID_BODY));
+
+    const newCaps = [{ name: 'Div 1', cap: 5 }, { name: 'Div 2', cap: 5 }, { name: 'Div 3', cap: 5 }];
+    await setLeague(ev('PUT', 'RestoreOrg', AUTH(user), { ...VALID_BODY, divisions: newCaps }));
+    const staged = await getLeagueRow(org_id);
+    expect(staged?.pending_structural?.divisions).toEqual(newCaps);
+
+    await setLeague(ev('PUT', 'RestoreOrg', AUTH(user), VALID_BODY));
+    const restored = await getLeagueRow(org_id);
+    expect(restored?.pending_structural).toBeUndefined();
+    expect(restored?.divisions).toEqual(VALID_BODY.divisions);
+  });
+
+  it('preserves current_season/status/created_at/creator on edit', async () => {
+    const user = await makeUser('PreserveOwn');
+    const org_id = await createOrg(user, 'PreserveOrg');
+    await setLeague(ev('PUT', 'PreserveOrg', AUTH(user), VALID_BODY));
+    const before = await getLeagueRow(org_id);
+
+    await setLeague(ev('PUT', 'PreserveOrg', AUTH(user), { ...VALID_BODY, weekdays: [3] }));
+    const after = await getLeagueRow(org_id);
+
+    expect(after?.current_season).toBe(before?.current_season);
+    expect(after?.status).toBe(before?.status);
+    expect(after?.created_at).toBe(before?.created_at);
+    expect(after?.creator_user_id).toBe(before?.creator_user_id);
+    expect(after?.creator_user_name).toBe(before?.creator_user_name);
+    expect(after?.weekdays).toEqual([3]);
+  });
+
+  it('stages a races_per_season change without touching divisions/boundaries', async () => {
+    const user = await makeUser('RacesOwner');
+    const org_id = await createOrg(user, 'RacesOrg');
+    await setLeague(ev('PUT', 'RacesOrg', AUTH(user), VALID_BODY));
+
+    await setLeague(ev('PUT', 'RacesOrg', AUTH(user), { ...VALID_BODY, races_per_season: 12 }));
+    const row = await getLeagueRow(org_id);
+    expect(row?.pending_structural?.races_per_season).toBe(12);
+    expect(row?.pending_structural?.divisions).toBeUndefined();
+    expect(row?.pending_structural?.boundaries).toBeUndefined();
+    expect(row?.races_per_season).toBe(8);
+    expect(row?.divisions).toEqual(VALID_BODY.divisions);
+    expect(row?.boundaries).toEqual(VALID_BODY.boundaries);
+  });
+
+  it('clears a previously-set live optional field when a later edit omits it', async () => {
+    const user = await makeUser('OptClearOwn');
+    const org_id = await createOrg(user, 'OptClearOrg');
+    // First set with a race_name...
+    await setLeague(ev('PUT', 'OptClearOrg', AUTH(user), { ...VALID_BODY, race_name: 'Friday League' }));
+    expect((await getLeagueRow(org_id))?.race_name).toBe('Friday League');
+    // ...then edit WITHOUT race_name → it must be cleared (removeUndefinedValues + full-item put).
+    await setLeague(ev('PUT', 'OptClearOrg', AUTH(user), VALID_BODY));
+    expect((await getLeagueRow(org_id))?.race_name).toBeUndefined();
   });
 });

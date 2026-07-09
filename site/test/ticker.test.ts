@@ -8,6 +8,7 @@ import {
   singleGroupOrder,
   composeOrderCells,
   liveOrderCells,
+  leagueOrderCells,
   buildCellNode,
 } from '../src/render/ticker.js';
 import type { GetRaceResponse, HorseView } from '@token-derby/shared';
@@ -243,6 +244,45 @@ describe('liveOrderCells', () => {
   });
 });
 
+describe('leagueOrderCells', () => {
+  const horse = (over: Partial<HorseView>): HorseView => ({
+    horse_id: over.horse_id ?? 'h', stable_horse_id: over.horse_id, name: over.name ?? 'H',
+    colors: { body: '#000', mane: '#000', tail: '#000', saddle: '#000' },
+    current_tokens: over.current_tokens ?? 0, rank: over.rank ?? 1, joined_at: '2026-07-07T00:00:00Z',
+    xp: 0, user_name: 'U', division: over.division,
+  } as HorseView);
+  const base = { league_id: 'o1', league_division_names: ['Premier', 'Championship'] };
+
+  it('groups the order by division with real-name labels, top flight first', () => {
+    const race = { ...base, horses: [
+      horse({ horse_id: 'a', name: 'Bolt', division: 1, rank: 1, current_tokens: 900 }),
+      horse({ horse_id: 'c', name: 'Oak', division: 2, rank: 1, current_tokens: 500 }),
+      horse({ horse_id: 'b', name: 'Ada', division: 1, rank: 2, current_tokens: 700 }),
+    ] } as any;
+    const cells = leagueOrderCells(race);
+    const labels = cells.filter((c) => c.kind === 'label').map((c: any) => c.text);
+    expect(labels).toEqual(['Premier', 'Championship']);
+    // a group separator appears between the two divisions
+    expect(cells.some((c) => c.kind === 'groupsep')).toBe(true);
+    // within Premier, Bolt (rank 1) precedes Ada (rank 2)
+    const orderNames = cells.filter((c) => c.kind === 'order').map((c: any) => c.horseName);
+    expect(orderNames.slice(0, 2)).toEqual(['Bolt', 'Ada']);
+  });
+
+  it('falls back to a single flat group for a non-league race', () => {
+    const race = { horses: [horse({ horse_id: 'a', rank: 1 }), horse({ horse_id: 'b', rank: 2 })] } as any;
+    const cells = leagueOrderCells(race);
+    expect(cells.some((c) => c.kind === 'label')).toBe(false);
+    expect(cells.some((c) => c.kind === 'groupsep')).toBe(false);
+  });
+
+  it('skips empty divisions', () => {
+    const race = { league_id: 'o1', league_division_names: ['Premier', 'Championship', 'League One'],
+      horses: [horse({ horse_id: 'a', division: 1, rank: 1 })] } as any;
+    expect(leagueOrderCells(race).filter((c) => c.kind === 'label').map((c: any) => c.text)).toEqual(['Premier']);
+  });
+});
+
 describe('buildCellNode', () => {
   it('renders an order cell', () => {
     const node = buildCellNode(document, { kind: 'order', position: 1, horseName: 'Bolt', valueText: '900', isLeader: true });
@@ -271,5 +311,14 @@ describe('buildCellNode', () => {
 
   it('renders an achievement separator', () => {
     expect(buildCellNode(document, { kind: 'sep' }).classList.contains('achievement-ticker-sep')).toBe(true);
+  });
+});
+
+describe('section gap (league spacing)', () => {
+  it('renders a wide section gap only when flagged (league order)', () => {
+    const flat = buildCellNode(document, { kind: 'sectiongap' });
+    expect(flat.className).toBe('ticker-section-gap');
+    const wide = buildCellNode(document, { kind: 'sectiongap', wide: true });
+    expect(wide.classList.contains('ticker-section-gap--wide')).toBe(true);
   });
 });

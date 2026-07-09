@@ -13,7 +13,7 @@ export async function scoreLeagueRace(race: Race, horses: Horse[]): Promise<void
   if (!league) return; // deleted mid-season
   const season = race.league_season;
   const round = race.league_round;
-  const bottom = league.divisions;
+  const bottom = league.divisions.length;
 
   const members = new Set((await listOrgMembers(org_id)).map(m => m.user_id));
   const participants = horses.filter(

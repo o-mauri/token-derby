@@ -160,3 +160,13 @@ export function raceXpMultiplier(input: { distinct_jockeys: number; duration_ms:
   // Non-stacking: the harsher factor governs — never multiply them together.
   return Math.min(jockeyFactor, durationFactor);
 }
+
+// League season prize XP is gated like race XP, by distinct participating horses
+// across the season: >=3 full, exactly 2 half, <=1 none. Mirrors RACE_XP_GATE.
+export const LEAGUE_XP_GATE = { full_horses: 3, half_horses: 2 } as const;
+
+export function leagueXpMultiplier(distinctHorses: number): number {
+  if (distinctHorses >= LEAGUE_XP_GATE.full_horses) return 1;
+  if (distinctHorses >= LEAGUE_XP_GATE.half_horses) return 0.5;
+  return 0;
+}

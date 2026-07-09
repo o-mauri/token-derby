@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderFinishedOverlay } from '../src/render/finished.js';
-import type { GetRaceResponse, HorseView } from '@token-derby/shared';
+import type { GetRaceResponse, HorseView, SeasonStandings, StandingRow } from '@token-derby/shared';
 
 function fakeWin() {
   let cb: (() => void) | null = null; let cleared = false;
@@ -62,6 +62,44 @@ function horse(
     ...(xp_awarded !== undefined ? { xp_awarded } : {}),
     ...extras,
   };
+}
+
+function leagueRace(overrides: Partial<GetRaceResponse> = {}): GetRaceResponse {
+  return {
+    ...race([
+      horse('a', 1, 'Alpha', 1000, 0, 80),
+      horse('b', 2, 'Bravo', 800, 0, 65),
+      horse('c', 3, 'Charlie', 500, 0, 50),
+    ]),
+    league_id: 'org-1',
+    league_season: 1,
+    league_round: 4,
+    organisation_name: 'Acme',
+    ...overrides,
+  };
+}
+
+function standingRow(
+  rank: number, horseName: string, userName: string, points: number, zone: StandingRow['zone'] = null,
+): StandingRow {
+  return { rank, stable_horse_id: `sh-${horseName}`, horse_name: horseName, user_name: userName, points, season_tokens: points * 10, zone };
+}
+
+function fakeStandings(round: number, racesPerSeason: number): SeasonStandings {
+  return {
+    org_name: 'Acme',
+    season: 1,
+    round,
+    races_per_season: racesPerSeason,
+    divisions: [
+      { division: 1, name: 'Premier', rows: [standingRow(1, 'Comet', 'User Comet', 40), standingRow(2, 'Blaze', 'User Blaze', 32)] },
+      { division: 2, name: 'Challenger', rows: [standingRow(1, 'Rocket', 'User Rocket', 28)] },
+    ],
+  };
+}
+
+async function flush(n = 20): Promise<void> {
+  for (let i = 0; i < n; i++) await Promise.resolve();
 }
 
 let track: HTMLDivElement;
@@ -284,5 +322,91 @@ describe('renderFinishedOverlay', () => {
     expect(wasCleared()).toBe(true);
     // calling teardown a second time must not throw (abort is idempotent)
     expect(() => teardown()).not.toThrow();
+  });
+
+  it('appends a Season Standings face for a league fixture', async () => {
+    const raceEl = document.createElement('div');
+    const raceData = leagueRace({ league_round: 4 });
+    const standings = fakeStandings(4, 8);
+    const { win } = fakeWin();
+    const fetchStandings = vi.fn(async () => ({ standings }));
+    const teardown = renderFinishedOverlay(raceEl, raceData, { win, fetchStandings });
+    await flush();
+
+    expect(fetchStandings).toHaveBeenCalledWith('Acme', 1);
+    const faces = [...raceEl.querySelectorAll<HTMLElement>('.detail-cycle .detail-face')];
+    const seasonFace = faces.find((f) => f.classList.contains('season-face'));
+    expect(seasonFace).not.toBeUndefined();
+    expect(seasonFace!.querySelector('.div-grid')).not.toBeNull();
+    expect(seasonFace!.textContent).toContain('Round 4/8');
+    expect(seasonFace!.querySelector('.season-champion')).toBeNull();
+    teardown();
+  });
+
+  it('crowns the champion on the season finale', async () => {
+    const raceEl = document.createElement('div');
+    const raceData = leagueRace({ league_round: 8 });
+    const standings = fakeStandings(8, 8);
+    const { win } = fakeWin();
+    const teardown = renderFinishedOverlay(raceEl, raceData, {
+      win,
+      fetchStandings: async () => ({ standings }),
+    });
+    await flush();
+
+    const faces = [...raceEl.querySelectorAll<HTMLElement>('.detail-cycle .detail-face')];
+    const seasonFace = faces.find((f) => f.classList.contains('season-face'));
+    expect(seasonFace).not.toBeUndefined();
+    expect(seasonFace!.querySelector('.season-face-head')?.textContent).toContain('Final');
+    const banner = seasonFace!.querySelector('.season-champion');
+    expect(banner).not.toBeNull();
+    expect(banner!.textContent).toContain('Comet');
+    expect(banner!.textContent).toContain('User Comet');
+    expect(banner!.textContent).toContain('Premier');
+    teardown();
+  });
+
+  it('crowns the pool winner on a season-1 finale (top divisions empty)', async () => {
+    // Season 1 is a single pool: divisions 1 & 2 are empty, everyone is in the
+    // bottom division. The champion must fall through to the highest POPULATED
+    // flight (the pool), not be null because Division 1 has no rows.
+    const raceEl = document.createElement('div');
+    const raceData = leagueRace({ league_round: 8 });
+    const standings = {
+      org_name: 'Acme', season: 1, round: 8, races_per_season: 8,
+      divisions: [
+        { division: 1, name: 'Premier', rows: [] },
+        { division: 2, name: 'Championship', rows: [] },
+        { division: 3, name: 'League One', rows: [
+          { rank: 1, stable_horse_id: 's1', horse_name: 'Rookie', user_name: 'Nova', points: 40, season_tokens: 900, zone: null },
+          { rank: 2, stable_horse_id: 's2', horse_name: 'Second', user_name: 'Kit', points: 22, season_tokens: 400, zone: null },
+        ] },
+      ],
+    };
+    const { win } = fakeWin();
+    const teardown = renderFinishedOverlay(raceEl, raceData, { win, fetchStandings: async () => ({ standings }) });
+    await flush();
+
+    const seasonFace = [...raceEl.querySelectorAll<HTMLElement>('.detail-cycle .detail-face')]
+      .find((f) => f.classList.contains('season-face'));
+    const banner = seasonFace!.querySelector('.season-champion');
+    expect(banner).not.toBeNull();
+    expect(banner!.textContent).toContain('Rookie');       // the pool winner, not null
+    expect(banner!.textContent).toContain('League One');   // its (bottom) division name
+    teardown();
+  });
+
+  it('adds no Season Standings face for a standard race', async () => {
+    const raceEl = document.createElement('div');
+    const raceData = makeFinishedRaceWithManyHorses(); // no league_id/league_season/organisation_name
+    const { win } = fakeWin();
+    const fetchStandings = vi.fn(async () => ({ standings: fakeStandings(1, 8) }));
+    const teardown = renderFinishedOverlay(raceEl, raceData, { win, fetchStandings });
+    await flush();
+
+    expect(fetchStandings).not.toHaveBeenCalled();
+    expect(raceEl.querySelector('.season-face')).toBeNull();
+    expect(raceEl.querySelector('.div-grid')).toBeNull();
+    teardown();
   });
 });

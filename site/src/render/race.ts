@@ -7,7 +7,7 @@ import { renderFinishedOverlay } from './finished.js';
 import { formatDuration, predictTimeLeftSeconds, type CountdownAnchor } from '../time.js';
 import { startAutoScroll } from './autoscroll.js';
 import { horseFaceSvg } from '../horse-face.js';
-import { createTicker, collectFreshItems, liveOrderCells, type TickerCell } from './ticker.js';
+import { createTicker, collectFreshItems, leagueOrderCells, type TickerCell } from './ticker.js';
 
 const POLL_INTERVAL_MS = 60_000;
 const TIMER_TICK_MS = 1_000;
@@ -109,9 +109,9 @@ export function renderRace(root: HTMLElement, joinCode: string): () => void {
           i === 0 ? [{ kind: 'achievement', item }] : [{ kind: 'sep' }, { kind: 'achievement', item }],
         );
       }
-      const cells = liveOrderCells(race);
+      const cells = leagueOrderCells(race);
       if (lastAchievements.length) {
-        cells.push({ kind: 'sectiongap' }, ...lastAchievements);
+        cells.push({ kind: 'sectiongap', wide: race.league_id != null }, ...lastAchievements);
       }
       ticker.setCells(cells);
     } else {

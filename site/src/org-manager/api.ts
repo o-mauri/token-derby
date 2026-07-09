@@ -3,6 +3,7 @@ import type {
   OrgMembersResponse, GetOrgScheduleResponse, SetOrgScheduleRequest, SetOrgScheduleResponse,
   GetOrgWebhookResponse, SetOrgWebhookResponse, CreateOrganisationResponse,
   JoinOrganisationResponse,
+  GetOrgLeagueResponse, SetOrgLeagueRequest, SetOrgLeagueResponse, DeleteOrgLeagueResponse,
 } from '@token-derby/shared';
 import { getSession, setSession, clearSession } from './session.js';
 
@@ -75,6 +76,12 @@ export const setSchedule = (name: string, body: SetOrgScheduleRequest, f: FetchF
   authed<SetOrgScheduleResponse>('PUT', `/api/organisations/${u(name)}/schedule`, body, f);
 export const clearSchedule = (name: string, f: FetchFn = fetch) =>
   authed<{ deleted?: boolean }>('DELETE', `/api/organisations/${u(name)}/schedule`, undefined, f);
+export const getLeague = (name: string, f: FetchFn = fetch) =>
+  authed<GetOrgLeagueResponse>('GET', `/api/organisations/${u(name)}/league`, undefined, f);
+export const setLeague = (name: string, body: SetOrgLeagueRequest, f: FetchFn = fetch) =>
+  authed<SetOrgLeagueResponse>('PUT', `/api/organisations/${u(name)}/league`, body, f);
+export const clearLeague = (name: string, f: FetchFn = fetch) =>
+  authed<DeleteOrgLeagueResponse>('DELETE', `/api/organisations/${u(name)}/league`, undefined, f);
 export const getWebhook = (name: string, f: FetchFn = fetch) =>
   authed<GetOrgWebhookResponse>('GET', `/api/organisations/${u(name)}/webhook`, undefined, f);
 export const setWebhook = (name: string, url: string, f: FetchFn = fetch) =>

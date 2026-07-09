@@ -416,6 +416,19 @@ html, body {
   96%  { opacity: 0; }
   100% { opacity: 1; }
 }
+/* League lanes rotate 5 frames (adds the in-division league position) instead of 4. */
+.horse-stats-row.is-league .stat-view { animation-name: stat-cycle-5; }
+.horse-stats-row.is-league .stat-view:nth-child(2) { animation-delay: -9.6s; }
+.horse-stats-row.is-league .stat-view:nth-child(3) { animation-delay: -7.2s; }
+.horse-stats-row.is-league .stat-view:nth-child(4) { animation-delay: -4.8s; }
+.horse-stats-row.is-league .stat-view:nth-child(5) { animation-delay: -2.4s; }
+@keyframes stat-cycle-5 {
+  0%   { opacity: 1; }
+  16%  { opacity: 1; }
+  20%  { opacity: 0; }
+  96%  { opacity: 0; }
+  100% { opacity: 1; }
+}
 /* The running strip (dirt + rails) begins to the right of the label column. */
 .lane-track {
   position: relative;
@@ -549,6 +562,11 @@ html, body {
 .horse-position.pos-1 { color: #ffd700; }  /* gold   */
 .horse-position.pos-2 { color: #c8ccd2; }  /* silver */
 .horse-position.pos-3 { color: #cd7f32; }  /* bronze */
+.horse-league-pos {
+  font-size: 0.55rem;
+  font-weight: bold;
+  color: #a68bd8;
+}
 
 /* ── Pending state extras ─────────────────────────── */
 
@@ -737,6 +755,16 @@ html, body {
 .chart-face .chart-svg { height: 64vh; border: none; }
 .chart-face .chart-legend { justify-content: center; gap: 8px 20px; font-size: 1.05rem; }
 .chart-face .legend-chip { width: 14px; height: 14px; }
+
+/* End-screen Season Standings face (league fixtures only) — reuses the
+   .div-grid/.div-card/zone styling from the org standings renderer. */
+.season-face { text-align: left; }
+.season-face-head { text-transform: uppercase; letter-spacing: 0.18em; font-size: 0.8rem; color: #a68bd8; margin: 0 0 10px; }
+.season-champion { display: flex; align-items: center; gap: 12px; border: 2px solid #ffd166; background: rgba(255, 209, 102, 0.08); padding: 10px 14px; margin: 0 0 12px; }
+.season-champion-trophy { font-size: 1.8rem; }
+.season-champion-label { font-size: 0.7rem; letter-spacing: 0.15em; color: #ffd166; }
+.season-champion-name { font-size: 1.3rem; color: #fff; }
+.season-champion-name small { color: #9ca3af; font-size: 0.85rem; }
 
 /* ── Confetti ─────────────────────────────────────── */
 
@@ -1503,6 +1531,9 @@ label.label input:disabled { opacity: 0.5; }
   letter-spacing: 0.06em;
   margin-right: 0.2em;
 }
+.ticker-group-label.ticker-div-1 { background: #ffd166; color: #0b0b0f; }
+.ticker-group-label.ticker-div-2 { background: #4db8ff; color: #0b0b0f; }
+.ticker-group-label.ticker-div-3 { background: #a68bd8; color: #0b0b0f; }
 .ticker-group-sep {
   color: #6b4f95;
   padding: 0 2.4rem;
@@ -1510,6 +1541,10 @@ label.label input:disabled { opacity: 0.5; }
 .ticker-section-gap {
   display: inline-block;
   width: 150px;
+}
+/* League tickers space the order block out from the achievements (≥600px). */
+.ticker-section-gap--wide {
+  width: 600px;
 }
 
 /* End-screen detail-cycle nav: prev/next + page dots. */
@@ -1550,3 +1585,56 @@ label.label input:disabled { opacity: 0.5; }
 @media (prefers-reduced-motion: no-preference) {
   .facedot { transition: background 0.2s ease; }
 }
+
+/* Racing tab — mode picker + per-division league editor */
+.org-racing-modes { display: flex; gap: 18px; margin: 6px 0 12px; flex-wrap: wrap; }
+.org-racing-mode { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.org-racing-warn:not(:empty) { color: #ffcc55; margin: 6px 0; font-size: 0.85rem; }
+.org-div-note { font-size: 0.8rem; margin: 2px 0 8px; }
+.org-divisions { display: flex; flex-direction: column; gap: 4px; margin: 6px 0; }
+.org-div-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border: 1px solid #3a3a4a; border-radius: 4px; }
+.org-div-n { opacity: 0.6; width: 1.2rem; text-align: center; }
+.org-div-name { flex: 1 1 auto; min-width: 100px; }
+.org-div-cap input { width: 56px; }
+.org-div-overflow { opacity: 0.6; font-size: 0.8rem; }
+.org-div-remove { margin-left: auto; padding: 2px 8px; }
+.org-div-swap { display: flex; align-items: center; gap: 8px; padding: 2px 8px 2px 30px; opacity: 0.9; font-size: 0.85rem; }
+.org-div-swapn { width: 48px; }
+.org-div-swaptext { opacity: 0.6; }
+.org-div-summary:not(:empty) { margin: 10px 0; padding: 8px 12px; border: 1px dashed #3a3a4a; border-radius: 4px; }
+.org-error:not(:empty) { color: #ff6b6b; margin: 8px 0; font-size: 0.85rem; }
+@media (max-width: 600px) { .org-div-row { flex-wrap: wrap; } }
+
+/* ---- League standings (public org page) ---- */
+.org-standings { margin: 0 0 26px; }
+.season-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.season-line { color: var(--muted); font-size: 1.05rem; }
+.season-prog { flex-basis: 100%; height: 5px; background: #26262e; border: 1px solid var(--border); margin: 8px 0 4px; }
+.season-prog > i { display: block; height: 100%; background: #ffd166; }
+.org-eyebrow { text-transform: uppercase; letter-spacing: 0.22em; font-size: 0.78rem; color: #a68bd8; margin: 22px 0 10px; }
+
+.div-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; align-items: start; }
+.div-card { border: 2px solid var(--border); background: var(--panel); }
+.div-card-h { display: flex; align-items: center; justify-content: space-between; padding: 0.5rem 0.7rem; border-bottom: 2px solid #26262e; }
+.div-card-name { font-size: 1.05rem; display: flex; align-items: center; gap: 0.45rem; }
+.div-chip { font-size: 0.7rem; padding: 0 0.4rem; color: #0b0b0f; letter-spacing: 0.06em; }
+.div-card.d1 .div-chip { background: #ffd166; }
+.div-card.d2 .div-chip { background: #4db8ff; }
+.div-card.d3 .div-chip { background: #a68bd8; }
+.div-flight { font-size: 0.68rem; letter-spacing: 0.12em; color: var(--muted); }
+.div-empty { color: var(--muted); padding: 0.6rem 0.7rem; font-size: 0.9rem; margin: 0; }
+
+.org-standings table { width: 100%; border-collapse: collapse; font-size: 1.05rem; font-variant-numeric: tabular-nums; }
+.org-standings td { padding: 0.26rem 0.7rem; }
+.org-standings .rank { color: var(--muted); width: 2.1rem; }
+.org-standings .nm small { color: var(--muted); font-size: 0.78rem; }
+.org-standings .pts { text-align: right; width: 3.2rem; }
+.org-standings tr.lead .rank { color: #ffd166; }
+.org-standings tr.lead .nm { color: #fff; }
+.org-standings tr.promote { background: rgba(74, 222, 128, 0.10); }
+.org-standings tr.promote .rank { color: #4ade80; }
+.org-standings tr.relegate { background: rgba(255, 107, 107, 0.09); }
+.org-standings tr.relegate .rank { color: #ff6b6b; }
+.org-standings .zone td { padding: 0.05rem 0.7rem; font-size: 0.6rem; letter-spacing: 0.18em; text-transform: uppercase; }
+.org-standings .zone.up td { color: #4ade80; border-bottom: 1px dashed rgba(74, 222, 128, 0.45); }
+.org-standings .zone.down td { color: #ff6b6b; border-top: 1px dashed rgba(255, 107, 107, 0.45); }

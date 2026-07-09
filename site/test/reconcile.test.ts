@@ -187,6 +187,34 @@ describe('reconcileHorses', () => {
     reconcileHorses(track, r, new Date('2026-04-22T13:00:00Z'));
     expect(track.querySelector('.horse')?.classList.contains('crashed')).toBe(false);
   });
+
+  it('shows a live in-division league position (e.g. "3rd (Premier)") for a league fixture', () => {
+    const r = race({
+      league_id: 'org-1',
+      league_division_names: ['Premier', 'Championship'],
+      horses: [
+        horse('a', 900, 'Alpha', '2026-04-22T09:00:00Z', { division: 1 }),
+        horse('b', 600, 'Bravo', '2026-04-22T09:01:00Z', { division: 1 }),
+        horse('c', 300, 'Charlie', '2026-04-22T09:02:00Z', { division: 1 }),
+      ],
+    });
+    reconcileHorses(track, r, new Date('2026-04-22T13:00:00Z'));
+    const trailingLane = track.querySelector('.lane[data-horse-id="c"]')!;
+    expect(trailingLane.querySelector('.horse-league-pos')?.textContent).toBe('3rd (Premier)');
+    // League lanes tag the rotator and cycle 5 frames (owner/level/pace/position/league-pos).
+    expect(trailingLane.querySelector('.horse-stats-row.is-league')).toBeTruthy();
+    expect(trailingLane.querySelectorAll('.horse-stats-row .stat-view').length).toBe(5);
+  });
+
+  it('omits the league-position view for a standard race', () => {
+    const r = race({ horses: [
+      horse('a', 500, 'Alpha', '2026-04-22T09:00:00Z'),
+    ] });
+    reconcileHorses(track, r, new Date('2026-04-22T13:00:00Z'));
+    expect(track.querySelector('.horse-league-pos')).toBeNull();
+    expect(track.querySelector('.horse-stats-row.is-league')).toBeNull();
+    expect(track.querySelectorAll('.horse-stats-row .stat-view')).toHaveLength(4);
+  });
 });
 
 describe('sortHorses', () => {

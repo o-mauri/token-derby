@@ -1,12 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import type { ListOrgRacesResponse, RaceSummary } from '@token-derby/shared';
+import type { ListOrgRacesResponse, RaceSummary, GetLeagueStandingsResponse, SeasonStandings } from '@token-derby/shared';
 
 // Mock the api module so renderOrg's fetchOrgRaces resolves with our fixture
 // without touching the network or the global fetch.
 const fetchOrgRaces = vi.fn<() => Promise<ListOrgRacesResponse>>();
+const fetchStandings = vi.fn<() => Promise<GetLeagueStandingsResponse>>();
 vi.mock('../src/api.js', async () => {
   const actual = await vi.importActual<typeof import('../src/api.js')>('../src/api.js');
-  return { ...actual, fetchOrgRaces: () => fetchOrgRaces() };
+  return { ...actual, fetchOrgRaces: () => fetchOrgRaces(), fetchOrgLeagueStandings: () => fetchStandings() };
 });
 
 import { renderOrg } from '../src/render/org.js';
@@ -19,8 +20,7 @@ function resp(races: RaceSummary[]): ListOrgRacesResponse {
 
 // renderOrg resolves the fetch promise asynchronously; flush microtasks.
 async function flush() {
-  await Promise.resolve();
-  await Promise.resolve();
+  for (let i = 0; i < 6; i++) await Promise.resolve();
 }
 
 let root: HTMLElement;
@@ -32,6 +32,8 @@ beforeEach(() => {
   root = document.createElement('div');
   document.body.appendChild(root);
   fetchOrgRaces.mockReset();
+  fetchStandings.mockReset();
+  fetchStandings.mockResolvedValue({ standings: null });
 });
 
 afterEach(() => {
@@ -203,5 +205,83 @@ describe('renderOrg', () => {
     await flush();
     expect(root.querySelector('.org-status')?.textContent).toContain('No races yet');
     cleanup();
+  });
+});
+
+function leagueStandings(): SeasonStandings {
+  return {
+    org_name: 'Acme', season: 1, round: 4, races_per_season: 8,
+    divisions: [
+      { division: 1, name: 'Premier', rows: [
+        { rank: 1, stable_horse_id: 'a', horse_name: 'Bolt', user_name: 'sam', points: 54, season_tokens: 900000, zone: null },
+        { rank: 2, stable_horse_id: 'b', horse_name: 'Vega', user_name: 'lin', points: 30, season_tokens: 400000, zone: 'relegate' },
+      ] },
+      { division: 2, name: 'Championship', rows: [
+        { rank: 1, stable_horse_id: 'c', horse_name: 'Oak', user_name: 'bex', points: 40, season_tokens: 500000, zone: 'promote' },
+        { rank: 2, stable_horse_id: 'd', horse_name: 'Nyx', user_name: 'rho', points: 11, season_tokens: 100000, zone: 'relegate' },
+      ] },
+    ],
+  };
+}
+const liveRace: RaceSummary = {
+  race_id: 'r1', name: 'League Race (4/8)', join_code: 'ABC123',
+  start_time: new Date('2026-06-04T11:30:00Z').toISOString(),
+  end_time: new Date('2026-06-04T14:00:00Z').toISOString(),
+  status: 'live', time_left_seconds: 7200,
+  highlight: { horse_name: 'Bolt', tokens: 900000, colors: PALETTE },
+};
+
+describe('renderOrg — league standings', () => {
+  it('renders side-by-side division standings with names, zones, and a season header', async () => {
+    fetchOrgRaces.mockResolvedValue(resp([liveRace]));
+    fetchStandings.mockResolvedValue({ standings: leagueStandings() });
+    renderOrg(root, 'Acme');
+    await flush();
+    const standings = root.querySelector('.org-standings');
+    expect(standings).toBeTruthy();
+    expect(root.querySelectorAll('.div-card').length).toBe(2);
+    expect(standings!.textContent).toContain('Premier');
+    expect(standings!.textContent).toContain('Championship');
+    expect(standings!.textContent).toContain('Season 1');
+    expect(standings!.textContent).toContain('Round 4/8');
+    expect(root.querySelector('tr.promote')).toBeTruthy();
+    expect(root.querySelector('tr.relegate')).toBeTruthy();
+    expect(standings!.textContent).toContain('▲ promotion');
+    expect(standings!.textContent).toContain('▼ relegation');
+    // fixtures still render below the standings
+    expect(root.querySelector('.race-list')).toBeTruthy();
+  });
+
+  it('omits the standings block for a non-league org', async () => {
+    fetchOrgRaces.mockResolvedValue(resp([liveRace]));
+    fetchStandings.mockResolvedValue({ standings: null });
+    renderOrg(root, 'Acme');
+    await flush();
+    expect(root.querySelector('.org-standings')).toBeNull();
+    expect(root.querySelector('.race-list')).toBeTruthy();
+  });
+
+  it('still renders races when the standings fetch fails', async () => {
+    fetchOrgRaces.mockResolvedValue(resp([liveRace]));
+    fetchStandings.mockRejectedValue(new Error('boom'));
+    renderOrg(root, 'Acme');
+    await flush();
+    expect(root.querySelector('.org-standings')).toBeNull();
+    expect(root.querySelector('.race-list')).toBeTruthy();
+  });
+
+  it('escapes division and horse/jockey names', async () => {
+    fetchOrgRaces.mockResolvedValue(resp([]));
+    fetchStandings.mockResolvedValue({ standings: {
+      org_name: 'Acme', season: 1, round: 1, races_per_season: 8,
+      divisions: [{ division: 1, name: '<b>D</b>', rows: [
+        { rank: 1, stable_horse_id: 'a', horse_name: '<i>x</i>', user_name: 'u', points: 1, season_tokens: 0, zone: null },
+      ] }],
+    } });
+    renderOrg(root, 'Acme');
+    await flush();
+    expect(root.innerHTML).not.toContain('<b>D</b>');
+    expect(root.innerHTML).not.toContain('<i>x</i>');
+    expect(root.querySelector('.div-card-name')!.textContent).toContain('<b>D</b>'); // rendered as text
   });
 });

@@ -73,6 +73,10 @@ export type Race = {
   league_id?: string;
   league_season?: number;
   league_round?: number;
+  // League fixtures only: the league's division names, index 0 = division 1
+  // (top flight). Lets clients label the division-grouped order without a
+  // separate config fetch. Absent for non-league races.
+  league_division_names?: string[];
 };
 
 export type HorseView = Horse & {
@@ -81,7 +85,8 @@ export type HorseView = Horse & {
   // series points. Present only for live races; absent for pending/finished.
   pace_15m?: number;
   // League fixtures only: the horse's division for the current season (bottom
-  // division for an unscored new entrant). Absent for non-league races.
+  // division = league.divisions.length for an unscored new entrant). Absent
+  // for non-league races.
   division?: number;
 };
 
@@ -212,15 +217,26 @@ export type RaceSchedule = {
 
 export type LeagueStatus = 'active' | 'complete';
 
+// One division's config within a league. `cap` is the division's size; the
+// LAST division in the list is the uncapped overflow (its cap is ignored).
+export type DivisionConfig = { name: string; cap: number };
+
+// Shape-only config edits staged during an active season and applied at the next
+// rollover (see set-org-league). Live fields (schedule/name/options) apply immediately.
+export type PendingStructural = {
+  divisions?: DivisionConfig[];
+  boundaries?: number[];
+  races_per_season?: number;
+};
+
 // One league config per org. Stored on the org's LEAGUE row. Mutually
-// exclusive with RaceSchedule. The bottom (overflow) division ignores
-// `racers_per_division`.
+// exclusive with RaceSchedule. The bottom (overflow) division ignores its
+// `cap` (it holds everyone above the caps of the divisions before it).
 export type League = {
   org_id: string;
-  divisions: number;              // number of divisions (>= 1)
-  racers_per_division: number;    // cap per division (>= 1); bottom division ignores it
+  divisions: DivisionConfig[];    // ordered top → bottom; last = uncapped overflow
+  boundaries: number[];           // length divisions.length-1; swap[i] between div i and i+1
   races_per_season: number;       // fixtures per season (>= 1)
-  promote_relegate_count: number; // >= 0 and < racers_per_division
   weekdays: number[];             // ISO weekdays, 1=Mon..7=Sun
   start_local: string;            // "HH:MM" 24h, local to tz
   end_local: string;              // "HH:MM" 24h, local to tz
@@ -231,6 +247,7 @@ export type League = {
   primary_top5?: boolean;
   current_season: number;         // 1-based; the season fixtures accrue into
   status: LeagueStatus;           // 'complete' is transient during rollover
+  pending_structural?: PendingStructural; // shape edits staged mid-season, applied at rollover
   created_at: string;
   creator_user_id: string;
   creator_user_name: string;
@@ -245,6 +262,7 @@ export type LeagueSeason = {
   status: 'active' | 'complete';
   fixtures_materialised: number;
   last_materialised_date?: string; // local YYYY-MM-DD
+  final_fixture_end?: string; // ISO end_time of the final fixture; set at final-round materialisation
   created_at: string;
 };
 
@@ -263,6 +281,21 @@ export type LeagueStanding = {
   points: number;
   season_tokens: number;    // sum of final_tokens across the season's fixtures
   entered_at: string;
+  prize_awarded?: boolean;  // set once at rollover before minting season prize XP (idempotency mark)
+};
+
+// Compact, history-safe record of a finished season. Full tables remain queryable
+// from the retained LEAGUE#SEASON#<n>#DIV#... rows; this snapshots the champion and
+// the season's division names so a later rename can't rewrite history.
+export type LeagueSeasonResult = {
+  org_id: string;
+  season: number;
+  champion: { stable_horse_id: string; horse_name: string; user_name: string; points: number } | null;
+  division_champions: Array<{ division: number; name: string; stable_horse_id: string; horse_name: string }>;
+  promoted: string[];   // stable_horse_ids that moved up
+  relegated: string[];  // stable_horse_ids that moved down
+  division_names: string[]; // snapshot; index 0 = division 1
+  finished_at: string;
 };
 
 export type StandingRow = {
@@ -274,7 +307,7 @@ export type StandingRow = {
   season_tokens: number;
   zone: 'promote' | 'relegate' | null;
 };
-export type DivisionStandings = { division: number; rows: StandingRow[] };
+export type DivisionStandings = { division: number; name: string; rows: StandingRow[] };
 export type SeasonStandings = {
   org_name: string;
   season: number;

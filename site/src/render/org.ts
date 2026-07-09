@@ -1,9 +1,10 @@
 import type { RaceSummary, RaceHighlight } from '@token-derby/shared';
 import { hatById } from '@token-derby/shared';
-import { fetchOrgRaces, ApiError } from '../api.js';
+import { fetchOrgRaces, fetchOrgLeagueStandings, ApiError } from '../api.js';
 import { horseFaceSvg } from '../horse-face.js';
 import { buildHorseSvg } from '../sprite-svg.js';
 import { buildHatGroup } from '../hat-svg.js';
+import { renderLeagueStandings } from './league-standings.js';
 import {
   formatDuration,
   predictTimeLeftSeconds,
@@ -47,10 +48,17 @@ export function renderOrg(root: HTMLElement, orgName: string): () => void {
   };
   const interval = setInterval(tick, TIMER_TICK_MS);
 
-  fetchOrgRaces(orgName).then((res) => {
+  const racesP = fetchOrgRaces(orgName);
+  // Standings are league-only and best-effort: a failure or a non-league org
+  // (null) simply omits the block; it must never break the race list.
+  const standingsP = fetchOrgLeagueStandings(orgName).then((r) => r.standings).catch(() => null);
+
+  Promise.all([racesP, standingsP]).then(([res, standings]) => {
     if (ctrl.signal.aborted) return;
     const nameEl = section.querySelector<HTMLElement>('.org-name')!;
     nameEl.textContent = res.org_name;
+    body.innerHTML = '';
+    if (standings) body.appendChild(renderLeagueStandings(doc, standings));
     tickers = renderRaceList(body, res.races);
     tick(); // paint countdowns immediately rather than waiting a full second
   }).catch((err: unknown) => {
@@ -75,14 +83,16 @@ function renderRaceList(body: HTMLElement, races: RaceSummary[]): Ticker[] {
   const live = races.filter(r => r.status === 'live');
   const pending = races.filter(r => r.status === 'pending');
   const finished = races.filter(r => r.status === 'finished');
+  const doc = body.ownerDocument;
 
   if (races.length === 0) {
-    body.innerHTML = `<p class="org-status">No races yet. Create one with <code>token-derby create</code>.</p>`;
+    const p = doc.createElement('p');
+    p.className = 'org-status';
+    p.innerHTML = 'No races yet. Create one with <code>token-derby create</code>.';
+    body.appendChild(p);
     return [];
   }
 
-  body.innerHTML = '';
-  const doc = body.ownerDocument;
   const tickers: Ticker[] = [];
   for (const [title, group] of [
     ['Live', live],

@@ -22,7 +22,13 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
     return ok(response);
   }
 
-  const season = league.current_season;
+  const seasonParam = event.queryStringParameters?.season;
+  let season = league.current_season;
+  if (seasonParam !== undefined) {
+    const n = Number(seasonParam);
+    if (!Number.isInteger(n) || n < 1) return err('BAD_REQUEST', 'season must be a positive integer');
+    season = n;
+  }
   const seasonRow = await getLeagueSeason(org.org_id, season);
   const standings = await listSeasonStandings(org.org_id, season);
 
@@ -30,7 +36,7 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
     standings: buildSeasonStandings({
       org_name: org.org_name,
       divisions: league.divisions,
-      promote_relegate_count: league.promote_relegate_count,
+      boundaries: league.boundaries,
       races_per_season: league.races_per_season,
       season,
       round: seasonRow?.fixtures_materialised ?? 0,

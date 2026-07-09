@@ -36,10 +36,17 @@ export function reconcileHorses(
   for (const horse of visible) {
     let lane = existing.get(horse.horse_id);
     if (!lane) {
-      lane = createLane(track.ownerDocument, horse);
+      lane = createLane(track.ownerDocument, horse, race.league_id != null);
     }
     track.appendChild(lane);
-    updateLane(lane, horse, race.horses, pct, paceByHorseId.get(horse.horse_id) ?? null);
+    updateLane(
+      lane,
+      horse,
+      race.horses,
+      pct,
+      paceByHorseId.get(horse.horse_id) ?? null,
+      race.league_division_names,
+    );
   }
 }
 
@@ -49,7 +56,7 @@ export function sortHorses(horses: readonly HorseView[]): HorseView[] {
     .sort((a, b) => new Date(a.joined_at).getTime() - new Date(b.joined_at).getTime());
 }
 
-function createLane(doc: Document, horse: HorseView): HTMLElement {
+function createLane(doc: Document, horse: HorseView, isLeague: boolean): HTMLElement {
   const lane = doc.createElement('div');
   lane.className = 'lane';
   lane.dataset.horseId = horse.horse_id;
@@ -90,6 +97,7 @@ function createLane(doc: Document, horse: HorseView): HTMLElement {
   // ── Row 3: rotator that flips between owner / level / pace / position ──
   const statsRow = doc.createElement('div');
   statsRow.className = 'horse-stats-row';
+  if (isLeague) statsRow.classList.add('is-league');
   const makeView = (): HTMLElement => {
     const view = doc.createElement('div');
     view.className = 'stat-view';
@@ -124,6 +132,13 @@ function createLane(doc: Document, horse: HorseView): HTMLElement {
   const position = doc.createElement('span');
   position.className = 'horse-position';
   makeView().appendChild(position);
+
+  // View 5 — live league position within the horse's division (league fixtures only)
+  if (isLeague) {
+    const leaguePos = doc.createElement('span');
+    leaguePos.className = 'horse-league-pos';
+    makeView().appendChild(leaguePos);
+  }
 
   box.appendChild(statsRow);
   info.appendChild(box);
@@ -165,6 +180,7 @@ function updateLane(
   allHorses: readonly HorseView[],
   pct: number,
   pace: number | null,
+  leagueDivisionNames?: string[],
 ): void {
   const wrap = lane.querySelector<HTMLElement>('.horse')!;
   const x = horseXPct(horse, allHorses, pct);
@@ -190,6 +206,15 @@ function updateLane(
     const rank = 1 + allHorses.filter((h) => h.current_tokens > horse.current_tokens).length;
     posEl.textContent = ordinal(rank);
     posEl.className = 'horse-position' + (rank <= 3 ? ` pos-${rank}` : '');
+  }
+
+  // Live position within the horse's own division (league fixtures only).
+  const lpEl = lane.querySelector<HTMLElement>('.horse-league-pos');
+  if (lpEl && horse.division !== undefined && leagueDivisionNames) {
+    const inDiv = allHorses.filter((h) => h.division === horse.division);
+    const rank = 1 + inDiv.filter((h) => h.current_tokens > horse.current_tokens).length;
+    const name = leagueDivisionNames[horse.division - 1] ?? `Div ${horse.division}`;
+    lpEl.textContent = `${ordinal(rank)} (${name})`;
   }
 
   // Marquee any row whose content overflows the narrow name-tag: pause at the

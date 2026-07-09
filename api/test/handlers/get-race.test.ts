@@ -208,7 +208,10 @@ describe('getRace handler', () => {
     const owner = await makeUser('GR_LgOwner');
     const org_id = await createOrg(owner, 'GRLgOrg');
     await putLeague({
-      org_id, divisions: 3, racers_per_division: 10, races_per_season: 8, promote_relegate_count: 1,
+      org_id,
+      divisions: [{ name: 'Div 1', cap: 10 }, { name: 'Div 2', cap: 10 }, { name: 'Div 3', cap: 10 }],
+      boundaries: [2, 2],
+      races_per_season: 8,
       weekdays: [1], start_local: '09:00', end_local: '17:00', tz: 'UTC',
       current_season: 1, status: 'active', created_at: 'c',
       creator_user_id: owner.user_id, creator_user_name: owner.display_name,
@@ -267,5 +270,51 @@ describe('getRace handler', () => {
     expect(hA.division).toBe(2);
     const hB = body.horses.find((h: any) => h.stable_horse_id === horseB.stable_horse_id);
     expect(hB.division).toBe(3);
+  });
+
+  it('includes league_division_names for a league fixture', async () => {
+    const owner = await makeUser('GR_DivOwner');
+    const org_id = await createOrg(owner, 'GRDivOrg');
+    await putLeague({
+      org_id,
+      divisions: [{ name: 'Div 1', cap: 10 }, { name: 'Div 2', cap: 10 }, { name: 'Div 3', cap: 10 }],
+      boundaries: [2, 2],
+      races_per_season: 8,
+      weekdays: [1], start_local: '09:00', end_local: '17:00', tz: 'UTC',
+      current_season: 1, status: 'active', created_at: 'c',
+      creator_user_id: owner.user_id, creator_user_name: owner.display_name,
+    });
+
+    const join_code = generateJoinCode();
+    await putRace({
+      race_id: generateRaceId(),
+      name: 'League Div Names Fixture',
+      start_time: new Date(Date.now() - 60_000).toISOString(),
+      end_time: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      tz: 'UTC',
+      max_participants: 20,
+      join_code,
+      created_at: new Date().toISOString(),
+      org_id,
+      organisation_name: 'GRDivOrg',
+      league_id: org_id,
+      league_season: 1,
+      league_round: 1,
+    }, generateAdminCode());
+
+    const res: any = await getRaceHandler(evt(null, `/races/${join_code}`, 'GET /races/{join_code}', { join_code }));
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.league_division_names).toEqual(['Div 1', 'Div 2', 'Div 3']);
+  });
+
+  it('omits league_division_names for a standard race', async () => {
+    const creator = await makeUser('GR_NoDivNames');
+    const { join_code } = await setupRace(creator);
+
+    const res: any = await getRaceHandler(evt(null, `/races/${join_code}`, 'GET /races/{join_code}', { join_code }));
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.league_division_names).toBeUndefined();
   });
 });

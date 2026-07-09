@@ -74,6 +74,10 @@ export function orgLeagueStandingsPrefix(org_id: string, season: number) {
   return { pk: `${ORG_PK_PREFIX}${org_id}`, skPrefix: `LEAGUE#SEASON#${season}#DIV#` };
 }
 
+export function orgLeagueSeasonResultKey(org_id: string, season: number) {
+  return { pk: `${ORG_PK_PREFIX}${org_id}`, sk: `LEAGUE#SEASON#${season}#RESULT` };
+}
+
 export const POINT_SK_PREFIX = 'POINT#';
 
 // 12 digits comfortably exceeds any realistic per-race heartbeat count and

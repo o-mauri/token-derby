@@ -181,7 +181,10 @@ describe('finaliseRace league scoring', () => {
     const org_id = JSON.parse(orgRes.body).org_id;
 
     const league: League = {
-      org_id, divisions: 3, racers_per_division: 10, races_per_season: 8, promote_relegate_count: 2,
+      org_id,
+      divisions: [{ name: 'Div 1', cap: 10 }, { name: 'Div 2', cap: 10 }, { name: 'Div 3', cap: 10 }],
+      boundaries: [2, 2],
+      races_per_season: 8,
       weekdays: [1], start_local: '09:00', end_local: '17:00', tz: 'UTC', current_season: 1,
       status: 'active', created_at: 'c', creator_user_id: owner.user_id, creator_user_name: 'FrLeagueOwner',
     };
