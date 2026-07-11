@@ -1553,7 +1553,15 @@ label.label input:disabled { opacity: 0.5; }
   align-items: center;
   justify-content: center;
   gap: 0.9rem;
-  margin-top: 0.6rem;
+  /* Pinned bottom-centre, above the chart face — mirrors the dismiss button.
+     A chart face is `position: fixed; z-index: 50` and covers the whole screen,
+     so an in-flow nav gets painted over (invisible on the graph pages). Fixing
+     it here keeps the pager reachable on every face. */
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 24px;
+  z-index: 100;
 }
 .detail-nav-btn {
   background: var(--panel);

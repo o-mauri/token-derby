@@ -8,7 +8,7 @@ export type TickPoint = {
 
 export const TICK_MS = 60_000; // 1 minute
 export const PACE_WINDOW_MS = 15 * 60_000; // trailing pace window: 15 minutes
-export const PACE_SMOOTH_WINDOW_MIN = 10; // end-of-race pace graph: trailing moving-average window
+export const PACE_SMOOTH_WINDOW_MIN = 30; // end-of-race pace graph: trailing moving-average window
 
 /**
  * Trailing simple moving average. `out[i]` is the mean of `values` over the

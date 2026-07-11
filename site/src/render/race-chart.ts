@@ -35,8 +35,8 @@ function fmtClock(ms: number): string {
 // the chosen mode, as {t, v} pairs. Idle ticks carry the cumulative total
 // forward and report 0 pace, so all horses line up on the same x-grid.
 //
-// Throughput is smoothed with a trailing moving average (window ramps 1..10 min
-// then holds at 10) so the end-of-race pace graph reads as a trend rather than
+// Throughput is smoothed with a trailing moving average (window ramps 1..30 min
+// then holds at 30) so the end-of-race pace graph reads as a trend rather than
 // a jagged per-minute sawtooth. The leading start anchor stays at 0 (line begins
 // at the left edge, matching the cumulative face); the ramp-up applies to the
 // real minute ticks after it, so there are no gaps.
@@ -98,7 +98,7 @@ function buildFace(
   face.className = 'detail-face chart-face';
   const title = doc.createElement('div');
   title.className = 'chart-title';
-  title.textContent = mode === 'cumulative' ? 'Cumulative tokens' : 'Tokens / min (10-min avg)';
+  title.textContent = mode === 'cumulative' ? 'Cumulative tokens' : 'Tokens / min (30-min avg)';
   face.appendChild(title);
   face.appendChild(svg);
 
