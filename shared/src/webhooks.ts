@@ -44,7 +44,7 @@ export type LeagueRaceOrderRow = {
   horse_name: string;
   user_name: string;
   final_tokens: number;
-  points_awarded: number;    // linear league points earned this fixture
+  points_awarded: number;    // fixed-table league points earned this fixture
 };
 
 export type RaceEndedEvent = WebhookEnvelope<{

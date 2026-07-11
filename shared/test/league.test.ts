@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validateLeagueConfig, leagueFixtureName, linearLeaguePoints, buildSeasonStandings, placementPrizeXp, seasonPrizeXp, computeNextDivisions, byStanding, type LeagueConfigInput } from '../src/league.js';
+import { validateLeagueConfig, leagueFixtureName, leaguePoints, buildSeasonStandings, placementPrizeXp, seasonPrizeXp, computeNextDivisions, byStanding, type LeagueConfigInput } from '../src/league.js';
 import type { LeagueStanding } from '../src/types.js';
 
 describe('validateLeagueConfig', () => {
@@ -53,14 +53,13 @@ describe('leagueFixtureName', () => {
   });
 });
 
-describe('linearLeaguePoints', () => {
-  it('awards field-size points to 1st, descending to 1 for last', () => {
-    expect(linearLeaguePoints(1, 8)).toBe(8);
-    expect(linearLeaguePoints(2, 8)).toBe(7);
-    expect(linearLeaguePoints(8, 8)).toBe(1);
+describe('leaguePoints', () => {
+  it('awards the fixed table for the top 9 finishers', () => {
+    expect([1, 2, 3, 4, 5, 6, 7, 8, 9].map((r) => leaguePoints(r))).toEqual([20, 15, 12, 10, 8, 6, 4, 2, 1]);
   });
-  it('is 1 for the only racer in a division of 1', () => {
-    expect(linearLeaguePoints(1, 1)).toBe(1);
+  it('is 0 for 10th place and lower', () => {
+    expect(leaguePoints(10)).toBe(0);
+    expect(leaguePoints(25)).toBe(0);
   });
 });
 

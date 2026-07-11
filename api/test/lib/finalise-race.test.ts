@@ -200,11 +200,11 @@ describe('finaliseRace league scoring', () => {
 
     const standings = await listSeasonStandings(org_id, 1);
     expect(standings).toHaveLength(1);
-    // Sole entrant → bottom division (3), field of 1 → 1 point.
+    // Sole entrant → bottom division (3), 1st place → 20 points.
     expect(standings[0]).toMatchObject({
       division: 3,
       stable_horse_id: horse.stable_horse_id,
-      points: 1,
+      points: 20,
       season_tokens: 900,
     });
   });
@@ -344,11 +344,11 @@ describe('finaliseRace webhook delivery', () => {
     const payload = JSON.parse(ended[0]!.body);
     expect(payload.league).toBeTruthy();
     expect(payload.league).toMatchObject({ season: 1, round: 1, races_per_season: 8 });
-    // both new entrants → bottom division (3); ordered by tokens with linear points
+    // both new entrants → bottom division (3); ordered by tokens with fixed-table points
     const bottom = payload.league.race_order.find((d: any) => d.division === 3);
     expect(bottom.name).toBe('League One');
     expect(bottom.order.map((o: any) => o.horse_name)).toEqual(['Alpha', 'Beta']);
-    expect(bottom.order.map((o: any) => o.points_awarded)).toEqual([2, 1]);
+    expect(bottom.order.map((o: any) => o.points_awarded)).toEqual([20, 15]);
     expect(payload.league.standings.divisions).toHaveLength(3);
 
     await new Promise(r => server.close(() => r(null)));

@@ -1,5 +1,5 @@
 import type { Race, Horse } from '@token-derby/shared';
-import { linearLeaguePoints } from '@token-derby/shared';
+import { leaguePoints } from '@token-derby/shared';
 import { getLeague } from '../db/leagues.js';
 import { listOrgMembers } from '../db/organisations.js';
 import { listSeasonStandings, ensureStanding, addStandingPointsForRound } from '../db/league-standings.js';
@@ -61,7 +61,7 @@ export async function scoreLeagueRace(race: Race, horses: Horse[]): Promise<Leag
   }
 
   // Bucket by division, rank within each by final_tokens (join-time tie-break),
-  // award linear points.
+  // award fixed-table points.
   const buckets = new Map<number, typeof withDivision>();
   for (const w of withDivision) {
     const arr = buckets.get(w.division) ?? [];
@@ -74,11 +74,10 @@ export async function scoreLeagueRace(race: Race, horses: Horse[]): Promise<Leag
       if (b.h.final_tokens! !== a.h.final_tokens!) return b.h.final_tokens! - a.h.final_tokens!;
       return new Date(a.h.joined_at).getTime() - new Date(b.h.joined_at).getTime();
     });
-    const k = bucket.length;
     const order: LeagueRaceResult['divisions'][number]['order'] = [];
     for (let i = 0; i < bucket.length; i++) {
       const { h } = bucket[i]!;
-      const points = linearLeaguePoints(i + 1, k);
+      const points = leaguePoints(i + 1);
       await addStandingPointsForRound(org_id, season, division, h.stable_horse_id, points, h.final_tokens ?? 0, round);
       order.push({
         position: i + 1,

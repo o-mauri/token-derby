@@ -70,10 +70,11 @@ export function leagueFixtureName(base: string, round: number, racesPerSeason: n
   return `${base} (League Race (${round}/${racesPerSeason}))`;
 }
 
-// League points for a finishing position within a division: among `fieldSize`
-// horses that raced, 1st gets `fieldSize`, last gets 1. `rank` is 1-based.
-export function linearLeaguePoints(rank: number, fieldSize: number): number {
-  return fieldSize - rank + 1;
+// Fixed league points for a finishing position within a division. `rank` is
+// 1-based; the top 9 score on this table and 10th-or-lower score 0.
+const LEAGUE_POINTS = [20, 15, 12, 10, 8, 6, 4, 2, 1];
+export function leaguePoints(rank: number): number {
+  return LEAGUE_POINTS[rank - 1] ?? 0;
 }
 
 // Assemble display-ready season standings from raw standing rows + league config.

@@ -46,7 +46,7 @@ function leagueRace(org_id: string, round = 1): Race {
 }
 
 describe('scoreLeagueRace', () => {
-  it('scores members in the bottom division by linear points (season 1 single pool)', async () => {
+  it('scores members in the bottom division by the fixed points table (season 1 single pool)', async () => {
     const owner = await makeUser('ScoreOwner');
     const { org_id } = await createOrg(owner, 'ScoreOrg1');
     await putLeague(baseLeague(org_id)); // divisions.length === 3 → bottom division is 3
@@ -58,9 +58,9 @@ describe('scoreLeagueRace', () => {
 
     const rows = await listSeasonStandings(org_id, 1);
     const byId = Object.fromEntries(rows.map(r => [r.stable_horse_id, r]));
-    // field of 2 in the bottom division: 1st(900)→2pts, 2nd(500)→1pt
-    expect(byId['s1']).toMatchObject({ division: 3, points: 2, season_tokens: 900 });
-    expect(byId['s2']).toMatchObject({ division: 3, points: 1, season_tokens: 500 });
+    // bottom division: 1st(900)→20pts, 2nd(500)→15pts
+    expect(byId['s1']).toMatchObject({ division: 3, points: 20, season_tokens: 900 });
+    expect(byId['s2']).toMatchObject({ division: 3, points: 15, season_tokens: 500 });
   });
 
   it('ranks and scores each division independently (per-division field sizes)', async () => {
@@ -80,15 +80,15 @@ describe('scoreLeagueRace', () => {
       final_tokens: tokens, joined_at: `2026-07-07T09:0${sec}:00Z`,
     });
     // Div 2's lone horse has FAR more tokens than Div 1's — proves points are
-    // computed per-division (field size + rank), never compared across divisions.
+    // computed per-division (by within-division rank), never compared across divisions.
     await scoreLeagueRace(leagueRace(org_id, 1), [mk('d1a', 900, 0), mk('d1b', 500, 1), mk('d2a', 5000, 2)]);
 
     const byId = Object.fromEntries((await listSeasonStandings(org_id, 1)).map(r => [r.stable_horse_id, r]));
-    // Div 1: field of 2 → 1st(900)=2pts, 2nd(500)=1pt
-    expect(byId['d1a']).toMatchObject({ division: 1, points: 2 });
-    expect(byId['d1b']).toMatchObject({ division: 1, points: 1 });
-    // Div 2: field of 1 → 1pt, despite 5000 tokens (not ranked against Div 1)
-    expect(byId['d2a']).toMatchObject({ division: 2, points: 1 });
+    // Div 1: 1st(900)=20pts, 2nd(500)=15pts
+    expect(byId['d1a']).toMatchObject({ division: 1, points: 20 });
+    expect(byId['d1b']).toMatchObject({ division: 1, points: 15 });
+    // Div 2: its 1st place = 20pts, despite 5000 tokens (not ranked against Div 1)
+    expect(byId['d2a']).toMatchObject({ division: 2, points: 20 });
   });
 
   it('places a new entrant in the bottom division alongside an existing standing in one call', async () => {
@@ -108,10 +108,10 @@ describe('scoreLeagueRace', () => {
     await scoreLeagueRace(leagueRace(org_id, 1), [mk('vet', 800), mk('newbie', 999)]);
 
     const byId = Object.fromEntries((await listSeasonStandings(org_id, 1)).map(r => [r.stable_horse_id, r]));
-    // Veteran scored in its Div 1 (field of 1 → 1pt); new entrant created in the
-    // bottom division (3) and scored there (field of 1 → 1pt) — despite more tokens.
-    expect(byId['vet']).toMatchObject({ division: 1, points: 1 });
-    expect(byId['newbie']).toMatchObject({ division: 3, points: 1, season_tokens: 999 });
+    // Veteran scored in its Div 1 (1st → 20pts); new entrant created in the
+    // bottom division (3) and scored there (1st → 20pts) — despite more tokens.
+    expect(byId['vet']).toMatchObject({ division: 1, points: 20 });
+    expect(byId['newbie']).toMatchObject({ division: 3, points: 20, season_tokens: 999 });
   });
 
   it('excludes horses whose owner is not an org member', async () => {
@@ -134,7 +134,7 @@ describe('scoreLeagueRace', () => {
     await scoreLeagueRace(race, [h1]);
     await scoreLeagueRace(race, [h1]); // re-run
     const [row] = await listSeasonStandings(org_id, 1);
-    expect(row.points).toBe(1); // field of 1 → 1 point, not 2
+    expect(row.points).toBe(20); // 1st → 20 points once, not double-counted to 40
   });
 
   it('no-ops when the league has been deleted', async () => {
@@ -148,7 +148,7 @@ describe('scoreLeagueRace', () => {
 });
 
 describe('scoreLeagueRace return value', () => {
-  it('returns the per-division order + linear points for the fixture', async () => {
+  it('returns the per-division order + points for the fixture', async () => {
     const owner = await makeUser('ScoreRetOwn');
     const { org_id } = await createOrg(owner, 'ScoreRetOrg');
     await putLeague(baseLeague(org_id)); // divisions.length === 3 → bottom pool is division 3
@@ -159,7 +159,7 @@ describe('scoreLeagueRace return value', () => {
     expect(result?.round).toBe(1);
     const div3 = result!.divisions.find(d => d.division === 3)!;
     expect(div3.order.map(o => o.stable_horse_id)).toEqual(['s1', 's2']); // ranked by tokens
-    expect(div3.order.map(o => o.points_awarded)).toEqual([2, 1]);        // field of 2
+    expect(div3.order.map(o => o.points_awarded)).toEqual([20, 15]);      // 1st, 2nd
     expect(div3.order[0]).toMatchObject({ position: 1, horse_name: 'Fast', final_tokens: 900 });
   });
 

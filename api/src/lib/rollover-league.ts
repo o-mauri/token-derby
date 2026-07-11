@@ -95,8 +95,8 @@ export async function rolloverDueLeague(league: League, now: Date): Promise<bool
   }
   // Season champion = winner of the highest populated flight (division 1 in
   // steady state; the single bottom pool in season 1, where higher divisions are
-  // empty). NOT the global points leader: points are per-division field-size, so
-  // a dominant lower division can out-point the top flight. Scan divisions in
+  // empty). NOT the global points leader: points are scored by within-division
+  // rank, so a dominant lower division can out-point the top flight. Scan divisions in
   // order and take the first populated one's leader (same horse as
   // division_champions[0], but carrying points/user_name for the summary).
   const championStanding = (() => {
