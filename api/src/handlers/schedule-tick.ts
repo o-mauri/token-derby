@@ -2,10 +2,12 @@ import type { ScheduledHandler } from 'aws-lambda';
 import { listAllSchedules, tryClaimMaterialised } from '../db/schedules.js';
 import { listAllLeagues } from '../db/leagues.js';
 import { ensureLeagueSeason, tryClaimLeagueFixture, stampFinalFixtureEnd } from '../db/league-seasons.js';
-import { getOrganisationById } from '../db/organisations.js';
+import { getOrganisationById, listOrgsWithSlackDigest, markDigestSent } from '../db/organisations.js';
 import { isoWeekdayInTz, localDateInTz, localDateTimeToUtcMs } from '../lib/tz.js';
 import { createRace } from '../lib/create-race.js';
 import { rolloverDueLeague } from '../lib/rollover-league.js';
+import { buildOrgLeaderboard } from '../lib/org-leaderboard.js';
+import { sendOrgDigest } from '../lib/slack/send.js';
 import { leagueFixtureName } from '@token-derby/shared';
 
 // Fired every minute by EventBridge. Materialises org races whose current local
@@ -55,6 +57,7 @@ export const handler: ScheduledHandler = async () => {
           org_name: org.org_name,
           webhook_url: org.webhook_url,
           webhook_secret: org.webhook_secret,
+          slack: org.slack,
         },
       });
 
@@ -139,6 +142,7 @@ export const handler: ScheduledHandler = async () => {
           org_name: org.org_name,
           webhook_url: org.webhook_url,
           webhook_secret: org.webhook_secret,
+          slack: org.slack,
         },
         league: { league_id: league.org_id, season, round },
       });
@@ -150,6 +154,33 @@ export const handler: ScheduledHandler = async () => {
       }
     } catch (e) {
       console.warn('league tick error', { org_id: league.org_id, error: e instanceof Error ? e.message : String(e) });
+    }
+  }
+
+  // Weekly Slack digests. Same at-most-once, weekday/time-gated shape as above.
+  const digestOrgs = await listOrgsWithSlackDigest();
+  for (const org of digestOrgs) {
+    try {
+      const d = org.slack?.digest;
+      if (!org.slack?.messages.weekly_digest || !d) continue;
+      const localDate = localDateInTz(now, d.tz);
+      if (org.slack.digest_last_sent_date === localDate) continue;
+      if (isoWeekdayInTz(now, d.tz) !== d.weekday) continue;
+      const dueMs = localDateTimeToUtcMs(localDate, d.time_local, d.tz);
+      if (nowMs < dueMs) continue;
+
+      const claimed = await markDigestSent(org.org_id, localDate);
+      if (!claimed) continue;
+
+      const leaderboard = await buildOrgLeaderboard(org);
+      if (leaderboard.horses.length === 0) {
+        console.log('digest: org has no horses, skipping', { org_id: org.org_id });
+        continue;
+      }
+      await sendOrgDigest(org, leaderboard);
+      console.log('weekly digest sent', { org_id: org.org_id, localDate });
+    } catch (e) {
+      console.warn('digest tick error', { org_id: org.org_id, error: e instanceof Error ? e.message : String(e) });
     }
   }
 };

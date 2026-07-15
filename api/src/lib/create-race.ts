@@ -4,12 +4,15 @@ import { randomUUID } from 'node:crypto';
 import { generateRaceId, generateJoinCode, generateAdminCode } from './codes.js';
 import { putRace, getRaceByJoinCode, listRacesByOrgId } from '../db/races.js';
 import { sendOrgWebhook } from './webhook.js';
+import { sendOrgSlack } from './slack/send.js';
+import type { OrgSlackConfig } from '../db/organisations.js';
 
 export type CreateRaceOrg = {
   org_id: string;
   org_name: string;
   webhook_url?: string;
   webhook_secret?: string;
+  slack?: OrgSlackConfig;
 };
 
 export type CreateRaceInput = {
@@ -103,6 +106,7 @@ export async function createRace(input: CreateRaceInput): Promise<CreateRaceResu
       },
     };
     await sendOrgWebhook(input.org, 'race.created', payload);
+    await sendOrgSlack(input.org, 'race.created', payload);
   }
 
   return { ok: true, race_id, join_code, admin_code };

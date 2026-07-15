@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { putRace, getRaceById, setRaceEndedIfAbsent } from '../../src/db/races.js';
 import { putHorse, listHorses } from '../../src/db/horses.js';
 import { finaliseRace } from '../../src/lib/finalise-race.js';
@@ -6,7 +6,7 @@ import type { Horse, Race } from '@token-derby/shared';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { createHmac } from 'node:crypto';
-import { setOrgWebhook, getOrganisationByName } from '../../src/db/organisations.js';
+import { setOrgWebhook, setOrgSlack, getOrganisationByName } from '../../src/db/organisations.js';
 import { handler as createOrgHandler } from '../../src/handlers/create-organisation.js';
 import { handler as createRaceHandler } from '../../src/handlers/create-race.js';
 import { getRaceByJoinCode } from '../../src/db/races.js';
@@ -15,6 +15,9 @@ import { CURRENT_CLI_VERSION } from '../helpers/cli-version.js';
 import { putLeague } from '../../src/db/leagues.js';
 import { listSeasonStandings } from '../../src/db/league-standings.js';
 import type { League } from '@token-derby/shared';
+
+const slackPost = vi.fn(async () => ({ ok: true }));
+vi.mock('../../src/lib/slack/client.js', () => ({ postSlackMessage: (...a: any[]) => slackPost(...a) }));
 
 function findHorse(horses: Horse[], name: string): Horse {
   const h = horses.find(h => h.name === name);
@@ -352,5 +355,45 @@ describe('finaliseRace webhook delivery', () => {
     expect(payload.league.standings.divisions).toHaveLength(3);
 
     await new Promise(r => server.close(() => r(null)));
+  });
+
+  it('fires a Slack post alongside race.ended when the org has slack configured', async () => {
+    const owner = await makeUser('FrSlackOwner');
+    const orgName = 'FrSlkOrg1';
+    await createOrgHandler({
+      version: '2.0', routeKey: 'POST /organisations', rawPath: '/organisations', rawQueryString: '',
+      headers: { 'content-type': 'application/json', 'x-cli-version': CURRENT_CLI_VERSION, 'x-user-id': owner.user_id, 'x-user-token': owner.secret_token },
+      requestContext: {} as any,
+      body: JSON.stringify({ name: orgName }),
+      isBase64Encoded: false,
+    });
+    const persisted = await getOrganisationByName(orgName);
+    await setOrgSlack(persisted!.org_id, {
+      bot_token: 'xoxb-secret', channel_id: 'C1',
+      messages: { race_created: false, race_ended: true, league_season_ended: false, weekly_digest: false },
+    });
+
+    const createRes: any = await createRaceHandler({
+      version: '2.0', routeKey: 'POST /races', rawPath: '/races', rawQueryString: '',
+      headers: { 'content-type': 'application/json', 'x-cli-version': CURRENT_CLI_VERSION, 'x-user-id': owner.user_id, 'x-user-token': owner.secret_token },
+      requestContext: {} as any,
+      body: JSON.stringify({
+        name: 'FrSlackRace1',
+        start_time: new Date(Date.now() - 600_000).toISOString(),
+        end_time: new Date(Date.now() - 60_000).toISOString(),
+        tz: 'UTC',
+        organisation_name: orgName,
+      }),
+      isBase64Encoded: false,
+    });
+    expect(createRes.statusCode).toBe(200);
+    const joinCode = JSON.parse(createRes.body).join_code;
+    const race = await getRaceByJoinCode(joinCode);
+    expect(race).toBeTruthy();
+
+    slackPost.mockClear();
+    await finaliseRace(race!, new Date());
+
+    expect(slackPost).toHaveBeenCalled();
   });
 });

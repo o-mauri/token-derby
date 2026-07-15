@@ -7,6 +7,7 @@ import { getOrganisationById } from '../db/organisations.js';
 import { getLeague } from '../db/leagues.js';
 import { listSeasonStandings } from '../db/league-standings.js';
 import { sendOrgWebhook } from './webhook.js';
+import { sendOrgSlack } from './slack/send.js';
 import { scoreLeagueRace } from './score-league-race.js';
 import { randomUUID } from 'node:crypto';
 
@@ -96,7 +97,7 @@ export async function finaliseRace(race: Race, now: Date): Promise<FinaliseResul
   const newly_finalised = ended_at === now.toISOString();
   if (newly_finalised && race.org_id) {
     const org = await getOrganisationById(race.org_id);
-    if (org && org.webhook_url) {
+    if (org && (org.webhook_url || org.slack)) {
       const results = ranked.map((h, i) => ({
         rank: i + 1,
         horse_id: h.horse_id,
@@ -155,6 +156,7 @@ export async function finaliseRace(race: Race, now: Date): Promise<FinaliseResul
         ...(league ? { league } : {}),
       };
       await sendOrgWebhook(org, 'race.ended', payload);
+      await sendOrgSlack(org, 'race.ended', payload);
     }
   }
 

@@ -71,7 +71,7 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
     creator_user_name: auth.display_name,
     cli_version,
     org: org
-      ? { org_id: org.org_id, org_name: org.org_name, webhook_url: org.webhook_url, webhook_secret: org.webhook_secret }
+      ? { org_id: org.org_id, org_name: org.org_name, webhook_url: org.webhook_url, webhook_secret: org.webhook_secret, slack: org.slack }
       : null,
   });
   if (!result.ok) return err(result.code, result.message);

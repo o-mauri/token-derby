@@ -4,9 +4,14 @@ import { handler as createOrgHandler } from '../../src/handlers/create-organisat
 import { handler as tick } from '../../src/handlers/schedule-tick.js';
 import { putSchedule } from '../../src/db/schedules.js';
 import { listRacesByOrgId } from '../../src/db/races.js';
+import { setOrgSlack, getOrganisationByName } from '../../src/db/organisations.js';
+import { putStableHorse } from '../../src/db/stable.js';
 import { makeUser, type TestUser } from '../helpers/auth-helper.js';
-import type { RaceSchedule } from '@token-derby/shared';
+import type { RaceSchedule, OrgSlackDigest, StableHorse } from '@token-derby/shared';
 import { CURRENT_CLI_VERSION } from '../helpers/cli-version.js';
+
+const slackPost = vi.fn(async () => ({ ok: true }));
+vi.mock('../../src/lib/slack/client.js', () => ({ postSlackMessage: (...a: any[]) => slackPost(...a) }));
 
 const runTick = () => (tick as unknown as () => Promise<void>)();
 
@@ -28,7 +33,15 @@ function baseSchedule(org_id: string): RaceSchedule {
   };
 }
 
-afterEach(() => { vi.useRealTimers(); });
+function digestConfig(digest: OrgSlackDigest) {
+  return {
+    bot_token: 'xoxb-secret', channel_id: 'C1',
+    messages: { race_created: false, race_ended: false, league_season_ended: false, weekly_digest: true },
+    digest,
+  };
+}
+
+afterEach(() => { vi.useRealTimers(); slackPost.mockClear(); });
 
 describe('schedule-tick', () => {
   it('creates the day race inside the window and is idempotent', async () => {
@@ -126,5 +139,67 @@ describe('schedule-tick', () => {
     // Bad schedule created nothing; good schedule still materialised its race.
     expect((await listRacesByOrgId(badOrg)).length).toBe(0);
     expect((await listRacesByOrgId(goodOrg)).length).toBe(1);
+  });
+
+  describe('weekly slack digest', () => {
+    it('posts once when weekday+time match and a re-tick does not double-post', async () => {
+      const owner = await makeUser('TickDigestOwn');
+      const org_id = await createOrg(owner, 'TickDigOrg1');
+      const org = await getOrganisationByName('TickDigOrg1');
+      await setOrgSlack(org_id, digestConfig({ weekday: 1, time_local: '09:00', tz: 'UTC' })); // Monday 09:00 UTC
+      await putStableHorse(owner.user_id, {
+        stable_horse_id: 'h-digest', name: 'DigestHorse',
+        colors: { body: '#1', mane: '#2', tail: '#3', saddle: '#4' },
+        created_at: new Date().toISOString(), xp: 10,
+      } as StableHorse);
+      expect(org).toBeTruthy();
+
+      // 2024-07-01 is a Monday; 10:00 UTC is past the 09:00 digest time.
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2024-07-01T10:00:00Z'));
+
+      await runTick();
+      expect(slackPost).toHaveBeenCalledTimes(1);
+
+      // Re-tick same minute: markDigestSent claim prevents a second post.
+      await runTick();
+      expect(slackPost).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not post on the wrong weekday', async () => {
+      const owner = await makeUser('TickDigestWkday');
+      const org_id = await createOrg(owner, 'TickDigOrg2');
+      await setOrgSlack(org_id, digestConfig({ weekday: 2, time_local: '09:00', tz: 'UTC' })); // Tuesday
+      await putStableHorse(owner.user_id, {
+        stable_horse_id: 'h-digest2', name: 'DigestHorse2',
+        colors: { body: '#1', mane: '#2', tail: '#3', saddle: '#4' },
+        created_at: new Date().toISOString(), xp: 10,
+      } as StableHorse);
+
+      // 2024-07-01 is a Monday, not the configured Tuesday.
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2024-07-01T10:00:00Z'));
+
+      await runTick();
+      expect(slackPost).not.toHaveBeenCalled();
+    });
+
+    it('does not post before the digest time is reached', async () => {
+      const owner = await makeUser('TickDigestEarly');
+      const org_id = await createOrg(owner, 'TickDigOrg3');
+      await setOrgSlack(org_id, digestConfig({ weekday: 1, time_local: '11:00', tz: 'UTC' })); // later than now
+      await putStableHorse(owner.user_id, {
+        stable_horse_id: 'h-digest3', name: 'DigestHorse3',
+        colors: { body: '#1', mane: '#2', tail: '#3', saddle: '#4' },
+        created_at: new Date().toISOString(), xp: 10,
+      } as StableHorse);
+
+      // 2024-07-01 10:00 UTC is before the 11:00 digest time.
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2024-07-01T10:00:00Z'));
+
+      await runTick();
+      expect(slackPost).not.toHaveBeenCalled();
+    });
   });
 });

@@ -4,6 +4,7 @@ import { renderSidebar } from '../../src/org-manager/render/sidebar.js';
 import { renderOverview } from '../../src/org-manager/render/tabs/overview.js';
 import { renderSchedule } from '../../src/org-manager/render/tabs/schedule.js';
 import { renderWebhook } from '../../src/org-manager/render/tabs/webhook.js';
+import { renderSlackbot } from '../../src/org-manager/render/tabs/slackbot.js';
 import { renderMembers } from '../../src/org-manager/render/tabs/members.js';
 import { renderLeagueEditor } from '../../src/org-manager/render/tabs/league-editor.js';
 import { renderRacing } from '../../src/org-manager/render/tabs/racing.js';
@@ -65,6 +66,65 @@ describe('renderWebhook', () => {
     renderWebhook(root, { webhook: null, isOwner: true, onSave: vi.fn(), onClear: vi.fn() });
     expect(root.querySelector('button[data-action="save"]')).toBeTruthy();
     expect(root.querySelector('button[data-action="clear"]')).toBeTruthy();
+  });
+});
+
+describe('renderSlackbot', () => {
+  it('renders four message checkboxes, digest controls, and Save/Clear for owners', () => {
+    renderSlackbot(root, {
+      slack: {
+        configured: true,
+        channel_id: 'C0123',
+        messages: { race_created: true, race_ended: true, league_season_ended: false, weekly_digest: true },
+        digest: { weekday: 5, time_local: '15:00', tz: 'Europe/London' },
+      },
+      isOwner: true,
+      onSave: vi.fn(),
+      onClear: vi.fn(),
+    });
+    expect(root.querySelectorAll('input[name="msg"]').length).toBe(4);
+    expect(root.querySelector<HTMLInputElement>('input[name="bot_token"]')!.placeholder).toMatch(/configured/i);
+    expect(root.querySelector('select[name="weekday"]')).toBeTruthy();
+    expect(root.querySelector('input[name="time_local"]')).toBeTruthy();
+    expect(root.querySelector('input[name="tz"]')).toBeTruthy();
+    expect(root.querySelector('button[data-action="save"]')).toBeTruthy();
+    expect(root.querySelector('button[data-action="clear"]')).toBeTruthy();
+  });
+
+  it('hides Save/Clear and disables inputs for non-owners', () => {
+    renderSlackbot(root, { slack: null, isOwner: false, onSave: vi.fn(), onClear: vi.fn() });
+    expect(root.querySelector('button[data-action="save"]')).toBeNull();
+    expect(root.querySelector('button[data-action="clear"]')).toBeNull();
+    expect(root.querySelector<HTMLInputElement>('input[name="bot_token"]')!.disabled).toBe(true);
+  });
+
+  it('omits bot_token from the saved body when the token field is left blank, but includes it when filled', () => {
+    const onSave = vi.fn();
+    renderSlackbot(root, {
+      slack: {
+        configured: true,
+        channel_id: 'C0123',
+        messages: { race_created: true, race_ended: true, league_season_ended: false, weekly_digest: true },
+        digest: { weekday: 5, time_local: '15:00', tz: 'Europe/London' },
+      },
+      isOwner: true,
+      onSave,
+      onClear: vi.fn(),
+    });
+
+    // Leave the bot-token field blank.
+    (root.querySelector('[data-action="save"]') as HTMLElement).click();
+    expect(onSave).toHaveBeenCalledTimes(1);
+    const blankBody = onSave.mock.calls[0]![0];
+    expect('bot_token' in blankBody).toBe(false);
+
+    // Fill in the bot-token field.
+    root.querySelector<HTMLInputElement>('input[name="bot_token"]')!.value = 'xoxb-new-token';
+    (root.querySelector('[data-action="save"]') as HTMLElement).click();
+    expect(onSave).toHaveBeenCalledTimes(2);
+    const filledBody = onSave.mock.calls[1]![0];
+    expect('bot_token' in filledBody).toBe(true);
+    expect(filledBody.bot_token).toBe('xoxb-new-token');
   });
 });
 

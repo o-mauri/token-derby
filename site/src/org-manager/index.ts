@@ -7,9 +7,10 @@ import { renderOverview } from './render/tabs/overview.js';
 import { renderMembers } from './render/tabs/members.js';
 import { renderRacing } from './render/tabs/racing.js';
 import { renderWebhook } from './render/tabs/webhook.js';
+import { renderSlackbot } from './render/tabs/slackbot.js';
 import type { OrganisationSummary } from '@token-derby/shared';
 
-type Tab = 'overview' | 'members' | 'racing' | 'webhook';
+type Tab = 'overview' | 'members' | 'racing' | 'webhook' | 'slackbot';
 
 export function renderOrgManager(root: HTMLElement): () => void {
   let disposed = false;
@@ -65,7 +66,7 @@ export function renderOrgManager(root: HTMLElement): () => void {
       const name = selected;
       mainEl.innerHTML = `
         <nav class="org-tabs">
-          ${(['overview', 'members', 'racing', 'webhook'] as Tab[]).map((t) =>
+          ${(['overview', 'members', 'racing', 'webhook', 'slackbot'] as Tab[]).map((t) =>
             `<button type="button" class="org-tab${t === tab ? ' on' : ''}" data-tab="${t}">${t}</button>`).join('')}
         </nav>
         <div class="org-tabbody"></div>`;
@@ -115,6 +116,17 @@ export function renderOrgManager(root: HTMLElement): () => void {
           const onClear = async () => { try { await api.clearWebhook(name); void drawMain(); } catch (e) { alert(String((e as Error).message)); } };
           const drawWebhook = (lastSecret?: string) => renderWebhook(bodyEl, { webhook, isOwner, lastSecret, onSave, onClear });
           drawWebhook();
+        }
+        else if (tab === 'slackbot') {
+          // Slack GET is owner-only server-side; non-owners just see the empty form disabled.
+          let slack = null as Awaited<ReturnType<typeof api.getSlack>> | null;
+          if (isOwner) { try { slack = await api.getSlack(name); } catch { slack = null; } }
+          const onSave = async (body: Parameters<typeof api.setSlack>[1]) => {
+            try { slack = await api.setSlack(name, body); renderSlackbot(bodyEl, { slack, isOwner, onSave, onClear }); }
+            catch (e) { alert(String((e as Error).message)); }
+          };
+          const onClear = async () => { try { await api.clearSlack(name); void drawMain(); } catch (e) { alert(String((e as Error).message)); } };
+          renderSlackbot(bodyEl, { slack, isOwner, onSave, onClear });
         }
       } catch (e) {
         if (e instanceof ApiError && e.status === 401) { clearSession(); showLogin(); return; }

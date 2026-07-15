@@ -4,6 +4,7 @@ import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as s3 from 'aws-cdk-lib/aws-s3';
+import * as iam from 'aws-cdk-lib/aws-iam';
 import * as s3deploy from 'aws-cdk-lib/aws-s3-deployment';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
@@ -102,6 +103,24 @@ export class TokenDerbyStack extends cdk.Stack {
       sortKey: { name: 'org_id', type: dynamodb.AttributeType.STRING },
     });
 
+    // ── Winner sprite bucket (public, content-addressed) ────────────────
+    const spriteBucket = new s3.Bucket(this, 'WinnerSprites', {
+      blockPublicAccess: new s3.BlockPublicAccess({
+        blockPublicAcls: true,
+        ignorePublicAcls: true,
+        blockPublicPolicy: false,
+        restrictPublicBuckets: false,
+      }),
+      removalPolicy: config.disposable ? cdk.RemovalPolicy.DESTROY : cdk.RemovalPolicy.RETAIN,
+      autoDeleteObjects: config.disposable,
+    });
+
+    spriteBucket.addToResourcePolicy(new iam.PolicyStatement({
+      actions: ['s3:GetObject'],
+      principals: [new iam.AnyPrincipal()],
+      resources: [spriteBucket.arnForObjects('winners/*')],
+    }));
+
     // ── Lambda factory ─────────────────────────────────────────────────
     const apiDir = path.resolve(__dirname, '..', '..', 'api', 'src', 'handlers');
     const commonEnv = { TABLE_NAME, NODE_OPTIONS: '--enable-source-maps', ADMIN_SSM_PREFIX: config.ssmPrefix };
@@ -130,6 +149,13 @@ export class TokenDerbyStack extends cdk.Stack {
     const joinRaceFn = makeFn('JoinRaceFn', 'join-race');
     const heartbeatFn = makeFn('HeartbeatFn', 'heartbeat');
     const endRaceFn = makeFn('EndRaceFn', 'end-race');
+
+    // race.ended fires from finaliseRace, invoked by get-race, heartbeat, and
+    // end-race — those are the only handlers that render/upload a winner sprite.
+    for (const fn of [getRaceFn, heartbeatFn, endRaceFn]) {
+      spriteBucket.grantPut(fn);
+      fn.addEnvironment('SPRITE_BUCKET', spriteBucket.bucketName);
+    }
     const createOrgFn = makeFn('CreateOrgFn', 'create-organisation');
     const joinOrgFn = makeFn('JoinOrgFn', 'join-organisation');
     const listOrgsFn = makeFn('ListOrgsFn', 'list-organisations');
@@ -139,6 +165,9 @@ export class TokenDerbyStack extends cdk.Stack {
     const setOrgWebhookFn = makeFn('SetOrgWebhookFn', 'set-org-webhook');
     const getOrgWebhookFn = makeFn('GetOrgWebhookFn', 'get-org-webhook');
     const deleteOrgWebhookFn = makeFn('DeleteOrgWebhookFn', 'delete-org-webhook');
+    const setOrgSlackFn = makeFn('SetOrgSlackFn', 'set-org-slack');
+    const getOrgSlackFn = makeFn('GetOrgSlackFn', 'get-org-slack');
+    const deleteOrgSlackFn = makeFn('DeleteOrgSlackFn', 'delete-org-slack');
     const setOrgScheduleFn = makeFn('SetOrgScheduleFn', 'set-org-schedule');
     const getOrgScheduleFn = makeFn('GetOrgScheduleFn', 'get-org-schedule');
     const deleteOrgScheduleFn = makeFn('DeleteOrgScheduleFn', 'delete-org-schedule');
@@ -230,6 +259,21 @@ export class TokenDerbyStack extends cdk.Stack {
       path: '/api/organisations/{org_name}/webhook',
       methods: [HttpMethod.DELETE],
       integration: new HttpLambdaIntegration('DeleteOrgWebhookInt', deleteOrgWebhookFn),
+    });
+    httpApi.addRoutes({
+      path: '/api/organisations/{org_name}/slack',
+      methods: [HttpMethod.PUT],
+      integration: new HttpLambdaIntegration('SetOrgSlackInt', setOrgSlackFn),
+    });
+    httpApi.addRoutes({
+      path: '/api/organisations/{org_name}/slack',
+      methods: [HttpMethod.GET],
+      integration: new HttpLambdaIntegration('GetOrgSlackInt', getOrgSlackFn),
+    });
+    httpApi.addRoutes({
+      path: '/api/organisations/{org_name}/slack',
+      methods: [HttpMethod.DELETE],
+      integration: new HttpLambdaIntegration('DeleteOrgSlackInt', deleteOrgSlackFn),
     });
     httpApi.addRoutes({
       path: '/api/organisations/{org_name}/schedule',

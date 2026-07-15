@@ -7,6 +7,7 @@ import { renderOverview } from './org-manager/render/tabs/overview.js';
 import { renderMembers } from './org-manager/render/tabs/members.js';
 import { renderRacing } from './org-manager/render/tabs/racing.js';
 import { renderWebhook } from './org-manager/render/tabs/webhook.js';
+import { renderSlackbot } from './org-manager/render/tabs/slackbot.js';
 
 const app = document.getElementById('app')!;
 
@@ -27,6 +28,7 @@ shell.innerHTML = `
       <button type="button" class="org-tab">members</button>
       <button type="button" class="org-tab">racing</button>
       <button type="button" class="org-tab">webhook</button>
+      <button type="button" class="org-tab">slackbot</button>
     </nav>
     <div class="org-tabbody"></div>
   </div>
@@ -119,6 +121,25 @@ renderWebhook(tabSection('Webhook tab (owner, just saved)'), {
   webhook: { webhook_url: 'https://example.com/hooks/token-derby' },
   isOwner: true,
   lastSecret: 'whsec_9F3kD8pQ2xR7',
+  onSave: () => {},
+  onClear: () => {},
+});
+
+renderSlackbot(tabSection('Slackbot tab (owner, configured)'), {
+  slack: {
+    configured: true,
+    channel_id: 'C0123',
+    messages: { race_created: true, race_ended: true, league_season_ended: false, weekly_digest: true },
+    digest: { weekday: 5, time_local: '15:00', tz: 'Europe/London' },
+  },
+  isOwner: true,
+  onSave: () => {},
+  onClear: () => {},
+});
+
+renderSlackbot(tabSection('Slackbot tab (non-owner)'), {
+  slack: null,
+  isOwner: false,
   onSave: () => {},
   onClear: () => {},
 });

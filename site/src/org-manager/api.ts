@@ -4,6 +4,7 @@ import type {
   GetOrgWebhookResponse, SetOrgWebhookResponse, CreateOrganisationResponse,
   JoinOrganisationResponse,
   GetOrgLeagueResponse, SetOrgLeagueRequest, SetOrgLeagueResponse, DeleteOrgLeagueResponse,
+  GetOrgSlackResponse, SetOrgSlackRequest,
 } from '@token-derby/shared';
 import { getSession, setSession, clearSession } from './session.js';
 
@@ -88,6 +89,12 @@ export const setWebhook = (name: string, url: string, f: FetchFn = fetch) =>
   authed<SetOrgWebhookResponse>('PUT', `/api/organisations/${u(name)}/webhook`, { url }, f);
 export const clearWebhook = (name: string, f: FetchFn = fetch) =>
   authed<{ deleted?: boolean }>('DELETE', `/api/organisations/${u(name)}/webhook`, undefined, f);
+export const getSlack = (name: string, f: FetchFn = fetch) =>
+  authed<GetOrgSlackResponse>('GET', `/api/organisations/${u(name)}/slack`, undefined, f);
+export const setSlack = (name: string, body: SetOrgSlackRequest, f: FetchFn = fetch) =>
+  authed<GetOrgSlackResponse>('PUT', `/api/organisations/${u(name)}/slack`, body, f);
+export const clearSlack = (name: string, f: FetchFn = fetch) =>
+  authed<{ ok?: boolean }>('DELETE', `/api/organisations/${u(name)}/slack`, undefined, f);
 export const createOrganisation = (name: string, f: FetchFn = fetch) =>
   authed<CreateOrganisationResponse>('POST', '/api/organisations', { name }, f);
 export const joinOrganisation = (token: string, f: FetchFn = fetch) =>

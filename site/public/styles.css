@@ -1400,7 +1400,7 @@ label.label {
   max-width: 260px;
 }
 label.label:has(input[type="checkbox"]) { flex-direction: row; align-items: center; max-width: none; }
-label.label input {
+label.label input, label.label select {
   font-family: inherit;
   text-transform: none;
   letter-spacing: normal;
@@ -1413,8 +1413,8 @@ label.label input {
   width: 100%;
 }
 label.label input[type="checkbox"] { width: auto; }
-label.label input:focus { outline: none; border-color: var(--accent); }
-label.label input:disabled { opacity: 0.5; }
+label.label input:focus, label.label select:focus { outline: none; border-color: var(--accent); }
+label.label input:disabled, label.label select:disabled { opacity: 0.5; }
 
 .org-token {
   display: inline-block;

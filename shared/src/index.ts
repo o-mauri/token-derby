@@ -13,3 +13,4 @@ export * from './league.js';
 export * from './admin.js';
 export * from './series-transform.js';
 export * from './web-sessions.js';
+export * from './sprite-grid.js';

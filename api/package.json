@@ -10,13 +10,16 @@
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.650.0",
+    "@aws-sdk/client-s3": "^3.650.0",
     "@aws-sdk/client-ssm": "^3.650.0",
     "@aws-sdk/lib-dynamodb": "^3.650.0",
-    "@token-derby/shared": "*"
+    "@token-derby/shared": "*",
+    "pngjs": "^7.0.0"
   },
   "devDependencies": {
     "@types/aws-lambda": "^8.10.145",
     "@types/node": "^22.7.0",
+    "@types/pngjs": "^6.0.5",
     "typescript": "^5.6.0",
     "vitest": "^2.1.0"
   }

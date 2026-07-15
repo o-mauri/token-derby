@@ -8,6 +8,7 @@ import { listRacesByOrgId } from '../db/races.js';
 import { getOrganisationById } from '../db/organisations.js';
 import { finaliseRace } from './finalise-race.js';
 import { sendOrgWebhook } from './webhook.js';
+import { sendOrgSlack } from './slack/send.js';
 import { awardHorseXp } from '../db/stable.js';
 import { randomUUID } from 'node:crypto';
 
@@ -131,7 +132,7 @@ export async function rolloverDueLeague(league: League, now: Date): Promise<bool
     // rollover, so it's isolated in its own try/catch.
     try {
       const org = await getOrganisationById(org_id);
-      if (org?.webhook_url) {
+      if (org?.webhook_url || org?.slack) {
         const move = (pred: (from: number, to: number) => boolean) =>
           standings.flatMap((s) => {
             const to = nextDivision.get(s.stable_horse_id) ?? s.division;
@@ -165,6 +166,7 @@ export async function rolloverDueLeague(league: League, now: Date): Promise<bool
           },
         };
         await sendOrgWebhook(org, 'league.season.ended', payload);
+        await sendOrgSlack(org, 'league.season.ended', payload);
       }
     } catch (err) {
       if (typeof process === 'undefined' || process.env.NODE_ENV !== 'production') {

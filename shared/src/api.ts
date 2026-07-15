@@ -170,6 +170,27 @@ export type SetOrgWebhookResponse = { webhook_url: string; webhook_secret: strin
 export type GetOrgWebhookResponse = { webhook_url: string | null };
 export type DeleteOrgWebhookResponse = { ok: true };
 
+export type OrgSlackMessages = {
+  race_created: boolean;
+  race_ended: boolean;
+  league_season_ended: boolean;
+  weekly_digest: boolean;
+};
+export type OrgSlackDigest = { weekday: number; time_local: string; tz: string };
+export type SetOrgSlackRequest = {
+  bot_token?: string;          // omit on update to keep the stored token
+  channel_id: string;
+  messages: OrgSlackMessages;
+  digest?: OrgSlackDigest;
+};
+export type GetOrgSlackResponse = {
+  configured: boolean;
+  channel_id: string | null;
+  messages: OrgSlackMessages | null;
+  digest: OrgSlackDigest | null;
+};
+export type DeleteOrgSlackResponse = { ok: true };
+
 export type RollHatResponse =
   | { result: 'hat'; collected: CollectedHat; hat_index: number; remaining_rolls: number }
   | { result: 'duplicate'; hat_id: HatId; variant?: number; xp_awarded: number; new_xp: number; remaining_rolls: number }
