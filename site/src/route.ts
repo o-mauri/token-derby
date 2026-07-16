@@ -4,6 +4,7 @@ export type Route =
   | { type: 'org'; orgName: string }
   | { type: 'org-live'; orgName: string }
   | { type: 'catalog' }
+  | { type: 'about' }
   | { type: 'org-manager' }
   | { type: 'not-found' };
 
@@ -23,6 +24,8 @@ export function parseRoute(pathname: string): Route {
   if (orgMatch) return { type: 'org', orgName: orgMatch[1]! };
 
   if (trimmed === '/catalog') return { type: 'catalog' };
+
+  if (trimmed === '/about') return { type: 'about' };
 
   return { type: 'not-found' };
 }

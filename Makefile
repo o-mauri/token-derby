@@ -1,4 +1,4 @@
-.PHONY: install build build-site test dynamodb-up dynamodb-down bootstrap deploy deploy-staging destroy destroy-staging smoke-api
+.PHONY: install build build-site test dynamodb-up dynamodb-down bootstrap deploy _deploy-site deploy-staging destroy destroy-staging smoke-api publish-cli
 
 # AWS profile for all deployment targets. Override with: make deploy AWS_PROFILE=other
 AWS_PROFILE ?= personal
@@ -28,8 +28,11 @@ bootstrap:
 	echo "Bootstrapping account $$ACCOUNT (profile: $(AWS_PROFILE))"; \
 	cd infra && AWS_PROFILE=$(AWS_PROFILE) npx cdk bootstrap aws://$$ACCOUNT/eu-west-2 aws://$$ACCOUNT/us-east-1
 
-# Deploy the whole stack (API + site). Builds site first so site/dist is fresh.
-deploy: build-site
+deploy:
+	AWS_PROFILE=$(AWS_PROFILE) node scripts/release.mjs site
+
+# Internal: build + deploy without a version bump (invoked by release.mjs).
+_deploy-site: build-site
 	cd infra && AWS_PROFILE=$(AWS_PROFILE) npx cdk deploy --require-approval never
 
 destroy:
@@ -45,3 +48,7 @@ destroy-staging:
 # Run end-to-end smoke test against the deployed API
 smoke-api:
 	@bash scripts/smoke-api.sh
+
+# Bump the CLI version, record a changelog entry, then publish to npm.
+publish-cli:
+	node scripts/release.mjs cli

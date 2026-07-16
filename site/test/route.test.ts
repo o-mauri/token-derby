@@ -55,6 +55,11 @@ describe('parseRoute', () => {
     expect(parseRoute('/catalog/')).toEqual({ type: 'catalog' });
   });
 
+  it('maps "/about" to about', () => {
+    expect(parseRoute('/about')).toEqual({ type: 'about' });
+    expect(parseRoute('/about/')).toEqual({ type: 'about' });
+  });
+
   it('returns not-found for unknown paths', () => {
     expect(parseRoute('/foo')).toEqual({ type: 'not-found' });
     expect(parseRoute('/race/')).toEqual({ type: 'not-found' });

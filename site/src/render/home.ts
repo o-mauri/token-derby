@@ -18,6 +18,7 @@ export function renderHome(root: HTMLElement): void {
     </form>
     <p class="home-divider">— or browse the —</p>
     <a class="catalog-link" href="/catalog" id="catalog-link">Hat catalog →</a>
+    <a class="catalog-link" href="/about" id="about-link">About / What's new →</a>
     <div class="install-line terminal" role="note" aria-label="Install command">
       <span class="terminal-prompt">$</span>
       <span class="terminal-cmd">npm i -g @mauricode/token-derby</span>
