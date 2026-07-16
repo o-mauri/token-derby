@@ -1523,6 +1523,27 @@ label.label input:disabled, label.label select:disabled { opacity: 0.5; }
 }
 .ticker-order-val--leader { color: #7bed9f; }  /* leader’s absolute tokens */
 
+/* Projected league-standings rows — share the ticker container/track. */
+.ticker-standing {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4em;
+  padding: 0 0.9rem;
+  white-space: nowrap;
+}
+.ticker-standing-pos { color: var(--muted); }
+.ticker-standing-name { color: var(--text); }
+.ticker-standing-total {
+  color: var(--text);
+  font-weight: bold;
+  font-variant-numeric: tabular-nums;
+}
+.ticker-standing-total--leader { color: #ffd166; }  /* division leader’s projected points */
+.ticker-standing-gain {
+  color: #7bed9f;                     /* points this fixture would add */
+  font-variant-numeric: tabular-nums;
+}
+
 .ticker-group-label {
   color: var(--bg);
   background: var(--accent);

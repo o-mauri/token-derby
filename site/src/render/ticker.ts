@@ -1,5 +1,5 @@
-import type { GetRaceResponse, HorseView } from '@token-derby/shared';
-import { describeAchievement } from '@token-derby/shared';
+import type { GetRaceResponse, HorseView, SeasonStandings } from '@token-derby/shared';
+import { describeAchievement, leaguePoints } from '@token-derby/shared';
 
 export type TickerItem = {
   horseName: string;
@@ -36,6 +36,40 @@ export function renderOrderItem(
   val.className = cell.isLeader ? 'ticker-order-val ticker-order-val--leader' : 'ticker-order-val';
   val.textContent = cell.valueText;
   root.appendChild(val);
+
+  return root;
+}
+
+// A league-standings cell: the horse's projected season total after this race
+// (current points + points this position would earn), with the gain in brackets.
+export function renderStandingItem(
+  doc: Document,
+  cell: { position: number; horseName: string; total: number; gain: number; isLeader: boolean },
+): HTMLElement {
+  const root = doc.createElement('div');
+  root.className = 'ticker-standing';
+
+  const pos = doc.createElement('span');
+  pos.className = 'ticker-standing-pos';
+  pos.textContent = `${cell.position}.`;
+  root.appendChild(pos);
+
+  const name = doc.createElement('span');
+  name.className = 'ticker-standing-name';
+  name.textContent = cell.horseName;
+  root.appendChild(name);
+
+  const total = doc.createElement('span');
+  total.className = cell.isLeader
+    ? 'ticker-standing-total ticker-standing-total--leader'
+    : 'ticker-standing-total';
+  total.textContent = cell.total.toLocaleString();
+  root.appendChild(total);
+
+  const gain = doc.createElement('span');
+  gain.className = 'ticker-standing-gain';
+  gain.textContent = `(+${cell.gain.toLocaleString()})`;
+  root.appendChild(gain);
 
   return root;
 }
@@ -109,6 +143,7 @@ export function renderTickerSep(doc: Document): HTMLElement {
 export type TickerCell =
   | { kind: 'achievement'; item: TickerItem }
   | { kind: 'order'; position: number; horseName: string; valueText: string; isLeader: boolean }
+  | { kind: 'standing'; position: number; horseName: string; total: number; gain: number; isLeader: boolean }
   | { kind: 'label'; text: string; groupClass?: string }
   | { kind: 'sep' }        // "•" between achievements
   | { kind: 'groupsep' }   // "│" between order groups (divisions)
@@ -180,6 +215,83 @@ export function leagueOrderCells(race: GetRaceResponse): TickerCell[] {
   return composeOrderCells(groups);
 }
 
+// Points each racer is on track to earn this fixture, keyed by stable_horse_id.
+// Mirrors the server's scoring (score-league-race): bucket by division, rank
+// within each by the live order, award the fixed points table by position. Also
+// carries current_tokens so standings can project a season-tokens tie-break.
+export function projectedGains(race: GetRaceResponse): Map<string, { gain: number; tokens: number }> {
+  const bottom = race.league_division_names?.length ?? 1;
+  const byDiv = new Map<number, HorseView[]>();
+  for (const h of race.horses) {
+    const d = h.division ?? bottom;
+    const arr = byDiv.get(d) ?? [];
+    arr.push(h);
+    byDiv.set(d, arr);
+  }
+  const out = new Map<string, { gain: number; tokens: number }>();
+  for (const hs of byDiv.values()) {
+    sortByRank(hs).forEach((h, i) => {
+      out.set(h.stable_horse_id, { gain: leaguePoints(i + 1), tokens: h.current_tokens });
+    });
+  }
+  return out;
+}
+
+// The live league table projected to this fixture's finish: every season member
+// (grouped by division, top flight first) shown with their season points PLUS the
+// points their current position would earn, re-ranked within each division by that
+// projected total. Racers not yet in the standings (new entrants) are folded in at
+// zero points; non-racers keep their standing with a +0. Empty divisions are dropped.
+export function leagueStandingsCells(race: GetRaceResponse, standings: SeasonStandings): TickerCell[] {
+  const gains = projectedGains(race);
+  const bottom = race.league_division_names?.length ?? standings.divisions.length;
+
+  // Racers grouped by division, so a new entrant missing from the standings still
+  // shows up in the right table.
+  const racersByDiv = new Map<number, HorseView[]>();
+  for (const h of race.horses) {
+    const d = h.division ?? bottom;
+    const arr = racersByDiv.get(d) ?? [];
+    arr.push(h);
+    racersByDiv.set(d, arr);
+  }
+  const inStandings = new Set<string>();
+  for (const div of standings.divisions) for (const r of div.rows) inStandings.add(r.stable_horse_id);
+
+  const cells: TickerCell[] = [];
+  let emittedGroup = false;
+  for (const div of standings.divisions) {
+    const rows = div.rows.map((r) => ({
+      stable_horse_id: r.stable_horse_id, name: r.horse_name, points: r.points, seasonTokens: r.season_tokens,
+    }));
+    for (const h of racersByDiv.get(div.division) ?? []) {
+      if (!inStandings.has(h.stable_horse_id)) {
+        rows.push({ stable_horse_id: h.stable_horse_id, name: h.name, points: 0, seasonTokens: 0 });
+      }
+    }
+    if (rows.length === 0) continue;
+
+    const projected = rows.map((r) => {
+      const g = gains.get(r.stable_horse_id);
+      const gain = g?.gain ?? 0;
+      return { name: r.name, gain, total: r.points + gain, projTokens: r.seasonTokens + (g?.tokens ?? 0) };
+    });
+    // Same tie-break shape as the league table: points (projected) desc, then
+    // season tokens (projected) desc, then name for a stable order.
+    projected.sort((a, b) =>
+      (b.total - a.total) || (b.projTokens - a.projTokens) ||
+      (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+
+    if (emittedGroup) cells.push({ kind: 'groupsep' });
+    emittedGroup = true;
+    cells.push({ kind: 'label', text: div.name, groupClass: `ticker-div-${((div.division - 1) % 3) + 1}` });
+    projected.forEach((r, i) => {
+      cells.push({ kind: 'standing', position: i + 1, horseName: r.name, total: r.total, gain: r.gain, isLeader: i === 0 });
+    });
+  }
+  return cells;
+}
+
 // The loop seam: a wide blank break marking the end of one pass and the start
 // of the next, so a repeating batch reads as a repeat rather than as distinct
 // achievements. Its width is set dynamically by the ticker.
@@ -216,6 +328,7 @@ export function buildCellNode(doc: Document, cell: TickerCell): HTMLElement {
   switch (cell.kind) {
     case 'achievement': return renderTickerItem(doc, cell.item);
     case 'order': return renderOrderItem(doc, cell);
+    case 'standing': return renderStandingItem(doc, cell);
     case 'label': return renderGroupLabel(doc, cell);
     case 'sep': return renderTickerSep(doc);
     case 'groupsep': return renderGroupSep(doc);
@@ -226,18 +339,75 @@ export function buildCellNode(doc: Document, cell: TickerCell): HTMLElement {
 export type Ticker = {
   el: HTMLElement;
   /**
-   * Replace the looping content. Items already on screen keep scrolling off the
-   * left; everything appended from here on comes from `cells`. Pass `[]` to let
-   * the ticker drain to empty (e.g. when the race is not live).
+   * Queue the looping content. A new batch does NOT cut the current pass short:
+   * items already on screen keep scrolling and the pass runs to its loop-seam,
+   * then the queued batch takes over (bracketed by seams as usual). Only when the
+   * ticker is idle (nothing looping) does a batch start immediately. Pass `[]` to
+   * let the ticker drain to empty after the current pass (e.g. race not live).
    */
   setCells(cells: TickerCell[]): void;
   destroy(): void;
 };
 
+// What appendNext should emit next: a real cell, or the loop-seam that ends a pass.
+export type NextEmit = { kind: 'cell'; cell: TickerCell } | { kind: 'seam' };
+
+// The pass cycler, kept DOM-free so it's unit-testable. It walks `cells`
+// cyclically, emits one loop-seam after the last cell, and — crucially — only
+// swaps in a queued batch at that seam. Swapping mid-pass is exactly the bug
+// that made the on-screen order "jump back to the start" on every poll: the old
+// code reset the cursor immediately, so the next append restarted from cell 0.
+export function createPassScheduler(initial: TickerCell[] = []) {
+  let cells: TickerCell[] = initial.slice();
+  let pending: TickerCell[] | null = null;
+  let cursor = 0;
+
+  return {
+    // Queue a batch. Applied immediately only when nothing is currently looping
+    // (no pass to finish); otherwise deferred to the next seam. The latest queued
+    // batch wins if set() is called several times within one pass.
+    set(next: TickerCell[]): void {
+      if (cells.length === 0) {
+        cells = next.slice();
+        pending = null;
+        cursor = 0;
+      } else {
+        pending = next.slice();
+      }
+    },
+    // The batch currently being emitted — the old one until the seam swap lands.
+    current(): TickerCell[] {
+      return cells;
+    },
+    next(): NextEmit | null {
+      if (cells.length === 0) return null;
+      const period = cells.length + 1; // cells + one loop-seam
+      const slot = cursor % period;
+      cursor++;
+      if (slot === cells.length) {
+        // End of pass: adopt any queued batch so the next pass shows fresh stats.
+        if (pending !== null) {
+          cells = pending;
+          pending = null;
+          cursor = 0;
+        }
+        return { kind: 'seam' };
+      }
+      return { kind: 'cell', cell: cells[slot]! };
+    },
+  };
+}
+
 const SPEED_PX_PER_S = 70;
 const FILL_BUFFER_PX = 96; // keep this much content past the right edge
 const MIN_GAP_PX = 140;        // loop-seam floor for a standard (flat) ticker
 const MIN_GAP_PX_LEAGUE = 600; // wider floor for the league order (division groups) so it doesn't tile
+
+// League batches carry division-group labels and need a wider loop-seam so the
+// grouped order gets breathing room; standard (flat) tickers keep the base floor.
+function seamFloorFor(cells: TickerCell[]): number {
+  return cells.some((c) => c.kind === 'label') ? MIN_GAP_PX_LEAGUE : MIN_GAP_PX;
+}
 
 export function createTicker(doc: Document): Ticker {
   const el = doc.createElement('div');
@@ -247,8 +417,7 @@ export function createTicker(doc: Document): Ticker {
   track.className = 'achievement-ticker-track';
   el.appendChild(track);
 
-  let cells: TickerCell[] = [];
-  let cursor = 0;
+  const scheduler = createPassScheduler();
   let seamFloor = MIN_GAP_PX; // widened to MIN_GAP_PX_LEAGUE when the batch has division groups
   let pos = 0; // px the track has scrolled to the left
   let widthSinceSeam = 0; // width emitted since the last loop-seam gap
@@ -265,13 +434,11 @@ export function createTicker(doc: Document): Ticker {
   // Emit one node per call, cycling through `cells` and appending a single
   // stretchable loop-seam after the final cell so each pass clears the viewport.
   function appendNext(): boolean {
-    if (cells.length === 0) return false;
-    const period = cells.length + 1; // cells + one loop-seam
-    const slot = cursor % period;
-    cursor++;
+    const emit = scheduler.next();
+    if (emit === null) return false;
 
-    const isSeam = slot === cells.length;
-    const node: HTMLElement = isSeam ? renderTickerGap(doc) : buildCellNode(doc, cells[slot]!);
+    const isSeam = emit.kind === 'seam';
+    const node: HTMLElement = isSeam ? renderTickerGap(doc) : buildCellNode(doc, emit.cell);
 
     track.appendChild(node);
     let width = Math.max(1, node.offsetWidth);
@@ -283,6 +450,9 @@ export function createTicker(doc: Document): Ticker {
       width = Math.max(seamFloor, viewport - widthSinceSeam + seamFloor);
       node.style.width = `${width}px`;
       widthSinceSeam = 0;
+      // A seam is the pass boundary where the scheduler may have swapped in a
+      // deferred batch — refresh the floor for the pass that now begins.
+      seamFloor = seamFloorFor(scheduler.current());
     } else {
       widthSinceSeam += width;
     }
@@ -329,13 +499,11 @@ export function createTicker(doc: Document): Ticker {
   return {
     el,
     setCells(next: TickerCell[]) {
-      cells = next.slice();
-      cursor = 0;
-      widthSinceSeam = 0;
-      // League batches carry division-group labels — widen the loop seam so the
-      // grouped order gets its ≥600px breathing room. Standard (flat) tickers keep
-      // the original floor, unchanged.
-      seamFloor = next.some((c) => c.kind === 'label') ? MIN_GAP_PX_LEAGUE : MIN_GAP_PX;
+      scheduler.set(next);
+      // If the scheduler applied the batch immediately (nothing was looping), it
+      // is the live batch now, so adopt its seam floor. If it deferred, current()
+      // is still the old batch and appendNext refreshes the floor at the seam.
+      seamFloor = seamFloorFor(scheduler.current());
     },
     destroy() {
       if (raf !== null) win.cancelAnimationFrame(raf);

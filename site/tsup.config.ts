@@ -7,6 +7,7 @@ export default defineConfig({
     'preview-org': 'src/preview-org.ts',
     'preview-org-manager': 'src/preview-org-manager.ts',
     'preview-race': 'src/preview-race.ts',
+    'preview-league': 'src/preview-league.ts',
     'preview-toasts': 'src/preview-toasts.ts',
   },
   format: ['esm'],

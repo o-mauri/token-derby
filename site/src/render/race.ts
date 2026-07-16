@@ -1,5 +1,5 @@
-import type { GetRaceResponse } from '@token-derby/shared';
-import { fetchRace, ApiError } from '../api.js';
+import type { GetRaceResponse, SeasonStandings } from '@token-derby/shared';
+import { fetchRace, fetchOrgLeagueStandings, ApiError } from '../api.js';
 import { runPollLoop } from '../poll.js';
 import { reconcileHorses } from './reconcile.js';
 import { updatePendingBanner, removePendingBanner } from './pending.js';
@@ -7,12 +7,18 @@ import { renderFinishedOverlay } from './finished.js';
 import { formatDuration, predictTimeLeftSeconds, type CountdownAnchor } from '../time.js';
 import { startAutoScroll } from './autoscroll.js';
 import { horseFaceSvg } from '../horse-face.js';
-import { createTicker, collectFreshItems, leagueOrderCells, type TickerCell } from './ticker.js';
+import { createTicker, collectFreshItems, leagueOrderCells, leagueStandingsCells, type TickerCell } from './ticker.js';
 
 const POLL_INTERVAL_MS = 60_000;
 const TIMER_TICK_MS = 1_000;
 
-export function renderRace(root: HTMLElement, joinCode: string): () => void {
+type RenderRaceOpts = {
+  // Injectable for previews/tests; defaults to the real standings endpoint.
+  fetchStandings?: (orgName: string, season: number) => Promise<{ standings: SeasonStandings | null }>;
+};
+
+export function renderRace(root: HTMLElement, joinCode: string, opts: RenderRaceOpts = {}): () => void {
+  const fetchStandings = opts.fetchStandings ?? ((orgName, season) => fetchOrgLeagueStandings(orgName, season));
   root.ownerDocument.body.classList.add('tv'); // TV is the only mode
   root.innerHTML = '';
 
@@ -45,6 +51,44 @@ export function renderRace(root: HTMLElement, joinCode: string): () => void {
   // Achievements persist between polls (a poll with no new events keeps showing
   // the last ones); the live order is recomputed every poll.
   let lastAchievements: TickerCell[] = [];
+  // Last live snapshot, kept so an async standings load can recompose the ticker
+  // immediately rather than waiting for the next poll.
+  let lastLiveRace: GetRaceResponse | null = null;
+  // League standings are the season points BEFORE this fixture — static for the
+  // race's duration, so fetch once (best-effort) and cache. `attempted` gates a
+  // single in-flight request; a failed load clears it so a later poll can retry.
+  let standings: SeasonStandings | null = null;
+  let standingsAttempted = false;
+
+  // Build the live ticker from the current snapshot + cached state: division order,
+  // then (league only) the projected standings, then persisted achievements — each
+  // behind a section gap. Runs on every poll and when standings first arrive.
+  const composeLiveTicker = (race: GetRaceResponse): void => {
+    const isLeague = race.league_id != null;
+    const cells = leagueOrderCells(race);
+    if (isLeague && standings) {
+      cells.push({ kind: 'sectiongap', wide: true }, ...leagueStandingsCells(race, standings));
+    }
+    if (lastAchievements.length) {
+      cells.push({ kind: 'sectiongap', wide: isLeague }, ...lastAchievements);
+    }
+    ticker.setCells(cells);
+  };
+
+  const ensureStandings = (orgName: string, season: number): void => {
+    if (standings || standingsAttempted) return;
+    standingsAttempted = true;
+    fetchStandings(orgName, season)
+      .then((res) => {
+        standings = res.standings;
+        // Recompose now so the standings appear without waiting a full poll.
+        if (standings && lastLiveRace) composeLiveTicker(lastLiveRace);
+      })
+      .catch((err) => {
+        standingsAttempted = false; // allow a retry on the next poll
+        console.warn('[race] league standings load failed', err);
+      });
+  };
   const nameEl = frame.querySelector<HTMLElement>('.race-name')!;
   const statusEl = frame.querySelector<HTMLElement>('.race-status')!;
   const timeLeftEl = frame.querySelector<HTMLElement>('.race-time-left')!;
@@ -100,21 +144,24 @@ export function renderRace(root: HTMLElement, joinCode: string): () => void {
 
     reconcileHorses(track, race, now, paceByHorseId);
 
-    // Live races: the order is the steady-state loop; fresh achievements are
-    // appended after a section gap. Non-live races have no order → clear the bar.
+    // Live races: the order is the steady-state loop; for a league fixture the
+    // projected standings follow, then fresh achievements. Non-live races have no
+    // order → clear the bar.
     if (race.status === 'live') {
+      lastLiveRace = race;
       const fresh = collectFreshItems(race, shownAt);
       if (fresh.length) {
         lastAchievements = fresh.flatMap((item, i): TickerCell[] =>
           i === 0 ? [{ kind: 'achievement', item }] : [{ kind: 'sep' }, { kind: 'achievement', item }],
         );
       }
-      const cells = leagueOrderCells(race);
-      if (lastAchievements.length) {
-        cells.push({ kind: 'sectiongap', wide: race.league_id != null }, ...lastAchievements);
+      // League fixtures: kick off the one-time standings load (best-effort).
+      if (race.league_id != null && race.organisation_name && race.league_season !== undefined) {
+        ensureStandings(race.organisation_name, race.league_season);
       }
-      ticker.setCells(cells);
+      composeLiveTicker(race);
     } else {
+      lastLiveRace = null;
       ticker.setCells([]);
     }
 
