@@ -6,7 +6,7 @@ function finiteNonNeg(v: unknown): number {
 
 /**
  * The raw (pre-rate-cap) weighted delta for a heartbeat. New CLIs send per-source
- * `components`; the locked `primary` model counts 1:1 and the others at 10%.
+ * `components`; the locked `primary` model counts 1:1 and the others at 50%.
  * Legacy CLIs send a bare `delta` (treated as primary-only). Returns null when
  * the body carries neither a usable `components` object nor a valid `delta`.
  */

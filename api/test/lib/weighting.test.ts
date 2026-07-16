@@ -2,10 +2,10 @@ import { describe, it, expect } from 'vitest';
 import { resolveHeartbeatDelta } from '../../src/lib/weighting.js';
 
 describe('resolveHeartbeatDelta', () => {
-  it('weights components: primary at 1, others at 0.1', () => {
+  it('weights components: primary at 1, others at 0.5', () => {
     const d = resolveHeartbeatDelta({ components: { claude: 1000, codex: 500, gemini: 200 } }, 'codex');
-    // 500*1 + 1000*0.1 + 200*0.1 = 500 + 100 + 20 = 620
-    expect(d).toBe(620);
+    // 500*1 + 1000*0.5 + 200*0.5 = 500 + 500 + 100 = 1100
+    expect(d).toBe(1100);
   });
 
   it('all-primary components pass straight through', () => {
@@ -23,8 +23,8 @@ describe('resolveHeartbeatDelta', () => {
 
   it('treats negative or non-finite component values as 0', () => {
     const d = resolveHeartbeatDelta({ components: { claude: -5, codex: Infinity as any, gemini: 10 } }, 'claude');
-    // claude -5→0 (×1), codex Inf→0 (×0.1), gemini 10 (×0.1) = 1
-    expect(d).toBe(1);
+    // claude -5→0 (×1), codex Inf→0 (×0.5), gemini 10 (×0.5) = 5
+    expect(d).toBe(5);
   });
 
   it('returns null when neither components nor a valid delta is present', () => {

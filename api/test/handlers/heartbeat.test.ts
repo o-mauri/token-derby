@@ -343,7 +343,7 @@ describe('heartbeat handler', () => {
   it('weights components by the horse primary before the rate cap', async () => {
     // Join with primary_model='codex'; rate cap disabled via TOKEN_DERBY_MAX_RATE=1B
     const { join_code, race_id, horse_id, heartbeat_token } = await setupWithPrimary('codex');
-    // raw weighted = codex:5000*1 + claude:1000*0.1 + gemini:0*0.1 = 5100
+    // raw weighted = codex:5000*1 + claude:1000*0.5 + gemini:0*0.5 = 5500
     const res: any = await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, {
       seq: 1,
       components: { claude: 1000, codex: 5000, gemini: 0 },
@@ -351,7 +351,7 @@ describe('heartbeat handler', () => {
     expect(res.statusCode).toBe(200);
     const horses = await listHorses(race_id);
     const own = horses.find(h => h.horse_id === horse_id);
-    expect(own?.current_tokens).toBe(5100);
+    expect(own?.current_tokens).toBe(5500);
   });
 
   it('accepts a legacy bare delta (primary defaults to claude for legacy horses)', async () => {

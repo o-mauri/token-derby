@@ -1,68 +1,302 @@
 [
-  { "version": "0.10.0", "date": "2026-07-16", "component": "site",
-    "changes": ["League standings now scroll in the live ticker", "Fixed the ticker resetting mid-scroll"] },
-  { "version": "0.9.0", "date": "2026-07-07", "component": "site",
-    "changes": ["League racing mode: divisions, standings and season views", "Live running-order ticker during a race", "End-of-race screen navigation between pages"] },
-  { "version": "2.12.1", "date": "2026-07-05", "component": "cli",
-    "changes": ["Org management polish in the web UI", "Environment (prod/staging) support hardening"] },
-  { "version": "2.12.0", "date": "2026-07-03", "component": "cli",
-    "changes": ["Org management wired into the web UI"] },
-  { "version": "2.11.0", "date": "2026-07-03", "component": "cli",
-    "changes": ["New `token-derby env` command to switch environments", "Stacks parameterised by environment (prod/staging)"] },
-  { "version": "0.8.0", "date": "2026-07-03", "component": "site",
-    "changes": ["Organisation management moved into the UI"] },
-  { "version": "2.10.1", "date": "2026-07-02", "component": "cli",
-    "changes": ["Fixed a race stall when the primary CLI has no home directory"] },
-  { "version": "2.10.0", "date": "2026-07-02", "component": "cli",
-    "changes": ["Per-conversation primary tracker with a top-N cap and forfeit", "Per-race primary_top5 toggle (replaces the env var)", "General UI improvements"] },
-  { "version": "0.7.0", "date": "2026-06-22", "component": "site",
-    "changes": ["Full-page end-of-race token graph with rank-based line colours", "Rotating standings + charts panel on the finished overlay", "Name-tag redesign and rolling achievement ticker"] },
-  { "version": "2.9.0", "date": "2026-06-21", "component": "cli",
-    "changes": ["Name-tag redesign and rolling achievement ticker on the race view", "Live-API demo server (`npm run dev:live`)"] },
-  { "version": "2.8.0", "date": "2026-06-11", "component": "cli",
-    "changes": ["Admin dashboard edit mode: rename users/horses, remove hats, delete horses"] },
-  { "version": "0.6.0", "date": "2026-06-04", "component": "site",
-    "changes": ["Organisation race rows with live countdowns", "Set-and-forget `/org/{name}/live` race view", "Live races pinned to the top while the page scrolls"] },
-  { "version": "2.7.0", "date": "2026-05-31", "component": "cli",
-    "changes": ["RaceScoreTracker delta protocol for scoring", "Fail-loud transcript scanner (no silent undercount)", "Anti-farm XP gating on real competition"] },
-  { "version": "2.5.7", "date": "2026-05-29", "component": "cli",
-    "changes": ["Delta-protocol tracker state persisted across restarts", "Heartbeat payload frozen across retries"] },
-  { "version": "2.5.6", "date": "2026-05-28", "component": "cli",
-    "changes": ["Packaging fix"] },
-  { "version": "2.5.5", "date": "2026-05-28", "component": "cli",
-    "changes": ["Packaging fix"] },
-  { "version": "2.5.4", "date": "2026-05-28", "component": "cli",
-    "changes": ["Subagent transcript scanning + sampler-freeze fix", "No free roll at level 1 (anti-farm)"] },
-  { "version": "0.5.0", "date": "2026-05-28", "component": "site",
-    "changes": ["Equipped hats rendered on the live race view", "Hat catalog page at /catalog", "Compact race UI with a TV-mode toggle"] },
-  { "version": "2.5.3", "date": "2026-05-27", "component": "cli",
-    "changes": ["Packaging fix"] },
-  { "version": "2.5.2", "date": "2026-05-27", "component": "cli",
-    "changes": ["Packaging fix"] },
-  { "version": "2.5.1", "date": "2026-05-27", "component": "cli",
-    "changes": ["Packaging fix"] },
-  { "version": "2.5.0", "date": "2026-05-27", "component": "cli",
-    "changes": ["Roll horse picker shown as a confirmation step", "Cleaner self-upgrade hints", "Rainbow Crown hat art"] },
-  { "version": "2.4.0", "date": "2026-05-21", "component": "cli",
-    "changes": ["`token-derby update` command", "Race-level input/output token mode"] },
-  { "version": "2.3.0", "date": "2026-05-21", "component": "cli",
-    "changes": ["Organisation webhooks: `organisation webhook {set,get,clear}`", "race.created and race.ended webhooks"] },
-  { "version": "0.4.0", "date": "2026-05-19", "component": "site",
-    "changes": ["Mid-race achievement toasts", "Live XP shown in the mid-race level chip"] },
-  { "version": "2.0.1", "date": "2026-05-18", "component": "cli",
-    "changes": ["Packaging fix for the organisation page release"] },
-  { "version": "2.0.0", "date": "2026-05-18", "component": "cli",
-    "changes": ["Organisation page"] },
-  { "version": "0.3.0", "date": "2026-05-18", "component": "site",
-    "changes": ["Organisation page"] },
-  { "version": "1.1.0", "date": "2026-05-15", "component": "cli",
-    "changes": ["Persistent stable horse identity", "Minimum CLI version enforcement"] },
-  { "version": "1.0.0", "date": "2026-05-14", "component": "cli",
-    "changes": ["Caller identity and one-horse-per-user", "Races version-pinned to the creator's MAJOR.MINOR", "Server-side rate cap on heartbeat token claims"] },
-  { "version": "0.2.0", "date": "2026-05-14", "component": "site",
-    "changes": ["TV mode with autoscroll and edge-to-edge lanes", "Live token count and 30-minute rolling pace per horse", "Dirt-track lane background"] },
-  { "version": "0.1.0", "date": "2026-04-24", "component": "site",
-    "changes": ["First site: home page, live race view, horse sprites, pending/finished states"] },
-  { "version": "0.1.0", "date": "2026-04-23", "component": "cli",
-    "changes": ["First published CLI — run horses in token races driven by Claude Code output"] }
+  {
+    "version": "0.11.0",
+    "date": "2026-07-16",
+    "component": "site",
+    "changes": [
+      "added versioning to site"
+    ]
+  },
+  {
+    "version": "0.10.0",
+    "date": "2026-07-16",
+    "component": "site",
+    "changes": [
+      "League standings now scroll in the live ticker",
+      "Fixed the ticker resetting mid-scroll"
+    ]
+  },
+  {
+    "version": "0.9.0",
+    "date": "2026-07-07",
+    "component": "site",
+    "changes": [
+      "League racing mode: divisions, standings and season views",
+      "Live running-order ticker during a race",
+      "End-of-race screen navigation between pages"
+    ]
+  },
+  {
+    "version": "2.12.1",
+    "date": "2026-07-05",
+    "component": "cli",
+    "changes": [
+      "Org management polish in the web UI",
+      "Environment (prod/staging) support hardening"
+    ]
+  },
+  {
+    "version": "2.12.0",
+    "date": "2026-07-03",
+    "component": "cli",
+    "changes": [
+      "Org management wired into the web UI"
+    ]
+  },
+  {
+    "version": "2.11.0",
+    "date": "2026-07-03",
+    "component": "cli",
+    "changes": [
+      "New `token-derby env` command to switch environments",
+      "Stacks parameterised by environment (prod/staging)"
+    ]
+  },
+  {
+    "version": "0.8.0",
+    "date": "2026-07-03",
+    "component": "site",
+    "changes": [
+      "Organisation management moved into the UI"
+    ]
+  },
+  {
+    "version": "2.10.1",
+    "date": "2026-07-02",
+    "component": "cli",
+    "changes": [
+      "Fixed a race stall when the primary CLI has no home directory"
+    ]
+  },
+  {
+    "version": "2.10.0",
+    "date": "2026-07-02",
+    "component": "cli",
+    "changes": [
+      "Per-conversation primary tracker with a top-N cap and forfeit",
+      "Per-race primary_top5 toggle (replaces the env var)",
+      "General UI improvements"
+    ]
+  },
+  {
+    "version": "0.7.0",
+    "date": "2026-06-22",
+    "component": "site",
+    "changes": [
+      "Full-page end-of-race token graph with rank-based line colours",
+      "Rotating standings + charts panel on the finished overlay",
+      "Name-tag redesign and rolling achievement ticker"
+    ]
+  },
+  {
+    "version": "2.9.0",
+    "date": "2026-06-21",
+    "component": "cli",
+    "changes": [
+      "Name-tag redesign and rolling achievement ticker on the race view",
+      "Live-API demo server (`npm run dev:live`)"
+    ]
+  },
+  {
+    "version": "2.8.0",
+    "date": "2026-06-11",
+    "component": "cli",
+    "changes": [
+      "Admin dashboard edit mode: rename users/horses, remove hats, delete horses"
+    ]
+  },
+  {
+    "version": "0.6.0",
+    "date": "2026-06-04",
+    "component": "site",
+    "changes": [
+      "Organisation race rows with live countdowns",
+      "Set-and-forget `/org/{name}/live` race view",
+      "Live races pinned to the top while the page scrolls"
+    ]
+  },
+  {
+    "version": "2.7.0",
+    "date": "2026-05-31",
+    "component": "cli",
+    "changes": [
+      "RaceScoreTracker delta protocol for scoring",
+      "Fail-loud transcript scanner (no silent undercount)",
+      "Anti-farm XP gating on real competition"
+    ]
+  },
+  {
+    "version": "2.5.7",
+    "date": "2026-05-29",
+    "component": "cli",
+    "changes": [
+      "Delta-protocol tracker state persisted across restarts",
+      "Heartbeat payload frozen across retries"
+    ]
+  },
+  {
+    "version": "2.5.6",
+    "date": "2026-05-28",
+    "component": "cli",
+    "changes": [
+      "Packaging fix"
+    ]
+  },
+  {
+    "version": "2.5.5",
+    "date": "2026-05-28",
+    "component": "cli",
+    "changes": [
+      "Packaging fix"
+    ]
+  },
+  {
+    "version": "2.5.4",
+    "date": "2026-05-28",
+    "component": "cli",
+    "changes": [
+      "Subagent transcript scanning + sampler-freeze fix",
+      "No free roll at level 1 (anti-farm)"
+    ]
+  },
+  {
+    "version": "0.5.0",
+    "date": "2026-05-28",
+    "component": "site",
+    "changes": [
+      "Equipped hats rendered on the live race view",
+      "Hat catalog page at /catalog",
+      "Compact race UI with a TV-mode toggle"
+    ]
+  },
+  {
+    "version": "2.5.3",
+    "date": "2026-05-27",
+    "component": "cli",
+    "changes": [
+      "Packaging fix"
+    ]
+  },
+  {
+    "version": "2.5.2",
+    "date": "2026-05-27",
+    "component": "cli",
+    "changes": [
+      "Packaging fix"
+    ]
+  },
+  {
+    "version": "2.5.1",
+    "date": "2026-05-27",
+    "component": "cli",
+    "changes": [
+      "Packaging fix"
+    ]
+  },
+  {
+    "version": "2.5.0",
+    "date": "2026-05-27",
+    "component": "cli",
+    "changes": [
+      "Roll horse picker shown as a confirmation step",
+      "Cleaner self-upgrade hints",
+      "Rainbow Crown hat art"
+    ]
+  },
+  {
+    "version": "2.4.0",
+    "date": "2026-05-21",
+    "component": "cli",
+    "changes": [
+      "`token-derby update` command",
+      "Race-level input/output token mode"
+    ]
+  },
+  {
+    "version": "2.3.0",
+    "date": "2026-05-21",
+    "component": "cli",
+    "changes": [
+      "Organisation webhooks: `organisation webhook {set,get,clear}`",
+      "race.created and race.ended webhooks"
+    ]
+  },
+  {
+    "version": "0.4.0",
+    "date": "2026-05-19",
+    "component": "site",
+    "changes": [
+      "Mid-race achievement toasts",
+      "Live XP shown in the mid-race level chip"
+    ]
+  },
+  {
+    "version": "2.0.1",
+    "date": "2026-05-18",
+    "component": "cli",
+    "changes": [
+      "Packaging fix for the organisation page release"
+    ]
+  },
+  {
+    "version": "2.0.0",
+    "date": "2026-05-18",
+    "component": "cli",
+    "changes": [
+      "Organisation page"
+    ]
+  },
+  {
+    "version": "0.3.0",
+    "date": "2026-05-18",
+    "component": "site",
+    "changes": [
+      "Organisation page"
+    ]
+  },
+  {
+    "version": "1.1.0",
+    "date": "2026-05-15",
+    "component": "cli",
+    "changes": [
+      "Persistent stable horse identity",
+      "Minimum CLI version enforcement"
+    ]
+  },
+  {
+    "version": "1.0.0",
+    "date": "2026-05-14",
+    "component": "cli",
+    "changes": [
+      "Caller identity and one-horse-per-user",
+      "Races version-pinned to the creator's MAJOR.MINOR",
+      "Server-side rate cap on heartbeat token claims"
+    ]
+  },
+  {
+    "version": "0.2.0",
+    "date": "2026-05-14",
+    "component": "site",
+    "changes": [
+      "TV mode with autoscroll and edge-to-edge lanes",
+      "Live token count and 30-minute rolling pace per horse",
+      "Dirt-track lane background"
+    ]
+  },
+  {
+    "version": "0.1.0",
+    "date": "2026-04-24",
+    "component": "site",
+    "changes": [
+      "First site: home page, live race view, horse sprites, pending/finished states"
+    ]
+  },
+  {
+    "version": "0.1.0",
+    "date": "2026-04-23",
+    "component": "cli",
+    "changes": [
+      "First published CLI — run horses in token races driven by Claude Code output"
+    ]
+  }
 ]

@@ -5,8 +5,7 @@ import { StatusScreen } from '../ui/StatusScreen.js';
 import { describeAchievement, type RecentEvent } from '@token-derby/shared';
 import { runHeartbeatLoop } from './heartbeat-loop.js';
 import { readAllSources, isStall, type BeatReading } from '../tokens/race-tokens.js';
-import { primaryConversationCap } from '../tokens/primary-cap.js';
-import { MODEL_KEYS, type ModelKey } from '@token-derby/shared';
+import { type ModelKey } from '@token-derby/shared';
 import { RaceScoreTracker, type RaceScoreState } from '../tokens/race-score.js';
 import * as endpoints from '../api/endpoints.js';
 import { ApiError } from '../api/client.js';
@@ -35,8 +34,6 @@ export function RunRace({ active, initialState, pendingMode, ownUserName }: RunR
   const ctrl = useRef(new AbortController());
   const [stalled, setStalled] = useState(false);
   const [stallReason, setStallReason] = useState<string | null>(null);
-  const baselineRef = useRef(initialState.acked);
-  const [perSource, setPerSource] = useState<Record<ModelKey, number>>({ claude: 0, codex: 0, gemini: 0 });
 
   // Re-render every second so the "Ns ago" counter updates.
   useEffect(() => {
@@ -73,12 +70,6 @@ export function RunRace({ active, initialState, pendingMode, ownUserName }: RunR
         if (pendingRef.current && !isStall(reading)) tracker.reprime();
         setStalled(tracker.stalled);
         setStallReason(tracker.stalled ? tracker.stallReason : null);
-        const since = tracker.secondarySinceJoin(baselineRef.current);
-        const ps: Record<ModelKey, number> = { claude: 0, codex: 0, gemini: 0 };
-        for (const k of MODEL_KEYS) {
-          ps[k] = k === active.primary_model ? tracker.primaryCounted() : since[k];
-        }
-        setPerSource(ps);
         return tracker.nextBeat();
       },
       sendBeat: async (snapshot) => {
@@ -152,8 +143,6 @@ export function RunRace({ active, initialState, pendingMode, ownUserName }: RunR
         stalled={stalled}
         stallReason={stallReason}
         primaryModel={active.primary_model}
-        perSource={perSource}
-        primaryCapped={primaryConversationCap(active.primary_top5 ?? false) !== Infinity}
       />
       {achievements.length > 0 && (
         <Box flexDirection="column" marginTop={1}>

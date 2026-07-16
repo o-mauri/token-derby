@@ -13,7 +13,7 @@ export function PrimaryPicker({ onPick }: { onPick: (m: ModelKey) => void }) {
   });
   return (
     <Box flexDirection="column">
-      <Text bold>Pick your primary model for this race (counts 1:1; the others count at 10%).</Text>
+      <Text bold>Pick your primary model for this race (counts 1:1; the others count at 50%).</Text>
       <Text dimColor>This is locked for the whole race — you can't change it, even by rejoining.</Text>
       {MODEL_KEYS.map((m, idx) => (
         <Text key={m} color={idx === i ? 'cyan' : undefined}>

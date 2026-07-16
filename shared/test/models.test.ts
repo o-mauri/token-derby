@@ -4,7 +4,7 @@ import { MODEL_KEYS, SECONDARY_WEIGHT, isModelKey, weightFor, weightedTotal } fr
 describe('models', () => {
   it('lists exactly the three model keys', () => {
     expect(MODEL_KEYS).toEqual(['claude', 'codex', 'gemini']);
-    expect(SECONDARY_WEIGHT).toBe(0.1);
+    expect(SECONDARY_WEIGHT).toBe(0.5);
   });
 
   it('isModelKey validates the enum', () => {
@@ -13,13 +13,13 @@ describe('models', () => {
     expect(isModelKey(undefined)).toBe(false);
   });
 
-  it('weightFor is 1 for the primary and 0.1 for others', () => {
+  it('weightFor is 1 for the primary and 0.5 for others', () => {
     expect(weightFor('codex', 'codex')).toBe(1);
-    expect(weightFor('codex', 'claude')).toBe(0.1);
+    expect(weightFor('codex', 'claude')).toBe(0.5);
   });
 
-  it('weightedTotal sums primary at full weight and others at 10%', () => {
-    // primary codex: 310000*1 + 1240000*0.1 + 52000*0.1 = 310000 + 124000 + 5200 = 439200
-    expect(weightedTotal('codex', { claude: 1_240_000, codex: 310_000, gemini: 52_000 })).toBe(439_200);
+  it('weightedTotal sums primary at full weight and others at 50%', () => {
+    // primary codex: 310000*1 + 1240000*0.5 + 52000*0.5 = 310000 + 620000 + 26000 = 956000
+    expect(weightedTotal('codex', { claude: 1_240_000, codex: 310_000, gemini: 52_000 })).toBe(956_000);
   });
 });
