@@ -1,6 +1,6 @@
 import { tokenMultiplier } from '@token-derby/shared';
 
-const DEFAULT_MAX_RATE_PER_SECOND = 500;
+const DEFAULT_MAX_RATE_PER_SECOND = 750;
 
 function envRate(): number {
   const n = Number(process.env.TOKEN_DERBY_MAX_RATE);
