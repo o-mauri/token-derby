@@ -1,0 +1,24 @@
+{
+  "name": "@token-derby/client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "prebuild": "npm run build --workspace=@token-derby/shared",
+    "build": "tsc -p .",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@token-derby/shared": "*",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.9"
+  }
+}
