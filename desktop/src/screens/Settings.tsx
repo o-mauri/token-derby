@@ -11,7 +11,19 @@ function messageFor(err: unknown): string {
 // Everyday controls up top; the Advanced accordion below gates the
 // power-user overrides (env, api base, home folder) that can break sign-in
 // if set wrong, so it stays collapsed by default.
-export default function Settings({ onBack }: { onBack: () => void }) {
+//
+// `onIdentityChange` lets the shell's header (name/horse-count, rendered
+// above this screen and never remounted — see App.tsx's refreshHeader) stay
+// in sync whenever something here changes who's signed in or what they're
+// called: a display-name edit, an environment switch (different identity
+// per env), or a sign-out.
+export default function Settings({
+  onBack,
+  onIdentityChange,
+}: {
+  onBack: () => void;
+  onIdentityChange?: () => void;
+}) {
   const [config, setConfig] = useState<Config | null>(null);
   const [appVersion, setAppVersion] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -81,6 +93,7 @@ export default function Settings({ onBack }: { onBack: () => void }) {
       setDisplayName(result.display_name);
       setNameInput(result.display_name);
       setEditingName(false);
+      onIdentityChange?.();
     } catch (err) {
       setNameError(messageFor(err));
     } finally {
@@ -134,8 +147,13 @@ export default function Settings({ onBack }: { onBack: () => void }) {
     setSignOutError(null);
     try {
       // main.ts hides the popover and opens onboarding once this call
-      // resolves ok — nothing more to do here on success.
+      // resolves ok. onIdentityChange clears the shell header immediately
+      // (rather than leaving the previous user's name/count showing for the
+      // moment before the popover hides), and the window-focus listener in
+      // App.tsx picks up the eventual new identity once onboarding completes
+      // and the popover is shown again.
       await api.signOut();
+      onIdentityChange?.();
     } catch (err) {
       setSignOutError(messageFor(err));
       setSigningOut(false);
@@ -155,8 +173,10 @@ export default function Settings({ onBack }: { onBack: () => void }) {
     try {
       await api.setConfig({ env });
       // Identity, display name, and api base are all per-environment —
-      // reload everything rather than patching state piecemeal.
+      // reload everything rather than patching state piecemeal, and tell
+      // the shell header (a different identity now, or none at all).
       load();
+      onIdentityChange?.();
     } catch (err) {
       setEnvError(messageFor(err));
     } finally {

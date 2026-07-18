@@ -15,15 +15,32 @@ export default function App() {
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [horseCount, setHorseCount] = useState<number | null>(null);
 
-  useEffect(() => {
+  // The popover is one long-lived BrowserWindow that's only ever show()/
+  // hide()'d (see electron/windows.ts) — this component never remounts, so
+  // a mount-only fetch would leave the header stuck on stale identity/
+  // horse-count after anything in Settings changes who's signed in (env
+  // switch, sign-out→re-onboard). refreshHeader() is re-run explicitly by
+  // those flows below, plus on window focus as a catch-all for whenever the
+  // popover is shown again (e.g. after onboarding closes and main.ts calls
+  // popover.show()/focus()).
+  function refreshHeader() {
     api.getBootstrap().then(
       (bootstrap) => setDisplayName(bootstrap.identity?.display_name ?? null),
-      () => {},
+      () => setDisplayName(null),
     );
     api.listStable().then(
       (stable) => setHorseCount(stable.horses.length),
-      () => {},
+      () => setHorseCount(null),
     );
+  }
+
+  useEffect(() => {
+    refreshHeader();
+  }, []);
+
+  useEffect(() => {
+    window.addEventListener('focus', refreshHeader);
+    return () => window.removeEventListener('focus', refreshHeader);
   }, []);
 
   // The popover has no application menu (it's an accessory/tray-only app —
@@ -76,7 +93,15 @@ export default function App() {
         {tab === 'race' && <Race />}
         {tab === 'stable' && <Stable />}
         {tab === 'org' && <Org />}
-        {tab === 'settings' && <Settings onBack={() => setTab('race')} />}
+        {tab === 'settings' && (
+          <Settings
+            onBack={() => {
+              refreshHeader();
+              setTab('race');
+            }}
+            onIdentityChange={refreshHeader}
+          />
+        )}
       </main>
     </div>
   );
