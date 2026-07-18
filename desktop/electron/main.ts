@@ -47,6 +47,15 @@ app.whenReady().then(async () => {
         popover.show();
         popover.focus();
       }
+      // Mirror image of the above: Settings' sign-out clears the identity on
+      // disk, so send the user back through onboarding instead of leaving
+      // them looking at a now-invalid popover.
+      if (channel === CHANNELS.signOut && result.ok) {
+        popover.hide();
+        if (!onboardingWindow || onboardingWindow.isDestroyed()) {
+          onboardingWindow = createAppWindow('/onboarding');
+        }
+      }
       return result;
     });
   }

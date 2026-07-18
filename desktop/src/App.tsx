@@ -3,13 +3,13 @@ import { api } from './api.js';
 import Race from './screens/Race.js';
 import Stable from './screens/Stable.js';
 import Org from './screens/Org.js';
+import Settings from './screens/Settings.js';
 
 type Tab = 'race' | 'stable' | 'org' | 'settings';
 
 // Popover shell: header (identity + gear→settings) and the Race/Stable/Org
 // tab bar, all driven by local route state — this is a single fixed-size
-// BrowserWindow (see electron/windows.ts), never a real router. Task 11
-// fills in the Settings tab content.
+// BrowserWindow (see electron/windows.ts), never a real router.
 export default function App() {
   const [tab, setTab] = useState<Tab>('race');
   const [displayName, setDisplayName] = useState<string | null>(null);
@@ -24,6 +24,20 @@ export default function App() {
       (stable) => setHorseCount(stable.horses.length),
       () => {},
     );
+  }, []);
+
+  // The popover has no application menu (it's an accessory/tray-only app —
+  // see main.ts's app.dock.hide()), so Cmd+Q needs its own handler here
+  // rather than relying on Electron's default menu shortcut.
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'q') {
+        e.preventDefault();
+        api.quitApp().catch(() => {});
+      }
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
 
   const initial = (displayName ?? '?').trim().charAt(0).toUpperCase() || '?';
@@ -62,7 +76,7 @@ export default function App() {
         {tab === 'race' && <Race />}
         {tab === 'stable' && <Stable />}
         {tab === 'org' && <Org />}
-        {tab === 'settings' && <SettingsPlaceholder onBack={() => setTab('race')} />}
+        {tab === 'settings' && <Settings onBack={() => setTab('race')} />}
       </main>
     </div>
   );
@@ -77,21 +91,6 @@ function TabButton({ label, active, onClick }: { label: string; active: boolean;
     >
       {label}
     </button>
-  );
-}
-
-function Placeholder({ label }: { label: string }) {
-  return <p className="popover-placeholder">{label} coming soon.</p>;
-}
-
-function SettingsPlaceholder({ onBack }: { onBack: () => void }) {
-  return (
-    <div>
-      <button className="popover-settings-back" type="button" onClick={onBack}>
-        ‹ Back
-      </button>
-      <p className="popover-placeholder">Settings coming soon.</p>
-    </div>
   );
 }
 

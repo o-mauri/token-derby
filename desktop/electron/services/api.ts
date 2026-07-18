@@ -1,4 +1,4 @@
-import { app, shell, type BrowserWindow } from 'electron';
+import { app, dialog, shell, type BrowserWindow } from 'electron';
 import { createTransport, createEndpoints, ApiError } from '@token-derby/client';
 import type {
   CreateStableHorseRequest,
@@ -194,8 +194,19 @@ async function getConfig(): Promise<Result<Config>> {
   return guard(async () => loadConfig());
 }
 
+// env/apiBaseOverride changes need no extra wiring here: getTransport() and
+// its getIdentity callback both call loadConfig() fresh on every request, so
+// the very next api call already resolves against the new environment.
+// launchAtLogin is the one setting with an OS-level side effect, so it's
+// applied here rather than left as inert config-file state.
 async function setConfig(patch: Partial<Config>): Promise<Result<Config>> {
-  return guard(async () => saveConfig(patch));
+  return guard(async () => {
+    const next = saveConfig(patch);
+    if (patch.launchAtLogin !== undefined) {
+      app.setLoginItemSettings({ openAtLogin: next.launchAtLogin });
+    }
+    return next;
+  });
 }
 
 async function signOut(): Promise<Result<{ ok: true }>> {
@@ -208,6 +219,34 @@ async function signOut(): Promise<Result<{ ok: true }>> {
 async function openExternal(url: string): Promise<Result<{ ok: true }>> {
   return guard(async () => {
     await shell.openExternal(url);
+    return { ok: true as const };
+  });
+}
+
+// Lets the Settings "Home folder" override use a native picker instead of a
+// bare text field. Cancelling the dialog resolves to a null path rather than
+// an error — the caller just leaves the existing value in place.
+async function chooseFolder(): Promise<Result<{ path: string | null }>> {
+  return guard(async () => {
+    const result = await dialog.showOpenDialog({ properties: ['openDirectory', 'createDirectory'] });
+    return { path: result.canceled ? null : (result.filePaths[0] ?? null) };
+  });
+}
+
+// Surfaces the "<user_id>:<secret_token>" pair Settings' "Copy identity"
+// button hands to the clipboard — the same format Onboarding's paste-fallback
+// step (and the CLI's identity.json) already use, so it round-trips there.
+async function exportIdentity(): Promise<Result<{ token: string }>> {
+  return guard(async () => {
+    const identity = await identityStore.load(loadConfig());
+    if (!identity) throw new Error('No identity to export');
+    return { token: `${identity.user_id}:${identity.secret_token}` };
+  });
+}
+
+async function quitApp(): Promise<Result<{ ok: true }>> {
+  return guard(async () => {
+    app.quit();
     return { ok: true as const };
   });
 }
@@ -242,4 +281,7 @@ export const apiService = {
   signOut,
   openExternal,
   checkForUpdate,
+  chooseFolder,
+  exportIdentity,
+  quitApp,
 } satisfies DesktopApi;

@@ -51,6 +51,9 @@ export const CHANNELS = {
   signOut: 'api:signOut',
   openExternal: 'api:openExternal',
   checkForUpdate: 'api:checkForUpdate',
+  chooseFolder: 'api:chooseFolder',
+  exportIdentity: 'api:exportIdentity',
+  quitApp: 'api:quitApp',
 } as const;
 
 export type ApiMethod = keyof typeof CHANNELS;
@@ -100,4 +103,9 @@ export type DesktopApi = {
   signOut(): Promise<Result<{ ok: true }>>;
   openExternal(url: string): Promise<Result<{ ok: true }>>;
   checkForUpdate(): Promise<Result<{ updateAvailable: boolean }>>;
+  // Native folder picker backing Settings' Advanced "Home folder" override.
+  chooseFolder(): Promise<Result<{ path: string | null }>>;
+  // "<user_id>:<secret_token>" pair for Settings' "Copy identity" action.
+  exportIdentity(): Promise<Result<{ token: string }>>;
+  quitApp(): Promise<Result<{ ok: true }>>;
 };

@@ -27,6 +27,9 @@ const api: DesktopApi = {
   signOut: () => ipcRenderer.invoke(CHANNELS.signOut),
   openExternal: (url) => ipcRenderer.invoke(CHANNELS.openExternal, url),
   checkForUpdate: () => ipcRenderer.invoke(CHANNELS.checkForUpdate),
+  chooseFolder: () => ipcRenderer.invoke(CHANNELS.chooseFolder),
+  exportIdentity: () => ipcRenderer.invoke(CHANNELS.exportIdentity),
+  quitApp: () => ipcRenderer.invoke(CHANNELS.quitApp),
 };
 
 contextBridge.exposeInMainWorld('api', api);

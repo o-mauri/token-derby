@@ -774,3 +774,187 @@ body {
   color: #ff8a80;
   border-color: rgba(255, 138, 128, 0.4);
 }
+
+/* ── Settings screen ───────────────────────────────────────────────── */
+
+.settings-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(245, 233, 211, 0.1);
+}
+
+.settings-section:last-child {
+  border-bottom: none;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.settings-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.6;
+}
+
+.settings-value {
+  font-size: 13px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-hint {
+  font-size: 11px;
+  opacity: 0.55;
+}
+
+.settings-inline-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-inline-form input {
+  flex: 1;
+  min-width: 0;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 6px;
+  padding: 6px 8px;
+  color: var(--td-cream);
+  font-size: 13px;
+  font-family: inherit;
+}
+
+.settings-small-button {
+  padding: 6px 12px;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.settings-signout-button {
+  color: #ff8a80;
+  border-color: rgba(255, 138, 128, 0.4);
+}
+
+.settings-toggle {
+  margin-left: auto;
+  width: 36px;
+  height: 20px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  padding: 2px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+}
+
+.settings-toggle:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.settings-toggle-knob {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--td-cream);
+  transition: transform 0.15s ease;
+}
+
+.settings-toggle-on {
+  background: var(--td-accent);
+  border-color: var(--td-accent);
+}
+
+.settings-toggle-on .settings-toggle-knob {
+  transform: translateX(16px);
+}
+
+.settings-advanced {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.settings-advanced-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: transparent;
+  border: none;
+  color: var(--td-cream);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.75;
+  padding: 0;
+  cursor: pointer;
+}
+
+.settings-advanced-toggle:hover {
+  opacity: 1;
+}
+
+.settings-advanced-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.settings-caption {
+  margin: 0;
+  font-size: 11px;
+  opacity: 0.55;
+  line-height: 1.4;
+}
+
+.settings-segmented {
+  display: flex;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  padding: 3px;
+}
+
+.settings-segment {
+  flex: 1;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--td-cream);
+  opacity: 0.6;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.settings-segment:hover {
+  opacity: 0.85;
+}
+
+.settings-segment-active {
+  opacity: 1;
+  background: rgba(245, 233, 211, 0.14);
+}
