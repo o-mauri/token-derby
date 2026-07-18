@@ -2,13 +2,14 @@ import { useEffect, useState } from 'react';
 import { api } from './api.js';
 import Race from './screens/Race.js';
 import Stable from './screens/Stable.js';
+import Org from './screens/Org.js';
 
 type Tab = 'race' | 'stable' | 'org' | 'settings';
 
 // Popover shell: header (identity + gear→settings) and the Race/Stable/Org
 // tab bar, all driven by local route state — this is a single fixed-size
-// BrowserWindow (see electron/windows.ts), never a real router. Tasks 9-11
-// fill in the Stable/Org/Settings tab content.
+// BrowserWindow (see electron/windows.ts), never a real router. Task 11
+// fills in the Settings tab content.
 export default function App() {
   const [tab, setTab] = useState<Tab>('race');
   const [displayName, setDisplayName] = useState<string | null>(null);
@@ -60,7 +61,7 @@ export default function App() {
       <main className="popover-body">
         {tab === 'race' && <Race />}
         {tab === 'stable' && <Stable />}
-        {tab === 'org' && <Placeholder label="Org" />}
+        {tab === 'org' && <Org />}
         {tab === 'settings' && <SettingsPlaceholder onBack={() => setTab('race')} />}
       </main>
     </div>

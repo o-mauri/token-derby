@@ -1,4 +1,4 @@
-import type { DesktopApi, Bootstrap, Result } from '../electron/ipc.js';
+import type { DesktopApi, Bootstrap, Result, WebSessionHandoff } from '../electron/ipc.js';
 import type { Config } from '../electron/config.js';
 import type {
   GetRaceResponse,
@@ -16,7 +16,6 @@ import type {
   RollHatResponse,
   EquipHatRequest,
   EquipHatResponse,
-  WebSessionCreateResponse,
 } from '@token-derby/shared';
 
 // preload.ts exposes this via contextBridge; this file is the renderer's
@@ -71,7 +70,7 @@ export const api = {
     window.api.getOrgLeaderboard(orgId).then(unwrap),
   joinOrganisation: (token: string): Promise<JoinOrganisationResponse> =>
     window.api.joinOrganisation(token).then(unwrap),
-  createWebSession: (): Promise<WebSessionCreateResponse> => window.api.createWebSession().then(unwrap),
+  createWebSession: (): Promise<WebSessionHandoff> => window.api.createWebSession().then(unwrap),
   getConfig: (): Promise<Config> => window.api.getConfig().then(unwrap),
   setConfig: (patch: Partial<Config>): Promise<Config> => window.api.setConfig(patch).then(unwrap),
   signOut: (): Promise<{ ok: true }> => window.api.signOut().then(unwrap),

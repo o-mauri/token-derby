@@ -177,8 +177,17 @@ async function joinOrganisation(token: string) {
   return guard(() => getApi().joinOrganisation({ join_token: token }));
 }
 
-async function createWebSession() {
-  return guard(() => getApi().createWebSession());
+// Mirrors cli/src/commands/web.ts's `webOrigin()` — the site is served from
+// the same origin as the API, minus the `/api` suffix.
+function webOrigin(): string {
+  return resolveApiBase(loadConfig()).replace(/\/api\/?$/, '');
+}
+
+async function createWebSession(): Promise<Result<{ url: string }>> {
+  return guard(async () => {
+    const { code } = await getApi().createWebSession();
+    return { url: `${webOrigin()}/org-manager#code=${code}` };
+  });
 }
 
 async function getConfig(): Promise<Result<Config>> {

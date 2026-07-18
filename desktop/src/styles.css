@@ -489,6 +489,101 @@ body {
   align-self: stretch;
 }
 
+/* ── Org tab ────────────────────────────────────────────────────────── */
+
+.org-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.org-name {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.org-select {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 6px;
+  padding: 8px 10px;
+  color: var(--td-cream);
+  font-size: 13px;
+  font-family: inherit;
+}
+
+.org-leaderboard {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.org-leaderboard-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.org-leaderboard-rank {
+  width: 18px;
+  text-align: center;
+  opacity: 0.6;
+  font-weight: 700;
+}
+
+.org-leaderboard-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.org-leaderboard-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 600;
+}
+
+.org-leaderboard-owner {
+  font-size: 10px;
+  opacity: 0.55;
+}
+
+.org-leaderboard-stats {
+  flex-shrink: 0;
+  font-weight: 700;
+  opacity: 0.9;
+  font-size: 11px;
+}
+
+.org-manager-button {
+  align-self: stretch;
+}
+
+.org-join-toggle {
+  align-self: center;
+}
+
+.org-join-form {
+  padding-top: 4px;
+}
+
+.org-join-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 /* ── Horse editor window ────────────────────────────────────────────── */
 
 .editor-window {

@@ -18,7 +18,6 @@ import type {
   RollHatResponse,
   EquipHatRequest,
   EquipHatResponse,
-  WebSessionCreateResponse,
 } from '@token-derby/shared';
 import type { Config } from './config.js';
 
@@ -65,6 +64,12 @@ export type Bootstrap = {
   appVersion: string;
 };
 
+// The server's WebSessionCreateResponse is just `{ code }` — main resolves
+// that one-time code against the current env's web origin (same
+// origin-stripping the CLI's `token-derby web` uses) so the renderer gets a
+// URL it can hand straight to openExternal.
+export type WebSessionHandoff = { url: string };
+
 // The full `window.api` surface. preload.ts implements this by wrapping each
 // method in `ipcRenderer.invoke`; services/api.ts implements the main-process
 // side, and `apiService satisfies DesktopApi` keeps the two from drifting.
@@ -89,7 +94,7 @@ export type DesktopApi = {
   listOrganisations(): Promise<Result<ListOrganisationsResponse>>;
   getOrgLeaderboard(orgId: string): Promise<Result<GetOrgLeaderboardResponse>>;
   joinOrganisation(token: string): Promise<Result<JoinOrganisationResponse>>;
-  createWebSession(): Promise<Result<WebSessionCreateResponse>>;
+  createWebSession(): Promise<Result<WebSessionHandoff>>;
   getConfig(): Promise<Result<Config>>;
   setConfig(patch: Partial<Config>): Promise<Result<Config>>;
   signOut(): Promise<Result<{ ok: true }>>;
