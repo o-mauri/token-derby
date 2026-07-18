@@ -1,4 +1,5 @@
 import type { DesktopApi, Bootstrap, Result, WebSessionHandoff } from '../electron/ipc.js';
+import type { UpdateCheckResult } from '../electron/updater.js';
 import type { Config } from '../electron/config.js';
 import type {
   GetRaceResponse,
@@ -75,7 +76,7 @@ export const api = {
   setConfig: (patch: Partial<Config>): Promise<Config> => window.api.setConfig(patch).then(unwrap),
   signOut: (): Promise<{ ok: true }> => window.api.signOut().then(unwrap),
   openExternal: (url: string): Promise<{ ok: true }> => window.api.openExternal(url).then(unwrap),
-  checkForUpdate: (): Promise<{ updateAvailable: boolean }> => window.api.checkForUpdate().then(unwrap),
+  checkForUpdate: (): Promise<UpdateCheckResult> => window.api.checkForUpdate().then(unwrap),
   chooseFolder: (): Promise<{ path: string | null }> => window.api.chooseFolder().then(unwrap),
   exportIdentity: (): Promise<{ token: string }> => window.api.exportIdentity().then(unwrap),
   quitApp: (): Promise<{ ok: true }> => window.api.quitApp().then(unwrap),

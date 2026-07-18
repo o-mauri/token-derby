@@ -8,6 +8,11 @@ build/
 # electron-builder output
 desktop/release/
 
+# electron-builder's buildResources dir holds source assets (app icon), not
+# generated output — exempt it from the blanket build/ ignore above.
+!desktop/build/
+!desktop/build/**
+
 # Shared workspace emits next to its sources rather than into dist/ — ignore the build artifacts.
 shared/src/**/*.js
 shared/src/**/*.d.ts

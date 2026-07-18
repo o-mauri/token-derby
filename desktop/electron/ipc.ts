@@ -20,6 +20,7 @@ import type {
   EquipHatResponse,
 } from '@token-derby/shared';
 import type { Config } from './config.js';
+import type { UpdateCheckResult } from './updater.js';
 
 export type Result<T> =
   | { ok: true; data: T }
@@ -102,7 +103,7 @@ export type DesktopApi = {
   setConfig(patch: Partial<Config>): Promise<Result<Config>>;
   signOut(): Promise<Result<{ ok: true }>>;
   openExternal(url: string): Promise<Result<{ ok: true }>>;
-  checkForUpdate(): Promise<Result<{ updateAvailable: boolean }>>;
+  checkForUpdate(): Promise<Result<UpdateCheckResult>>;
   // Native folder picker backing Settings' Advanced "Home folder" override.
   chooseFolder(): Promise<Result<{ path: string | null }>>;
   // "<user_id>:<secret_token>" pair for Settings' "Copy identity" action.

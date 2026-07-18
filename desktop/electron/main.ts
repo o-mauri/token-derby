@@ -1,4 +1,4 @@
-import { app, ipcMain, type BrowserWindow } from 'electron';
+import { app, ipcMain, shell, Notification, type BrowserWindow } from 'electron';
 import { createPopover, createAppWindow, positionPopoverUnderTray } from './windows.js';
 import { createTray } from './tray.js';
 import { CHANNELS, type DesktopApi, type Result } from './ipc.js';
@@ -64,7 +64,33 @@ app.whenReady().then(async () => {
   if (!identity) {
     onboardingWindow = createAppWindow('/onboarding');
   }
+
+  // Best-effort, non-blocking: a slow or unreachable feed should never delay
+  // startup, and Settings' "Check for updates" button covers the on-demand
+  // path regardless of how this turns out.
+  checkForUpdateOnLaunch();
 });
+
+async function checkForUpdateOnLaunch(): Promise<void> {
+  try {
+    const result = await apiService.checkForUpdate();
+    if (!result.ok || !result.data.update) return;
+    const { version, url } = result.data;
+    if (!Notification.isSupported()) return;
+    const notification = new Notification({
+      title: 'Token Derby update available',
+      body: `Version ${version} is ready to download.`,
+    });
+    notification.on('click', () => {
+      shell.openExternal(url).catch(() => {
+        // Non-fatal: the user can still open Settings and click through.
+      });
+    });
+    notification.show();
+  } catch {
+    // Non-fatal — see comment above.
+  }
+}
 
 app.on('window-all-closed', () => {
   // Menu-bar app: stay resident even with no windows open.

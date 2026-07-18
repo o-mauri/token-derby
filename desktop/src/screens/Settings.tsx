@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { Config, EnvName } from '../../electron/config.js';
+import type { UpdateCheckResult } from '../../electron/updater.js';
 import { api, DesktopApiError } from '../api.js';
 import { errorMessage } from '../lib/errors.js';
 
@@ -39,6 +40,7 @@ export default function Settings({
 
   const [checkingUpdate, setCheckingUpdate] = useState(false);
   const [updateMessage, setUpdateMessage] = useState<string | null>(null);
+  const [updateResult, setUpdateResult] = useState<UpdateCheckResult | null>(null);
 
   const [copyBusy, setCopyBusy] = useState(false);
   const [copyMessage, setCopyMessage] = useState<string | null>(null);
@@ -117,14 +119,23 @@ export default function Settings({
   async function handleCheckForUpdate() {
     setCheckingUpdate(true);
     setUpdateMessage(null);
+    setUpdateResult(null);
     try {
       const result = await api.checkForUpdate();
-      setUpdateMessage(result.updateAvailable ? 'A new version is available.' : "You're up to date.");
+      setUpdateResult(result);
+      if (!result.update) setUpdateMessage("You're up to date.");
     } catch (err) {
       setUpdateMessage(messageFor(err));
     } finally {
       setCheckingUpdate(false);
     }
+  }
+
+  function handleDownloadUpdate() {
+    if (!updateResult?.update) return;
+    api.openExternal(updateResult.url).catch(() => {
+      // Non-fatal: the button stays put and the user can click it again.
+    });
   }
 
   async function handleCopyIdentity() {
@@ -303,6 +314,18 @@ export default function Settings({
           </button>
           {updateMessage && <span className="settings-hint">{updateMessage}</span>}
         </div>
+        {updateResult?.update && (
+          <div className="settings-update-available">
+            <button
+              type="button"
+              className="onboarding-button-secondary settings-small-button"
+              onClick={handleDownloadUpdate}
+            >
+              Download v{updateResult.version}
+            </button>
+            {updateResult.notes && <p className="settings-caption">{updateResult.notes}</p>}
+          </div>
+        )}
       </section>
 
       <section className="settings-section">

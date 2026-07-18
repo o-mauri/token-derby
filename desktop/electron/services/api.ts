@@ -9,6 +9,7 @@ import type { DesktopApi, Bootstrap, Result } from '../ipc.js';
 import { loadConfig, saveConfig, resolveApiBase, type Config } from '../config.js';
 import * as identityStore from '../identity.js';
 import { createAppWindow } from '../windows.js';
+import { checkForUpdate as runUpdateCheck, type UpdateCheckResult } from '../updater.js';
 
 // Resolved lazily (Electron's `app` isn't available until the app is ready,
 // and doesn't exist at all under vitest) and cached for the process lifetime.
@@ -251,10 +252,8 @@ async function quitApp(): Promise<Result<{ ok: true }>> {
   });
 }
 
-// Real update-checking lands with distribution (Task 12) — stubbed so the
-// window.api surface is stable for the renderer to build against now.
-async function checkForUpdate(): Promise<Result<{ updateAvailable: boolean }>> {
-  return guard(async () => ({ updateAvailable: false }));
+async function checkForUpdate(): Promise<Result<UpdateCheckResult>> {
+  return guard(() => runUpdateCheck(getClientVersion()));
 }
 
 export const apiService = {

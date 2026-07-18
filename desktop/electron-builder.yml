@@ -1,13 +1,18 @@
-appId: com.tokenderby.desktop
+appId: co.uk.mauricode.token-derby
 productName: Token Derby
+# Pinned to match the installed devDependency exactly — electron-builder's
+# version-detection can't resolve devDependencies.electron's "^33.0.0" range
+# under npm workspaces (electron lives in the hoisted root node_modules, not
+# desktop/node_modules), so it needs an explicit, exact version here instead.
+electronVersion: 33.4.11
 directories:
   output: release
+  buildResources: build
 files:
-  - dist/**/*
-  - dist-electron/**/*
-  - package.json
+  - dist/**
+  - dist-electron/**
 mac:
-  category: public.app-category.utilities
-  target:
-    - dmg
-  icon: electron/assets/trayTemplate.png
+  target: dmg
+  category: public.app-category.games
+  icon: build/icon.icns
+  identity: null
