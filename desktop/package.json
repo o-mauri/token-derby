@@ -2,12 +2,11 @@
   "name": "@token-derby/desktop",
   "version": "0.1.0",
   "private": true,
-  "type": "module",
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite",
     "build:renderer": "vite build",
-    "build:main": "rm -rf dist-electron && tsc -p tsconfig.node.json && node scripts/mark-commonjs.mjs",
+    "build:main": "rm -rf dist-electron && tsc -p tsconfig.node.json && node scripts/copy-assets.mjs",
     "build": "npm run build:renderer && npm run build:main",
     "dist": "npm run build && electron-builder --mac --config electron-builder.yml",
     "test": "vitest run --passWithNoTests",
