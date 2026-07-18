@@ -420,3 +420,262 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
+
+/* ── Stable tab ─────────────────────────────────────────────────────── */
+
+.stable-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.stable-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.stable-card-button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: var(--td-cream);
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.stable-card-button:hover {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.stable-card-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.stable-card-name {
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stable-card-stats {
+  font-size: 11px;
+  opacity: 0.6;
+}
+
+.stable-card-edit {
+  flex-shrink: 0;
+  font-size: 11px;
+  opacity: 0.5;
+}
+
+.stable-new-button {
+  align-self: stretch;
+}
+
+/* ── Horse editor window ────────────────────────────────────────────── */
+
+.editor-window {
+  height: 100%;
+  display: flex;
+  background: var(--td-dark);
+  font-family: var(--td-mono);
+}
+
+.editor-empty {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 24px;
+}
+
+.editor-preview {
+  width: 220px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 28px 16px;
+  border-right: 1px solid rgba(245, 233, 211, 0.12);
+}
+
+.editor-preview-stats {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+}
+
+.editor-preview-name {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.editor-preview-stat {
+  font-size: 12px;
+  opacity: 0.65;
+}
+
+.editor-form {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px 28px;
+  overflow-y: auto;
+}
+
+.editor-name-field {
+  max-width: 320px;
+}
+
+.editor-slots {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.editor-slot {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.editor-slot-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.editor-slot-label {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.7;
+}
+
+.editor-slot-arrows {
+  display: flex;
+  gap: 4px;
+}
+
+.editor-arrow {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 4px;
+  color: var(--td-cream);
+  width: 22px;
+  height: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.editor-arrow:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.editor-swatch-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.editor-swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  border: 2px solid transparent;
+  padding: 0;
+  cursor: pointer;
+}
+
+.editor-swatch-selected {
+  border-color: var(--td-cream);
+}
+
+.editor-hats {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.editor-hats-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.editor-roll-button {
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+.editor-hat-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.editor-hat-tile {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 6px;
+  color: var(--td-cream);
+  font-family: inherit;
+  font-size: 11px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.editor-hat-tile:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.editor-hat-tile-selected {
+  border-color: var(--td-accent);
+  background: rgba(224, 86, 63, 0.18);
+}
+
+.editor-hat-tile-locked {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.editor-message {
+  margin: 0;
+  font-size: 12px;
+  color: #9be89b;
+}
+
+.editor-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: auto;
+  padding-top: 8px;
+}
+
+.editor-delete-button {
+  color: #ff8a80;
+  border-color: rgba(255, 138, 128, 0.4);
+}

@@ -16,6 +16,7 @@ const api: DesktopApi = {
   deleteStableHorse: (id) => ipcRenderer.invoke(CHANNELS.deleteStableHorse, id),
   rollHat: (id) => ipcRenderer.invoke(CHANNELS.rollHat, id),
   equipHat: (id, req) => ipcRenderer.invoke(CHANNELS.equipHat, id, req),
+  openHorseEditor: (id) => ipcRenderer.invoke(CHANNELS.openHorseEditor, id),
   getRace: (joinCode) => ipcRenderer.invoke(CHANNELS.getRace, joinCode),
   listOrganisations: () => ipcRenderer.invoke(CHANNELS.listOrganisations),
   getOrgLeaderboard: (orgId) => ipcRenderer.invoke(CHANNELS.getOrgLeaderboard, orgId),

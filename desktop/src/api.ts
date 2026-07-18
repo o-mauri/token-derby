@@ -64,6 +64,7 @@ export const api = {
   rollHat: (id: string): Promise<RollHatResponse> => window.api.rollHat(id).then(unwrap),
   equipHat: (id: string, req: EquipHatRequest): Promise<EquipHatResponse> =>
     window.api.equipHat(id, req).then(unwrap),
+  openHorseEditor: (id: string): Promise<{ ok: true }> => window.api.openHorseEditor(id).then(unwrap),
   getRace: (joinCode: string): Promise<GetRaceResponse> => window.api.getRace(joinCode).then(unwrap),
   listOrganisations: (): Promise<ListOrganisationsResponse> => window.api.listOrganisations().then(unwrap),
   getOrgLeaderboard: (orgId: string): Promise<GetOrgLeaderboardResponse> =>

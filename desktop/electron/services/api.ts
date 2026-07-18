@@ -1,4 +1,4 @@
-import { app, shell } from 'electron';
+import { app, shell, type BrowserWindow } from 'electron';
 import { createTransport, createEndpoints, ApiError } from '@token-derby/client';
 import type {
   CreateStableHorseRequest,
@@ -8,6 +8,7 @@ import type {
 import type { DesktopApi, Bootstrap, Result } from '../ipc.js';
 import { loadConfig, saveConfig, resolveApiBase, type Config } from '../config.js';
 import * as identityStore from '../identity.js';
+import { createAppWindow } from '../windows.js';
 
 // Resolved lazily (Electron's `app` isn't available until the app is ready,
 // and doesn't exist at all under vitest) and cached for the process lifetime.
@@ -142,6 +143,24 @@ async function equipHat(id: string, req: EquipHatRequest) {
   return guard(() => getApi().equipHat(id, req));
 }
 
+// One editor BrowserWindow per stable horse — a second click on an
+// already-open horse focuses it instead of stacking duplicate windows.
+const editorWindows = new Map<string, BrowserWindow>();
+
+async function openHorseEditor(stableHorseId: string): Promise<Result<{ ok: true }>> {
+  return guard(async () => {
+    const existing = editorWindows.get(stableHorseId);
+    if (existing && !existing.isDestroyed()) {
+      existing.focus();
+      return { ok: true as const };
+    }
+    const win = createAppWindow(`/horse/${encodeURIComponent(stableHorseId)}`);
+    editorWindows.set(stableHorseId, win);
+    win.on('closed', () => editorWindows.delete(stableHorseId));
+    return { ok: true as const };
+  });
+}
+
 async function getRace(joinCode: string) {
   return guard(() => getApi().getRace(joinCode));
 }
@@ -203,6 +222,7 @@ export const apiService = {
   deleteStableHorse,
   rollHat,
   equipHat,
+  openHorseEditor,
   getRace,
   listOrganisations,
   getOrgLeaderboard,

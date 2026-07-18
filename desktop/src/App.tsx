@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from './api.js';
 import Race from './screens/Race.js';
+import Stable from './screens/Stable.js';
 
 type Tab = 'race' | 'stable' | 'org' | 'settings';
 
@@ -58,7 +59,7 @@ export default function App() {
 
       <main className="popover-body">
         {tab === 'race' && <Race />}
-        {tab === 'stable' && <Placeholder label="Stable" />}
+        {tab === 'stable' && <Stable />}
         {tab === 'org' && <Placeholder label="Org" />}
         {tab === 'settings' && <SettingsPlaceholder onBack={() => setTab('race')} />}
       </main>

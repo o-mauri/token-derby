@@ -41,6 +41,7 @@ export const CHANNELS = {
   deleteStableHorse: 'api:deleteStableHorse',
   rollHat: 'api:rollHat',
   equipHat: 'api:equipHat',
+  openHorseEditor: 'api:openHorseEditor',
   getRace: 'api:getRace',
   listOrganisations: 'api:listOrganisations',
   getOrgLeaderboard: 'api:getOrgLeaderboard',
@@ -80,6 +81,10 @@ export type DesktopApi = {
   deleteStableHorse(id: string): Promise<Result<DeleteStableHorseResponse>>;
   rollHat(id: string): Promise<Result<RollHatResponse>>;
   equipHat(id: string, req: EquipHatRequest): Promise<Result<EquipHatResponse>>;
+  // Opens (or focuses an already-open) horse editor BrowserWindow for this
+  // stable horse. Lives in the api service so main.ts's generic CHANNELS
+  // wiring picks it up for free, same as every other window.api method.
+  openHorseEditor(stableHorseId: string): Promise<Result<{ ok: true }>>;
   getRace(joinCode: string): Promise<Result<GetRaceResponse>>;
   listOrganisations(): Promise<Result<ListOrganisationsResponse>>;
   getOrgLeaderboard(orgId: string): Promise<Result<GetOrgLeaderboardResponse>>;

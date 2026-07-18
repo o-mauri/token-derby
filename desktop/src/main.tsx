@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import Onboarding from './windows/Onboarding';
+import HorseEditor from './windows/HorseEditor';
 import './styles.css';
 
 // Each BrowserWindow loads a fixed hash route (see electron/windows.ts
@@ -10,6 +11,8 @@ import './styles.css';
 function Root() {
   const route = window.location.hash.replace(/^#/, '') || '/';
   if (route === '/onboarding') return <Onboarding />;
+  const horseMatch = route.match(/^\/horse\/(.+)$/);
+  if (horseMatch) return <HorseEditor stableHorseId={decodeURIComponent(horseMatch[1]!)} />;
   return <App />;
 }
 
