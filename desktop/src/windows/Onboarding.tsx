@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { api } from '../api.js';
+import { api, DesktopApiError } from '../api.js';
+import { errorMessage } from '../lib/errors.js';
 import { validateDisplayName, buildPasteToken } from './onboarding-logic.js';
 
 // First-run onboarding: create a new jockey, or import an identity the CLI
@@ -20,9 +21,10 @@ export default function Onboarding() {
   const [secretToken, setSecretToken] = useState('');
 
   useEffect(() => {
-    api.getBootstrap().then((result) => {
-      if (result.ok) setEnv(result.data.config.env);
-    });
+    api.getBootstrap().then(
+      (bootstrap) => setEnv(bootstrap.config.env),
+      () => {},
+    );
   }, []);
 
   async function handleCreateJockey(e: React.FormEvent) {
@@ -34,25 +36,27 @@ export default function Onboarding() {
     }
     setBusy(true);
     setError(null);
-    const result = await api.initJockey(validated.name);
-    setBusy(false);
-    if (result.ok) {
+    try {
+      await api.initJockey(validated.name);
       setStep('success');
-    } else {
-      setError(result.message);
+    } catch (err) {
+      setError(err instanceof DesktopApiError ? errorMessage(err.code) : errorMessage('UNKNOWN'));
+    } finally {
+      setBusy(false);
     }
   }
 
   async function handleImportFromCli() {
     setBusy(true);
     setError(null);
-    const result = await api.importCliIdentity();
-    setBusy(false);
-    if (result.ok) {
+    try {
+      await api.importCliIdentity();
       setStep('success');
-    } else {
+    } catch {
       setError(null);
       setStep('paste-fallback');
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -64,12 +68,13 @@ export default function Onboarding() {
     }
     setBusy(true);
     setError(null);
-    const result = await api.pasteIdentity(buildPasteToken(userId, secretToken));
-    setBusy(false);
-    if (result.ok) {
+    try {
+      await api.pasteIdentity(buildPasteToken(userId, secretToken));
       setStep('success');
-    } else {
-      setError(result.message);
+    } catch (err) {
+      setError(err instanceof DesktopApiError ? errorMessage(err.code) : errorMessage('UNKNOWN'));
+    } finally {
+      setBusy(false);
     }
   }
 
