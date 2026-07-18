@@ -23,6 +23,7 @@ describe('createTransport', () => {
     expect(cap.headers['x-user-id']).toBe('u1');
     expect(cap.headers['x-user-token']).toBe('s1');
     expect(cap.headers['x-cli-version']).toBeUndefined();
+    expect(cap.headers['user-agent']).toBe('token-derby-desktop/0.1.0');
   });
 
   it('sends x-cli-version (no x-client) when client is cli', async () => {
@@ -34,6 +35,7 @@ describe('createTransport', () => {
     await t.request('GET', '/races/ABC', undefined, undefined);
     expect(cap.headers['x-cli-version']).toBe('2.12.2');
     expect(cap.headers['x-client']).toBeUndefined();
+    expect(cap.headers['user-agent']).toBe('token-derby/2.12.2');
   });
 
   it('resolves baseUrl when given as a function', async () => {

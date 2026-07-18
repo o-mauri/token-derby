@@ -46,10 +46,11 @@ export function createTransport(config: ClientConfig): Transport {
       if (config.client === 'desktop') {
         headers[CLIENT_HEADER] = 'desktop';
         headers[CLIENT_VERSION_HEADER] = config.clientVersion;
+        headers['user-agent'] = `token-derby-desktop/${config.clientVersion}`;
       } else {
         headers[CLI_VERSION_HEADER] = config.clientVersion;
+        headers['user-agent'] = `token-derby/${config.clientVersion}`;
       }
-      headers['user-agent'] = `token-derby-${config.client}/${config.clientVersion}`;
 
       const identity = await config.getIdentity();
       if (identity) {
