@@ -3,8 +3,15 @@ import { ORG_NAME_PATTERN } from '@token-derby/shared';
 import { getOrganisationByName } from '../db/organisations.js';
 import { buildOrgLeaderboard } from '../lib/org-leaderboard.js';
 import { ok, err } from '../lib/http.js';
+import { readClient, readClientVersion, meetsMinimumVersion, versionMismatchMessage } from '../lib/version.js';
 
 export const handler: APIGatewayProxyHandlerV2 = async (event) => {
+  const client = readClient(event);
+  const version = readClientVersion(event);
+  if (version && !meetsMinimumVersion(client, version)) {
+    return err('VERSION_MISMATCH', versionMismatchMessage());
+  }
+
   const raw = event.pathParameters?.org_name;
   if (!raw) return err('BAD_REQUEST', 'org_name path parameter required');
   const org_name = decodeURIComponent(raw);

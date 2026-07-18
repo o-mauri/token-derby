@@ -5,17 +5,18 @@ import { generateUserId, generateSecretToken } from '../lib/codes.js';
 import { hashSecretToken } from '../lib/auth.js';
 import { putUser } from '../db/users.js';
 import { ok, err, parseJson } from '../lib/http.js';
-import { readCliVersion, meetsMinimumCliVersion, versionMismatchMessage } from '../lib/version.js';
+import { readClient, readClientVersion, meetsMinimumVersion, versionMismatchMessage } from '../lib/version.js';
 
 export const handler: APIGatewayProxyHandlerV2 = async (event) => {
-  const cli_version = readCliVersion(event);
-  if (!cli_version) {
+  const client = readClient(event);
+  const version = readClientVersion(event);
+  if (!version) {
     return err('BAD_REQUEST', 'X-Cli-Version header required — upgrade your CLI');
   }
-  if (!parseSemver(cli_version)) {
-    return err('BAD_REQUEST', `X-Cli-Version must be MAJOR.MINOR.PATCH (got "${cli_version}")`);
+  if (!parseSemver(version)) {
+    return err('BAD_REQUEST', `X-Cli-Version must be MAJOR.MINOR.PATCH (got "${version}")`);
   }
-  if (!meetsMinimumCliVersion(cli_version)) {
+  if (!meetsMinimumVersion(client, version)) {
     return err('VERSION_MISMATCH', versionMismatchMessage());
   }
 

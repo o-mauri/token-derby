@@ -4,7 +4,7 @@ import { handler as joinOrg } from '../../src/handlers/join-organisation.js';
 import { handler as listOrgs } from '../../src/handlers/list-organisations.js';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { makeUser, type TestUser } from '../helpers/auth-helper.js';
-import { CURRENT_CLI_VERSION } from '../helpers/cli-version.js';
+import { CURRENT_CLI_VERSION, desktopHeaders, OUTDATED_DESKTOP_VERSION } from '../helpers/cli-version.js';
 
 function postEvent(path: string, body: unknown, user: TestUser): APIGatewayProxyEventV2 {
   return {
@@ -75,5 +75,28 @@ describe('listOrganisations handler', () => {
     const res: any = await listOrgs(getEvent(bob));
     const list = JSON.parse(res.body).organisations as Array<{ org_id: string }>;
     expect(list.map(o => o.org_id)).toContain(body.org_id);
+  });
+
+  it('accepts a desktop client at or above the desktop minimum', async () => {
+    const alice = await makeUser('ListDesk_Alice');
+    const res: any = await listOrgs({
+      ...getEvent(alice),
+      headers: { ...desktopHeaders(), 'x-user-id': alice.user_id, 'x-user-token': alice.secret_token },
+    });
+    expect(res.statusCode).toBe(200);
+  });
+
+  it('rejects a desktop client below the desktop minimum', async () => {
+    const alice = await makeUser('ListDesk_Old');
+    const res: any = await listOrgs({
+      ...getEvent(alice),
+      headers: {
+        ...desktopHeaders(OUTDATED_DESKTOP_VERSION),
+        'x-user-id': alice.user_id,
+        'x-user-token': alice.secret_token,
+      },
+    });
+    expect(res.statusCode).toBe(426);
+    expect(JSON.parse(res.body).code).toBe('VERSION_MISMATCH');
   });
 });

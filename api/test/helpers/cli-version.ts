@@ -15,3 +15,19 @@ export const MISMATCHED_MINOR_CLI_VERSION = `${maj}.${min + 1}.0`;
 
 /** Far below any supported minimum — rejected by the version gate. */
 export const OUTDATED_CLI_VERSION = '1.5.0';
+
+/** A valid, current desktop-app version — at or above the API's desktop minimum. */
+export const CURRENT_DESKTOP_VERSION = '0.1.0';
+
+/** Far below the desktop minimum — rejected by the version gate. */
+export const OUTDATED_DESKTOP_VERSION = '0.0.1';
+
+/** Builds the `x-cli-version` header pair used by the default (CLI) client. */
+export function cliHeaders(version: string = CURRENT_CLI_VERSION): Record<string, string> {
+  return { 'x-cli-version': version };
+}
+
+/** Builds the `x-client` + `x-client-version` header pair for the desktop client. */
+export function desktopHeaders(version: string = CURRENT_DESKTOP_VERSION): Record<string, string> {
+  return { 'x-client': 'desktop', 'x-client-version': version };
+}
