@@ -171,6 +171,133 @@ body {
   display: block;
 }
 
+.race-join {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 24px;
+}
+
+.race-join-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.race-join-field input {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 6px;
+  padding: 8px 10px;
+  color: var(--td-cream);
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.race-join-field input:focus {
+  outline: none;
+  border-color: var(--td-cream);
+}
+
+.race-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding-top: 40px;
+  text-align: center;
+}
+
+.race-empty-message {
+  margin: 0;
+  font-size: 13px;
+  opacity: 0.75;
+}
+
+.race-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.race-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.race-panel-name {
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.race-live-indicator {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--td-accent);
+  border: 1px solid var(--td-accent);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+.race-standings {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.race-standing-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.race-standing-leader {
+  background: rgba(224, 86, 63, 0.14);
+}
+
+.race-standing-you {
+  outline: 1px solid rgba(245, 233, 211, 0.35);
+}
+
+.race-standing-rank {
+  width: 18px;
+  text-align: center;
+  opacity: 0.6;
+  font-weight: 700;
+}
+
+.race-standing-name {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.race-standing-tokens {
+  font-weight: 700;
+  opacity: 0.9;
+}
+
+.race-change-code {
+  align-self: center;
+  margin-top: 4px;
+}
+
 .onboarding {
   height: 100%;
   display: flex;
