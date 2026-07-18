@@ -1,0 +1,13 @@
+appId: com.tokenderby.desktop
+productName: Token Derby
+directories:
+  output: release
+files:
+  - dist/**/*
+  - dist-electron/**/*
+  - package.json
+mac:
+  category: public.app-category.utilities
+  target:
+    - dmg
+  icon: electron/assets/trayTemplate.png

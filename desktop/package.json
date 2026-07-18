@@ -1,0 +1,25 @@
+{
+  "name": "@token-derby/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "dev": "vite",
+    "build:renderer": "vite build",
+    "build:main": "rm -rf dist-electron && tsc -p tsconfig.node.json && node scripts/mark-commonjs.mjs",
+    "build": "npm run build:renderer && npm run build:main",
+    "dist": "npm run build && electron-builder --mac --config electron-builder.yml",
+    "test": "vitest run --passWithNoTests",
+    "start": "electron ."
+  },
+  "dependencies": { "@token-derby/client": "*", "@token-derby/shared": "*" },
+  "devDependencies": {
+    "electron": "^33.0.0", "electron-builder": "^25.1.8",
+    "vite": "^5.4.0", "vite-plugin-electron": "^0.28.8",
+    "react": "^18.3.1", "react-dom": "^18.3.1",
+    "@types/react": "^18.3.0", "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.0",
+    "typescript": "^5.6.0", "vitest": "^2.1.9"
+  }
+}

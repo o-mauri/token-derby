@@ -1,8 +1,12 @@
 # Dependencies & build output
 node_modules/
 dist/
+dist-electron/
 build/
 *.tsbuildinfo
+
+# electron-builder output
+desktop/release/
 
 # Shared workspace emits next to its sources rather than into dist/ — ignore the build artifacts.
 shared/src/**/*.js
