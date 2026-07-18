@@ -5,6 +5,7 @@ import { api, DesktopApiError } from '../api.js';
 import { errorMessage } from '../lib/errors.js';
 import { SLOTS, PALETTES, nextColor, prevColor, defaultColors, type Slot } from '../lib/palette.js';
 import HorseSprite from '../sprites/HorseSprite.js';
+import { mergeRollRefresh } from './horse-editor-logic.js';
 
 type HatChoice = number | null; // null = unequipped; number = index into horse.hats[]
 
@@ -106,13 +107,22 @@ export default function HorseEditor({ stableHorseId }: { stableHorseId: string }
   }
 
   async function handleRoll() {
+    if (!horse) return;
     setRolling(true);
     setActionError(null);
     setMessage(null);
     try {
       const result: RollHatResponse = await api.rollHat(stableHorseId);
       setMessage(describeRoll(result));
-      load();
+      // Refresh hats/xp/equipped state from the server, but never clobber
+      // the user's in-progress name/colour edits (see horse-editor-logic.ts).
+      const res = await api.listStable();
+      const fresh = res.horses.find((h) => h.stable_horse_id === stableHorseId);
+      if (fresh) {
+        const merged = mergeRollRefresh({ name, colors, horse, hatChoice }, fresh);
+        setHorse(merged.horse);
+        setHatChoice(merged.hatChoice);
+      }
     } catch (err) {
       setActionError(err instanceof DesktopApiError ? errorMessage(err.code) : errorMessage('UNKNOWN'));
     } finally {
