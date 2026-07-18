@@ -32,3 +32,126 @@ body {
   font-weight: 600;
   letter-spacing: 0.01em;
 }
+
+.onboarding {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 32px;
+  background: var(--td-dark);
+  text-align: center;
+}
+
+.onboarding-logo {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.onboarding-logo-pixel {
+  width: 14px;
+  height: 14px;
+  background: var(--td-cream);
+  image-rendering: pixelated;
+}
+
+.onboarding-logo-pixel:nth-child(2) {
+  background: #e0563f;
+  transform: translateY(-6px);
+}
+
+.onboarding-title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.onboarding-tagline {
+  margin: 0 0 16px;
+  opacity: 0.7;
+  font-size: 13px;
+}
+
+.onboarding-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  max-width: 320px;
+}
+
+.onboarding-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  text-align: left;
+}
+
+.onboarding-field input {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 6px;
+  padding: 8px 10px;
+  color: var(--td-cream);
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.onboarding-field input:focus {
+  outline: none;
+  border-color: var(--td-cream);
+}
+
+.onboarding-button {
+  border: none;
+  border-radius: 6px;
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--td-cream);
+  color: var(--td-dark);
+}
+
+.onboarding-button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.onboarding-button-secondary {
+  background: transparent;
+  color: var(--td-cream);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+}
+
+.onboarding-button-link {
+  background: transparent;
+  color: var(--td-cream);
+  opacity: 0.7;
+  padding: 4px;
+}
+
+.onboarding-error {
+  margin: 0;
+  color: #ff8a80;
+  font-size: 13px;
+}
+
+.onboarding-hint {
+  margin: 0 0 4px;
+  font-size: 13px;
+  opacity: 0.8;
+}
+
+.onboarding-env {
+  margin-top: 24px;
+  font-size: 11px;
+  opacity: 0.5;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}

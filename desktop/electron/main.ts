@@ -1,8 +1,10 @@
-import { app, ipcMain } from 'electron';
-import { createPopover, positionPopoverUnderTray } from './windows.js';
+import { app, ipcMain, type BrowserWindow } from 'electron';
+import { createPopover, createAppWindow, positionPopoverUnderTray } from './windows.js';
 import { createTray } from './tray.js';
-import { CHANNELS, type DesktopApi } from './ipc.js';
+import { CHANNELS, type DesktopApi, type Result } from './ipc.js';
 import { apiService } from './services/api.js';
+import { loadConfig } from './config.js';
+import * as identityStore from './identity.js';
 
 // Menu-bar app: no dock icon, and the app stays resident when all windows close.
 app.dock?.hide();
@@ -11,12 +13,18 @@ app.dock?.hide();
 // apiService method already returns a never-throwing Result, so handlers
 // need no try/catch of their own.
 const handlers = apiService as unknown as Record<keyof DesktopApi, (...args: unknown[]) => Promise<unknown>>;
-for (const method of Object.keys(CHANNELS) as (keyof typeof CHANNELS)[]) {
-  ipcMain.handle(CHANNELS[method], (_event, ...args) => handlers[method](...args));
-}
 
-app.whenReady().then(() => {
+// Once one of these succeeds during onboarding, an identity now exists —
+// close the onboarding window and reveal the popover.
+const IDENTITY_CHANNELS: Set<string> = new Set([
+  CHANNELS.initJockey,
+  CHANNELS.importCliIdentity,
+  CHANNELS.pasteIdentity,
+]);
+
+app.whenReady().then(async () => {
   const popover = createPopover();
+  let onboardingWindow: BrowserWindow | null = null;
 
   const tray = createTray(() => {
     if (popover.isVisible()) {
@@ -27,6 +35,26 @@ app.whenReady().then(() => {
     popover.show();
     popover.focus();
   });
+
+  for (const method of Object.keys(CHANNELS) as (keyof typeof CHANNELS)[]) {
+    const channel = CHANNELS[method];
+    ipcMain.handle(channel, async (_event, ...args) => {
+      const result = (await handlers[method](...args)) as Result<unknown>;
+      if (IDENTITY_CHANNELS.has(channel) && onboardingWindow && result.ok) {
+        onboardingWindow.close();
+        onboardingWindow = null;
+        positionPopoverUnderTray(popover, tray.getBounds());
+        popover.show();
+        popover.focus();
+      }
+      return result;
+    });
+  }
+
+  const identity = await identityStore.load(loadConfig());
+  if (!identity) {
+    onboardingWindow = createAppWindow('/onboarding');
+  }
 });
 
 app.on('window-all-closed', () => {
