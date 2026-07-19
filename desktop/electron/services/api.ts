@@ -170,8 +170,8 @@ async function listOrganisations() {
   return guard(() => getApi().listOrganisations());
 }
 
-async function getOrgLeaderboard(orgId: string) {
-  return guard(() => getApi().getOrgLeaderboard(orgId));
+async function getOrgLeaderboard(orgName: string) {
+  return guard(() => getApi().getOrgLeaderboard(orgName));
 }
 
 async function joinOrganisation(token: string) {

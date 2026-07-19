@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import type { OrganisationSummary } from '@token-derby/shared';
 import { api, DesktopApiError } from '../api.js';
 import { errorMessage } from '../lib/errors.js';
-import { mapLeaderboard, type LeaderboardRow } from './org-leaderboard.js';
+import { mapLeaderboard, resolveOrgName, type LeaderboardRow } from './org-leaderboard.js';
 
 function messageFor(err: unknown): string {
   return errorMessage(err instanceof DesktopApiError ? err.code : 'UNKNOWN');
@@ -45,21 +45,24 @@ export default function Org() {
   }, []);
 
   useEffect(() => {
-    if (!selectedOrgId) {
+    // getOrgLeaderboard is keyed by org NAME, not org_id — resolve it here
+    // rather than passing the id straight through (see resolveOrgName).
+    const name = orgs ? resolveOrgName(orgs, selectedOrgId) : null;
+    if (!name) {
       setLeaderboard(null);
       setOrgName(null);
       return;
     }
     setLeaderboard(null);
     setLeaderboardError(null);
-    api.getOrgLeaderboard(selectedOrgId).then(
+    api.getOrgLeaderboard(name).then(
       (res) => {
         setOrgName(res.org_name);
         setLeaderboard(mapLeaderboard(res));
       },
       (err) => setLeaderboardError(messageFor(err)),
     );
-  }, [selectedOrgId]);
+  }, [orgs, selectedOrgId]);
 
   async function handleJoin(e: React.FormEvent) {
     e.preventDefault();

@@ -96,7 +96,7 @@ export type DesktopApi = {
   openHorseEditor(stableHorseId: string): Promise<Result<{ ok: true }>>;
   getRace(joinCode: string): Promise<Result<GetRaceResponse>>;
   listOrganisations(): Promise<Result<ListOrganisationsResponse>>;
-  getOrgLeaderboard(orgId: string): Promise<Result<GetOrgLeaderboardResponse>>;
+  getOrgLeaderboard(orgName: string): Promise<Result<GetOrgLeaderboardResponse>>;
   joinOrganisation(token: string): Promise<Result<JoinOrganisationResponse>>;
   createWebSession(): Promise<Result<WebSessionHandoff>>;
   getConfig(): Promise<Result<Config>>;

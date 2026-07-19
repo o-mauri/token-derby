@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { mapLeaderboard } from '../src/screens/org-leaderboard.js';
-import type { GetOrgLeaderboardResponse, LeaderboardEntry } from '@token-derby/shared';
+import { mapLeaderboard, resolveOrgName } from '../src/screens/org-leaderboard.js';
+import { ORG_NAME_PATTERN } from '@token-derby/shared';
+import type { GetOrgLeaderboardResponse, LeaderboardEntry, OrganisationSummary } from '@token-derby/shared';
 
 function fakeEntry(overrides: Partial<LeaderboardEntry> & { name: string; owner_name: string; xp: number }): LeaderboardEntry {
   return {
@@ -54,5 +55,39 @@ describe('mapLeaderboard', () => {
 
   it('returns an empty list for an org with no leaderboard entries', () => {
     expect(mapLeaderboard(fakeResp([]))).toEqual([]);
+  });
+});
+
+// getOrgLeaderboard is called with an org NAME (the server resolves the path
+// param via getOrganisationByName and rejects anything failing
+// ORG_NAME_PATTERN — a randomUUID org_id always fails that pattern). These
+// tests pin down that resolveOrgName picks org_name, not org_id, using a
+// summary where the two are deliberately different shapes so a swap would
+// be caught even by an == comparison mistake.
+describe('resolveOrgName', () => {
+  const orgs: OrganisationSummary[] = [
+    { org_id: '3f2504e0-4f89-41d3-9a0c-0305e82c3301', org_name: 'DerbyClub' },
+    { org_id: '9c858901-8a57-4791-81fe-4c455b099bc9', org_name: 'StableMates' },
+  ];
+
+  it('resolves the org_name for the matching org_id, not the id itself', () => {
+    const result = resolveOrgName(orgs, '3f2504e0-4f89-41d3-9a0c-0305e82c3301');
+    expect(result).toBe('DerbyClub');
+  });
+
+  it('resolves a value that satisfies the server\'s ORG_NAME_PATTERN', () => {
+    const result = resolveOrgName(orgs, '9c858901-8a57-4791-81fe-4c455b099bc9');
+    expect(result).not.toBeNull();
+    expect(ORG_NAME_PATTERN.test(result!)).toBe(true);
+    // The id itself would never pass — this is exactly the bug being guarded against.
+    expect(ORG_NAME_PATTERN.test('9c858901-8a57-4791-81fe-4c455b099bc9')).toBe(false);
+  });
+
+  it('returns null when orgId is null', () => {
+    expect(resolveOrgName(orgs, null)).toBeNull();
+  });
+
+  it('returns null when no org matches the given id', () => {
+    expect(resolveOrgName(orgs, 'no-such-id')).toBeNull();
   });
 });

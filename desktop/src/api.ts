@@ -67,8 +67,8 @@ export const api = {
   openHorseEditor: (id: string): Promise<{ ok: true }> => window.api.openHorseEditor(id).then(unwrap),
   getRace: (joinCode: string): Promise<GetRaceResponse> => window.api.getRace(joinCode).then(unwrap),
   listOrganisations: (): Promise<ListOrganisationsResponse> => window.api.listOrganisations().then(unwrap),
-  getOrgLeaderboard: (orgId: string): Promise<GetOrgLeaderboardResponse> =>
-    window.api.getOrgLeaderboard(orgId).then(unwrap),
+  getOrgLeaderboard: (orgName: string): Promise<GetOrgLeaderboardResponse> =>
+    window.api.getOrgLeaderboard(orgName).then(unwrap),
   joinOrganisation: (token: string): Promise<JoinOrganisationResponse> =>
     window.api.joinOrganisation(token).then(unwrap),
   createWebSession: (): Promise<WebSessionHandoff> => window.api.createWebSession().then(unwrap),
