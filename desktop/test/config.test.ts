@@ -32,8 +32,8 @@ describe('config', () => {
       .toBe('https://token-derby.mauricode.co.uk/api');
   });
 
-  it('defaults to staging', () => {
-    expect(DEFAULT_CONFIG.env).toBe('staging');
+  it('defaults to prod', () => {
+    expect(DEFAULT_CONFIG.env).toBe('prod');
   });
 
   describe('saveConfig / loadConfig round-trip', () => {

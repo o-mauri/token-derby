@@ -21,7 +21,7 @@ export const ENVIRONMENTS: Record<EnvName, { apiBase: string }> = {
 // touches prod data. Users can switch to prod from Settings once this is
 // ready to ship.
 export const DEFAULT_CONFIG: Config = {
-  env: 'staging',
+  env: 'prod',
   apiBaseOverride: null,
   homeOverride: null,
   launchAtLogin: false,
