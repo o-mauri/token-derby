@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { CollectedHat, HorseColors, RollHatResponse, StableHorse } from '@token-derby/shared';
-import { hatById } from '@token-derby/shared';
+import { hatById, levelFromXp } from '@token-derby/shared';
 import { api, DesktopApiError } from '../api.js';
 import { errorMessage } from '../lib/errors.js';
 import { SLOTS, PALETTES, nextColor, prevColor, defaultColors, type Slot } from '../lib/palette.js';
@@ -84,6 +84,13 @@ export default function HorseEditor({ stableHorseId }: { stableHorseId: string }
 
   const owned = horse.hats ?? [];
   const previewHat: CollectedHat | undefined = hatChoice !== null ? owned[hatChoice] : undefined;
+
+  // Rolls accrue as a horse levels up; mirror the server's eligibility rule
+  // (roll-hat handler) so the button reflects how many rolls are actually
+  // available and doesn't invite a roll the server will reject.
+  const currentLevel = levelFromXp(horse.xp);
+  const lastRolledLevel = horse.last_rolled_level ?? Math.max(1, currentLevel - 1);
+  const rollsAvailable = Math.max(0, currentLevel - lastRolledLevel);
 
   function setColorSlot(slot: Slot, value: string) {
     setColors((c) => ({ ...c, [slot]: value }));
@@ -222,8 +229,13 @@ export default function HorseEditor({ stableHorseId }: { stableHorseId: string }
         <div className="editor-hats">
           <div className="editor-hats-header">
             <span className="editor-slot-label">Hats</span>
-            <button type="button" className="onboarding-button-secondary editor-roll-button" onClick={handleRoll} disabled={rolling}>
-              {rolling ? 'Rolling…' : 'Roll'}
+            <button
+              type="button"
+              className="onboarding-button-secondary editor-roll-button"
+              onClick={handleRoll}
+              disabled={rolling || rollsAvailable === 0}
+            >
+              {rolling ? 'Rolling…' : rollsAvailable > 0 ? `Roll (${rollsAvailable})` : 'No rolls'}
             </button>
           </div>
           <div className="editor-hat-grid">

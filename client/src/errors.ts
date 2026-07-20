@@ -14,6 +14,7 @@ export type ApiErrorCode =
   | 'UNAUTHENTICATED'
   | 'STABLE_HORSE_NOT_FOUND'
   | 'STABLE_HORSE_NAME_TAKEN'
+  | 'INSUFFICIENT_ROLLS'
   | 'NETWORK_ERROR';
 
 export class ApiError extends Error {

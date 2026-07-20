@@ -24,6 +24,7 @@ const MESSAGES: Record<DesktopErrorCode, string> = {
   UNAUTHENTICATED: "Your session isn't valid — you'll need to set up your jockey again.",
   STABLE_HORSE_NOT_FOUND: 'Horse not found in your stable.',
   STABLE_HORSE_NAME_TAKEN: 'You already have a horse with that name.',
+  INSUFFICIENT_ROLLS: 'No rolls left — level up this horse to earn more.',
   NETWORK_ERROR: "Couldn't reach Token Derby — check your connection and try again.",
   UNKNOWN: GENERIC_MESSAGE,
   NO_IDENTITY: "You'll need to set up your jockey again.",
