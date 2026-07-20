@@ -396,6 +396,19 @@ body {
   background: transparent;
   color: var(--td-cream);
   border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 6px;
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.onboarding-button-secondary:hover {
+  background: rgba(245, 233, 211, 0.08);
+  border-color: rgba(245, 233, 211, 0.45);
 }
 
 .onboarding-button-link {
@@ -403,6 +416,35 @@ body {
   color: var(--td-cream);
   opacity: 0.7;
   padding: 4px;
+  border: none;
+  font: inherit;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  transition: opacity 0.15s ease;
+}
+
+.onboarding-button-link:hover {
+  opacity: 1;
+}
+
+/* Prominent secondary actions in the popover — bordered pill, not a faint
+   text link — so they read as real buttons. */
+.org-join-toggle,
+.race-change-code {
+  align-self: flex-start;
+  opacity: 1;
+  border: 1px solid rgba(245, 233, 211, 0.24);
+  border-radius: 6px;
+  padding: 8px 14px;
+  font-weight: 600;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.org-join-toggle:hover,
+.race-change-code:hover {
+  background: rgba(245, 233, 211, 0.08);
+  border-color: rgba(245, 233, 211, 0.45);
 }
 
 .onboarding-error {
