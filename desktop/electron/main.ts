@@ -1,4 +1,4 @@
-import { app, ipcMain, shell, Notification, type BrowserWindow } from 'electron';
+import { app, ipcMain, shell, Notification, nativeTheme, type BrowserWindow } from 'electron';
 import { createPopover, createAppWindow, positionPopoverUnderTray } from './windows.js';
 import { createTray } from './tray.js';
 import { CHANNELS, type DesktopApi, type Result } from './ipc.js';
@@ -23,6 +23,11 @@ const IDENTITY_CHANNELS: Set<string> = new Set([
 ]);
 
 app.whenReady().then(async () => {
+  // The UI is a dark design (cream on dark). Force dark appearance so the
+  // popover's vibrancy renders as dark glass rather than light frost when the
+  // user's macOS is in light mode — otherwise cream text washes out.
+  nativeTheme.themeSource = 'dark';
+
   const popover = createPopover();
   let onboardingWindow: BrowserWindow | null = null;
 

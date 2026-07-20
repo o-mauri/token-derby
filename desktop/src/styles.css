@@ -31,6 +31,10 @@ body {
   display: flex;
   flex-direction: column;
   font-family: var(--td-mono);
+  /* Translucent dark scrim over the window vibrancy: keeps the liquid-glass
+     look while guaranteeing cream text stays legible regardless of the OS
+     appearance behind it. */
+  background: rgba(26, 16, 32, 0.72);
 }
 
 .popover-header {
