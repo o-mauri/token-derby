@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { CollectedHat, HorseColors, RollHatResponse, StableHorse } from '@token-derby/shared';
-import { HATS, hatById } from '@token-derby/shared';
+import { hatById } from '@token-derby/shared';
 import { api, DesktopApiError } from '../api.js';
 import { errorMessage } from '../lib/errors.js';
 import { SLOTS, PALETTES, nextColor, prevColor, defaultColors, type Slot } from '../lib/palette.js';
@@ -83,8 +83,6 @@ export default function HorseEditor({ stableHorseId }: { stableHorseId: string }
   }
 
   const owned = horse.hats ?? [];
-  const ownedIds = new Set(owned.map((h) => h.id));
-  const lockedHats = HATS.filter((h) => !ownedIds.has(h.id));
   const previewHat: CollectedHat | undefined = hatChoice !== null ? owned[hatChoice] : undefined;
 
   function setColorSlot(slot: Slot, value: string) {
@@ -245,11 +243,6 @@ export default function HorseEditor({ stableHorseId }: { stableHorseId: string }
               >
                 {hatLabel(collected)}
               </button>
-            ))}
-            {lockedHats.map((hat) => (
-              <div key={hat.id} className="editor-hat-tile editor-hat-tile-locked" aria-disabled="true">
-                {hat.name}
-              </div>
             ))}
           </div>
         </div>
