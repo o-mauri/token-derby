@@ -53,7 +53,7 @@ export default function Race() {
           <input
             value={joinCode}
             onChange={(e) => setJoinCode(e.target.value)}
-            placeholder="e.g. HORSE-42"
+            placeholder="ABC123"
             autoFocus
           />
         </label>
