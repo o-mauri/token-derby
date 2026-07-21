@@ -16,6 +16,7 @@ export type ClientConfig = {
   baseUrl: string | (() => string);
   client: ClientId;
   clientVersion: string;
+  raceCompatVersion?: string;
   getIdentity: () => Promise<Identity | null>;
   fetchImpl?: FetchFn;
 };
@@ -47,6 +48,7 @@ export function createTransport(config: ClientConfig): Transport {
         headers[CLIENT_HEADER] = 'desktop';
         headers[CLIENT_VERSION_HEADER] = config.clientVersion;
         headers['user-agent'] = `token-derby-desktop/${config.clientVersion}`;
+        if (config.raceCompatVersion) headers[CLI_VERSION_HEADER] = config.raceCompatVersion;
       } else {
         headers[CLI_VERSION_HEADER] = config.clientVersion;
         headers['user-agent'] = `token-derby/${config.clientVersion}`;

@@ -47,4 +47,16 @@ describe('createTransport', () => {
     await t.request('GET', '/jockey/me', undefined, undefined);
     expect(cap.url).toBe('https://x/api/jockey/me');
   });
+
+  it('desktop also sends x-cli-version when raceCompatVersion is set', async () => {
+    const cap: any = {};
+    const t = createTransport({
+      baseUrl: 'https://x/api', client: 'desktop', clientVersion: '0.1.0',
+      raceCompatVersion: '2.12.0', getIdentity: async () => null, fetchImpl: stubFetch(cap) as any,
+    });
+    await t.request('POST', '/races/ABC/join', {}, undefined);
+    expect(cap.headers['x-client']).toBe('desktop');
+    expect(cap.headers['x-client-version']).toBe('0.1.0');
+    expect(cap.headers['x-cli-version']).toBe('2.12.0');
+  });
 });
