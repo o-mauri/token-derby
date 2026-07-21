@@ -36,6 +36,12 @@ describe('config', () => {
     expect(DEFAULT_CONFIG.env).toBe('prod');
   });
 
+  it('defaults the three per-agent transcript dirs to null', () => {
+    expect(DEFAULT_CONFIG.claudeDir).toBeNull();
+    expect(DEFAULT_CONFIG.codexDir).toBeNull();
+    expect(DEFAULT_CONFIG.geminiDir).toBeNull();
+  });
+
   describe('saveConfig / loadConfig round-trip', () => {
     let tmp: string;
 
@@ -60,6 +66,26 @@ describe('config', () => {
       const cfg = loadConfig();
       expect(cfg.env).toBe('prod');
       expect(cfg.launchAtLogin).toBe(true);
+    });
+
+    it('round-trips claudeDir/codexDir/geminiDir through save and load', () => {
+      saveConfig({ claudeDir: '/x', codexDir: '/y', geminiDir: '/z' });
+      const cfg = loadConfig();
+      expect(cfg.claudeDir).toBe('/x');
+      expect(cfg.codexDir).toBe('/y');
+      expect(cfg.geminiDir).toBe('/z');
+    });
+
+    it('loads an invalid/absent transcript-dir value as null', async () => {
+      await fs.writeFile(
+        path.join(tmp, 'config.json'),
+        JSON.stringify({ claudeDir: 42, geminiDir: undefined }),
+        'utf8',
+      );
+      const cfg = loadConfig();
+      expect(cfg.claudeDir).toBeNull();
+      expect(cfg.codexDir).toBeNull();
+      expect(cfg.geminiDir).toBeNull();
     });
   });
 

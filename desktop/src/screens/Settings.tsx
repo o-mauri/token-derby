@@ -8,6 +8,14 @@ function messageFor(err: unknown): string {
   return errorMessage(err instanceof DesktopApiError ? err.code : 'UNKNOWN');
 }
 
+type TranscriptAgent = 'claude' | 'codex' | 'gemini';
+
+const TRANSCRIPT_AGENTS: { agent: TranscriptAgent; label: string; field: keyof Config }[] = [
+  { agent: 'claude', label: 'Claude', field: 'claudeDir' },
+  { agent: 'codex', label: 'Codex', field: 'codexDir' },
+  { agent: 'gemini', label: 'Gemini', field: 'geminiDir' },
+];
+
 // Settings sub-screen behind the popover shell's gear icon (see App.tsx).
 // Everyday controls up top; the Advanced accordion below gates the
 // power-user overrides (env, api base, home folder) that can break sign-in
@@ -61,6 +69,9 @@ export default function Settings({
   const [homeInput, setHomeInput] = useState('');
   const [homeBusy, setHomeBusy] = useState(false);
   const [homeError, setHomeError] = useState<string | null>(null);
+
+  const [transcriptBusy, setTranscriptBusy] = useState<TranscriptAgent | null>(null);
+  const [transcriptError, setTranscriptError] = useState<string | null>(null);
 
   function load() {
     setLoadError(null);
@@ -236,6 +247,31 @@ export default function Settings({
       setHomeError(messageFor(err));
     } finally {
       setHomeBusy(false);
+    }
+  }
+
+  async function handleChooseTranscriptDir(field: keyof Config, agent: TranscriptAgent) {
+    setTranscriptBusy(agent);
+    setTranscriptError(null);
+    try {
+      const { path } = await api.chooseFolder();
+      if (path) setConfig(await api.setConfig({ [field]: path }));
+    } catch (err) {
+      setTranscriptError(messageFor(err));
+    } finally {
+      setTranscriptBusy(null);
+    }
+  }
+
+  async function handleResetTranscriptDir(field: keyof Config, agent: TranscriptAgent) {
+    setTranscriptBusy(agent);
+    setTranscriptError(null);
+    try {
+      setConfig(await api.setConfig({ [field]: null }));
+    } catch (err) {
+      setTranscriptError(messageFor(err));
+    } finally {
+      setTranscriptBusy(null);
     }
   }
 
@@ -423,6 +459,33 @@ export default function Settings({
           </div>
           {homeError && <p className="onboarding-error">{homeError}</p>}
         </div>
+
+        {TRANSCRIPT_AGENTS.map(({ agent, label, field }) => (
+          <div className="onboarding-field settings-section" key={agent}>
+            <span>{label} transcript folder</span>
+            <input value={(config?.[field] as string | null) ?? ''} readOnly placeholder="Default" />
+            <div className="settings-row">
+              <button
+                type="button"
+                className="onboarding-button-secondary settings-small-button"
+                onClick={() => handleChooseTranscriptDir(field, agent)}
+                disabled={transcriptBusy !== null}
+              >
+                {transcriptBusy === agent ? 'Working…' : 'Choose…'}
+              </button>
+              <button
+                type="button"
+                className="onboarding-button-link"
+                onClick={() => handleResetTranscriptDir(field, agent)}
+                disabled={transcriptBusy !== null || !config?.[field]}
+              >
+                Reset
+              </button>
+            </div>
+          </div>
+        ))}
+        {transcriptError && <p className="onboarding-error">{transcriptError}</p>}
+        <p className="settings-caption">Blank = default location.</p>
       </Accordion>
     </div>
   );

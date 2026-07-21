@@ -9,6 +9,9 @@ export type Config = {
   apiBaseOverride: string | null;
   homeOverride: string | null;
   launchAtLogin: boolean;
+  claudeDir: string | null;
+  codexDir: string | null;
+  geminiDir: string | null;
 };
 
 // Mirrors cli/src/config.ts's ENVIRONMENTS map — same two server environments.
@@ -25,6 +28,9 @@ export const DEFAULT_CONFIG: Config = {
   apiBaseOverride: null,
   homeOverride: null,
   launchAtLogin: false,
+  claudeDir: null,
+  codexDir: null,
+  geminiDir: null,
 };
 
 // Fixed location for config.json itself — independent of any homeOverride
@@ -51,6 +57,9 @@ export function loadConfig(): Config {
       homeOverride: typeof parsed.homeOverride === 'string' ? parsed.homeOverride : null,
       launchAtLogin:
         typeof parsed.launchAtLogin === 'boolean' ? parsed.launchAtLogin : DEFAULT_CONFIG.launchAtLogin,
+      claudeDir: typeof parsed.claudeDir === 'string' ? parsed.claudeDir : null,
+      codexDir: typeof parsed.codexDir === 'string' ? parsed.codexDir : null,
+      geminiDir: typeof parsed.geminiDir === 'string' ? parsed.geminiDir : null,
     };
   } catch {
     return { ...DEFAULT_CONFIG };

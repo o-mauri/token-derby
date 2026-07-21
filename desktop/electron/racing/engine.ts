@@ -13,6 +13,7 @@ import type { GetRaceResponse, ModelKey } from '@token-derby/shared';
 import { loadConfig, resolveApiBase } from '../config.js';
 import * as identityStore from '../identity.js';
 import { loadActiveRace, saveActiveRace, clearActiveRace, type DesktopActiveRace } from './active-race.js';
+import { applyTranscriptDirs } from './transcripts.js';
 import { deriveStatus } from './status.js';
 import type { ActiveRaceStatus } from '../ipc.js';
 
@@ -168,6 +169,9 @@ function beginLoop(api: RacingApi, active: DesktopActiveRace, raceTracker: RaceS
 
   runHeartbeatLoop({
     prepareBeat: async () => {
+      // Re-applied every beat (not just at start) so a transcript-dir
+      // override saved in Settings mid-race takes effect on the next tick.
+      applyTranscriptDirs(loadConfig());
       const reading = await scanWithTimeout({ counts_input: active.counts_input }, active.primary_model);
       raceTracker.recordReading(reading);
       if (pending && !isStall(reading)) {
@@ -231,6 +235,7 @@ export async function startRace(
   opts?: { confirm?: boolean },
 ): Promise<{ started: boolean; needsConfirm?: boolean }> {
   const code = joinCode.toUpperCase();
+  applyTranscriptDirs(loadConfig());
   const api = buildApi();
 
   // Skip the soft-guard round-trip entirely when the caller already confirmed
@@ -302,6 +307,7 @@ export async function resumeIfActive(): Promise<void> {
   const saved = await loadActiveRace();
   if (!saved) return;
 
+  applyTranscriptDirs(loadConfig());
   const api = buildApi();
   let race: GetRaceResponse;
   try {

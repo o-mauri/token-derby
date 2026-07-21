@@ -24,7 +24,7 @@ vi.mock('@token-derby/token-engine', async (orig) => ({
   readAllSources: mockReadAllSources,
 }));
 
-const { DEFAULT_CONFIG } = await import('../electron/config.js');
+const { DEFAULT_CONFIG, saveConfig } = await import('../electron/config.js');
 const { applyTranscriptDirs } = await import('../electron/racing/transcripts.js');
 const { loadActiveRace } = await import('../electron/racing/active-race.js');
 const engine = await import('../electron/racing/engine.js');
@@ -84,7 +84,11 @@ beforeEach(async () => {
   // Deliberately not created yet — readAllSources treats a missing
   // transcript dir as "0 tokens so far", matching a fresh join.
   claudeDir = path.join(tmpHome, 'claude-projects');
-  applyTranscriptDirs({ ...DEFAULT_CONFIG, claudeDir } as any);
+  // Persisted (not just applied in-memory) — engine.ts now reloads config
+  // and re-applies transcript-dir overrides on every startRace/prepareBeat,
+  // which would otherwise wipe an in-memory-only override on the first tick.
+  saveConfig({ claudeDir });
+  applyTranscriptDirs({ ...DEFAULT_CONFIG, claudeDir });
 
   stubApi = { getRace: vi.fn(), joinRace: vi.fn(), heartbeat: vi.fn() };
   mockCreateEndpoints.mockReturnValue(stubApi);
