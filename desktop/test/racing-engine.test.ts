@@ -14,10 +14,21 @@ vi.mock('@token-derby/client', async (orig) => ({
   createEndpoints: mockCreateEndpoints,
 }));
 
+// readAllSources defaults to the REAL implementation (a passthrough set in
+// beforeEach) so every existing fixture-transcript-dir test is unaffected;
+// the pending-window regression test below overrides it with an exact,
+// per-call sequence to avoid racing real fs timing against several ticks.
+const mockReadAllSources = vi.fn();
+vi.mock('@token-derby/token-engine', async (orig) => ({
+  ...(await orig<typeof import('@token-derby/token-engine')>()),
+  readAllSources: mockReadAllSources,
+}));
+
 const { DEFAULT_CONFIG } = await import('../electron/config.js');
 const { applyTranscriptDirs } = await import('../electron/racing/transcripts.js');
 const { loadActiveRace } = await import('../electron/racing/active-race.js');
 const engine = await import('../electron/racing/engine.js');
+const actualTokenEngine = await vi.importActual<typeof import('@token-derby/token-engine')>('@token-derby/token-engine');
 
 let tmpHome: string;
 let claudeDir: string;
@@ -77,6 +88,7 @@ beforeEach(async () => {
 
   stubApi = { getRace: vi.fn(), joinRace: vi.fn(), heartbeat: vi.fn() };
   mockCreateEndpoints.mockReturnValue(stubApi);
+  mockReadAllSources.mockImplementation(actualTokenEngine.readAllSources);
 });
 
 afterEach(async () => {
@@ -302,5 +314,152 @@ describe('resumeIfActive', () => {
 
     expect(await loadActiveRace()).toBeNull();
     expect(stubApi.heartbeat).not.toHaveBeenCalled();
+  });
+});
+
+// Regression: CRITICAL 1 from the B3 review. The old code flipped the local
+// `pending` flag to false on the first non-stall LOCAL read, independent of
+// what the server actually reported — so a race sitting `pending` for
+// several heartbeats (joined before start_time) would count real growth
+// from the second beat onward, defeating the guard. The fix: `pending` only
+// clears once a response reports the SERVER's race_status as 'live', and the
+// tracker reprimes on every tick while still pending, not just the first.
+describe('pending-window guard (CRITICAL 1 regression)', () => {
+  it('reprimes every tick while the server still reports pending, and only counts growth once it reports live', async () => {
+    process.env.TOKEN_DERBY_HEARTBEAT_INTERVAL_MS = '2';
+
+    stubApi.getRace
+      .mockResolvedValueOnce(raceFixture({ horses: [], status: 'pending' })) // pre-join (soft guard)
+      .mockResolvedValueOnce(raceFixture({ horses: [horseFixture()], status: 'pending' })); // post-join
+
+    stubApi.joinRace.mockResolvedValue({ horse_id: 'horse-1', heartbeat_token: 'hb-token', primary_model: 'claude' });
+
+    // Local reads: 0 at join, then growing across ticks while the server
+    // still says pending (30 → 55 → 60), then more growth (60 → 90) once the
+    // server has reported live. A steady 90 covers any further ticks.
+    const reading = (tokens: number) => ({
+      secondary: { claude: 0, codex: 0, gemini: 0 },
+      primaryByConv: new Map([['proj/conv', tokens]]),
+    });
+    mockReadAllSources
+      .mockResolvedValueOnce(reading(0)) // join-time anchor scan
+      .mockResolvedValueOnce(reading(30)) // tick A (pending)
+      .mockResolvedValueOnce(reading(55)) // tick B (still pending — this is where the old bug counted 25)
+      .mockResolvedValueOnce(reading(60)) // tick C (still pending when prepared; server flips to live in its response)
+      .mockResolvedValueOnce(reading(90)) // tick D (pending cleared — real growth now counted)
+      .mockResolvedValue(reading(90)); // steady state for any further ticks
+
+    let heartbeatCall = 0;
+    stubApi.heartbeat.mockImplementation(async (_joinCode: string, _horseId: string, _token: string, body: any) => {
+      heartbeatCall += 1;
+      const race_status = heartbeatCall < 3 ? 'pending' : 'live';
+      return {
+        race_status,
+        server_time: new Date().toISOString(),
+        time_left_seconds: 90,
+        last_seq: body.seq,
+        horses: [horseFixture({ current_tokens: body.components.claude })],
+        race: raceFixture({ status: race_status }),
+      };
+    });
+
+    await engine.startRace('abc123', 'stable-1', 'claude');
+
+    await vi.waitFor(() => expect(stubApi.heartbeat.mock.calls.length).toBeGreaterThanOrEqual(4), { timeout: 2000 });
+
+    const componentsAt = (i: number) => stubApi.heartbeat.mock.calls[i]![3].components.claude;
+    expect(componentsAt(0)).toBe(0); // tick A: reprimed
+    expect(componentsAt(1)).toBe(0); // tick B: still pending — reprimed again (the regression)
+    expect(componentsAt(2)).toBe(0); // tick C: still pending when prepared — reprimed again
+    expect(componentsAt(3)).toBe(30); // tick D: pending cleared last beat — real delta (90-60) counted
+
+    await engine.stopRace();
+  });
+});
+
+// Regression: CRITICAL 2 from the B3 review. runHeartbeatLoop's abortSignal
+// only prevents FUTURE scheduling — a tick already in flight when
+// stopLoop()/stopRace() runs still resolves and previously fired onSuccess
+// against a race that's no longer current, re-persisting active-race.json
+// and re-emitting a live status after Stop (or clobbering a swapped-in race).
+// The fix checks `controller === ctrl` at the top of every callback.
+describe('stale in-flight loop (CRITICAL 2 regression)', () => {
+  it('a heartbeat response that resolves after stopRace() does not resurrect the race', async () => {
+    stubApi.getRace.mockResolvedValue(raceFixture({ horses: [horseFixture()] }));
+    stubApi.joinRace.mockResolvedValue({ horse_id: 'horse-1', heartbeat_token: 'hb-token', primary_model: 'claude' });
+
+    let resolveHeartbeat!: (value: unknown) => void;
+    stubApi.heartbeat.mockImplementation(() => new Promise((resolve) => { resolveHeartbeat = resolve; }));
+
+    await engine.startRace('abc123', 'stable-1', 'claude', { confirm: true });
+    expect(await loadActiveRace()).not.toBeNull();
+
+    await vi.waitFor(() => expect(stubApi.heartbeat).toHaveBeenCalledTimes(1), { timeout: 2000 });
+
+    const stopResult = await engine.stopRace();
+    expect(stopResult).toEqual({ ok: true });
+    expect(await loadActiveRace()).toBeNull();
+    expect(await engine.getActiveRace()).toBeNull();
+
+    // The in-flight request finally resolves *after* stop — must be a no-op.
+    resolveHeartbeat({
+      race_status: 'live',
+      server_time: new Date().toISOString(),
+      time_left_seconds: 90,
+      last_seq: 1,
+      horses: [horseFixture({ current_tokens: 999 })],
+      race: raceFixture(),
+    });
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+
+    expect(await loadActiveRace()).toBeNull(); // not re-persisted
+    expect(await engine.getActiveRace()).toBeNull(); // status not re-emitted
+  });
+
+  it('a heartbeat response from a race superseded by a startRace swap does not overwrite the new race', async () => {
+    stubApi.getRace.mockResolvedValue(raceFixture({ horses: [horseFixture()] }));
+    stubApi.joinRace
+      .mockResolvedValueOnce({ horse_id: 'horse-1', heartbeat_token: 'hb-token-1', primary_model: 'claude' })
+      .mockResolvedValueOnce({ horse_id: 'horse-2', heartbeat_token: 'hb-token-2', primary_model: 'claude' });
+
+    let resolveFirstHeartbeat!: (value: unknown) => void;
+    stubApi.heartbeat
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveFirstHeartbeat = resolve; }))
+      .mockImplementation(async (_joinCode: string, _horseId: string, _token: string, body: any) => ({
+        race_status: 'live',
+        server_time: new Date().toISOString(),
+        time_left_seconds: 90,
+        last_seq: body.seq,
+        horses: [horseFixture({ horse_id: 'horse-2' })],
+        race: raceFixture({ join_code: 'DEF456' }),
+      }));
+
+    await engine.startRace('abc123', 'stable-1', 'claude', { confirm: true });
+    await vi.waitFor(() => expect(stubApi.heartbeat).toHaveBeenCalledTimes(1), { timeout: 2000 });
+
+    // Swap to a different race while the first one's heartbeat is still in flight.
+    await engine.startRace('def456', 'stable-2', 'claude', { confirm: true });
+    const afterSwap = (await loadActiveRace()) as DesktopActiveRace;
+    expect(afterSwap.horse_id).toBe('horse-2');
+
+    // The superseded race's late response resolves now — must not clobber horse-2's state.
+    resolveFirstHeartbeat({
+      race_status: 'live',
+      server_time: new Date().toISOString(),
+      time_left_seconds: 90,
+      last_seq: 999,
+      horses: [horseFixture({ horse_id: 'horse-1' })],
+      race: raceFixture({ join_code: 'ABC123' }),
+    });
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+
+    const after = (await loadActiveRace()) as DesktopActiveRace;
+    expect(after.horse_id).toBe('horse-2');
+    expect(after.join_code).toBe('DEF456');
+
+    const status = await engine.getActiveRace();
+    expect(status?.horseId).toBe('horse-2');
   });
 });

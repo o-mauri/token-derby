@@ -7,6 +7,7 @@ import {
   runHeartbeatLoop,
   RACING_COMPAT_VERSION,
   type RaceScoreState,
+  type BeatReading,
 } from '@token-derby/token-engine';
 import type { GetRaceResponse, ModelKey } from '@token-derby/shared';
 import { loadConfig, resolveApiBase } from '../config.js';
@@ -24,6 +25,22 @@ const RETRY_DELAYS_MS = [1_000, 2_000, 4_000, 8_000, 15_000] as const;
 // "now" is probably already being raced elsewhere (another device/process
 // for the same jockey) — starting a second loop would double-count tokens.
 const SOFT_GUARD_WINDOW_MS = 2 * DEFAULT_INTERVAL_MS;
+
+// Ports run-race.tsx's scanWithTimeout: an unbounded readAllSources() would
+// freeze the whole loop on a hung read (prepareBeat never resolves, so the
+// loop never reaches sendBeat/onError). Degrade a hang to a stall instead.
+const SCAN_TIMEOUT_MS = 10_000;
+
+async function scanWithTimeout(race: { counts_input?: boolean }, primary: ModelKey): Promise<BeatReading> {
+  try {
+    return await Promise.race([
+      readAllSources(race, primary),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('scan timeout')), SCAN_TIMEOUT_MS)),
+    ]);
+  } catch {
+    return { stall: 'Token scan timed out' };
+  }
+}
 
 // Tests set TOKEN_DERBY_HEARTBEAT_INTERVAL_MS=0 to tick the loop synchronously
 // instead of waiting on a real 60s timer, matching the TOKEN_DERBY_* env-hook
@@ -130,20 +147,31 @@ async function buildInitialState(
 // Ports run-race.tsx's beat cycle onto runHeartbeatLoop: read local
 // transcripts, fold into the tracker, send the delta, persist + emit status
 // on ack. `pendingMode` mirrors the CLI's re-prime-on-go-live behaviour so
-// tokens produced before the race goes live aren't credited.
+// tokens produced before the race goes live aren't credited: reprime EVERY
+// tick while pending, and only clear `pending` once a response reports the
+// SERVER's race_status as 'live' (never from a local read alone) — a race
+// can sit pending for many heartbeats, and each one must anchor away local
+// growth, not just the first.
 function beginLoop(api: RacingApi, active: DesktopActiveRace, raceTracker: RaceScoreTracker, pendingMode: boolean): void {
   const ctrl = new AbortController();
   controller = ctrl;
   tracker = raceTracker;
   let pending = pendingMode;
 
+  // runHeartbeatLoop's abortSignal only prevents FUTURE scheduling — a tick
+  // already in flight when stopLoop() runs (via stopRace() or a startRace
+  // swap) still resolves and would otherwise fire these callbacks against a
+  // race that's no longer current. Every callback below re-checks that this
+  // closure's `ctrl` is still the module's active controller before touching
+  // any shared state, so a late response from a superseded loop is a no-op.
+  const isCurrentLoop = () => controller === ctrl;
+
   runHeartbeatLoop({
     prepareBeat: async () => {
-      const reading = await readAllSources({ counts_input: active.counts_input }, active.primary_model);
+      const reading = await scanWithTimeout({ counts_input: active.counts_input }, active.primary_model);
       raceTracker.recordReading(reading);
       if (pending && !isStall(reading)) {
         raceTracker.reprime();
-        pending = false;
       }
       return raceTracker.nextBeat();
     },
@@ -153,6 +181,7 @@ function beginLoop(api: RacingApi, active: DesktopActiveRace, raceTracker: RaceS
         components: snapshot.components,
       }),
     onSuccess: (resp, snapshot) => {
+      if (!isCurrentLoop()) return;
       raceTracker.ack(snapshot, resp.last_seq);
       if (resp.race_status === 'live') pending = false;
       current = {
@@ -164,6 +193,7 @@ function beginLoop(api: RacingApi, active: DesktopActiveRace, raceTracker: RaceS
       setStatus(deriveStatus(resp, active.horse_id, currentRaceName, raceTracker.stalled));
     },
     onError: (err) => {
+      if (!isCurrentLoop()) return;
       // A version mismatch is fatal (the server rejected this CLI's counting
       // rules outright) — stop the loop rather than retrying forever.
       // Anything else is transient and the loop's own backoff handles it;
@@ -179,6 +209,7 @@ function beginLoop(api: RacingApi, active: DesktopActiveRace, raceTracker: RaceS
       }
     },
     onFinished: () => {
+      if (!isCurrentLoop()) return;
       void clearActiveRace();
       const finished = lastStatus ? { ...lastStatus, status: 'finished' as const } : null;
       controller = null;
@@ -202,9 +233,10 @@ export async function startRace(
   const code = joinCode.toUpperCase();
   const api = buildApi();
 
-  const preJoinRace: GetRaceResponse = await api.getRace(code);
-
+  // Skip the soft-guard round-trip entirely when the caller already confirmed
+  // — its only purpose is deciding whether to ask for confirmation.
   if (!opts?.confirm) {
+    const preJoinRace: GetRaceResponse = await api.getRace(code);
     const existing = preJoinRace.horses.find(h => h.stable_horse_id === stableHorseId);
     if (existing) {
       const lastHeartbeatMs = new Date(existing.last_heartbeat).getTime();
