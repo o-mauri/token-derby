@@ -309,12 +309,25 @@ export async function resumeIfActive(): Promise<void> {
 
   applyTranscriptDirs(loadConfig());
   const api = buildApi();
-  let race: GetRaceResponse;
+  let race: GetRaceResponse | null;
   try {
     race = await api.getRace(saved.join_code);
-  } catch {
-    // Can't reach the server right now — leave the persisted file in place
-    // so the next launch (or an explicit retry) can still resume it.
+  } catch (err) {
+    // A genuinely dead race (deleted, or one the server no longer knows
+    // about) means the persisted file is stale — clear it so we stop
+    // retrying it forever. Anything else (network down, server 5xx) is
+    // transient: leave the file in place so the next launch can retry.
+    if (err instanceof ApiError && (err.code === 'RACE_NOT_FOUND' || err.code === 'RACE_FINISHED')) {
+      await clearActiveRace();
+    }
+    return;
+  }
+
+  // The transport can resolve with `null` (a 200 with an empty/non-JSON
+  // body) instead of throwing — e.g. a race that no longer exists. Treat
+  // that the same as a dead race rather than crashing on `race.status`.
+  if (!race) {
+    await clearActiveRace();
     return;
   }
 

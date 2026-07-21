@@ -319,6 +319,67 @@ describe('resumeIfActive', () => {
     expect(await loadActiveRace()).toBeNull();
     expect(stubApi.heartbeat).not.toHaveBeenCalled();
   });
+
+  function persistedRaceFixture(): DesktopActiveRace {
+    return {
+      join_code: 'ABC123',
+      race_id: 'race-1',
+      horse_id: 'horse-1',
+      heartbeat_token: 'hb-token',
+      horse_name: 'Thunder',
+      primary_model: 'claude',
+      score: {
+        acked: { claude: 0, codex: 0, gemini: 0 },
+        lastGood: { claude: 0, codex: 0, gemini: 0 },
+        primaryConvAcked: {},
+        primaryCounted: 0,
+        seq: 3,
+      },
+      last_heartbeat_at: new Date(0).toISOString(),
+    };
+  }
+
+  // Regression (launch crash): the transport can RESOLVE with `null` — a 200
+  // with an empty/non-JSON body, e.g. for a race the server no longer knows
+  // about — rather than throw. The old code went straight to `race.status`
+  // and crashed the whole app on launch. Also covers CLAUDE.md's own note
+  // that a fixture-shaped active-race.json leaking to a real home dir is
+  // exactly what surfaced this.
+  it('does not crash, and clears the persisted file, when getRace resolves to null', async () => {
+    const { saveActiveRace } = await import('../electron/racing/active-race.js');
+    await saveActiveRace(persistedRaceFixture());
+    stubApi.getRace.mockResolvedValue(null);
+
+    await expect(engine.resumeIfActive()).resolves.toBeUndefined(); // must not throw
+
+    expect(await loadActiveRace()).toBeNull();
+    expect(await engine.getActiveRace()).toBeNull();
+    expect(stubApi.heartbeat).not.toHaveBeenCalled();
+  });
+
+  it('clears the persisted file (without crashing) when getRace throws RACE_NOT_FOUND', async () => {
+    const { saveActiveRace } = await import('../electron/racing/active-race.js');
+    const { ApiError } = await import('@token-derby/client');
+    await saveActiveRace(persistedRaceFixture());
+    stubApi.getRace.mockRejectedValue(new ApiError('RACE_NOT_FOUND', 'no such race', 404));
+
+    await expect(engine.resumeIfActive()).resolves.toBeUndefined();
+
+    expect(await loadActiveRace()).toBeNull();
+    expect(await engine.getActiveRace()).toBeNull();
+    expect(stubApi.heartbeat).not.toHaveBeenCalled();
+  });
+
+  it('leaves the persisted file in place (for a later retry) on a transient error', async () => {
+    const { saveActiveRace } = await import('../electron/racing/active-race.js');
+    await saveActiveRace(persistedRaceFixture());
+    stubApi.getRace.mockRejectedValue(new Error('network down'));
+
+    await expect(engine.resumeIfActive()).resolves.toBeUndefined();
+
+    expect(await loadActiveRace()).not.toBeNull();
+    expect(stubApi.heartbeat).not.toHaveBeenCalled();
+  });
 });
 
 // Regression: CRITICAL 1 from the B3 review. The old code flipped the local
