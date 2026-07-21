@@ -1,4 +1,4 @@
-import type { DesktopApi, Bootstrap, Result, WebSessionHandoff } from '../electron/ipc.js';
+import type { ActiveRaceStatus, DesktopApi, Bootstrap, RacingStatusListener, Result, WebSessionHandoff } from '../electron/ipc.js';
 import type { UpdateCheckResult } from '../electron/updater.js';
 import type { Config } from '../electron/config.js';
 import type {
@@ -17,6 +17,7 @@ import type {
   RollHatResponse,
   EquipHatRequest,
   EquipHatResponse,
+  ModelKey,
 } from '@token-derby/shared';
 
 // preload.ts exposes this via contextBridge; this file is the renderer's
@@ -26,6 +27,9 @@ import type {
 declare global {
   interface Window {
     api: DesktopApi;
+    // Separate bridge for RACING_STATUS_CHANNEL pushes (see preload.ts) —
+    // a subscription, not an invoke/Result call, so it isn't part of DesktopApi.
+    racingStatus: { subscribe(cb: RacingStatusListener): () => void };
   }
 }
 
@@ -65,6 +69,7 @@ export const api = {
   equipHat: (id: string, req: EquipHatRequest): Promise<EquipHatResponse> =>
     window.api.equipHat(id, req).then(unwrap),
   openHorseEditor: (id: string): Promise<{ ok: true }> => window.api.openHorseEditor(id).then(unwrap),
+  openRaceTrack: (joinCode: string): Promise<{ ok: true }> => window.api.openRaceTrack(joinCode).then(unwrap),
   getRace: (joinCode: string): Promise<GetRaceResponse> => window.api.getRace(joinCode).then(unwrap),
   listOrganisations: (): Promise<ListOrganisationsResponse> => window.api.listOrganisations().then(unwrap),
   getOrgLeaderboard: (orgName: string): Promise<GetOrgLeaderboardResponse> =>
@@ -80,4 +85,15 @@ export const api = {
   chooseFolder: (): Promise<{ path: string | null }> => window.api.chooseFolder().then(unwrap),
   exportIdentity: (): Promise<{ token: string }> => window.api.exportIdentity().then(unwrap),
   quitApp: (): Promise<{ ok: true }> => window.api.quitApp().then(unwrap),
+  startRace: (
+    joinCode: string,
+    stableHorseId: string,
+    primaryModel: ModelKey,
+    opts?: { confirm?: boolean },
+  ): Promise<{ started: boolean; needsConfirm?: boolean }> =>
+    window.api.startRace(joinCode, stableHorseId, primaryModel, opts).then(unwrap),
+  stopRace: (): Promise<{ ok: true }> => window.api.stopRace().then(unwrap),
+  getActiveRace: (): Promise<ActiveRaceStatus | null> => window.api.getActiveRace().then(unwrap),
+  // Subscribes to pushed racing-status updates; returns an unsubscribe fn.
+  onRacingStatus: (cb: RacingStatusListener): (() => void) => window.racingStatus.subscribe(cb),
 };

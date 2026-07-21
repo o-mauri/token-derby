@@ -1,5 +1,5 @@
-import { contextBridge, ipcRenderer } from 'electron';
-import { CHANNELS, type DesktopApi } from './ipc.js';
+import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
+import { CHANNELS, RACING_STATUS_CHANNEL, type DesktopApi, type RacingStatusListener } from './ipc.js';
 
 // Thin, one-to-one wrappers over ipcRenderer.invoke — all the actual work
 // happens in the main-process api service (services/api.ts).
@@ -17,6 +17,7 @@ const api: DesktopApi = {
   rollHat: (id) => ipcRenderer.invoke(CHANNELS.rollHat, id),
   equipHat: (id, req) => ipcRenderer.invoke(CHANNELS.equipHat, id, req),
   openHorseEditor: (id) => ipcRenderer.invoke(CHANNELS.openHorseEditor, id),
+  openRaceTrack: (joinCode) => ipcRenderer.invoke(CHANNELS.openRaceTrack, joinCode),
   getRace: (joinCode) => ipcRenderer.invoke(CHANNELS.getRace, joinCode),
   listOrganisations: () => ipcRenderer.invoke(CHANNELS.listOrganisations),
   getOrgLeaderboard: (orgName) => ipcRenderer.invoke(CHANNELS.getOrgLeaderboard, orgName),
@@ -37,3 +38,14 @@ const api: DesktopApi = {
 };
 
 contextBridge.exposeInMainWorld('api', api);
+
+// Pushed racing status updates (heartbeat ack/stall/finish/stop) — a
+// subscription rather than an invoke/Result round trip, so it's its own
+// small bridge instead of a DesktopApi method. Returns an unsubscribe fn.
+contextBridge.exposeInMainWorld('racingStatus', {
+  subscribe(cb: RacingStatusListener): () => void {
+    const listener = (_event: IpcRendererEvent, status: Parameters<RacingStatusListener>[0]) => cb(status);
+    ipcRenderer.on(RACING_STATUS_CHANNEL, listener);
+    return () => ipcRenderer.removeListener(RACING_STATUS_CHANNEL, listener);
+  },
+});

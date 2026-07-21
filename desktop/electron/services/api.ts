@@ -168,6 +168,26 @@ async function openHorseEditor(stableHorseId: string): Promise<Result<{ ok: true
   });
 }
 
+// One race-track BrowserWindow per join code — mirrors editorWindows above.
+// The window renders `/race-track/:joinCode`; the view itself is Task D1's,
+// so for now that route is a placeholder.
+const raceTrackWindows = new Map<string, BrowserWindow>();
+
+async function openRaceTrack(joinCode: string): Promise<Result<{ ok: true }>> {
+  return guard(async () => {
+    const code = joinCode.toUpperCase();
+    const existing = raceTrackWindows.get(code);
+    if (existing && !existing.isDestroyed()) {
+      existing.focus();
+      return { ok: true as const };
+    }
+    const win = createAppWindow(`/race-track/${encodeURIComponent(code)}`);
+    raceTrackWindows.set(code, win);
+    win.on('closed', () => raceTrackWindows.delete(code));
+    return { ok: true as const };
+  });
+}
+
 async function getRace(joinCode: string) {
   return guard(() => getApi().getRace(joinCode));
 }
@@ -293,6 +313,7 @@ export const apiService = {
   rollHat,
   equipHat,
   openHorseEditor,
+  openRaceTrack,
   getRace,
   listOrganisations,
   getOrgLeaderboard,

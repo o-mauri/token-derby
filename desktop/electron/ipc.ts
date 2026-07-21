@@ -44,6 +44,7 @@ export const CHANNELS = {
   rollHat: 'api:rollHat',
   equipHat: 'api:equipHat',
   openHorseEditor: 'api:openHorseEditor',
+  openRaceTrack: 'api:openRaceTrack',
   getRace: 'api:getRace',
   listOrganisations: 'api:listOrganisations',
   getOrgLeaderboard: 'api:getOrgLeaderboard',
@@ -83,6 +84,12 @@ export type ActiveRaceStatus = {
   stalled: boolean;
 };
 
+// Renderer-side subscribe callback for RACING_STATUS_CHANNEL pushes. Kept
+// separate from CHANNELS/DesktopApi — those are all invoke/Result round
+// trips, and this is a subscription — so preload.ts exposes it as its own
+// small bridge rather than folding it into the generic per-method wiring.
+export type RacingStatusListener = (status: ActiveRaceStatus | null) => void;
+
 // Local-only snapshot the renderer uses to decide onboarding vs main UI —
 // no network call, just current config + whatever identity is on disk.
 export type Bootstrap = {
@@ -117,6 +124,11 @@ export type DesktopApi = {
   // stable horse. Lives in the api service so main.ts's generic CHANNELS
   // wiring picks it up for free, same as every other window.api method.
   openHorseEditor(stableHorseId: string): Promise<Result<{ ok: true }>>;
+  // Opens (or focuses) the race-track BrowserWindow for this join code —
+  // same one-window-per-key pattern as openHorseEditor. The window itself
+  // renders `/race-track/:joinCode` (a placeholder until Task D1 ports the
+  // full view).
+  openRaceTrack(joinCode: string): Promise<Result<{ ok: true }>>;
   getRace(joinCode: string): Promise<Result<GetRaceResponse>>;
   listOrganisations(): Promise<Result<ListOrganisationsResponse>>;
   getOrgLeaderboard(orgName: string): Promise<Result<GetOrgLeaderboardResponse>>;

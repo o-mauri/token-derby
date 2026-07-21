@@ -302,6 +302,35 @@ body {
   margin-top: 4px;
 }
 
+.race-mode-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  margin-top: 4px;
+}
+
+.race-mode-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.race-active-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.race-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .onboarding {
   height: 100%;
   display: flex;
@@ -644,6 +673,17 @@ body {
   justify-content: center;
   text-align: center;
   padding: 24px;
+}
+
+.race-track-window {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 24px;
+  background: var(--td-dark);
+  font-family: var(--td-mono);
 }
 
 .editor-preview {
