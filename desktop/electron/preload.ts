@@ -19,6 +19,7 @@ const api: DesktopApi = {
   openHorseEditor: (id) => ipcRenderer.invoke(CHANNELS.openHorseEditor, id),
   openRaceTrack: (joinCode) => ipcRenderer.invoke(CHANNELS.openRaceTrack, joinCode),
   getRace: (joinCode) => ipcRenderer.invoke(CHANNELS.getRace, joinCode),
+  getRaceSeries: (joinCode) => ipcRenderer.invoke(CHANNELS.getRaceSeries, joinCode),
   listOrganisations: () => ipcRenderer.invoke(CHANNELS.listOrganisations),
   getOrgLeaderboard: (orgName) => ipcRenderer.invoke(CHANNELS.getOrgLeaderboard, orgName),
   joinOrganisation: (token) => ipcRenderer.invoke(CHANNELS.joinOrganisation, token),

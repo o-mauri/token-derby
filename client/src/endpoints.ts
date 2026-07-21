@@ -1,6 +1,6 @@
 import type {
   CreateRaceRequest, CreateRaceResponse,
-  GetRaceResponse, JoinRaceRequest, JoinRaceResponse,
+  GetRaceResponse, GetRaceSeriesResponse, JoinRaceRequest, JoinRaceResponse,
   HeartbeatRequest, HeartbeatResponse, EndRaceResponse,
   JoinOrganisationRequest, JoinOrganisationResponse,
   ListOrganisationsResponse, GetOrganisationResponse, GetOrgLeaderboardResponse,
@@ -21,6 +21,17 @@ export function createEndpoints(t: Transport) {
 
     getRace(joinCode: string) {
       return t.request<GetRaceResponse>('GET', `/races/${encodeURIComponent(joinCode)}`, undefined, undefined);
+    },
+
+    // Time-series token deltas per horse, for the token-over-time graph
+    // (site's finished overlay; the desktop race-track window's chart faces).
+    getRaceSeries(joinCode: string) {
+      return t.request<GetRaceSeriesResponse>(
+        'GET',
+        `/races/${encodeURIComponent(joinCode)}/series`,
+        undefined,
+        undefined,
+      );
     },
 
     joinRace(joinCode: string, body: JoinRaceRequest) {

@@ -4,6 +4,7 @@
 
 import type {
   GetRaceResponse,
+  GetRaceSeriesResponse,
   ListOrganisationsResponse,
   GetOrgLeaderboardResponse,
   JoinOrganisationResponse,
@@ -46,6 +47,7 @@ export const CHANNELS = {
   openHorseEditor: 'api:openHorseEditor',
   openRaceTrack: 'api:openRaceTrack',
   getRace: 'api:getRace',
+  getRaceSeries: 'api:getRaceSeries',
   listOrganisations: 'api:listOrganisations',
   getOrgLeaderboard: 'api:getOrgLeaderboard',
   joinOrganisation: 'api:joinOrganisation',
@@ -130,6 +132,9 @@ export type DesktopApi = {
   // full view).
   openRaceTrack(joinCode: string): Promise<Result<{ ok: true }>>;
   getRace(joinCode: string): Promise<Result<GetRaceResponse>>;
+  // Time-series token deltas per horse, feeding the race-track window's
+  // token-over-time chart faces (mirrors the site's fetchRaceSeries).
+  getRaceSeries(joinCode: string): Promise<Result<GetRaceSeriesResponse>>;
   listOrganisations(): Promise<Result<ListOrganisationsResponse>>;
   getOrgLeaderboard(orgName: string): Promise<Result<GetOrgLeaderboardResponse>>;
   joinOrganisation(token: string): Promise<Result<JoinOrganisationResponse>>;

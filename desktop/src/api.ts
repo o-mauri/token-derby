@@ -3,6 +3,7 @@ import type { UpdateCheckResult } from '../electron/updater.js';
 import type { Config } from '../electron/config.js';
 import type {
   GetRaceResponse,
+  GetRaceSeriesResponse,
   ListOrganisationsResponse,
   GetOrgLeaderboardResponse,
   JoinOrganisationResponse,
@@ -71,6 +72,8 @@ export const api = {
   openHorseEditor: (id: string): Promise<{ ok: true }> => window.api.openHorseEditor(id).then(unwrap),
   openRaceTrack: (joinCode: string): Promise<{ ok: true }> => window.api.openRaceTrack(joinCode).then(unwrap),
   getRace: (joinCode: string): Promise<GetRaceResponse> => window.api.getRace(joinCode).then(unwrap),
+  getRaceSeries: (joinCode: string): Promise<GetRaceSeriesResponse> =>
+    window.api.getRaceSeries(joinCode).then(unwrap),
   listOrganisations: (): Promise<ListOrganisationsResponse> => window.api.listOrganisations().then(unwrap),
   getOrgLeaderboard: (orgName: string): Promise<GetOrgLeaderboardResponse> =>
     window.api.getOrgLeaderboard(orgName).then(unwrap),

@@ -192,6 +192,10 @@ async function getRace(joinCode: string) {
   return guard(() => getApi().getRace(joinCode));
 }
 
+async function getRaceSeries(joinCode: string) {
+  return guard(() => getApi().getRaceSeries(joinCode));
+}
+
 async function listOrganisations() {
   return guard(() => getApi().listOrganisations());
 }
@@ -315,6 +319,7 @@ export const apiService = {
   openHorseEditor,
   openRaceTrack,
   getRace,
+  getRaceSeries,
   listOrganisations,
   getOrgLeaderboard,
   joinOrganisation,

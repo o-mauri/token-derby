@@ -1,0 +1,550 @@
+/* Ported (best-effort, not pixel-perfect) from site/public/styles.css's race
+ * view rules — scoped under .race-track-window so nothing leaks into the
+ * popover/other app windows, which use their own --td-* theme. Deliberately
+ * dropped vs. the site: the crowd strip (needs site-only image assets under
+ * site/public/img/), the pixel webfont (falls back to the mono stack below),
+ * and TV-mode/media-query sizing. Full visual/animation fidelity is a
+ * deferred manual-verify item (see task-D1-report.md) — this file exists so
+ * the ported DOM structure isn't fully unstyled, not as a finished design.
+ */
+.race-track-window {
+  --bg: #000000;
+  --panel: #1a1a1a;
+  --text: #f5e9d3;
+  --muted: #9ca3af;
+  --accent: #d1d5db;
+  --border: #3a3a3a;
+  --lane: #3d2856;
+  --track-gap: 0px;
+  --horse-height: 60px;
+  --sprite-scale: 2;
+  --label-col: 124px;
+  --label-mid: 23%;
+  --ticker-h: 2.6rem;
+  --pixel-font: "VT323", "Courier New", ui-monospace, monospace;
+
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--pixel-font);
+  font-size: 16px;
+  line-height: 1.25;
+}
+
+.race-track-window .horse-face {
+  height: 1em;
+  width: auto;
+  image-rendering: pixelated;
+  shape-rendering: crispEdges;
+  flex-shrink: 0;
+}
+
+.race-track-window .btn {
+  background: var(--accent);
+  color: var(--bg);
+  border: none;
+  padding: 4px 12px;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: bold;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  border-radius: 3px;
+}
+.race-track-window .btn:hover { filter: brightness(1.1); }
+
+.race-track-window .race {
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  min-height: 100vh;
+}
+.race-track-window .race-header {
+  padding: 6px 24px;
+  border-bottom: 2px solid var(--panel);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.race-track-window .race-header h1 { margin: 0; color: var(--accent); font-size: 1.15rem; letter-spacing: 0.05em; display: flex; align-items: center; gap: 0.4em; }
+.race-track-window .race-header .meta { color: var(--muted); display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+.race-track-window .race-header .meta b { color: var(--text); font-weight: normal; }
+.race-track-window .race-status { text-transform: uppercase; letter-spacing: 0.1em; }
+.race-track-window .race-status--pending { color: var(--accent); }
+.race-track-window .race-status--live { color: #7bed9f; }
+.race-track-window .race-status--finished { color: var(--muted); }
+
+.race-track-window .track {
+  padding: 0 4px 24px 4px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--track-gap);
+  overflow-y: auto;
+}
+
+.race-track-window .lane {
+  flex: 0 0 var(--horse-height);
+  height: var(--horse-height);
+  display: flex;
+  align-items: stretch;
+}
+.race-track-window .lane-info {
+  flex: 0 0 var(--label-col);
+  position: relative;
+  pointer-events: none;
+}
+.race-track-window .lane-info-box {
+  position: absolute;
+  top: var(--label-mid);
+  left: 4px;
+  right: 6px;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 1px 6px;
+  background: #1d1d24;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+  line-height: 1.0;
+  letter-spacing: 0.02em;
+}
+.race-track-window .horse-name-row,
+.race-track-window .horse-tokens-row {
+  overflow: hidden;
+  white-space: nowrap;
+}
+.race-track-window .horse-tokens-row { margin-top: -2px; }
+.race-track-window .row-scroll {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  will-change: transform;
+}
+.race-track-window .row-scroll.is-scrolling {
+  animation: td-label-marquee 7s ease-in-out infinite;
+}
+@keyframes td-label-marquee {
+  0%, 16%   { transform: translateX(0); }
+  46%, 54%  { transform: translateX(var(--shift, 0)); }
+  84%, 100% { transform: translateX(0); }
+}
+.race-track-window .horse-stats-row {
+  display: grid;
+  align-items: center;
+  overflow: hidden;
+  margin-top: -2px;
+}
+.race-track-window .stat-view {
+  grid-area: 1 / 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  animation: td-stat-cycle 12s ease-in-out infinite;
+}
+.race-track-window .stat-view:nth-child(2) { animation-delay: -9s; }
+.race-track-window .stat-view:nth-child(3) { animation-delay: -6s; }
+.race-track-window .stat-view:nth-child(4) { animation-delay: -3s; }
+@keyframes td-stat-cycle {
+  0%   { opacity: 1; }
+  21%  { opacity: 1; }
+  25%  { opacity: 0; }
+  96%  { opacity: 0; }
+  100% { opacity: 1; }
+}
+.race-track-window .horse-stats-row.is-league .stat-view { animation-name: td-stat-cycle-5; }
+.race-track-window .horse-stats-row.is-league .stat-view:nth-child(2) { animation-delay: -9.6s; }
+.race-track-window .horse-stats-row.is-league .stat-view:nth-child(3) { animation-delay: -7.2s; }
+.race-track-window .horse-stats-row.is-league .stat-view:nth-child(4) { animation-delay: -4.8s; }
+.race-track-window .horse-stats-row.is-league .stat-view:nth-child(5) { animation-delay: -2.4s; }
+@keyframes td-stat-cycle-5 {
+  0%   { opacity: 1; }
+  16%  { opacity: 1; }
+  20%  { opacity: 0; }
+  96%  { opacity: 0; }
+  100% { opacity: 1; }
+}
+.race-track-window .lane-track {
+  position: relative;
+  flex: 1 1 auto;
+  background: var(--lane);
+  border-radius: 4px;
+}
+.race-track-window .lane-track::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 4px;
+  background: #fff;
+}
+.race-track-window .lane-track::after {
+  content: "";
+  position: absolute;
+  right: 0; top: 0; bottom: 0;
+  width: 20px;
+  background:
+    conic-gradient(#fff 25%, #000 25% 50%, #fff 50% 75%, #000 75%) 0 0 / 10px 10px;
+  background-color: #fff;
+}
+.race-track-window .horse {
+  position: absolute;
+  top: -30%;
+  transform: translate(-50%, 0);
+  transition: left 3s linear;
+  height: 80%;
+  aspect-ratio: 32 / 24;
+  z-index: 1;
+}
+.race-track-window .horse-sprite { width: 100%; height: 100%; display: block; }
+.race-track-window .horse-dust {
+  position: absolute;
+  left: 8%;
+  bottom: -1px;
+  width: 7px;
+  height: 5px;
+  background: rgba(75, 55, 45, 0.85);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0;
+}
+.race-track-window .horse-dust::before,
+.race-track-window .horse-dust::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: inherit;
+  border-radius: inherit;
+}
+.race-track-window .horse.live .horse-dust          { animation: td-dust-puff 0.7s ease-out infinite; }
+.race-track-window .horse.live .horse-dust::before  { animation: td-dust-puff 0.7s ease-out infinite; animation-delay: 0.23s; }
+.race-track-window .horse.live .horse-dust::after   { animation: td-dust-puff 0.7s ease-out infinite; animation-delay: 0.46s; }
+@keyframes td-dust-puff {
+  0%   { opacity: 0;    transform: translate(0, 0)        scale(0.4); }
+  20%  { opacity: 0.75;                                              }
+  100% { opacity: 0;    transform: translate(-16px, -5px) scale(1.6); }
+}
+
+.race-track-window .horse-label { color: var(--text); font-size: 0.65rem; font-weight: 600; }
+.race-track-window .horse-level {
+  display: inline-block;
+  padding: 0 4px;
+  font-weight: 600;
+  font-size: 0.55rem;
+  text-transform: uppercase;
+  color: #fff;
+  background: #2563eb;
+  border-radius: 999px;
+  letter-spacing: 0.02em;
+  line-height: 1.4;
+}
+.race-track-window .user-label { color: var(--text); opacity: 0.6; font-size: 0.6rem; }
+.race-track-window .horse-tokens { color: #fbbf24; font-size: 0.65rem; font-weight: 600; }
+.race-track-window .horse-pace { color: var(--accent); font-size: 0.6rem; font-weight: bold; }
+.race-track-window .horse-position { font-size: 0.65rem; font-weight: bold; color: #aab0b8; }
+.race-track-window .horse-position.pos-1 { color: #ffd700; }
+.race-track-window .horse-position.pos-2 { color: #c8ccd2; }
+.race-track-window .horse-position.pos-3 { color: #cd7f32; }
+.race-track-window .horse-league-pos { font-size: 0.65rem; font-weight: bold; color: #a68bd8; }
+
+/* ── Leg/body animation (identical to the site's — pure sprite transforms) ── */
+.race-track-window .leg-back        { transform-origin: 6px 16px; }
+.race-track-window .leg-back-lower  { transform-origin: 6px 18px; }
+.race-track-window .leg-front       { transform-origin: 18px 16px; }
+.race-track-window .leg-front-lower { transform-origin: 18px 18px; }
+@keyframes td-hip-back {
+  0%   { transform: rotate(18deg); }
+  50%  { transform: rotate(-16deg); }
+  100% { transform: rotate(18deg); }
+}
+@keyframes td-hip-front {
+  0%   { transform: rotate(-16deg); }
+  50%  { transform: rotate(18deg); }
+  100% { transform: rotate(-16deg); }
+}
+@keyframes td-knee-back {
+  0%   { transform: rotate(0deg); }
+  30%  { transform: rotate(-28deg); }
+  50%  { transform: rotate(-12deg); }
+  80%  { transform: rotate(-20deg); }
+  100% { transform: rotate(0deg); }
+}
+@keyframes td-knee-front {
+  0%   { transform: rotate(0deg); }
+  20%  { transform: rotate(20deg); }
+  50%  { transform: rotate(0deg); }
+  70%  { transform: rotate(28deg); }
+  100% { transform: rotate(0deg); }
+}
+@keyframes td-body-bob {
+  0%, 100% { transform: translate(-50%, 0); }
+  25%      { transform: translate(-50%, -1px); }
+  75%      { transform: translate(-50%, 0.5px); }
+}
+.race-track-window .horse.live .leg-back,
+.race-track-window .horse.pending .leg-back { animation: td-hip-back 0.4s ease-in-out infinite; }
+.race-track-window .horse.live .leg-back-lower,
+.race-track-window .horse.pending .leg-back-lower { animation: td-knee-back 0.4s ease-in-out infinite; }
+.race-track-window .horse.live .leg-front,
+.race-track-window .horse.pending .leg-front { animation: td-hip-front 0.4s ease-in-out infinite; }
+.race-track-window .horse.live .leg-front-lower,
+.race-track-window .horse.pending .leg-front-lower { animation: td-knee-front 0.4s ease-in-out infinite; }
+.race-track-window .horse.live,
+.race-track-window .horse.pending { animation: td-body-bob 0.4s ease-in-out infinite; }
+
+/* ── Pending / finished ─────────────────────────────── */
+.race-track-window .pending-banner {
+  text-align: center;
+  padding: 16px;
+  background: var(--panel);
+  border-bottom: 2px solid var(--accent);
+  font-size: 1.15rem;
+  color: var(--accent);
+  letter-spacing: 0.1em;
+}
+.race-track-window .finished .horse { transition: left 1s ease-out, transform 1s ease-out, opacity 1s ease-out; }
+
+.race-track-window .podium {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: safe center;
+  gap: 24px;
+  padding: 24px 24px calc(var(--ticker-h) + 24px);
+  overflow-y: auto;
+  animation: td-fade-in 1s ease-out forwards;
+  z-index: 10000;
+}
+@keyframes td-fade-in { from { opacity: 0; } to { opacity: 1; } }
+.race-track-window .podium h2 { color: var(--accent); margin: 0; font-size: 1.6rem; letter-spacing: 0.1em; }
+.race-track-window .podium ol { list-style: none; padding: 0; margin: 0; display: flex; align-items: flex-end; gap: 16px; }
+.race-track-window .podium li {
+  background: var(--panel);
+  padding: 16px;
+  border-radius: 6px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 160px;
+}
+.race-track-window .podium li:nth-child(1) { border: 2px solid gold; transform: translateY(-16px); }
+.race-track-window .podium li:nth-child(2) { border: 2px solid silver; }
+.race-track-window .podium li:nth-child(3) { border: 2px solid #cd7f32; }
+.race-track-window .podium .place { font-size: 1.8rem; }
+.race-track-window .podium .name { font-weight: bold; }
+.race-track-window .podium .podium-user { color: var(--muted); font-size: 0.7em; }
+.race-track-window .podium .tokens { color: var(--muted); }
+.race-track-window .podium .xp-line { display: flex; gap: 8px; align-items: center; justify-content: center; margin-top: 4px; }
+.race-track-window .podium .level-chip {
+  display: inline-block;
+  padding: 2px 6px;
+  font-size: 0.7em;
+  color: #67e8f9;
+  border: 1px solid #67e8f9;
+  border-radius: 3px;
+  letter-spacing: 0.04em;
+}
+.race-track-window .podium .xp-gained { color: #67e8f9; font-weight: bold; font-size: 0.85em; }
+.race-track-window .podium .xp-bar { width: 150px; height: 8px; background: rgba(255, 255, 255, 0.1); border-radius: 4px; overflow: hidden; }
+.race-track-window .podium .xp-bar-fill { height: 100%; background: #67e8f9; transition: width 1.5s ease-out; }
+.race-track-window .podium .xp-bar-text { color: var(--muted); font-size: 0.7em; }
+.race-track-window .podium .level-up-banner {
+  margin-top: 6px;
+  color: gold;
+  font-weight: bold;
+  font-size: 0.95rem;
+  letter-spacing: 0.18em;
+  text-shadow: 0 0 12px rgba(255, 215, 0, 0.6);
+  animation: td-level-up-pulse 0.8s ease-in-out 0.3s infinite alternate;
+}
+@keyframes td-level-up-pulse {
+  from { transform: scale(1); }
+  to { transform: scale(1.12); }
+}
+.race-track-window .podium .standings-table { border-collapse: collapse; color: var(--text); background: var(--panel); border-radius: 6px; overflow: hidden; max-width: 90vw; }
+.race-track-window .podium .standings-table th,
+.race-track-window .podium .standings-table td { padding: 6px 14px; font-size: 0.85em; text-align: left; }
+.race-track-window .podium .standings-table th {
+  font-size: 0.75em;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+.race-track-window .podium .standings-table tbody tr:nth-child(even) { background: rgba(255, 255, 255, 0.03); }
+.race-track-window .podium .standings-table .rank { color: var(--muted); }
+.race-track-window .podium .standings-table .horse-name { font-weight: bold; }
+.race-track-window .podium .standings-table .horse-name .jockey { color: var(--muted); font-weight: normal; font-size: 0.9em; }
+.race-track-window .podium .standings-table .levelled-up { color: gold; font-weight: bold; }
+.race-track-window .podium .dismiss {
+  background: var(--accent);
+  color: var(--bg);
+  border: none;
+  padding: 8px 16px;
+  font: inherit;
+  cursor: pointer;
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 100;
+}
+.race-track-window .podium .dismiss:hover { filter: brightness(1.1); }
+
+.race-track-window .detail-cycle { display: grid; width: min(960px, 94vw); }
+.race-track-window .detail-cycle > .detail-face { grid-area: 1 / 1; opacity: 0; transition: opacity 0.6s ease; pointer-events: none; }
+.race-track-window .detail-cycle > .detail-face.is-active { opacity: 1; pointer-events: auto; }
+@media (prefers-reduced-motion: reduce) { .race-track-window .detail-cycle > .detail-face { transition: none; } }
+
+.race-track-window .chart-face { display: flex; flex-direction: column; gap: 8px; }
+.race-track-window .chart-title { color: var(--accent); letter-spacing: 0.08em; text-transform: uppercase; font-size: 0.9rem; }
+.race-track-window .chart-svg { width: 100%; height: auto; background: #0c0c0c; border: 1px solid #222; }
+.race-track-window .chart-grid { stroke: #222; stroke-width: 1; }
+.race-track-window .chart-line { stroke-linejoin: round; stroke-linecap: round; }
+.race-track-window .chart-axis { fill: #888; font-size: 10px; }
+.race-track-window .chart-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 0.85rem; color: #ccc; }
+.race-track-window .legend-item { display: inline-flex; align-items: center; gap: 5px; }
+.race-track-window .legend-chip { width: 10px; height: 10px; display: inline-block; }
+.race-track-window .detail-cycle > .chart-face {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  justify-content: center;
+  gap: 18px;
+  padding: clamp(20px, 4vw, 64px);
+  background: #0a0a0a;
+}
+.race-track-window .chart-face .chart-title { font-size: 1.3rem; text-align: center; }
+.race-track-window .chart-face .chart-svg { height: 60vh; border: none; }
+.race-track-window .chart-face .chart-legend { justify-content: center; gap: 8px 20px; font-size: 1rem; }
+.race-track-window .chart-face .legend-chip { width: 14px; height: 14px; }
+
+.race-track-window .season-face { text-align: left; }
+.race-track-window .season-face-head { text-transform: uppercase; letter-spacing: 0.18em; font-size: 0.8rem; color: #a68bd8; margin: 0 0 10px; }
+.race-track-window .season-champion { display: flex; align-items: center; gap: 12px; border: 2px solid #ffd166; background: rgba(255, 209, 102, 0.08); padding: 10px 14px; margin: 0 0 12px; }
+.race-track-window .season-champion-trophy { font-size: 1.8rem; }
+.race-track-window .season-champion-label { font-size: 0.7rem; letter-spacing: 0.15em; color: #ffd166; }
+.race-track-window .season-champion-name { font-size: 1.3rem; color: #fff; }
+.race-track-window .season-champion-name small { color: #9ca3af; font-size: 0.85rem; }
+
+.race-track-window .confetti { position: fixed; inset: 0; overflow: hidden; pointer-events: none; z-index: 5; }
+.race-track-window .confetti span { position: absolute; top: -20px; width: 8px; height: 12px; animation: td-fall 3s linear forwards; }
+@keyframes td-fall { to { transform: translateY(110vh) rotate(720deg); } }
+
+/* ── Achievement ticker ──────────────────────────────── */
+.race-track-window .achievement-ticker {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--ticker-h);
+  overflow: hidden;
+  z-index: 9999;
+  background: linear-gradient(180deg, rgba(12, 12, 12, 0.94), rgba(20, 20, 20, 0.98));
+  border-top: 2px solid #ffd166;
+  box-shadow: 0 -4px 18px rgba(0, 0, 0, 0.45);
+  white-space: nowrap;
+  transition: opacity 0.3s ease;
+}
+.race-track-window .achievement-ticker.is-empty { opacity: 0; pointer-events: none; }
+.race-track-window .achievement-ticker-track {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  height: 100%;
+  width: max-content;
+  will-change: transform;
+}
+.race-track-window .achievement-ticker-item {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  height: 100%;
+  padding: 0 1.5rem 0 0;
+  font-size: 0.95rem;
+  line-height: var(--ticker-h);
+  color: #fff;
+}
+.race-track-window .achievement-ticker-xp { font-weight: bold; color: #ffd166; }
+.race-track-window .achievement-ticker-horse { font-weight: bold; }
+.race-track-window .achievement-ticker-name { color: #ffd166; }
+.race-track-window .achievement-ticker-desc { color: #aaa; }
+.race-track-window .achievement-ticker-sep {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  height: 100%;
+  padding: 0 1.5rem;
+  color: #ffd166;
+  opacity: 0.55;
+}
+.race-track-window .achievement-ticker-gap { flex: 0 0 auto; height: 100%; }
+.race-track-window .race:has(.achievement-ticker:not(.is-empty)) { padding-bottom: var(--ticker-h); }
+
+.race-track-window .ticker-order,
+.race-track-window .ticker-standing {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4em;
+  padding: 0 0.9rem;
+  white-space: nowrap;
+}
+.race-track-window .ticker-order-pos,
+.race-track-window .ticker-standing-pos { color: var(--muted); }
+.race-track-window .ticker-order-name,
+.race-track-window .ticker-standing-name { color: var(--text); }
+.race-track-window .ticker-order-val { color: #d98a8a; font-variant-numeric: tabular-nums; }
+.race-track-window .ticker-order-val--leader { color: #7bed9f; }
+.race-track-window .ticker-standing-total { color: var(--text); font-weight: bold; font-variant-numeric: tabular-nums; }
+.race-track-window .ticker-standing-total--leader { color: #ffd166; }
+.race-track-window .ticker-standing-gain { color: #7bed9f; font-variant-numeric: tabular-nums; }
+.race-track-window .ticker-group-label {
+  color: var(--bg);
+  background: var(--accent);
+  padding: 0 0.4rem;
+  font-size: 0.85em;
+  letter-spacing: 0.06em;
+  margin-right: 0.2em;
+}
+.race-track-window .ticker-group-label.ticker-div-1 { background: #ffd166; color: #0b0b0f; }
+.race-track-window .ticker-group-label.ticker-div-2 { background: #4db8ff; color: #0b0b0f; }
+.race-track-window .ticker-group-label.ticker-div-3 { background: #a68bd8; color: #0b0b0f; }
+.race-track-window .ticker-group-sep { color: #6b4f95; padding: 0 2.4rem; }
+.race-track-window .ticker-section-gap { display: inline-block; width: 150px; }
+.race-track-window .ticker-section-gap--wide { width: 600px; }
+
+.race-track-window .detail-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.9rem;
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 24px;
+  z-index: 100;
+}
+.race-track-window .detail-nav-btn {
+  background: var(--panel);
+  color: var(--text);
+  border: 2px solid var(--border);
+  font-family: inherit;
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 0.15rem 0.7rem;
+  cursor: pointer;
+}
+.race-track-window .detail-nav-btn:hover { border-color: var(--accent); }
+.race-track-window .facedots { display: flex; align-items: center; gap: 0.45rem; }
+.race-track-window .facedot { width: 9px; height: 9px; padding: 0; border: none; background: var(--border); cursor: pointer; }
+.race-track-window .facedot.is-active { background: var(--accent); }
+
+.race-track-window .error { padding: 40px; text-align: center; color: var(--muted); }
+.race-track-window .error h2 { color: var(--accent); }

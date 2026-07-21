@@ -26,6 +26,18 @@ describe('endpoints', () => {
     expect((fetch.mock.calls[0]?.[1] as RequestInit).method).toBe('GET');
   });
 
+  it('getRaceSeries GETs /races/<joinCode>/series', async () => {
+    const fetch = vi.fn().mockResolvedValue({
+      ok: true, status: 200,
+      headers: { get: () => 'application/json' },
+      text: async () => JSON.stringify({ start_ms: 0, end_ms: 1, horses: [] }),
+    });
+    const { getRaceSeries } = makeEndpoints(fetch);
+    await getRaceSeries('JC1234');
+    expect(fetch.mock.calls[0]?.[0]).toBe('https://x/api/races/JC1234/series');
+    expect((fetch.mock.calls[0]?.[1] as RequestInit).method).toBe('GET');
+  });
+
   it('listStable GETs /jockey/me/horses', async () => {
     const fetch = vi.fn().mockResolvedValue({
       ok: true, status: 200,
