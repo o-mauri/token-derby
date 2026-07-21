@@ -1,10 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { raceStatusLabel, canRace } from '../src/screens/race-mode.js';
+import { raceStatusLabel } from '../src/screens/race-mode.js';
 import type { ActiveRaceStatus } from '../electron/ipc.js';
-import type { Standing } from '../src/screens/race-standings.js';
-import type { HorseColors } from '@token-derby/shared';
-
-const COLORS: HorseColors = { body: '#8B4513', mane: '#f5e9d3', tail: '#f5e9d3', saddle: '#3d2856' };
 
 function fakeStatus(overrides: Partial<ActiveRaceStatus> = {}): ActiveRaceStatus {
   return {
@@ -15,18 +11,6 @@ function fakeStatus(overrides: Partial<ActiveRaceStatus> = {}): ActiveRaceStatus
     tokens: 1_200_000,
     status: 'live',
     stalled: false,
-    ...overrides,
-  };
-}
-
-function fakeStanding(overrides: Partial<Standing> & { horse_id: string }): Standing {
-  return {
-    rank: 1,
-    name: 'Horse',
-    tokens: 0,
-    colors: COLORS,
-    isYou: false,
-    isLeader: false,
     ...overrides,
   };
 }
@@ -42,21 +26,5 @@ describe('raceStatusLabel', () => {
 
   it('formats sub-1000 token counts as plain integers', () => {
     expect(raceStatusLabel(fakeStatus({ rank: 1, tokens: 500 }))).toBe('P1 · 500');
-  });
-});
-
-describe('canRace', () => {
-  it('is true when there is no active race', () => {
-    expect(canRace([], null)).toBe(true);
-  });
-
-  it('is true when the active race\'s horse is not among these standings (a different race is being viewed)', () => {
-    const standings = [fakeStanding({ horse_id: 'h-other' })];
-    expect(canRace(standings, fakeStatus({ horseId: 'h-1' }))).toBe(true);
-  });
-
-  it('is false when the active race\'s horse IS among these standings (viewing the race you are racing)', () => {
-    const standings = [fakeStanding({ horse_id: 'h-1' }), fakeStanding({ horse_id: 'h-other' })];
-    expect(canRace(standings, fakeStatus({ horseId: 'h-1' }))).toBe(false);
   });
 });

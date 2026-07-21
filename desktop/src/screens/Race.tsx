@@ -8,7 +8,7 @@ import { errorMessage } from '../lib/errors.js';
 import { formatTokens } from '../lib/format.js';
 import HorseSprite from '../sprites/HorseSprite.js';
 import { mapStandings } from './race-standings.js';
-import { raceStatusLabel, canRace } from './race-mode.js';
+import { raceStatusLabel } from './race-mode.js';
 
 const MODEL_LABELS: Record<ModelKey, string> = { claude: 'Claude', codex: 'Codex', gemini: 'Gemini' };
 
@@ -25,9 +25,12 @@ function messageFor(err: unknown): string {
 // getActiveRace() on mount plus the pushed RACING_STATUS_CHANNEL updates —
 // with a LIVE indicator, Stop racing, and Open race track. Whenever a race
 // is active, `submittedCode` is kept in step with its join code so the same
-// standings machinery above renders it; canRace() (race-mode.ts) decides
-// which of the two (picker vs. active panel) to show based on whether that
-// active horse has actually shown up in these standings yet.
+// standings machinery above renders it. The panel's visibility is driven
+// directly off `activeRace` (the getActiveRace/pushed-status source of
+// truth) rather than off `standings` — `usePoll`'s 60s cadence means
+// standings can lag well behind a just-started race, and gating Stop racing
+// on that would leave a freshly-started race un-stoppable for up to a
+// minute.
 export default function Race() {
   const [joinCode, setJoinCode] = useState('');
   const [submittedCode, setSubmittedCode] = useState('');
@@ -79,7 +82,7 @@ export default function Race() {
     }
   }, [activeRace, submittedCode]);
 
-  const { data: race, error, loading } = usePoll(
+  const { data: race, error, loading, refresh: refreshRace } = usePoll(
     () => api.getRace(submittedCode),
     60000,
     submittedCode !== '',
@@ -89,12 +92,6 @@ export default function Race() {
     () => (race ? mapStandings(race, yourHorseIds) : []),
     [race, yourHorseIds],
   );
-
-  // Non-null once the active race's horse actually shows up in these
-  // standings — null for the brief window right after starting, before the
-  // next `getRace` poll catches up with the newly-joined code.
-  const activePanel: ActiveRaceStatus | null =
-    activeRace && !canRace(standings, activeRace) ? activeRace : null;
 
   function resetSelectedModel() {
     setSelectedModel('claude');
@@ -129,6 +126,10 @@ export default function Race() {
       } else {
         setNeedsConfirm(false);
         setActiveRace(await api.getActiveRace());
+        // Standings still poll on their own 60s cadence — kick off an
+        // immediate refetch so the just-joined horse's row shows up right
+        // away rather than after the next scheduled tick.
+        refreshRace();
       }
     } catch (err) {
       setStartError(messageFor(err));
@@ -149,10 +150,16 @@ export default function Race() {
     }
   }
 
-  function handleOpenTrack() {
+  async function handleOpenTrack() {
     if (!activeRace) return;
     setOpeningTrack(true);
-    api.openRaceTrack(activeRace.joinCode).finally(() => setOpeningTrack(false));
+    try {
+      await api.openRaceTrack(activeRace.joinCode);
+    } catch (err) {
+      setStartError(messageFor(err));
+    } finally {
+      setOpeningTrack(false);
+    }
   }
 
   if (!activeRaceChecked && !submittedCode) {
@@ -202,8 +209,8 @@ export default function Race() {
     <div className="race-panel">
       <div className="race-panel-header">
         <span className="race-panel-name">{race.name}</span>
-        {activePanel ? (
-          <span className="race-live-indicator">LIVE · {raceStatusLabel(activePanel)}</span>
+        {activeRace ? (
+          <span className="race-live-indicator">LIVE · {raceStatusLabel(activeRace)}</span>
         ) : (
           isLive && <span className="race-live-indicator">LIVE · 60s</span>
         )}
@@ -229,7 +236,7 @@ export default function Race() {
         ))}
       </ol>
 
-      {activePanel ? (
+      {activeRace ? (
         <div className="race-active-actions">
           <button
             type="button"
@@ -248,9 +255,9 @@ export default function Race() {
             Open race track ↗
           </button>
         </div>
-      ) : activeRace === null && stable.length === 0 ? (
+      ) : stable.length === 0 ? (
         <p className="popover-placeholder">Create a horse in the Stable tab to race.</p>
-      ) : activeRace === null ? (
+      ) : (
         <div className="race-mode-picker">
           <label className="race-mode-field">
             <span>Horse</span>
@@ -314,11 +321,12 @@ export default function Race() {
               {starting ? 'Starting…' : 'Race'}
             </button>
           )}
-          {startError && <p className="onboarding-error">{startError}</p>}
         </div>
-      ) : null}
+      )}
 
-      {!activePanel && (
+      {startError && <p className="onboarding-error">{startError}</p>}
+
+      {!activeRace && (
         <button
           type="button"
           className="onboarding-button-link race-change-code"
