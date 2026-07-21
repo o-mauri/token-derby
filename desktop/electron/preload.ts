@@ -30,6 +30,10 @@ const api: DesktopApi = {
   chooseFolder: () => ipcRenderer.invoke(CHANNELS.chooseFolder),
   exportIdentity: () => ipcRenderer.invoke(CHANNELS.exportIdentity),
   quitApp: () => ipcRenderer.invoke(CHANNELS.quitApp),
+  startRace: (joinCode, stableHorseId, primaryModel, opts) =>
+    ipcRenderer.invoke(CHANNELS.startRace, joinCode, stableHorseId, primaryModel, opts),
+  stopRace: () => ipcRenderer.invoke(CHANNELS.stopRace),
+  getActiveRace: () => ipcRenderer.invoke(CHANNELS.getActiveRace),
 };
 
 contextBridge.exposeInMainWorld('api', api);

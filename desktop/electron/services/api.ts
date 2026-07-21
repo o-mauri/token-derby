@@ -1,15 +1,18 @@
 import { app, dialog, shell, type BrowserWindow } from 'electron';
 import { createTransport, createEndpoints, ApiError } from '@token-derby/client';
+import { RACING_COMPAT_VERSION } from '@token-derby/token-engine';
 import type {
   CreateStableHorseRequest,
   UpdateStableHorseRequest,
   EquipHatRequest,
+  ModelKey,
 } from '@token-derby/shared';
-import type { DesktopApi, Bootstrap, Result } from '../ipc.js';
+import type { DesktopApi, Bootstrap, Result, ActiveRaceStatus } from '../ipc.js';
 import { loadConfig, saveConfig, resolveApiBase, type Config } from '../config.js';
 import * as identityStore from '../identity.js';
 import { createAppWindow } from '../windows.js';
 import { checkForUpdate as runUpdateCheck, type UpdateCheckResult } from '../updater.js';
+import * as racingEngine from '../racing/engine.js';
 
 // Resolved lazily (Electron's `app` isn't available until the app is ready,
 // and doesn't exist at all under vitest) and cached for the process lifetime.
@@ -45,6 +48,9 @@ function getTransport(clientVersion: string = getClientVersion()) {
     baseUrl: () => resolveApiBase(loadConfig()),
     client: 'desktop',
     clientVersion,
+    // Racing endpoints (join/heartbeat/getRace) check this against the
+    // engine's counting rules — see @token-derby/token-engine's compat note.
+    raceCompatVersion: RACING_COMPAT_VERSION,
     getIdentity: async () => {
       const id = await identityStore.load(loadConfig());
       return id ? { user_id: id.user_id, secret_token: id.secret_token } : null;
@@ -256,6 +262,23 @@ async function checkForUpdate(): Promise<Result<UpdateCheckResult>> {
   return guard(() => runUpdateCheck(getClientVersion()));
 }
 
+async function startRace(
+  joinCode: string,
+  stableHorseId: string,
+  primaryModel: ModelKey,
+  opts?: { confirm?: boolean },
+): Promise<Result<{ started: boolean; needsConfirm?: boolean }>> {
+  return guard(() => racingEngine.startRace(joinCode, stableHorseId, primaryModel, opts));
+}
+
+async function stopRace(): Promise<Result<{ ok: true }>> {
+  return guard(() => racingEngine.stopRace());
+}
+
+async function getActiveRace(): Promise<Result<ActiveRaceStatus | null>> {
+  return guard(() => racingEngine.getActiveRace());
+}
+
 export const apiService = {
   getBootstrap,
   initJockey,
@@ -283,4 +306,7 @@ export const apiService = {
   chooseFolder,
   exportIdentity,
   quitApp,
+  startRace,
+  stopRace,
+  getActiveRace,
 } satisfies DesktopApi;

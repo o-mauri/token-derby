@@ -1,10 +1,11 @@
 import { app, ipcMain, shell, Notification, nativeTheme, type BrowserWindow } from 'electron';
 import { createPopover, createAppWindow, positionPopoverUnderTray } from './windows.js';
 import { createTray } from './tray.js';
-import { CHANNELS, type DesktopApi, type Result } from './ipc.js';
+import { CHANNELS, RACING_STATUS_CHANNEL, type DesktopApi, type Result } from './ipc.js';
 import { apiService } from './services/api.js';
 import { loadConfig } from './config.js';
 import * as identityStore from './identity.js';
+import * as racingEngine from './racing/engine.js';
 
 // Menu-bar app: no dock icon, and the app stays resident when all windows close.
 app.dock?.hide();
@@ -68,6 +69,19 @@ app.whenReady().then(async () => {
   const identity = await identityStore.load(loadConfig());
   if (!identity) {
     onboardingWindow = createAppWindow('/onboarding');
+  }
+
+  // Push every racing status change to the popover's renderer. Tray icon/menu
+  // wiring is Task C2 — this registration is structured so that task can add
+  // its own subscriber alongside this one without touching engine.ts.
+  racingEngine.onStatus((status) => {
+    popover.webContents.send(RACING_STATUS_CHANNEL, status);
+  });
+
+  // If a race was mid-flight when the app last quit, resume its heartbeat
+  // loop rather than leaving the horse silently un-heartbeated.
+  if (identity) {
+    await racingEngine.resumeIfActive();
   }
 
   // Best-effort, non-blocking: a slow or unreachable feed should never delay

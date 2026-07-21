@@ -18,6 +18,8 @@ import type {
   RollHatResponse,
   EquipHatRequest,
   EquipHatResponse,
+  ModelKey,
+  RaceStatus,
 } from '@token-derby/shared';
 import type { Config } from './config.js';
 import type { UpdateCheckResult } from './updater.js';
@@ -55,10 +57,31 @@ export const CHANNELS = {
   chooseFolder: 'api:chooseFolder',
   exportIdentity: 'api:exportIdentity',
   quitApp: 'api:quitApp',
+  startRace: 'api:startRace',
+  stopRace: 'api:stopRace',
+  getActiveRace: 'api:getActiveRace',
 } as const;
 
 export type ApiMethod = keyof typeof CHANNELS;
 export type Channel = (typeof CHANNELS)[ApiMethod];
+
+// Main → renderer push whenever the racing engine's status changes (new
+// heartbeat ack, stall, finish, or the race being stopped). Not part of the
+// invoke-style CHANNELS map above since it's a one-way event, not a request.
+export const RACING_STATUS_CHANNEL = 'racing:status';
+
+// Snapshot the racing engine emits on every status change and returns from
+// getActiveRace(). `rank`/`tokens` come from the horse's entry in the race's
+// server-side horse list; `stalled` comes from the score tracker.
+export type ActiveRaceStatus = {
+  joinCode: string;
+  raceName: string;
+  horseId: string;
+  rank: number | null;
+  tokens: number;
+  status: RaceStatus;
+  stalled: boolean;
+};
 
 // Local-only snapshot the renderer uses to decide onboarding vs main UI —
 // no network call, just current config + whatever identity is on disk.
@@ -109,4 +132,14 @@ export type DesktopApi = {
   // "<user_id>:<secret_token>" pair for Settings' "Copy identity" action.
   exportIdentity(): Promise<Result<{ token: string }>>;
   quitApp(): Promise<Result<{ ok: true }>>;
+  // Soft guard: unless opts.confirm, a horse heartbeating within the last two
+  // intervals returns { started: false, needsConfirm: true } instead of joining.
+  startRace(
+    joinCode: string,
+    stableHorseId: string,
+    primaryModel: ModelKey,
+    opts?: { confirm?: boolean },
+  ): Promise<Result<{ started: boolean; needsConfirm?: boolean }>>;
+  stopRace(): Promise<Result<{ ok: true }>>;
+  getActiveRace(): Promise<Result<ActiveRaceStatus | null>>;
 };
