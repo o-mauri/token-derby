@@ -1,17 +1,17 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { scoreFor, readAllSources, type AllSources } from '../../src/tokens/race-tokens.js';
+import { scoreFor, readAllSources, type AllSources } from '../src/race-tokens.js';
 
-vi.mock('../../src/tokens/transcripts.js', async (orig) => ({
-  ...(await orig<typeof import('../../src/tokens/transcripts.js')>()),
+vi.mock('../src/transcripts.js', async (orig) => ({
+  ...(await orig<typeof import('../src/transcripts.js')>()),
   sumTokens: vi.fn(),
   sumTokensByConversation: vi.fn(),
 }));
-vi.mock('../../src/tokens/codex.js', () => ({ sumCodexTokens: vi.fn(), sumCodexByConversation: vi.fn() }));
-vi.mock('../../src/tokens/gemini.js', () => ({ sumGeminiTokens: vi.fn(), sumGeminiByConversation: vi.fn() }));
+vi.mock('../src/codex.js', () => ({ sumCodexTokens: vi.fn(), sumCodexByConversation: vi.fn() }));
+vi.mock('../src/gemini.js', () => ({ sumGeminiTokens: vi.fn(), sumGeminiByConversation: vi.fn() }));
 
-import { sumTokens, sumTokensByConversation } from '../../src/tokens/transcripts.js';
-import { sumCodexTokens, sumCodexByConversation } from '../../src/tokens/codex.js';
-import { sumGeminiTokens, sumGeminiByConversation } from '../../src/tokens/gemini.js';
+import { sumTokens, sumTokensByConversation } from '../src/transcripts.js';
+import { sumCodexTokens, sumCodexByConversation } from '../src/codex.js';
+import { sumGeminiTokens, sumGeminiByConversation } from '../src/gemini.js';
 
 afterEach(() => vi.clearAllMocks());
 

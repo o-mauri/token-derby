@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { sumGeminiTokens, sumGeminiByConversation } from '../../src/tokens/gemini.js';
+import { sumGeminiTokens, sumGeminiByConversation } from '../src/gemini.js';
 
 const dirs: string[] = [];
 async function tmpGemini(): Promise<string> {

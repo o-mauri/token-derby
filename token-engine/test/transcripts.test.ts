@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { sumTokens, sumTokensByConversation } from '../../src/tokens/transcripts.js';
+import { sumTokens, sumTokensByConversation } from '../src/transcripts.js';
 
 const dirs: string[] = [];
 async function tmpProjects(): Promise<string> {

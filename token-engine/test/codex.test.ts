@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { sumCodexTokens, sumCodexByConversation } from '../../src/tokens/codex.js';
+import { sumCodexTokens, sumCodexByConversation } from '../src/codex.js';
 
 const dirs: string[] = [];
 async function tmpCodex(): Promise<string> {

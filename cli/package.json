@@ -17,7 +17,7 @@
     "access": "public"
   },
   "scripts": {
-    "prebuild": "npm run build --workspace=@token-derby/shared && npm run build --workspace=@token-derby/client",
+    "prebuild": "npm run build --workspace=@token-derby/shared && npm run build --workspace=@token-derby/client && npm run build --workspace=@token-derby/token-engine",
     "build": "tsup",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -32,6 +32,7 @@
   "devDependencies": {
     "@token-derby/client": "*",
     "@token-derby/shared": "*",
+    "@token-derby/token-engine": "*",
     "@types/node": "^22.7.0",
     "@types/react": "^18.3.0",
     "ink-testing-library": "^4.0.0",

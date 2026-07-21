@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { RaceScoreTracker, type RaceScoreState } from '../../src/tokens/race-score.js';
-import type { AllSources } from '../../src/tokens/race-tokens.js';
+import { RaceScoreTracker, type RaceScoreState } from '../src/race-score.js';
+import type { AllSources } from '../src/race-tokens.js';
 
 // Primary = claude in these tests. secondary holds codex/gemini scalars.
 function baseState(primaryConv: Record<string, number> = {}): RaceScoreState {

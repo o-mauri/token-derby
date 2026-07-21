@@ -5,6 +5,7 @@
   "workspaces": [
     "shared",
     "client",
+    "token-engine",
     "api",
     "infra",
     "cli",

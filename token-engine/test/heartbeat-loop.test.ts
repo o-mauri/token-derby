@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { runHeartbeatLoop } from '../../src/runtime/heartbeat-loop.js';
+import { runHeartbeatLoop } from '../src/heartbeat-loop.js';
 
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => vi.useRealTimers());

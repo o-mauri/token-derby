@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { PRIMARY_TOP_CONVERSATIONS, primaryConversationCap } from '../../src/tokens/primary-cap.js';
+import { PRIMARY_TOP_CONVERSATIONS, primaryConversationCap } from '../src/primary-cap.js';
 
 describe('primaryConversationCap', () => {
   it('is Infinity (off) when disabled', () => {
