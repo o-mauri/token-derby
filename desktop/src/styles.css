@@ -675,17 +675,6 @@ body {
   padding: 24px;
 }
 
-.race-track-window {
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  padding: 24px;
-  background: var(--td-dark);
-  font-family: var(--td-mono);
-}
-
 .editor-preview {
   width: 220px;
   flex-shrink: 0;
