@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatTokens } from '../src/lib/format.js';
+import { formatTokens } from '../src/format.js';
 
 describe('formatTokens', () => {
   it('leaves sub-1000 counts as plain integers', () => {

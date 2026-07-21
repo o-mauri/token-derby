@@ -32,15 +32,26 @@ app.whenReady().then(async () => {
   const popover = createPopover();
   let onboardingWindow: BrowserWindow | null = null;
 
-  const tray = createTray(() => {
-    if (popover.isVisible()) {
-      popover.hide();
-      return;
-    }
-    positionPopoverUnderTray(popover, tray.getBounds());
-    popover.show();
-    popover.focus();
-  });
+  const trayHandle = createTray(
+    () => {
+      if (popover.isVisible()) {
+        popover.hide();
+        return;
+      }
+      positionPopoverUnderTray(popover, trayHandle.tray.getBounds());
+      popover.show();
+      popover.focus();
+    },
+    {
+      onOpenRaceTrack: (joinCode) => {
+        void apiService.openRaceTrack(joinCode);
+      },
+      onStopRace: () => {
+        void racingEngine.stopRace();
+      },
+    },
+  );
+  const tray = trayHandle.tray;
 
   for (const method of Object.keys(CHANNELS) as (keyof typeof CHANNELS)[]) {
     const channel = CHANNELS[method];
@@ -71,11 +82,11 @@ app.whenReady().then(async () => {
     onboardingWindow = createAppWindow('/onboarding');
   }
 
-  // Push every racing status change to the popover's renderer. Tray icon/menu
-  // wiring is Task C2 — this registration is structured so that task can add
-  // its own subscriber alongside this one without touching engine.ts.
+  // Push every racing status change to the popover's renderer, and mirror it
+  // onto the tray (title text + right-click quick-menu).
   racingEngine.onStatus((status) => {
     popover.webContents.send(RACING_STATUS_CHANNEL, status);
+    trayHandle.setStatus(status);
   });
 
   // If a race was mid-flight when the app last quit, resume its heartbeat
