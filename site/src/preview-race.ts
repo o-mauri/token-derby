@@ -75,6 +75,7 @@ function snapshot(now: number): GetRaceResponse {
     tz: 'UTC',
     max_participants: 30,
     join_code: JOIN_CODE,
+    organisation_name: 'Acme',
     created_at: new Date(RACE_START_MS - 60 * 60 * 1000).toISOString(),
     status: 'live',
     server_time: new Date(now).toISOString(),

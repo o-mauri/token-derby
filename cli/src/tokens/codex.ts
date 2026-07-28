@@ -2,6 +2,8 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { codexSessionsDir } from '../paths.js';
 import type { TokenTotals } from './transcripts.js';
+import { mapWithConcurrency, SCAN_CONCURRENCY } from './pool.js';
+import { ScanCache, type FileFold } from './scan-cache.js';
 
 // Counts real tokens the Codex CLI produced — same honesty rules as
 // tokens/transcripts.ts. Codex stores one rollout JSONL per session under
@@ -23,10 +25,13 @@ export async function sumCodexByConversation(): Promise<Map<string, TokenTotals>
     ...(await collectRollouts(path.join(root, 'sessions'))),
     ...(await collectRollouts(path.join(root, 'archived_sessions'))),
   ];
+  const cache = await ScanCache.open('codex');
+  const totals = await mapWithConcurrency(files, SCAN_CONCURRENCY, f =>
+    cache.readIncremental(f, CODEX_FOLD).catch(() => ({ input: 0, output: 0 })),
+  );
+  await cache.save();
   const byConv = new Map<string, TokenTotals>();
-  for (const file of files) {
-    byConv.set(file, await lastTokenCount(file)); // one rollout file = one conversation
-  }
+  files.forEach((file, i) => byConv.set(file, totals[i]!)); // one rollout file = one conversation
   return byConv;
 }
 
@@ -56,26 +61,25 @@ async function collectRollouts(dir: string): Promise<string[]> {
   return out;
 }
 
-/** Parse a rollout file and return the fresh-input/output from its LAST token_count event. */
-async function lastTokenCount(file: string): Promise<TokenTotals> {
-  let raw: string;
-  try {
-    raw = await fs.readFile(file, 'utf8');
-  } catch {
-    return { input: 0, output: 0 };
-  }
-  let usage: any = null;
-  for (const line of raw.split('\n')) {
-    if (!line.trim()) continue;
-    let parsed: any;
-    try { parsed = JSON.parse(line); } catch { continue; }
-    if (parsed?.payload?.type === 'token_count' && parsed.payload.info?.total_token_usage) {
-      usage = parsed.payload.info.total_token_usage; // keep overwriting → last wins
+// total_token_usage is a CUMULATIVE session total, so folding is last-wins, not
+// additive: a newly appended token_count REPLACES the cached value, and a chunk
+// carrying no such event leaves the cached value standing.
+const CODEX_FOLD: FileFold<TokenTotals> = {
+  empty: () => ({ input: 0, output: 0 }),
+  append: (acc, lines) => {
+    let usage: any = null;
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      let parsed: any;
+      try { parsed = JSON.parse(line); } catch { continue; }
+      if (parsed?.payload?.type === 'token_count' && parsed.payload.info?.total_token_usage) {
+        usage = parsed.payload.info.total_token_usage; // keep overwriting → last wins
+      }
     }
-  }
-  if (!usage) return { input: 0, output: 0 };
-  return {
-    input: Math.max(0, num(usage.input_tokens) - num(usage.cached_input_tokens)),
-    output: num(usage.output_tokens),
-  };
-}
+    if (!usage) return acc;
+    return {
+      input: Math.max(0, num(usage.input_tokens) - num(usage.cached_input_tokens)),
+      output: num(usage.output_tokens),
+    };
+  },
+};

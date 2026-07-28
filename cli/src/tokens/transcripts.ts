@@ -15,6 +15,8 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { claudeProjectsDir } from '../paths.js';
+import { mapWithConcurrency, SCAN_CONCURRENCY } from './pool.js';
+import { ScanCache, type FileFold } from './scan-cache.js';
 
 // `input` here is "fresh-input" tokens only: input_tokens (this turn's new
 // content) + cache_creation_input_tokens (tokens written into the cache this
@@ -43,15 +45,18 @@ function conversationId(file: string, root: string): string {
 export async function sumTokensByConversation(): Promise<Map<string, TokenTotals>> {
   const root = claudeProjectsDir();
   const files = await listJsonlFiles(root); // throws on missing root → fail-loud
+  const cache = await ScanCache.open('claude');
+  const totals = await mapWithConcurrency(files, SCAN_CONCURRENCY, f => cache.readIncremental(f, CLAUDE_FOLD));
+  await cache.save(); // only after a clean scan — a throw above must not commit
   const byConv = new Map<string, TokenTotals>();
-  for (const file of files) {
-    const t = await sumFile(file);
+  files.forEach((file, i) => {
+    const t = totals[i]!;
     const id = conversationId(file, root);
     const acc = byConv.get(id) ?? { input: 0, output: 0 };
     acc.input += t.input;
     acc.output += t.output;
     byConv.set(id, acc);
-  }
+  });
   return byConv;
 }
 
@@ -94,18 +99,21 @@ function addNum(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : 0;
 }
 
-async function sumFile(file: string): Promise<TokenTotals> {
-  const raw = await fs.readFile(file, 'utf8'); // throws on read error — do not swallow
-  let input = 0;
-  let output = 0;
-  for (const line of raw.split('\n')) {
-    if (!line.trim()) continue;
-    let parsed: any;
-    try { parsed = JSON.parse(line); } catch { continue; }
-    const usage = parsed?.message?.usage;
-    if (!usage) continue;
-    input += addNum(usage.input_tokens) + addNum(usage.cache_creation_input_tokens);
-    output += addNum(usage.output_tokens);
-  }
-  return { input, output };
-}
+// Transcripts are append-only, so a file's totals are the running sum of every
+// line ever written — newly appended lines simply add to the cached value.
+const CLAUDE_FOLD: FileFold<TokenTotals> = {
+  empty: () => ({ input: 0, output: 0 }),
+  append: (acc, lines) => {
+    let { input, output } = acc;
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      let parsed: any;
+      try { parsed = JSON.parse(line); } catch { continue; }
+      const usage = parsed?.message?.usage;
+      if (!usage) continue;
+      input += addNum(usage.input_tokens) + addNum(usage.cache_creation_input_tokens);
+      output += addNum(usage.output_tokens);
+    }
+    return { input, output }; // fresh object: never mutate the cached value
+  },
+};

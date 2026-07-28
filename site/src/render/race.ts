@@ -32,6 +32,7 @@ export function renderRace(root: HTMLElement, joinCode: string, opts: RenderRace
         <span>Status: <b class="race-status">—</b></span>
         <span>Time left: <b class="race-time-left">—</b></span>
         <span>Join code: <b>${joinCode}</b></span>
+        <button type="button" class="btn org-btn" hidden>← Org</button>
         <button type="button" class="btn home-btn">← Home</button>
       </div>
     </header>
@@ -99,6 +100,15 @@ export function renderRace(root: HTMLElement, joinCode: string, opts: RenderRace
     window.dispatchEvent(new PopStateEvent('popstate'));
   });
 
+  // Org back-button — revealed in onSnapshot once we know the race belongs to an org.
+  const orgBtn = frame.querySelector<HTMLButtonElement>('.org-btn')!;
+  let orgName: string | null = null;
+  orgBtn.addEventListener('click', () => {
+    if (!orgName) return;
+    window.history.pushState({}, '', `/org/${encodeURIComponent(orgName)}`);
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  });
+
 
   const ctrl = new AbortController();
   let finishedTeardown: (() => void) | null = null;
@@ -133,6 +143,11 @@ export function renderRace(root: HTMLElement, joinCode: string, opts: RenderRace
     const now = new Date();
     const nowMs = now.getTime();
     nameEl.textContent = race.name;
+    if (race.organisation_name) {
+      orgName = race.organisation_name;
+      orgBtn.textContent = `← ${race.organisation_name}`;
+      orgBtn.hidden = false;
+    }
     statusEl.textContent = race.status;
     statusEl.className = `race-status race-status--${race.status}`;
     countdownAnchor = { atMs: nowMs, timeLeftSeconds: race.time_left_seconds };

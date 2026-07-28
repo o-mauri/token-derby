@@ -1,5 +1,45 @@
 [
   {
+    "version": "0.12.0",
+    "date": "2026-07-28",
+    "component": "site",
+    "changes": [
+      "added return to org button on race screen"
+    ]
+  },
+  {
+    "version": "2.12.3",
+    "date": "2026-07-28",
+    "component": "cli",
+    "changes": [
+      "multiple fixes to prevent stuck cli with large cli usage folders"
+    ]
+  },
+  {
+    "version": "0.11.2",
+    "date": "2026-07-20",
+    "component": "site",
+    "changes": [
+      "set back minimum cli version"
+    ]
+  },
+  {
+    "version": "0.11.1",
+    "date": "2026-07-18",
+    "component": "site",
+    "changes": [
+      "updated minimum cli version"
+    ]
+  },
+  {
+    "version": "2.12.2",
+    "date": "2026-07-18",
+    "component": "cli",
+    "changes": [
+      "hidden incorrect model counts"
+    ]
+  },
+  {
     "version": "0.11.0",
     "date": "2026-07-16",
     "component": "site",

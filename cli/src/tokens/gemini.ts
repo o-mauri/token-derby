@@ -2,6 +2,8 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { geminiTmpDir } from '../paths.js';
 import type { TokenTotals } from './transcripts.js';
+import { mapWithConcurrency, SCAN_CONCURRENCY } from './pool.js';
+import { ScanCache } from './scan-cache.js';
 
 // Counts real tokens the Gemini CLI produced — same honesty rules as
 // tokens/transcripts.ts. Sessions live at
@@ -18,10 +20,13 @@ function num(v: unknown): number {
 
 export async function sumGeminiByConversation(): Promise<Map<string, TokenTotals>> {
   const files = await listChatFiles(geminiTmpDir()); // throws on missing root → fail-loud
+  const cache = await ScanCache.open('gemini');
+  const totals = await mapWithConcurrency(files, SCAN_CONCURRENCY, f =>
+    cache.readWhenChanged(f, async raw => sumGeminiRaw(f, raw)).catch(() => ({ input: 0, output: 0 })),
+  );
+  await cache.save();
   const byConv = new Map<string, TokenTotals>();
-  for (const file of files) {
-    byConv.set(file, await sumGeminiFile(file)); // one chat file = one conversation
-  }
+  files.forEach((file, i) => byConv.set(file, totals[i]!)); // one chat file = one conversation
   return byConv;
 }
 
@@ -51,13 +56,9 @@ async function listChatFiles(root: string): Promise<string[]> {
   return out;
 }
 
-async function sumGeminiFile(file: string): Promise<TokenTotals> {
-  let raw: string;
-  try {
-    raw = await fs.readFile(file, 'utf8');
-  } catch {
-    return { input: 0, output: 0 };
-  }
+// Gemini chats are rewritten whole rather than appended to, so there is no
+// offset to resume from — the cache gates on mtime+size and recomputes in full.
+function sumGeminiRaw(file: string, raw: string): TokenTotals {
   const messages = file.endsWith('.jsonl') ? parseJsonl(raw) : parseJson(raw);
   let input = 0;
   let output = 0;

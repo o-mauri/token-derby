@@ -4,13 +4,14 @@ import type { GetRaceResponse, HeartbeatResponse } from '@token-derby/shared';
 import { StatusScreen } from '../ui/StatusScreen.js';
 import { describeAchievement, type RecentEvent } from '@token-derby/shared';
 import { runHeartbeatLoop } from './heartbeat-loop.js';
-import { readAllSources, isStall, type BeatReading } from '../tokens/race-tokens.js';
+import { readAllSources, isStall, scanWithTimeout, type BeatReading } from '../tokens/race-tokens.js';
+import { ScanProgress, diagnoseScanTimeout } from '../tokens/scan-progress.js';
 import { type ModelKey } from '@token-derby/shared';
 import { RaceScoreTracker, type RaceScoreState } from '../tokens/race-score.js';
 import * as endpoints from '../api/endpoints.js';
 import { ApiError } from '../api/client.js';
 import { saveActiveRace, type ActiveRace } from '../stable/active-race.js';
-import { HEARTBEAT_INTERVAL_MS, HEARTBEAT_RETRY_DELAYS_MS } from '../config.js';
+import { HEARTBEAT_INTERVAL_MS, HEARTBEAT_RETRY_DELAYS_MS, SCAN_TIMEOUT_MS } from '../config.js';
 
 export type RunRaceProps = {
   active: ActiveRace;
@@ -52,20 +53,22 @@ export function RunRace({ active, initialState, pendingMode, ownUserName }: RunR
   useEffect(() => {
     const tracker = trackerRef.current;
 
-    const scanWithTimeout = async (): Promise<BeatReading> => {
+    const scanBeat = async (): Promise<BeatReading> => {
+      const progress = new ScanProgress();
       try {
-        return await Promise.race([
-          readAllSources(active, active.primary_model),
-          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('scan timeout')), 10_000)),
-        ]);
-      } catch {
-        return { stall: 'Token scan timed out' };
+        return await scanWithTimeout(
+          () => readAllSources(active, active.primary_model, progress),
+          SCAN_TIMEOUT_MS,
+          () => diagnoseScanTimeout(SCAN_TIMEOUT_MS, progress),
+        );
+      } catch (e: any) {
+        return { stall: `Token scan failed: ${e?.message ?? String(e)}` };
       }
     };
 
     runHeartbeatLoop({
       prepareBeat: async () => {
-        const reading = await scanWithTimeout();
+        const reading = await scanBeat();
         tracker.recordReading(reading);
         if (pendingRef.current && !isStall(reading)) tracker.reprime();
         setStalled(tracker.stalled);

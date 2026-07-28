@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { scoreFor, readAllSources, type AllSources } from '../../src/tokens/race-tokens.js';
+import { ScanProgress } from '../../src/tokens/scan-progress.js';
 
 vi.mock('../../src/tokens/transcripts.js', async (orig) => ({
   ...(await orig<typeof import('../../src/tokens/transcripts.js')>()),
@@ -50,6 +51,34 @@ describe('readAllSources', () => {
     vi.mocked(sumGeminiTokens).mockResolvedValue({ input: 0, output: 0 });
     const res = ok(await readAllSources({ counts_input: true }, 'codex'));
     expect(Object.fromEntries(res.primaryByConv)).toEqual({ 'rollout-x': 55 });
+  });
+
+  it('starts the secondary scans without waiting for the primary to finish', async () => {
+    // The beat should cost the SLOWEST source, not the sum of all of them.
+    let releasePrimary!: (m: Map<string, { input: number; output: number }>) => void;
+    vi.mocked(sumTokensByConversation).mockReturnValue(new Promise((r) => { releasePrimary = r; }));
+    vi.mocked(sumCodexTokens).mockResolvedValue({ input: 0, output: 50 });
+    vi.mocked(sumGeminiTokens).mockResolvedValue({ input: 0, output: 9 });
+
+    const pending = readAllSources({}, 'claude');
+    await Promise.resolve(); // flush scheduling; primary is still in flight
+    expect(sumCodexTokens).toHaveBeenCalled();
+    expect(sumGeminiTokens).toHaveBeenCalled();
+
+    releasePrimary(new Map([['proj/a', { input: 0, output: 100 }]]));
+    const res = ok(await pending);
+    expect(res.secondary.codex).toBe(50);
+    expect(Object.fromEntries(res.primaryByConv)).toEqual({ 'proj/a': 100 });
+  });
+
+  it('records which sources are still scanning when a beat runs long', async () => {
+    vi.mocked(sumTokensByConversation).mockReturnValue(new Promise(() => {})); // never settles
+    vi.mocked(sumCodexTokens).mockResolvedValue({ input: 0, output: 50 });
+    vi.mocked(sumGeminiTokens).mockResolvedValue({ input: 0, output: 9 });
+
+    const progress = new ScanProgress();
+    void readAllSources({}, 'claude', progress);
+    await vi.waitFor(() => expect(progress.outstanding()).toEqual(['claude']));
   });
 
   it('a secondary source failure contributes 0, not a stall', async () => {
