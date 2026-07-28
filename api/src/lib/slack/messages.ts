@@ -1,6 +1,7 @@
 import type {
   RaceCreatedEvent, RaceEndedEvent, RaceEndedResult,
   LeaderboardEntry, GetOrgLeaderboardResponse,
+  AnnounceReleaseRequest,
 } from '@token-derby/shared';
 import type { LeagueSeasonEndedEvent, LeagueMoveRow } from '@token-derby/shared';
 
@@ -138,4 +139,33 @@ export function buildLeagueSeasonEndedMessage(event: LeagueSeasonEndedEvent): Sl
     ? `League Season ${league.season} complete — champion ${league.champion.horse_name}`
     : `League Season ${league.season} complete`;
   return { text, blocks };
+}
+
+const CLI_PACKAGE = '@mauricode/token-derby';
+const SITE_URL = 'token-derby.mauricode.co.uk';
+
+function formatReleaseDate(date: string): string {
+  return new Intl.DateTimeFormat('en-GB', {
+    day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC',
+  }).format(new Date(`${date}T00:00:00Z`));
+}
+
+// Deliberately no <!here> — release notes are reference material, and this
+// message also fires on the far more frequent site deploys.
+export function buildReleaseMessage(release: AnnounceReleaseRequest): SlackMessage {
+  const isCli = release.component === 'cli';
+  const label = isCli ? 'CLI' : 'Site';
+  const bullets = release.changes.map((c) => `•  ${c}`).join('\n');
+
+  const blocks: any[] = [
+    { type: 'header', text: { type: 'plain_text', text: `🚀  ${label} updated — v${release.version}`, emoji: true } },
+    { type: 'section', text: { type: 'mrkdwn', text: `_Token Derby ${label}_  ·  ${formatReleaseDate(release.date)}\n\n${bullets}` } },
+  ];
+  if (isCli) {
+    blocks.push({ type: 'section', text: { type: 'mrkdwn', text: `\`npm i -g ${CLI_PACKAGE}@latest\`` } });
+  }
+  blocks.push({ type: 'divider' });
+  blocks.push({ type: 'context', elements: [{ type: 'mrkdwn', text: `Full changelog → ${SITE_URL}/about` }] });
+
+  return { text: `Token Derby ${label} v${release.version} released`, blocks };
 }
