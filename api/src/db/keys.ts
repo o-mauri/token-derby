@@ -107,3 +107,9 @@ export function webGrantKey(code: string) {
 export function webSessionKey(token: string) {
   return { pk: `${WEB_SESSION_PK_PREFIX}${token}`, sk: 'META' };
 }
+
+export const RELEASE_PK_PREFIX = 'RELEASE#';
+
+export function releaseKey(component: string, version: string) {
+  return { pk: `${RELEASE_PK_PREFIX}${component}#${version}`, sk: 'META' };
+}
