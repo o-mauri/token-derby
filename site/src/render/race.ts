@@ -8,6 +8,7 @@ import { formatDuration, predictTimeLeftSeconds, type CountdownAnchor } from '..
 import { startAutoScroll } from './autoscroll.js';
 import { horseFaceSvg } from '../horse-face.js';
 import { createTicker, collectFreshItems, leagueOrderCells, leagueStandingsCells, type TickerCell } from './ticker.js';
+import { applyCheerJitter, crowdColumns, syncSpectators, TILE_PX } from './crowd.js';
 
 const POLL_INTERVAL_MS = 60_000;
 const TIMER_TICK_MS = 1_000;
@@ -105,12 +106,14 @@ export function renderRace(root: HTMLElement, joinCode: string, opts: RenderRace
   startAutoScroll({ signal: ctrl.signal, target: track });
 
   const crowd = frame.querySelector<HTMLElement>('.crowd');
-  if (crowd) {
+  const crowdBody = frame.querySelector<HTMLElement>('.crowd-body');
+  if (crowd && crowdBody) {
+    frame.querySelectorAll<HTMLElement>('.crowd-cap').forEach((cap) => applyCheerJitter(cap));
     const fitCrowd = () => {
       const scale = parseFloat(getComputedStyle(crowd).getPropertyValue('--sprite-scale')) || 2;
-      const tile = scale * 32;
-      const w = Math.floor(frame.clientWidth / tile) * tile;
-      crowd.style.width = `${w}px`;
+      const cols = crowdColumns(frame.clientWidth, scale);
+      crowd.style.width = `${cols * scale * TILE_PX}px`;
+      syncSpectators(crowdBody, Math.max(0, cols - 2)); // the two caps take a tile each
     };
     fitCrowd();
     const ro = new ResizeObserver(fitCrowd);
