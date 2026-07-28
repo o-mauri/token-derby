@@ -3,7 +3,7 @@
 // update CURRENT_CLI_VERSION here and every fixture below follows.
 
 /** A valid, current CLI version — at or above the API minimum. The common fixture. */
-export const CURRENT_CLI_VERSION = '2.12.1';
+export const CURRENT_CLI_VERSION = '2.12.2';
 
 const [maj, min] = CURRENT_CLI_VERSION.split('.').map(Number) as [number, number];
 
