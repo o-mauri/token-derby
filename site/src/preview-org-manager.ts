@@ -129,7 +129,7 @@ renderSlackbot(tabSection('Slackbot tab (owner, configured)'), {
   slack: {
     configured: true,
     channel_id: 'C0123',
-    messages: { race_created: true, race_ended: true, league_season_ended: false, weekly_digest: true },
+    messages: { race_created: true, race_ended: true, league_season_ended: false, weekly_digest: true, release_published: false },
     digest: { weekday: 5, time_local: '15:00', tz: 'Europe/London' },
   },
   isOwner: true,

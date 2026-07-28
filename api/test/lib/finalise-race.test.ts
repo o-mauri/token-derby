@@ -370,7 +370,7 @@ describe('finaliseRace webhook delivery', () => {
     const persisted = await getOrganisationByName(orgName);
     await setOrgSlack(persisted!.org_id, {
       bot_token: 'xoxb-secret', channel_id: 'C1',
-      messages: { race_created: false, race_ended: true, league_season_ended: false, weekly_digest: false },
+      messages: { race_created: false, race_ended: true, league_season_ended: false, weekly_digest: false, release_published: false },
     });
 
     const createRes: any = await createRaceHandler({

@@ -70,19 +70,19 @@ describe('renderWebhook', () => {
 });
 
 describe('renderSlackbot', () => {
-  it('renders four message checkboxes, digest controls, and Save/Clear for owners', () => {
+  it('renders five message checkboxes, digest controls, and Save/Clear for owners', () => {
     renderSlackbot(root, {
       slack: {
         configured: true,
         channel_id: 'C0123',
-        messages: { race_created: true, race_ended: true, league_season_ended: false, weekly_digest: true },
+        messages: { race_created: true, race_ended: true, league_season_ended: false, weekly_digest: true, release_published: false },
         digest: { weekday: 5, time_local: '15:00', tz: 'Europe/London' },
       },
       isOwner: true,
       onSave: vi.fn(),
       onClear: vi.fn(),
     });
-    expect(root.querySelectorAll('input[name="msg"]').length).toBe(4);
+    expect(root.querySelectorAll('input[name="msg"]').length).toBe(5);
     expect(root.querySelector<HTMLInputElement>('input[name="bot_token"]')!.placeholder).toMatch(/configured/i);
     expect(root.querySelector('select[name="weekday"]')).toBeTruthy();
     expect(root.querySelector('input[name="time_local"]')).toBeTruthy();
@@ -104,7 +104,7 @@ describe('renderSlackbot', () => {
       slack: {
         configured: true,
         channel_id: 'C0123',
-        messages: { race_created: true, race_ended: true, league_season_ended: false, weekly_digest: true },
+        messages: { race_created: true, race_ended: true, league_season_ended: false, weekly_digest: true, release_published: false },
         digest: { weekday: 5, time_local: '15:00', tz: 'Europe/London' },
       },
       isOwner: true,

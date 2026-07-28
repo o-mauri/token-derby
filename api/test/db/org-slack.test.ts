@@ -5,7 +5,7 @@ import type { OrgSlackConfig } from '../../src/db/organisations.js';
 
 const CONFIG: OrgSlackConfig = {
   bot_token: 'xoxb-secret', channel_id: 'C1',
-  messages: { race_created: true, race_ended: true, league_season_ended: false, weekly_digest: true },
+  messages: { race_created: true, race_ended: true, league_season_ended: false, weekly_digest: true, release_published: false },
   digest: { weekday: 5, time_local: '15:00', tz: 'Europe/London' },
 };
 

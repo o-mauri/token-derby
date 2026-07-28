@@ -36,7 +36,7 @@ function baseSchedule(org_id: string): RaceSchedule {
 function digestConfig(digest: OrgSlackDigest) {
   return {
     bot_token: 'xoxb-secret', channel_id: 'C1',
-    messages: { race_created: false, race_ended: false, league_season_ended: false, weekly_digest: true },
+    messages: { race_created: false, race_ended: false, league_season_ended: false, weekly_digest: true, release_published: false },
     digest,
   };
 }

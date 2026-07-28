@@ -175,6 +175,7 @@ export type OrgSlackMessages = {
   race_ended: boolean;
   league_season_ended: boolean;
   weekly_digest: boolean;
+  release_published: boolean;
 };
 export type OrgSlackDigest = { weekday: number; time_local: string; tz: string };
 export type SetOrgSlackRequest = {
@@ -190,6 +191,19 @@ export type GetOrgSlackResponse = {
   digest: OrgSlackDigest | null;
 };
 export type DeleteOrgSlackResponse = { ok: true };
+
+export type ReleaseComponent = 'cli' | 'site';
+
+export type AnnounceReleaseRequest = {
+  component: ReleaseComponent;
+  version: string;    // x.y.z
+  date: string;       // YYYY-MM-DD
+  changes: string[];  // 1-20 non-empty entries
+};
+
+export type AnnounceReleaseResponse =
+  | { announced: true; orgs_notified: number }
+  | { announced: false; reason: 'duplicate' };
 
 export type RollHatResponse =
   | { result: 'hat'; collected: CollectedHat; hat_index: number; remaining_rolls: number }

@@ -10,7 +10,7 @@ import type { OrgSlackConfig } from '../../../src/db/organisations.js';
 
 const slack: OrgSlackConfig = {
   bot_token: 'xoxb', channel_id: 'C1',
-  messages: { race_created: true, race_ended: true, league_season_ended: true, weekly_digest: true },
+  messages: { race_created: true, race_ended: true, league_season_ended: true, weekly_digest: true, release_published: true },
 };
 const CREATED = { event: 'race.created', race: { name: 'R', join_code: 'AB1', start_time: '2026-05-21T17:00:00.000Z', end_time: '2026-05-21T17:30:00.000Z', tz: 'Europe/London' }, organisation: { org_id: 'o1', org_name: 'F' } } as any;
 const ENDED = { event: 'race.ended', race: { name: 'R', tz: 'Europe/London' }, organisation: { org_id: 'o1', org_name: 'F' }, results: [{ rank: 1, name: 'Bolt', colors: { body: '#FF0000', mane: '#000', tail: '#000', saddle: '#c00' }, final_tokens: 1, user_name: 'Al' }] } as any;
