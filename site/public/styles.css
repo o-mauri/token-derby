@@ -7,6 +7,16 @@
   --border: #3a3a3a;
   --lane: #3d2856;
   --lane-alt: #362248;
+  /* track-1.png is fully opaque, so --lane only shows through when a theme opts
+     into a blend mode. Derby keeps `normal` — the sprite renders untouched. */
+  --track-blend: normal;
+  --track-shade: transparent;
+  --track-wash: linear-gradient(var(--track-shade), var(--track-shade));
+  --wash-blend: normal;
+  --rail: #ffffff;
+  --label-box: #1d1d24;
+  --live: #7bed9f;
+  --ticker-accent: #ffd166;
   --track-gap: 0px;
   --horse-height: 60px;
   --sprite-scale: 2;
@@ -288,7 +298,7 @@ html, body {
 .race-header .meta b { color: var(--text); font-weight: normal; }
 .race-status { text-transform: uppercase; letter-spacing: 0.1em; }
 .race-status--pending { color: var(--accent); }
-.race-status--live { color: #7bed9f; }
+.race-status--live { color: var(--live); }
 .race-status--finished { color: var(--muted); }
 
 .crowd {
@@ -360,7 +370,7 @@ html, body {
   flex-direction: column;
   gap: 0;
   padding: 1px 6px;
-  background: #1d1d24;          /* slightly lifted off the page's pure black */
+  background: var(--label-box); /* slightly lifted off the page's pure black */
   border: 1px solid var(--border);
   border-radius: 4px;
   overflow: hidden;
@@ -435,7 +445,18 @@ html, body {
 .lane-track {
   position: relative;
   flex: 1 1 auto;
-  background: var(--lane) url('img/track-1.png') repeat-x center / auto 100%;
+  /* Two layers over --lane: a wash, then the dirt sprite. --track-blend re-tints
+     the (opaque) sprite from --lane; the wash then adjusts the result, because
+     `luminosity` preserves the sprite's own high luminance. Most themes only need
+     a flat darkening colour (--track-shade), so that is the default wash; a theme
+     wanting real colour variation across the lane replaces the whole image via
+     --track-wash (see Rainbow Road). Blending is confined to this element's own
+     backgrounds — .horse children are untouched (a `filter` here would have
+     recoloured the horses too). */
+  background:
+    var(--track-wash),
+    var(--lane) url('img/track-1.png') repeat-x center / auto 100%;
+  background-blend-mode: var(--wash-blend), var(--track-blend);
   image-rendering: pixelated;
   border-radius: 4px;
 }
@@ -444,7 +465,7 @@ html, body {
   position: absolute;
   left: 0; top: 0; bottom: 0;
   width: 4px;
-  background: #fff;
+  background: var(--rail);
 }
 .lane-track::after {
   content: "";
@@ -1165,7 +1186,7 @@ body.tv .race-header .meta .btn {
   overflow: hidden;
   z-index: 9999;
   background: linear-gradient(180deg, rgba(12, 12, 12, 0.94), rgba(20, 20, 20, 0.98));
-  border-top: 2px solid #ffd166;
+  border-top: 2px solid var(--ticker-accent);
   box-shadow: 0 -4px 18px rgba(0, 0, 0, 0.45);
   white-space: nowrap;
   transition: opacity 0.3s ease;
@@ -1195,10 +1216,10 @@ body.tv .race-header .meta .btn {
 }
 .achievement-ticker-xp {
   font-weight: bold;
-  color: #ffd166;
+  color: var(--ticker-accent);
 }
 .achievement-ticker-horse { font-weight: bold; }
-.achievement-ticker-name { color: #ffd166; }
+.achievement-ticker-name { color: var(--ticker-accent); }
 .achievement-ticker-desc { color: #aaa; }
 
 /* Bullet between achievements within a pass. */
@@ -1208,7 +1229,7 @@ body.tv .race-header .meta .btn {
   align-items: center;
   height: 100%;
   padding: 0 1.5rem;
-  color: #ffd166;
+  color: var(--ticker-accent);
   opacity: 0.55;
 }
 
@@ -1771,3 +1792,148 @@ label.label input:disabled, label.label select:disabled { opacity: 0.5; }
 .race-graphs-body .chart-face .chart-svg { height: 52vh; }
 .race-graphs-body .chart-face .chart-title { font-size: 1.05rem; }
 .race-graphs-empty { color: #999; font-size: 1.1rem; text-align: center; }
+
+/* ── Themes ─────────────────────────────────────────── */
+
+/* "Derby" — the original palette — lives in :root above, so it is also the
+   no-JS / pre-hydration default. Each theme below only overrides the tokens it
+   changes; anything unlisted falls through to :root.
+
+   --track-blend re-tints the opaque dirt sprite: `luminosity` keeps the pixel
+   art's luminance and takes hue/saturation from --lane, so one PNG serves every
+   theme. Derby stays `normal` (sprite untouched, byte-identical rendering). */
+
+:root[data-theme="midnight"] {
+  --bg: #05070f;
+  --panel: #101627;
+  --text: #dce6f5;
+  --muted: #7b8aa5;
+  --accent: #7dd3fc;
+  --border: #26334d;
+  --lane: #1b3a5c;
+  --track-blend: luminosity;
+  --track-shade: rgba(4, 10, 24, 0.55);
+  --rail: #cfe6ff;
+  --label-box: #121a2b;
+  --live: #5eead4;
+  --ticker-accent: #7dd3fc;
+}
+
+:root[data-theme="turf"] {
+  --bg: #06120a;
+  --panel: #102015;
+  --text: #eaf7e2;
+  --muted: #8aa88f;
+  --accent: #86efac;
+  --border: #22412c;
+  --lane: #2f6b32;
+  --track-blend: luminosity;
+  --track-shade: rgba(3, 18, 8, 0.35);
+  --rail: #f2fff2;
+  --label-box: #12241a;
+  --live: #bef264;
+  --ticker-accent: #fde047;
+}
+
+:root[data-theme="photo"] {
+  --bg: #0a0a0a;
+  --panel: #191919;
+  --text: #ededed;
+  --muted: #8f8f8f;
+  --accent: #ffffff;
+  --border: #3d3d3d;
+  --lane: #6b6b6b;   /* zero saturation → luminosity blend greys the dirt out */
+  --track-blend: luminosity;
+  --track-shade: rgba(0, 0, 0, 0.30);
+  --rail: #ffffff;
+  --label-box: #1c1c1c;
+  --live: #d4d4d4;
+  --ticker-accent: #e5e5e5;
+}
+
+/* A neutral --lane + luminosity flattens the dirt to greyscale texture; the wash
+   then paints hue/saturation back across the lane's width with `color` (which
+   takes hue+sat from the gradient and luminosity from the backdrop), so the
+   spectrum keeps every pixel of the sprite's shading and rails. */
+:root[data-theme="chromatic"] {
+  --bg: #06040f;
+  --panel: #171029;
+  --text: #f4ecff;
+  --muted: #9d92c4;
+  --accent: #ff7ae0;
+  --border: #3a2a5e;
+  --lane: #8a8a8a;
+  --track-blend: luminosity;
+  /* First and last stop are the same red, so one tile butts seamlessly against
+     the next and the scroll below has no visible seam. Stops are positioned
+     rather than evenly spaced so the magenta end of the spectrum stays a narrow
+     band instead of taking a full even share alongside the red seam. */
+  --track-wash: linear-gradient(
+    90deg,
+    #ff004d 0%, #ff7a00 15%, #ffe600 32%, #00d95f 50%,
+    #00c2ff 68%, #6a5cff 85%, #ff3ea5 95%, #ff004d 100%
+  );
+  --wash-blend: color;
+  --wash-tile: 480px;
+  --rail: #ffffff;
+  --label-box: #1a1230;
+  --live: #7dffcf;
+  --ticker-accent: #ffe600;
+}
+
+/* Size the wash to one spectrum tile (it repeats; the sprite layer keeps its own
+   `auto 100%`), then drift it against the direction the horses run, so the colours
+   rush backwards past them and read as speed. Shifting by exactly one tile width
+   means the end state matches the start, so the loop is invisible. */
+:root[data-theme="chromatic"] .lane-track {
+  background-size: var(--wash-tile) 100%, auto 100%;
+}
+/* Stepped rather than linear, matching the crowd's steps(4) cheer — a smooth
+   slide would read as the only non-pixel motion on the page. 24 steps over the
+   480px tile lands each jump on a round 10 sprite-pixels (tile ÷ --sprite-scale
+   ÷ 24), so the bands snap along the same grid the art is drawn on. */
+@media (prefers-reduced-motion: no-preference) {
+  :root[data-theme="chromatic"] .lane-track {
+    animation: chromatic-scroll 3s steps(24) infinite;
+  }
+}
+@keyframes chromatic-scroll {
+  from { background-position: 0 0, center; }
+  to   { background-position: calc(-1 * var(--wash-tile)) 0, center; }
+}
+/* Same rule the crowd follows — the spectacle stops once the race is over. */
+.race.finished .lane-track { animation-play-state: paused; }
+
+/* ── Theme picker ───────────────────────────────────── */
+
+.theme-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.theme-picker-caption {
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  font-size: 0.75rem;
+}
+.theme-select {
+  background: var(--panel);
+  color: var(--text);
+  border: 2px solid var(--border);
+  border-radius: 3px;
+  padding: 4px 8px;
+  font: inherit;
+  font-size: 0.85rem;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+}
+.theme-select:hover { border-color: var(--accent); }
+.theme-select:focus-visible { outline: none; border-color: var(--accent); }
+
+/* In the race header the picker sits among the meta items, so it matches the
+   button scale there rather than the roomier home-page sizing. */
+.race-header .meta .theme-picker { gap: 6px; }
+.race-header .meta .theme-select { padding: 2px 6px; font-size: 0.8rem; }
+body.tv .race-header .meta .theme-select { padding: 3px 10px; font-size: 0.9rem; }

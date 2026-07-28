@@ -1,6 +1,7 @@
 // Standalone preview of the live race view with dummy data.
 // Loaded by /preview-race.html — not part of the main app bundle.
 import { renderRace } from './render/race.js';
+import { initTheme } from './theme.js';
 import type { CollectedHat, GetRaceResponse, GetRaceSeriesResponse, HorseView, SeriesPoint } from '@token-derby/shared';
 
 const COLORS_A = { body: '#8B4513', mane: '#000000', tail: '#000000', saddle: '#C0392B' };
@@ -130,4 +131,6 @@ window.fetch = (async (input: RequestInfo | URL) => {
 }) as typeof fetch;
 
 const app = document.getElementById('app')!;
+initTheme(); // the preview HTML has no pre-paint script, so the picker
+            // would otherwise show a stored theme the page isn't using
 renderRace(app, JOIN_CODE, { showGraphs: true });

@@ -2,6 +2,7 @@
 // Loaded by /preview-league.html — not part of the main app bundle. Exercises the
 // projected league-standings section in the ticker (order → standings → achievements).
 import { renderRace } from './render/race.js';
+import { initTheme } from './theme.js';
 import type { GetRaceResponse, GetRaceSeriesResponse, HorseView, SeasonStandings, SeriesPoint } from '@token-derby/shared';
 
 const COLORS = [
@@ -151,4 +152,6 @@ window.fetch = (async (input: RequestInfo | URL) => {
 }) as typeof fetch;
 
 const app = document.getElementById('app')!;
+initTheme(); // the preview HTML has no pre-paint script, so the picker
+            // would otherwise show a stored theme the page isn't using
 renderRace(app, JOIN_CODE, { showGraphs: true });
