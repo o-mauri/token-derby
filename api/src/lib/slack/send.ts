@@ -1,12 +1,13 @@
 import { S3Client } from '@aws-sdk/client-s3';
 import type {
-  RaceCreatedEvent, RaceEndedEvent, LeagueSeasonEndedEvent, GetOrgLeaderboardResponse,
+  RaceCreatedEvent, RaceEndedEvent, LeagueSeasonEndedEvent, GetOrgLeaderboardResponse, AnnounceReleaseRequest,
 } from '@token-derby/shared';
 import type { OrgSlackConfig } from '../../db/organisations.js';
 import { postSlackMessage } from './client.js';
 import { ensureSprite } from './sprite-store.js';
 import {
   buildRaceCreatedMessage, buildRaceEndedMessage, buildLeagueSeasonEndedMessage, buildWeeklyDigestMessage,
+  buildReleaseMessage,
   type SlackMessage,
 } from './messages.js';
 
@@ -22,10 +23,11 @@ function log(org_id: string, event: string, error: unknown): void {
   console.warn('slack post failed', { org_id, event, error: error instanceof Error ? error.message : String(error) });
 }
 
-async function post(org: OrgWithSlack, msg: SlackMessage): Promise<void> {
+async function post(org: OrgWithSlack, msg: SlackMessage): Promise<boolean> {
   const cfg = org.slack!;
   const res = await postSlackMessage(cfg.bot_token, cfg.channel_id, msg.text, msg.blocks);
   if (!res.ok) console.warn('slack chat.postMessage non-ok', { org_id: org.org_id, error: res.error });
+  return res.ok;
 }
 
 export async function sendOrgSlack(org: OrgWithSlack, event: 'race.created', payload: RaceCreatedEvent): Promise<void>;
@@ -65,5 +67,18 @@ export async function sendOrgDigest(org: OrgWithSlack, leaderboard: GetOrgLeader
     await post(org, buildWeeklyDigestMessage(leaderboard));
   } catch (err) {
     log(org.org_id, 'weekly_digest', err);
+  }
+}
+
+// Returns whether Slack accepted the post, so the caller can report a
+// meaningful org count rather than "attempted N".
+export async function sendOrgRelease(org: OrgWithSlack, release: AnnounceReleaseRequest): Promise<boolean> {
+  const cfg = org.slack;
+  if (!cfg || !cfg.messages.release_published) return false;
+  try {
+    return await post(org, buildReleaseMessage(release));
+  } catch (err) {
+    log(org.org_id, 'release_published', err);
+    return false;
   }
 }

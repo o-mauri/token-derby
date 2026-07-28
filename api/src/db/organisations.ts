@@ -235,6 +235,26 @@ export async function listOrgsWithSlackDigest(): Promise<OrgRecord[]> {
   return out;
 }
 
+// Same filtered-Scan shape as the digest listing above; org meta rows are the
+// only rows that ever carry a `slack` attribute.
+export async function listOrgsWithSlackRelease(): Promise<OrgRecord[]> {
+  const out: OrgRecord[] = [];
+  let ExclusiveStartKey: Record<string, any> | undefined;
+  do {
+    const res = await ddb.send(new ScanCommand({
+      TableName: TABLE,
+      FilterExpression: 'attribute_exists(slack)',
+      ExclusiveStartKey,
+    }));
+    for (const it of res.Items ?? []) {
+      const org = pickOrgRecord(it);
+      if (org.slack?.messages.release_published) out.push(org);
+    }
+    ExclusiveStartKey = res.LastEvaluatedKey;
+  } while (ExclusiveStartKey);
+  return out;
+}
+
 function pickOrgRecord(item: Record<string, any>): OrgRecord {
   const { pk: _pk, sk: _sk, ...rest } = item;
   return rest as OrgRecord;
