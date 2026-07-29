@@ -83,9 +83,8 @@ function buildFace(
   const sx = (t: number) => scale(t, series.start_ms, endMs, PAD_L, W - PAD_R);
   const sy = (v: number) => scale(v, 0, maxV, H - PAD_B, PAD_T);
 
-  valuesByHorse.forEach(({ h }, i) => {
+  valuesByHorse.forEach(({ h, vals }, i) => {
     const stroke = colourOf(h, i);
-    const vals = valuesByHorse[i]!.vals;
     // Idle horses resample to an all-zero tick series, so this is naturally a
     // flat baseline at y=0 spanning the window — no special-casing needed.
     const pts: [number, number][] = vals.map((p) => [sx(p.t), sy(p.v)]);
@@ -139,8 +138,6 @@ export function buildChartFaces(
   const hasData = series.horses.some((h) => h.points.length > 0);
   if (!hasData) return [];
   const endMs = opts.endMs ?? series.end_ms;
-  const colourOf = opts.colourOf
-    ? (h: HorseView) => opts.colourOf!(h)
-    : (_h: HorseView, rankIndex: number) => lineColor(rankIndex);
+  const colourOf = opts.colourOf ?? ((_h: HorseView, i: number) => lineColor(i));
   return (opts.modes ?? ALL_MODES).map((m) => buildFace(doc, m, series, horses, endMs, colourOf));
 }

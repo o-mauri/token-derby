@@ -140,6 +140,22 @@ describe('buildChartFaces options', () => {
     expect(labels(clamped)).not.toBe(labels(full));
   });
 
+  it('clamps the actual chart geometry, not just the axis label', () => {
+    // A label-only assertion would still pass if endMs were dropped from the
+    // resample/scale path while left in the axis label — assert the point
+    // count of the drawn line instead: a 3-minute window draws an anchor plus
+    // one point per minute (4), a 10-minute window draws 11.
+    const doc = document;
+    const horses = [horse('a', 'Alpha', 1)];
+    const pointCount = (endMs: number) => {
+      const face = buildChartFaces(doc, series, horses, { modes: ['throughput'], endMs })[0]!;
+      const polyline = face.querySelector('svg polyline.chart-line')!;
+      return polyline.getAttribute('points')!.trim().split(/\s+/).length;
+    };
+    expect(pointCount(180_000)).toBe(4);    // 3-minute clamped window: anchor + 3
+    expect(pointCount(series.end_ms)).toBe(11); // full 10-minute window: anchor + 10
+  });
+
   it('uses colourOf when supplied', () => {
     const doc = document;
     const horses = [horse('a', 'Alpha', 1), horse('b', 'Beta', 2)];
@@ -148,8 +164,10 @@ describe('buildChartFaces options', () => {
       colourOf: (h) => (h.horse_id === 'a' ? '#123456' : '#654321'),
     });
     const strokes = [...faces[0]!.querySelectorAll('path.chart-line')].map((p) => p.getAttribute('stroke'));
-    expect(strokes).toContain('#123456');
-    expect(strokes).toContain('#654321');
+    // Per-index, not just "both appear somewhere" — a toContain-only check would
+    // still pass if the horse→colour mapping were swapped.
+    expect(strokes[0]).toBe('#123456');   // Alpha, rank 1
+    expect(strokes[1]).toBe('#654321');   // Beta, rank 2
   });
 
   it('with no options reproduces the existing two faces and rank colours', () => {

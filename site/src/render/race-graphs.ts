@@ -10,6 +10,7 @@ const TAB_LABELS: ReadonlyArray<{ mode: Mode; label: string }> = [
 export type RaceGraphs = {
   button: HTMLButtonElement;
   onSnapshot(race: GetRaceResponse): void;
+  close(): void;
   destroy(): void;
 };
 
@@ -20,9 +21,12 @@ type Opts = {
   now?: () => number;
 };
 
-// Stable colour per horse: sorted horse ids indexed into the palette, so the
-// mapping does not change as positions change, and every viewer sees the same
-// colours. Rebuilt per render from the current field; ids only ever get added.
+// Stable colour per horse: sorted horse ids indexed into the palette, so
+// positions changing (overtakes) never reshuffles colours, and every viewer
+// sees the same mapping. Rebuilt per render from the current field, so a
+// horse joining mid-race can still shift later ids' palette slots — but it is
+// stable for a fixed field, and always strictly better than the rank-keyed
+// default, which reshuffles on every overtake.
 function colourMap(horses: readonly HorseView[]): Map<string, string> {
   const ids = [...horses].map((h) => h.horse_id).sort();
   return new Map(ids.map((id, i) => [id, LINE_PALETTE[i % LINE_PALETTE.length]!]));
@@ -125,13 +129,18 @@ export function createRaceGraphs(opts: Opts): RaceGraphs {
   }
 
   function render(): void {
-    if (!dialog || !snapshot) return;
+    if (!dialog) return;
     if (failed) { showMessage("Couldn't load the graphs — retrying shortly."); return; }
-    if (!cached) return;
+    if (!snapshot || !cached) { showMessage('Loading…'); return; }
     const horses = visibleHorses();
     if (horses.length === 0) { showMessage('No data for this division yet.'); return; }
     const colours = colourMap(snapshot.horses);   // colours stay stable across filters
-    const faces = buildChartFaces(doc, cached, horses, {
+    // Scope the series to the visible horses before building, so a division
+    // whose horses have no points shows the empty message instead of a face
+    // (buildChartFaces' hasData check only sees the horses it is given).
+    const ids = new Set(horses.map((h) => h.horse_id));
+    const scoped = { ...cached, horses: cached.horses.filter((h) => ids.has(h.horse_id)) };
+    const faces = buildChartFaces(doc, scoped, horses, {
       modes: [mode],
       endMs: windowEnd(cached, now()),
       colourOf: (h) => colours.get(h.horse_id) ?? LINE_PALETTE[0]!,
@@ -213,9 +222,12 @@ export function createRaceGraphs(opts: Opts): RaceGraphs {
     button,
     onSnapshot(race) {
       snapshot = race;
-      if (open) renderDivisions();
-      if (open) void load();
+      if (open) {
+        renderDivisions();
+        void load();
+      }
     },
+    close,
     destroy() { close(); button.remove(); },
   };
 }

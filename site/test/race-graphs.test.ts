@@ -114,6 +114,33 @@ describe('race graphs popup', () => {
     g.destroy();
   });
 
+  it('renders the newer response when two overlapping loads resolve out of order', async () => {
+    // Distinguish "older" from "newer" by data shape: the older response has no
+    // points (renders the empty message), the newer one has points (renders a
+    // chart) — so which one "won" is directly observable in the DOM.
+    const olderSeries: GetRaceSeriesResponse = {
+      start_ms: 0, end_ms: 600_000,
+      horses: [{ horse_id: 'a', points: [] }, { horse_id: 'b', points: [] }],
+    };
+    const resolvers: Array<(v: GetRaceSeriesResponse) => void> = [];
+    const fetchSeries = vi.fn(() => new Promise<GetRaceSeriesResponse>((res) => { resolvers.push(res); }));
+    const { g } = setup({ fetchSeries });
+    g.onSnapshot(race());
+    g.button.click();                             // load #1 (older) in flight
+    await vi.waitFor(() => expect(fetchSeries).toHaveBeenCalledTimes(1));
+    g.onSnapshot(race());                         // load #2 (newer) in flight; #1's controller is aborted
+    await vi.waitFor(() => expect(fetchSeries).toHaveBeenCalledTimes(2));
+
+    resolvers[1]!(series);                        // newer resolves first
+    await vi.waitFor(() => expect(document.querySelector('.chart-svg')).toBeTruthy());
+
+    resolvers[0]!(olderSeries);                   // stale response arrives after — must be discarded
+    await Promise.resolve();
+    expect(document.querySelector('.chart-svg')).toBeTruthy();
+    expect(document.querySelector('.race-graphs-empty')).toBeNull();
+    g.destroy();
+  });
+
   it('destroy removes the dialog and stops refreshing', async () => {
     const { g, fetchSeries } = setup();
     g.onSnapshot(race());
@@ -203,6 +230,36 @@ describe('race graphs popup', () => {
     await vi.waitFor(() => expect(document.querySelector('.race-graphs-empty')).toBeTruthy());
     expect(document.querySelector('.race-graphs-empty')!.textContent)
       .toContain('No token data yet');
+    g.destroy();
+  });
+
+  it('shows a loading message when opened before the first snapshot', async () => {
+    const { g } = setup();
+    g.button.click();                    // no onSnapshot yet — snapshot stays null
+    await vi.waitFor(() => expect(document.querySelector('.race-graphs-empty')).toBeTruthy());
+    expect(document.querySelector('.race-graphs-empty')!.textContent).toContain('Loading…');
+    g.destroy();
+  });
+
+  it('shows the empty-division message when the selected division has runners but no points', async () => {
+    const seriesNoPointsInDivision1: GetRaceSeriesResponse = {
+      start_ms: 0, end_ms: 600_000,
+      horses: [
+        { horse_id: 'a', points: [] },
+        { horse_id: 'b', points: [{ t: 60_000, d: 10 }] },
+      ],
+    };
+    const { g } = setup({ fetchSeries: vi.fn(async () => seriesNoPointsInDivision1) });
+    g.onSnapshot(race({
+      league_division_names: ['Premier', 'Championship'],
+      horses: [horse('a', 'Alpha', 1, 1), horse('b', 'Beta', 2, 2)],
+    }));
+    g.button.click();
+    await vi.waitFor(() => expect(document.querySelector('.chart-svg')).toBeTruthy());   // All: b has points
+    document.querySelector<HTMLButtonElement>('.race-graphs-div[data-division="1"]')!.click();
+    expect(document.querySelector('.race-graphs-empty')!.textContent)
+      .toContain('No data for this division yet.');
+    expect(document.querySelector('.chart-svg')).toBeNull();
     g.destroy();
   });
 
@@ -306,5 +363,33 @@ describe('renderRace graph button wiring', () => {
     expect(root.querySelector('.graphs-btn')).toBeTruthy();
     on();
     expect(root.querySelector('.race-graphs')).toBeNull();
+  });
+
+  it('closes the popup when a finished snapshot arrives while it is open', async () => {
+    let raceJson = liveRaceJson();
+    // The popup fetches a different endpoint (…/series) than the race poll
+    // (…/<code>); branch on the URL so both requests get a shape they can parse.
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      const body = String(url).includes('/series')
+        ? { start_ms: 0, end_ms: 3_600_000, horses: [] }
+        : raceJson;
+      return new Response(JSON.stringify(body), {
+        status: 200, headers: { 'content-type': 'application/json' },
+      });
+    }));
+    const { renderRace } = await import('../src/render/race.js');
+    const root = document.createElement('div');
+    document.body.appendChild(root);
+
+    const off = renderRace(root, 'ABC123', { showGraphs: true });
+    await vi.advanceTimersByTimeAsync(0);   // first poll delivers the live snapshot
+    root.querySelector<HTMLButtonElement>('.graphs-btn')!.click();
+    await vi.waitFor(() => expect(root.querySelector('.race-graphs')).toBeTruthy());
+
+    raceJson = { ...raceJson, status: 'finished', horses: [] };
+    await vi.advanceTimersByTimeAsync(60_000);   // next poll tick delivers the finished snapshot
+    await vi.waitFor(() => expect(root.querySelector('.podium')).toBeTruthy());
+    expect(root.querySelector('.race-graphs')).toBeNull();
+    off();
   });
 });

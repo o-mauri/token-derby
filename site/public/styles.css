@@ -1760,7 +1760,13 @@ label.label input:disabled, label.label select:disabled { opacity: 0.5; }
   color: var(--accent);
 }
 .race-graphs-body { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }
-/* Override the end-screen sizing, which is set by unscoped `.chart-face` rules. */
+/* Override the end-screen sizing, which is set by unscoped `.chart-face` rules.
+   buildFace's faces also carry `.detail-face` (shared with the end-screen
+   cycler), but the end-screen hiding rules at lines 731 and 747 both require
+   a `.detail-cycle` ancestor, which these popup faces never have — they live
+   under `.race-graphs-body`, not `.detail-cycle`. Loosening either rule to
+   drop that `.detail-cycle` qualifier would make it apply here too and blank
+   the popup (opacity: 0, never given `.is-active`). */
 .race-graphs-body .chart-face { width: 100%; gap: 10px; }
 .race-graphs-body .chart-face .chart-svg { height: 52vh; }
 .race-graphs-body .chart-face .chart-title { font-size: 1.05rem; }

@@ -200,6 +200,7 @@ export function renderRace(root: HTMLElement, joinCode: string, opts: RenderRace
 
     if (race.status === 'finished') {
       if (!finishedTeardown) {
+        graphs?.close(); // podium takes over the view; the popup would be buried behind it
         finishedTeardown = renderFinishedOverlay(frame, race);
         ctrl.abort(); // stop polling, ticker, autoscroll, countdown — race is over
       }
