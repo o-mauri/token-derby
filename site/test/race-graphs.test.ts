@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createRaceGraphs } from '../src/render/race-graphs.js';
 import type { GetRaceResponse, GetRaceSeriesResponse, HorseView } from '@token-derby/shared';
 
@@ -267,5 +267,44 @@ describe('race graphs popup', () => {
     expect(allBtn.getAttribute('aria-selected')).toBe('true');
     expect(document.querySelectorAll('.legend-item')).toHaveLength(2);
     g.destroy();
+  });
+});
+
+function liveRaceJson() {
+  const now = Date.now();
+  return {
+    race_id: 'r1', name: 'Test Race', join_code: 'ABC123',
+    start_time: new Date(now - 60_000).toISOString(),
+    end_time: new Date(now + 3_600_000).toISOString(),
+    tz: 'UTC', max_participants: 30, created_at: new Date(now - 120_000).toISOString(),
+    status: 'live', server_time: new Date(now).toISOString(), time_left_seconds: 3600,
+    horses: [],
+  };
+}
+
+// renderRace has no fetchRace injection point and starts polling immediately,
+// so — unlike the popup tests above, which inject fetchSeries — this suite
+// stubs global fetch and fake timers, following site/test/race-stop-poll.test.ts.
+describe('renderRace graph button wiring', () => {
+  beforeEach(() => { vi.useFakeTimers(); });
+  afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
+
+  it('mounts the button only when showGraphs is set', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(liveRaceJson()), {
+      status: 200, headers: { 'content-type': 'application/json' },
+    })));
+    const { renderRace } = await import('../src/render/race.js');
+    const root = document.createElement('div');
+    document.body.appendChild(root);
+
+    const off = renderRace(root, 'ABC123');
+    expect(root.querySelector('.graphs-btn')).toBeNull();
+    off();
+
+    root.innerHTML = '';
+    const on = renderRace(root, 'ABC123', { showGraphs: true });
+    expect(root.querySelector('.graphs-btn')).toBeTruthy();
+    on();
+    expect(root.querySelector('.race-graphs')).toBeNull();
   });
 });

@@ -25,7 +25,7 @@ function route() {
   if (r.type === 'home') {
     renderHome(root);
   } else if (r.type === 'race') {
-    activeCleanup = renderRace(root, r.joinCode);
+    activeCleanup = renderRace(root, r.joinCode, { showGraphs: true });
   } else if (r.type === 'org') {
     activeCleanup = renderOrg(root, r.orgName);
   } else if (r.type === 'org-live') {

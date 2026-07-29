@@ -9,6 +9,7 @@ import { startAutoScroll } from './autoscroll.js';
 import { horseFaceSvg } from '../horse-face.js';
 import { createTicker, collectFreshItems, leagueOrderCells, leagueStandingsCells, type TickerCell } from './ticker.js';
 import { applyCheerJitter, crowdColumns, syncSpectators, TILE_PX } from './crowd.js';
+import { createRaceGraphs } from './race-graphs.js';
 
 const POLL_INTERVAL_MS = 60_000;
 const TIMER_TICK_MS = 1_000;
@@ -16,6 +17,9 @@ const TIMER_TICK_MS = 1_000;
 type RenderRaceOpts = {
   // Injectable for previews/tests; defaults to the real standings endpoint.
   fetchStandings?: (orgName: string, season: number) => Promise<{ standings: SeasonStandings | null }>;
+  // Mid-race graph popup. Off by default so the org-live TV view, which has no
+  // pointer, does not get a control nobody can click.
+  showGraphs?: boolean;
 };
 
 export function renderRace(root: HTMLElement, joinCode: string, opts: RenderRaceOpts = {}): () => void {
@@ -109,6 +113,10 @@ export function renderRace(root: HTMLElement, joinCode: string, opts: RenderRace
     window.dispatchEvent(new PopStateEvent('popstate'));
   });
 
+  const graphs = opts.showGraphs
+    ? createRaceGraphs({ doc: root.ownerDocument, joinCode })
+    : null;
+  if (graphs) frame.querySelector<HTMLElement>('.meta')!.prepend(graphs.button);
 
   const ctrl = new AbortController();
   let finishedTeardown: (() => void) | null = null;
@@ -150,6 +158,7 @@ export function renderRace(root: HTMLElement, joinCode: string, opts: RenderRace
     }
     statusEl.textContent = race.status;
     statusEl.className = `race-status race-status--${race.status}`;
+    graphs?.onSnapshot(race);
     countdownAnchor = { atMs: nowMs, timeLeftSeconds: race.time_left_seconds };
     timeLeftEl.textContent = formatDuration(race.time_left_seconds);
 
@@ -217,5 +226,5 @@ export function renderRace(root: HTMLElement, joinCode: string, opts: RenderRace
     abortSignal: ctrl.signal,
   });
 
-  return () => { ctrl.abort(); finishedTeardown?.(); };
+  return () => { ctrl.abort(); finishedTeardown?.(); graphs?.destroy(); };
 }

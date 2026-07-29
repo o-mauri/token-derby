@@ -96,4 +96,4 @@ window.fetch = (async (input: RequestInfo | URL) => {
 }) as typeof fetch;
 
 const app = document.getElementById('app')!;
-renderRace(app, JOIN_CODE);
+renderRace(app, JOIN_CODE, { showGraphs: true });
