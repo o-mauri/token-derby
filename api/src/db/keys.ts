@@ -113,3 +113,9 @@ export const RELEASE_PK_PREFIX = 'RELEASE#';
 export function releaseKey(component: string, version: string) {
   return { pk: `${RELEASE_PK_PREFIX}${component}#${version}`, sk: 'META' };
 }
+
+// Shares the release's partition so every recipient of a release can be read
+// with one Query alongside its META row.
+export function releaseOrgKey(component: string, version: string, org_id: string) {
+  return { pk: `${RELEASE_PK_PREFIX}${component}#${version}`, sk: `ORG#${org_id}` };
+}

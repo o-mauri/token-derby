@@ -107,4 +107,39 @@ describe('admin-announce-release', () => {
     await clearOrgSlack(okId);
     await clearOrgSlack(failId);
   });
+
+  it('retries only the orgs that did not receive the announcement', async () => {
+    sent.length = 0;
+    failingOrgIds.clear();
+    const okId = `ann-r-ok-${Date.now()}`;
+    const failId = `ann-r-fail-${Date.now()}`;
+    await putOrganisation({ org_id: okId, org_name: `AnnROk${Date.now()}`, creator_user_id: 'u1', created_at: 'now' } as any, `jt-${okId}`);
+    await putOrganisation({ org_id: failId, org_name: `AnnRFail${Date.now()}`, creator_user_id: 'u1', created_at: 'now' } as any, `jt-${failId}`);
+    const cfg: OrgSlackConfig = {
+      bot_token: 'xoxb', channel_id: 'C1',
+      messages: { race_created: false, race_ended: false, league_season_ended: false, weekly_digest: false, release_published: true },
+    };
+    await setOrgSlack(okId, cfg);
+    await setOrgSlack(failId, cfg);
+    failingOrgIds.add(failId);
+
+    const version = uniq();
+    await call(good(version), token());
+    expect(sent).toContain(okId);
+    expect(sent).toContain(failId);
+
+    // Slack recovers; the retry must reach the missed org and skip the one
+    // that already received it.
+    failingOrgIds.delete(failId);
+    sent.length = 0;
+    const retry = await call(good(version), token());
+    expect(retry.statusCode).toBe(200);
+    const body = JSON.parse(retry.body);
+    expect(body.announced).toBe(true);
+    expect(body.orgs_notified).toBe(1);
+    expect(sent).toEqual([failId]);
+
+    await clearOrgSlack(okId);
+    await clearOrgSlack(failId);
+  });
 });

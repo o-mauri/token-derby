@@ -106,7 +106,7 @@ console.log(`\n✓ ${component} v${next} released.`);
 try {
   const res = await announce(component, next);
   if (res.announced) console.log(`  Slack: announced to ${res.orgs_notified} org(s).`);
-  else console.log('  Slack: already claimed — no message was sent. If this release was never announced, the marker must be cleared before a retry can post.');
+  else console.log('  Slack: every opted-in org already has this release — nothing left to send.');
 } catch (e) {
   console.warn(`  ⚠ Slack announcement failed: ${e.message}`);
   console.warn(`     retry with: make announce-release COMPONENT=${component} VERSION=${next}`);

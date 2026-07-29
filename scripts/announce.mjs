@@ -71,7 +71,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   try {
     const res = await announce(component, version);
     if (res.announced) console.log(`✓ announced ${component} v${version} to ${res.orgs_notified} org(s).`);
-    else console.log(`• ${component} v${version} is already claimed — no message was sent. If this release was never announced, the marker must be cleared before a retry can post.`);
+    else console.log(`• every opted-in org already has ${component} v${version} — nothing left to send.`);
   } catch (e) {
     console.error(`✗ announcement failed: ${e.message}`);
     process.exit(1);

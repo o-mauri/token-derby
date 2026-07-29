@@ -2,7 +2,7 @@ import type { ApiHandler } from '../lib/http.js';
 import type { AnnounceReleaseRequest, AnnounceReleaseResponse, ReleaseComponent } from '@token-derby/shared';
 import { requireAdmin } from '../lib/admin-auth.js';
 import { loadAdminConfig } from '../lib/admin-config.js';
-import { claimRelease, unclaimRelease } from '../db/releases.js';
+import { claimRelease, unclaimRelease, claimReleaseForOrg, unclaimReleaseForOrg } from '../db/releases.js';
 import { listOrgsWithSlackRelease } from '../db/organisations.js';
 import { sendOrgRelease } from '../lib/slack/send.js';
 import { ok, err, parseJson } from '../lib/http.js';
@@ -37,22 +37,32 @@ export const handler: ApiHandler = async (event) => {
     changes: body.changes.map((c) => c.trim()),
   };
 
-  // At-most-once: a retried release claims nothing and posts nothing.
-  if (!(await claimRelease(release))) {
-    const dup: AnnounceReleaseResponse = { announced: false, reason: 'duplicate' };
-    return ok(dup);
-  }
+  // Records the release for audit; delivery is gated per org below, so a retry
+  // resumes a partial fan-out instead of being turned away as a duplicate.
+  const firstAttempt = await claimRelease(release);
 
   let orgs_notified = 0;
+  let orgs_skipped = 0;
   try {
     for (const org of await listOrgsWithSlackRelease()) {
+      if (!(await claimReleaseForOrg(release, org.org_id))) {
+        orgs_skipped += 1;
+        continue;
+      }
       if (await sendOrgRelease(org, release)) orgs_notified += 1;
+      else await unclaimReleaseForOrg(release, org.org_id);
     }
   } catch (e) {
-    // sendOrgRelease never throws (it catches internally and returns false),
-    // so the only way here is the Scan failing before any post — safe to unclaim.
-    await unclaimRelease(release);
+    // sendOrgRelease never throws (it catches internally and returns false), and
+    // the Scan is fully resolved before the first post, so nothing has been sent.
+    if (firstAttempt) await unclaimRelease(release);
     throw e;
+  }
+
+  // Nothing new to send and every candidate already had it: a true duplicate.
+  if (orgs_notified === 0 && orgs_skipped > 0) {
+    const dup: AnnounceReleaseResponse = { announced: false, reason: 'duplicate' };
+    return ok(dup);
   }
 
   const response: AnnounceReleaseResponse = { announced: true, orgs_notified };

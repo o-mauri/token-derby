@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import './../setup.js';
-import { claimRelease } from '../../src/db/releases.js';
+import { claimRelease, claimReleaseForOrg, unclaimReleaseForOrg } from '../../src/db/releases.js';
 import type { AnnounceReleaseRequest } from '@token-derby/shared';
 import { putOrganisation, setOrgSlack, listOrgsWithSlackRelease, type OrgSlackConfig } from '../../src/db/organisations.js';
 
@@ -13,6 +13,26 @@ describe('release markers', () => {
     const v = `2.13.${Date.now() % 1000}`;
     expect(await claimRelease(release(v))).toBe(true);
     expect(await claimRelease(release(v))).toBe(false);
+  });
+
+  it('claims a version per org at most once, and frees it on unclaim', async () => {
+    const v = `4.1.${Date.now() % 1000}`;
+    const rel = release(v);
+    expect(await claimReleaseForOrg(rel, 'org-a')).toBe(true);
+    expect(await claimReleaseForOrg(rel, 'org-a')).toBe(false);
+    // A different org is unaffected by org-a's marker.
+    expect(await claimReleaseForOrg(rel, 'org-b')).toBe(true);
+    // Unclaiming lets a retry reach that org again.
+    await unclaimReleaseForOrg(rel, 'org-a');
+    expect(await claimReleaseForOrg(rel, 'org-a')).toBe(true);
+  });
+
+  it('keeps the per-org marker separate from the release row', async () => {
+    const v = `4.2.${Date.now() % 1000}`;
+    const rel = release(v);
+    expect(await claimReleaseForOrg(rel, 'org-a')).toBe(true);
+    // The release row shares the partition but must still be claimable.
+    expect(await claimRelease(rel)).toBe(true);
   });
 
   it('tracks cli and site versions independently', async () => {
