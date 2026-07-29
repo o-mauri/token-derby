@@ -28,7 +28,9 @@ describe('resolveBump', () => {
 
   it('rejects anything else', () => {
     for (const answer of ['', 'nope', undefined]) {
-      expect(resolveBump('site', '0.12.1', answer).action).toBe('reject');
+      const r = resolveBump('site', '0.12.1', answer);
+      expect(r.action).toBe('reject');
+      expect(r.reason).toBe('invalid bump type — aborting, no changes made.');
     }
   });
 });
@@ -37,6 +39,7 @@ describe('findChangelogEntry', () => {
   const log = [
     { version: '0.12.1', date: '2026-07-28', component: 'site', changes: ['jitter'] },
     { version: '2.12.3', date: '2026-07-28', component: 'cli', changes: ['stuck cli fixes'] },
+    { version: '2.12.3', date: '2026-07-28', component: 'admin', changes: ['admin build fix'] },
   ];
 
   it('finds the entry for a component and version', () => {
@@ -44,6 +47,7 @@ describe('findChangelogEntry', () => {
   });
 
   it('does not confuse components that share a version', () => {
+    expect(findChangelogEntry(log, 'admin', '2.12.3').changes).toEqual(['admin build fix']);
     expect(() => findChangelogEntry(log, 'site', '2.12.3')).toThrow(/no changelog entry/);
   });
 
