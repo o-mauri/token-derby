@@ -1,7 +1,7 @@
 // Standalone preview of the live race view with dummy data.
 // Loaded by /preview-race.html — not part of the main app bundle.
 import { renderRace } from './render/race.js';
-import type { CollectedHat, GetRaceResponse, HorseView } from '@token-derby/shared';
+import type { CollectedHat, GetRaceResponse, GetRaceSeriesResponse, HorseView, SeriesPoint } from '@token-derby/shared';
 
 const COLORS_A = { body: '#8B4513', mane: '#000000', tail: '#000000', saddle: '#C0392B' };
 const COLORS_B = { body: '#FFFFFF', mane: '#000000', tail: '#000000', saddle: '#1B4F72' };
@@ -84,8 +84,42 @@ function snapshot(now: number): GetRaceResponse {
   };
 }
 
+// Dummy per-horse token series covering the elapsed part of the (live) race, so
+// the mid-race graph popup has data without a real API. Live races clamp their
+// chart window to "now", so points are only emitted up to this load time.
+const SERIES_NOW_MS = Date.now();
+
+function seriesFor(h: HorseView, seed: number): SeriesPoint[] {
+  const elapsedMinutes = Math.max(1, Math.floor((SERIES_NOW_MS - RACE_START_MS) / 60_000));
+  const weights = Array.from({ length: elapsedMinutes }, (_, m) => {
+    const active = Math.sin(m * 0.06 + seed * 1.7) > -0.25;
+    const burst = Math.max(0, Math.sin(m * 0.4 + seed) * Math.cos(m * 0.13 + seed));
+    return active ? burst : 0;
+  });
+  const sum = weights.reduce((a, b) => a + b, 0) || 1;
+  const total = h.current_tokens;
+  const points: SeriesPoint[] = [];
+  weights.forEach((w, m) => {
+    if (w <= 0) return; // idle minute — no point recorded
+    points.push({ t: RACE_START_MS + m * 60_000 + 30_000, d: Math.round((w / sum) * total) });
+  });
+  return points;
+}
+
+const SERIES: GetRaceSeriesResponse = {
+  start_ms: RACE_START_MS,
+  end_ms: RACE_END_MS,
+  horses: snapshot(SERIES_NOW_MS).horses.map((h, i) => ({ horse_id: h.horse_id, points: seriesFor(h, i) })),
+};
+
 window.fetch = (async (input: RequestInfo | URL) => {
   const url = typeof input === 'string' ? input : input.toString();
+  if (url.includes(`/api/races/${encodeURIComponent(JOIN_CODE)}/series`)) {
+    return new Response(JSON.stringify(SERIES), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  }
   if (url.includes(`/api/races/${encodeURIComponent(JOIN_CODE)}`)) {
     return new Response(JSON.stringify(snapshot(Date.now())), {
       status: 200,
