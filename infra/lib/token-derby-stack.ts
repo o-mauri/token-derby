@@ -103,6 +103,15 @@ export class TokenDerbyStack extends cdk.Stack {
       sortKey: { name: 'org_id', type: dynamodb.AttributeType.STRING },
     });
 
+    // Sparse — only Slack-configured org meta rows carry `slack_marker`, so the
+    // per-minute digest sweep queries a handful of entries instead of scanning
+    // the whole table.
+    table.addGlobalSecondaryIndex({
+      indexName: 'SlackOrgsIndex',
+      partitionKey: { name: 'slack_marker', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'org_id', type: dynamodb.AttributeType.STRING },
+    });
+
     // ── Winner sprite bucket (public, content-addressed) ────────────────
     const spriteBucket = new s3.Bucket(this, 'WinnerSprites', {
       blockPublicAccess: new s3.BlockPublicAccess({

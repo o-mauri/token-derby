@@ -3,6 +3,11 @@ import { ddb, TABLE } from './client.js';
 import { orgMetaKey, orgMemberKey, ORG_PK_PREFIX, MEMBER_SK_PREFIX, parseOrgId } from './keys.js';
 import type { Organisation, OrganisationSummary, OrgSlackMessages, OrgSlackDigest } from '@token-derby/shared';
 
+// Sparse index over org meta rows that have Slack configured. Only those rows
+// carry `slack_marker`, so the index holds one entry per Slack-enabled org.
+export const SLACK_ORGS_INDEX = 'SlackOrgsIndex';
+const SLACK_MARKER = 'SLACK';
+
 export type OrgSlackConfig = {
   bot_token: string;
   channel_id: string;
@@ -180,9 +185,9 @@ export async function setOrgSlack(org_id: string, config: OrgSlackConfig): Promi
   await ddb.send(new UpdateCommand({
     TableName: TABLE,
     Key: orgMetaKey(org_id),
-    UpdateExpression: 'SET slack = :s',
+    UpdateExpression: 'SET slack = :s, slack_marker = :m',
     ConditionExpression: 'attribute_exists(pk)',
-    ExpressionAttributeValues: { ':s': config },
+    ExpressionAttributeValues: { ':s': config, ':m': SLACK_MARKER },
   }));
 }
 
@@ -190,7 +195,7 @@ export async function clearOrgSlack(org_id: string): Promise<void> {
   await ddb.send(new UpdateCommand({
     TableName: TABLE,
     Key: orgMetaKey(org_id),
-    UpdateExpression: 'REMOVE slack',
+    UpdateExpression: 'REMOVE slack, slack_marker',
     ConditionExpression: 'attribute_exists(pk)',
   }));
 }
@@ -256,6 +261,6 @@ export async function listOrgsWithSlackRelease(): Promise<OrgRecord[]> {
 }
 
 function pickOrgRecord(item: Record<string, any>): OrgRecord {
-  const { pk: _pk, sk: _sk, ...rest } = item;
+  const { pk: _pk, sk: _sk, slack_marker: _m, ...rest } = item;
   return rest as OrgRecord;
 }

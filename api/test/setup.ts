@@ -31,6 +31,7 @@ beforeAll(async () => {
       { AttributeName: 'start_time', AttributeType: 'S' },
       { AttributeName: 'schedule_marker', AttributeType: 'S' },
       { AttributeName: 'league_marker', AttributeType: 'S' },
+      { AttributeName: 'slack_marker', AttributeType: 'S' },
     ],
     KeySchema: [
       { AttributeName: 'pk', KeyType: 'HASH' },
@@ -82,6 +83,14 @@ beforeAll(async () => {
         IndexName: 'LeaguesIndex',
         KeySchema: [
           { AttributeName: 'league_marker', KeyType: 'HASH' },
+          { AttributeName: 'org_id', KeyType: 'RANGE' },
+        ],
+        Projection: { ProjectionType: 'ALL' },
+      },
+      {
+        IndexName: 'SlackOrgsIndex',
+        KeySchema: [
+          { AttributeName: 'slack_marker', KeyType: 'HASH' },
           { AttributeName: 'org_id', KeyType: 'RANGE' },
         ],
         Projection: { ProjectionType: 'ALL' },

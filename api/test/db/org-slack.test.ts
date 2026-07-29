@@ -1,7 +1,21 @@
 import { describe, it, expect } from 'vitest';
 import './../setup.js';
+import { QueryCommand } from '@aws-sdk/lib-dynamodb';
+import { ddb, TABLE } from '../../src/db/client.js';
 import { putOrganisation, getOrganisationById, setOrgSlack, clearOrgSlack, markDigestSent } from '../../src/db/organisations.js';
 import type { OrgSlackConfig } from '../../src/db/organisations.js';
+
+// Reads the sparse index directly: the index name and marker value are a
+// persistent infra contract, so they are spelled out rather than imported.
+async function orgIdsOnSlackIndex(): Promise<string[]> {
+  const res = await ddb.send(new QueryCommand({
+    TableName: TABLE,
+    IndexName: 'SlackOrgsIndex',
+    KeyConditionExpression: 'slack_marker = :m',
+    ExpressionAttributeValues: { ':m': 'SLACK' },
+  }));
+  return (res.Items ?? []).map((i) => i.org_id as string);
+}
 
 const CONFIG: OrgSlackConfig = {
   bot_token: 'xoxb-secret', channel_id: 'C1',
@@ -24,6 +38,26 @@ describe('org slack db', () => {
     await clearOrgSlack(id);
     org = await getOrganisationById(id);
     expect(org!.slack).toBeUndefined();
+  });
+
+  it('indexes the org on SlackOrgsIndex while slack is configured', async () => {
+    const id = `marker-${Date.now()}`;
+    await seedOrg(id);
+    expect(await orgIdsOnSlackIndex()).not.toContain(id);
+
+    await setOrgSlack(id, CONFIG);
+    expect(await orgIdsOnSlackIndex()).toContain(id);
+
+    await clearOrgSlack(id);
+    expect(await orgIdsOnSlackIndex()).not.toContain(id);
+  });
+
+  it('keeps the index marker out of the returned org record', async () => {
+    const id = `strip-${Date.now()}`;
+    await seedOrg(id);
+    await setOrgSlack(id, CONFIG);
+    const org = await getOrganisationById(id);
+    expect(org).not.toHaveProperty('slack_marker');
   });
 
   it('markDigestSent claims a date at most once', async () => {
