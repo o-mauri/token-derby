@@ -24,15 +24,29 @@ const rl = createInterface({ input, output });
 const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
 const current = pkg.version;
 console.log(`\n${component} is at v${current}`);
-console.log(`  patch → ${bumpVersion(current, 'patch')}    minor → ${bumpVersion(current, 'minor')}    major → ${bumpVersion(current, 'major')}`);
+console.log(`  patch → ${bumpVersion(current, 'patch')}    minor → ${bumpVersion(current, 'minor')}    major → ${bumpVersion(current, 'major')}    none → no version change`);
 
-const kind = (await rl.question('bump [patch/minor/major]: ')).trim().toLowerCase();
-if (!['patch', 'minor', 'major'].includes(kind)) {
-  console.error('invalid bump type — aborting, no changes made.');
+const decision = resolveBump(component, current, await rl.question('bump [patch/minor/major/none]: '));
+if (decision.action === 'reject') {
+  console.error(decision.reason);
   rl.close();
   process.exit(1);
 }
-const next = bumpVersion(current, kind);
+
+// No version change: nothing to write, nothing to announce, nothing to roll back.
+if (decision.action === 'none') {
+  rl.close();
+  console.log('\nno version bump — skipping changelog. Running deploy…\n');
+  const step = spawnSync('make', ['_deploy-site'], { cwd: ROOT, stdio: 'inherit', env: process.env });
+  if (step.status !== 0) {
+    console.error(`\n✗ deploy failed (exit ${step.status}). No files were changed.`);
+    process.exit(1);
+  }
+  console.log('\n✓ site deployed (version unchanged).');
+  process.exit(0);
+}
+
+const next = decision.version;
 
 console.log('\nDescription — one bullet per line, blank line to finish:');
 const changes = [];

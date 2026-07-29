@@ -51,8 +51,9 @@ npx cdk deploy
 `make deploy` releases the site, `make publish-cli` releases the CLI. Both bump
 the version, prepend a `site/src/changelog.json` entry, publish, then announce
 the release to every org that has "Release published" enabled in its Slackbot
-settings. `make deploy` also accepts a `none` bump to deploy without a version
-change.
+settings. `make deploy` also accepts a `none` bump, which deploys the site as-is
+with no version change, no changelog entry, and no announcement. `make
+publish-cli` rejects `none` — npm won't accept a duplicate version.
 
 The announcement needs these in the root `.env` (gitignored):
 
