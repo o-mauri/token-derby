@@ -42,6 +42,6 @@ describe('ensureSprite', () => {
     await ensureSprite(client, 'my-bucket', COLORS);
     const put = sends.find((c) => c instanceof PutObjectCommand);
     expect(put).toBeTruthy();
-    expect(put.input.ContentType).toBe('image/png');
+    expect(put!.input.ContentType).toBe('image/png');
   });
 });

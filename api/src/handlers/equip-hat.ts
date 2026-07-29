@@ -1,10 +1,10 @@
-import type { APIGatewayProxyHandlerV2 } from 'aws-lambda';
+import type { ApiHandler } from '../lib/http.js';
 import type { EquipHatRequest, EquipHatResponse } from '@token-derby/shared';
 import { authenticate } from '../lib/auth.js';
 import { getStableHorse, equipHat } from '../db/stable.js';
 import { ok, err, parseJson } from '../lib/http.js';
 
-export const handler: APIGatewayProxyHandlerV2 = async (event) => {
+export const handler: ApiHandler = async (event) => {
   const auth = await authenticate(event);
   if ('error' in auth) return err('UNAUTHENTICATED', auth.error);
 

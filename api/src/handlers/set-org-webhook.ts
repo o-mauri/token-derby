@@ -1,4 +1,4 @@
-import type { APIGatewayProxyHandlerV2 } from 'aws-lambda';
+import type { ApiHandler } from '../lib/http.js';
 import type { SetOrgWebhookRequest, SetOrgWebhookResponse } from '@token-derby/shared';
 import { ORG_NAME_PATTERN, parseSemver } from '@token-derby/shared';
 import { getOrganisationByName, setOrgWebhook } from '../db/organisations.js';
@@ -16,7 +16,7 @@ const BLOCKED_HOSTNAMES = new Set([
   '169.254.169.254',
 ]);
 
-export const handler: APIGatewayProxyHandlerV2 = async (event) => {
+export const handler: ApiHandler = async (event) => {
   const auth = await resolveCaller(event);
   if ('error' in auth) return err('UNAUTHENTICATED', auth.error);
 

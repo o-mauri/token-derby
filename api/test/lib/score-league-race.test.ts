@@ -134,7 +134,7 @@ describe('scoreLeagueRace', () => {
     await scoreLeagueRace(race, [h1]);
     await scoreLeagueRace(race, [h1]); // re-run
     const [row] = await listSeasonStandings(org_id, 1);
-    expect(row.points).toBe(20); // 1st → 20 points once, not double-counted to 40
+    expect(row!.points).toBe(20); // 1st → 20 points once, not double-counted to 40
   });
 
   it('no-ops when the league has been deleted', async () => {

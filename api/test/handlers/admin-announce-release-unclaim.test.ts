@@ -26,7 +26,7 @@ function ev(body?: unknown, tok?: string): APIGatewayProxyEventV2 {
 }
 
 const good = (version: string) => ({ component: 'cli', version, date: '2026-07-28', changes: ['a fix'] });
-const call = (body?: unknown, tok?: string) => handler(ev(body, tok) as any, {} as any, {} as any) as Promise<any>;
+const call = (body?: unknown, tok?: string) => handler(ev(body, tok) as any) as Promise<any>;
 const uniq = () => `9.9.${Math.floor(Math.random() * 100000)}`;
 
 describe('admin-announce-release: fan-out failure', () => {

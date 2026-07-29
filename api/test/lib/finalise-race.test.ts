@@ -16,7 +16,7 @@ import { putLeague } from '../../src/db/leagues.js';
 import { listSeasonStandings } from '../../src/db/league-standings.js';
 import type { League } from '@token-derby/shared';
 
-const slackPost = vi.fn(async () => ({ ok: true }));
+const slackPost = vi.fn(async (..._a: any[]) => ({ ok: true }));
 vi.mock('../../src/lib/slack/client.js', () => ({ postSlackMessage: (...a: any[]) => slackPost(...a) }));
 
 function findHorse(horses: Horse[], name: string): Horse {

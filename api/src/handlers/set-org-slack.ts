@@ -1,4 +1,4 @@
-import type { APIGatewayProxyHandlerV2 } from 'aws-lambda';
+import type { ApiHandler } from '../lib/http.js';
 import type { SetOrgSlackRequest, GetOrgSlackResponse, OrgSlackMessages, OrgSlackDigest } from '@token-derby/shared';
 import { ORG_NAME_PATTERN } from '@token-derby/shared';
 import { getOrganisationByName, setOrgSlack, type OrgSlackConfig } from '../db/organisations.js';
@@ -19,7 +19,7 @@ function validDigest(d: any): d is OrgSlackDigest {
     && typeof d.tz === 'string' && isValidTimeZone(d.tz);
 }
 
-export const handler: APIGatewayProxyHandlerV2 = async (event) => {
+export const handler: ApiHandler = async (event) => {
   const auth = await resolveCaller(event);
   if ('error' in auth) return err('UNAUTHENTICATED', auth.error);
 

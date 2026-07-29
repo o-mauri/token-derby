@@ -1,4 +1,4 @@
-import type { APIGatewayProxyHandlerV2 } from 'aws-lambda';
+import type { ApiHandler } from '../lib/http.js';
 import type { AdminRenameUserRequest } from '@token-derby/shared';
 import { USER_NAME_MAX_LENGTH } from '@token-derby/shared';
 import { requireAdmin } from '../lib/admin-auth.js';
@@ -6,7 +6,7 @@ import { loadAdminConfig } from '../lib/admin-config.js';
 import { updateUserDisplayName } from '../db/users.js';
 import { ok, err, parseJson } from '../lib/http.js';
 
-export const handler: APIGatewayProxyHandlerV2 = async (event) => {
+export const handler: ApiHandler = async (event) => {
   const cfg = await loadAdminConfig();
   const auth = requireAdmin(event, cfg.sessionSecret);
   if (!auth.ok) return err('UNAUTHENTICATED', 'Admin session required');

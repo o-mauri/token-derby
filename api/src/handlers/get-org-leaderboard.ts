@@ -1,10 +1,10 @@
-import type { APIGatewayProxyHandlerV2 } from 'aws-lambda';
+import type { ApiHandler } from '../lib/http.js';
 import { ORG_NAME_PATTERN } from '@token-derby/shared';
 import { getOrganisationByName } from '../db/organisations.js';
 import { buildOrgLeaderboard } from '../lib/org-leaderboard.js';
 import { ok, err } from '../lib/http.js';
 
-export const handler: APIGatewayProxyHandlerV2 = async (event) => {
+export const handler: ApiHandler = async (event) => {
   const raw = event.pathParameters?.org_name;
   if (!raw) return err('BAD_REQUEST', 'org_name path parameter required');
   const org_name = decodeURIComponent(raw);

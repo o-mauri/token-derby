@@ -10,10 +10,10 @@ import { makeUser, type TestUser } from '../helpers/auth-helper.js';
 import type { RaceSchedule, OrgSlackDigest, StableHorse } from '@token-derby/shared';
 import { CURRENT_CLI_VERSION } from '../helpers/cli-version.js';
 
-const slackPost = vi.fn(async () => ({ ok: true }));
+const slackPost = vi.fn(async (..._a: any[]) => ({ ok: true }));
 vi.mock('../../src/lib/slack/client.js', () => ({ postSlackMessage: (...a: any[]) => slackPost(...a) }));
 
-const runTick = () => (tick as unknown as () => Promise<void>)();
+const runTick = () => tick();
 
 async function createOrg(user: TestUser, name: string): Promise<string> {
   const ev: APIGatewayProxyEventV2 = {

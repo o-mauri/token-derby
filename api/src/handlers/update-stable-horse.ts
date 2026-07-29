@@ -1,11 +1,11 @@
-import type { APIGatewayProxyHandlerV2 } from 'aws-lambda';
+import type { ApiHandler } from '../lib/http.js';
 import type { UpdateStableHorseRequest, UpdateStableHorseResponse } from '@token-derby/shared';
 import { HORSE_NAME_MAX_LENGTH } from '@token-derby/shared';
 import { authenticate } from '../lib/auth.js';
 import { getStableHorse, updateStableHorse } from '../db/stable.js';
 import { ok, err, parseJson } from '../lib/http.js';
 
-export const handler: APIGatewayProxyHandlerV2 = async (event) => {
+export const handler: ApiHandler = async (event) => {
   const auth = await authenticate(event);
   if ('error' in auth) return err('UNAUTHENTICATED', auth.error);
 

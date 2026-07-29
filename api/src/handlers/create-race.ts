@@ -1,4 +1,4 @@
-import type { APIGatewayProxyHandlerV2 } from 'aws-lambda';
+import type { ApiHandler } from '../lib/http.js';
 import type { CreateRaceRequest, CreateRaceResponse } from '@token-derby/shared';
 import { ORG_NAME_PATTERN, parseSemver } from '@token-derby/shared';
 import { getOrganisationByName, isMember } from '../db/organisations.js';
@@ -7,7 +7,7 @@ import { readCliVersion, meetsMinimumCliVersion, versionMismatchMessage } from '
 import { authenticate } from '../lib/auth.js';
 import { createRace } from '../lib/create-race.js';
 
-export const handler: APIGatewayProxyHandlerV2 = async (event) => {
+export const handler: ApiHandler = async (event) => {
   const cli_version = readCliVersion(event);
   if (!cli_version) {
     return err('BAD_REQUEST', 'X-Cli-Version header required — upgrade your CLI');

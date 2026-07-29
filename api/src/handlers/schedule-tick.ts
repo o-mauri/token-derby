@@ -1,4 +1,3 @@
-import type { ScheduledHandler } from 'aws-lambda';
 import { listAllSchedules, tryClaimMaterialised } from '../db/schedules.js';
 import { listAllLeagues } from '../db/leagues.js';
 import { ensureLeagueSeason, tryClaimLeagueFixture, stampFinalFixtureEnd } from '../db/league-seasons.js';
@@ -14,7 +13,7 @@ import { leagueFixtureName } from '@token-derby/shared';
 // time is inside an active weekday's window and not yet created today — both
 // repeating RaceSchedules and League fixtures (an org has at most one of the
 // two). One tick handles both since the work is the same shape.
-export const handler: ScheduledHandler = async () => {
+export const handler = async (): Promise<void> => {
   const now = new Date();
   const nowMs = now.getTime();
   const schedules = await listAllSchedules();

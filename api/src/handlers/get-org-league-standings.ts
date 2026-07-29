@@ -1,4 +1,4 @@
-import type { APIGatewayProxyHandlerV2 } from 'aws-lambda';
+import type { ApiHandler } from '../lib/http.js';
 import type { GetLeagueStandingsResponse } from '@token-derby/shared';
 import { ORG_NAME_PATTERN, buildSeasonStandings } from '@token-derby/shared';
 import { getOrganisationByName } from '../db/organisations.js';
@@ -7,7 +7,7 @@ import { getLeagueSeason } from '../db/league-seasons.js';
 import { listSeasonStandings } from '../db/league-standings.js';
 import { ok, err } from '../lib/http.js';
 
-export const handler: APIGatewayProxyHandlerV2 = async (event) => {
+export const handler: ApiHandler = async (event) => {
   const raw = event.pathParameters?.org_name;
   if (!raw) return err('BAD_REQUEST', 'org_name path parameter required');
   const org_name = decodeURIComponent(raw);

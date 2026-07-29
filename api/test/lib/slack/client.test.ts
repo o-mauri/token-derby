@@ -5,7 +5,7 @@ afterEach(() => vi.restoreAllMocks());
 
 describe('postSlackMessage', () => {
   it('posts to chat.postMessage and returns ok on success', async () => {
-    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ ok: true }), { status: 200 }));
+    const fetchMock = vi.fn(async (..._a: any[]) => new Response(JSON.stringify({ ok: true }), { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
     const res = await postSlackMessage('xoxb-1', 'C1', 'hi', []);
     expect(res.ok).toBe(true);

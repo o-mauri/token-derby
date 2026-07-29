@@ -11,5 +11,5 @@
       "@token-derby/shared": ["../shared/src/index.ts"]
     }
   },
-  "include": ["src/**/*"]
+  "include": ["src/**/*", "test/**/*"]
 }

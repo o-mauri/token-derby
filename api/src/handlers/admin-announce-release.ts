@@ -1,4 +1,4 @@
-import type { APIGatewayProxyHandlerV2 } from 'aws-lambda';
+import type { ApiHandler } from '../lib/http.js';
 import type { AnnounceReleaseRequest, AnnounceReleaseResponse, ReleaseComponent } from '@token-derby/shared';
 import { requireAdmin } from '../lib/admin-auth.js';
 import { loadAdminConfig } from '../lib/admin-config.js';
@@ -15,7 +15,7 @@ function validComponent(c: any): c is ReleaseComponent {
   return c === 'cli' || c === 'site';
 }
 
-export const handler: APIGatewayProxyHandlerV2 = async (event) => {
+export const handler: ApiHandler = async (event) => {
   const cfg = await loadAdminConfig();
   const auth = requireAdmin(event, cfg.sessionSecret);
   if (!auth.ok) return err('UNAUTHENTICATED', 'Admin session required');

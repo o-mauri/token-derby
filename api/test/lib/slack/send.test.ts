@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-const post = vi.fn(async () => ({ ok: true }));
-const ensure = vi.fn(async () => 'https://bucket/winners/x.png');
+// Rest params and a widened result keep the call-args and mockResolvedValueOnce
+// assertions below type-checkable.
+const post = vi.fn(async (..._a: any[]): Promise<{ ok: boolean; error?: string }> => ({ ok: true }));
+const ensure = vi.fn(async (..._a: any[]) => 'https://bucket/winners/x.png');
 vi.mock('../../../src/lib/slack/client.js', () => ({ postSlackMessage: (...a: any[]) => post(...a) }));
 vi.mock('../../../src/lib/slack/sprite-store.js', () => ({ ensureSprite: (...a: any[]) => ensure(...a) }));
 

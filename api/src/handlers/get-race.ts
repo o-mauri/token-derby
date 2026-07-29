@@ -1,4 +1,4 @@
-import type { APIGatewayProxyHandlerV2 } from 'aws-lambda';
+import type { ApiHandler } from '../lib/http.js';
 import type { GetRaceResponse, Horse, RaceStatus } from '@token-derby/shared';
 import { PACE_WINDOW_MS, trailingPace } from '@token-derby/shared';
 import { getRaceByJoinCode } from '../db/races.js';
@@ -14,7 +14,7 @@ import { ok, err } from '../lib/http.js';
 // Last ~30 points comfortably cover the 15-min window (heartbeats are ≤1/min).
 const RECENT_POINTS_LIMIT = 30;
 
-export const handler: APIGatewayProxyHandlerV2 = async (event) => {
+export const handler: ApiHandler = async (event) => {
   const join_code = event.pathParameters?.join_code;
   if (!join_code) return err('BAD_REQUEST', 'join_code required');
 
