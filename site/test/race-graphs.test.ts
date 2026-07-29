@@ -190,4 +190,82 @@ describe('race graphs popup', () => {
     expect(fetchSeries).toHaveBeenCalledTimes(1);
     g.destroy();
   });
+
+  const emptySeries: GetRaceSeriesResponse = {
+    start_ms: 0, end_ms: 600_000,
+    horses: [{ horse_id: 'a', points: [] }, { horse_id: 'b', points: [] }],
+  };
+
+  it('shows a waiting message when the race has no points yet', async () => {
+    const { g } = setup({ fetchSeries: vi.fn(async () => emptySeries) });
+    g.onSnapshot(race());
+    g.button.click();
+    await vi.waitFor(() => expect(document.querySelector('.race-graphs-empty')).toBeTruthy());
+    expect(document.querySelector('.race-graphs-empty')!.textContent)
+      .toContain('No token data yet');
+    g.destroy();
+  });
+
+  it('shows a division-scoped message when the selected division is empty', async () => {
+    const { g } = setup();
+    g.onSnapshot(race({
+      league_division_names: ['Premier', 'Championship'],
+      horses: [horse('a', 'Alpha', 1, 1)],   // nobody in division 2
+    }));
+    g.button.click();
+    await vi.waitFor(() => expect(document.querySelector('.chart-svg')).toBeTruthy());
+    document.querySelector<HTMLButtonElement>('.race-graphs-div[data-division="2"]')!.click();
+    expect(document.querySelector('.race-graphs-empty')!.textContent)
+      .toContain('No data for this division yet');
+    g.destroy();
+  });
+
+  it('shows an error message and stays open when the fetch fails', async () => {
+    const fetchSeries = vi.fn(async () => { throw new Error('boom'); });
+    const { g } = setup({ fetchSeries });
+    g.onSnapshot(race());
+    g.button.click();
+    await vi.waitFor(() => expect(document.querySelector('.race-graphs-empty')).toBeTruthy());
+    expect(document.querySelector('.race-graphs-empty')!.textContent).toContain("Couldn't load");
+    expect(document.querySelector('.race-graphs')).toBeTruthy();   // still open
+    g.destroy();
+  });
+
+  it('recovers on the next snapshot after a failure', async () => {
+    let fail = true;
+    const fetchSeries = vi.fn(async () => {
+      if (fail) throw new Error('boom');
+      return series;
+    });
+    const { g } = setup({ fetchSeries });
+    g.onSnapshot(race());
+    g.button.click();
+    await vi.waitFor(() => expect(document.querySelector('.race-graphs-empty')).toBeTruthy());
+    fail = false;
+    g.onSnapshot(race());
+    await vi.waitFor(() => expect(document.querySelector('.chart-svg')).toBeTruthy());
+    g.destroy();
+  });
+
+  it('resets to All when the selected division vanishes from a new snapshot', async () => {
+    const { g } = setup();
+    g.onSnapshot(race({
+      league_division_names: ['Premier', 'Championship'],
+      horses: [horse('a', 'Alpha', 1, 1), horse('b', 'Beta', 2, 2)],
+    }));
+    g.button.click();
+    await vi.waitFor(() => expect(document.querySelector('.race-graphs-div')).toBeTruthy());
+    document.querySelector<HTMLButtonElement>('.race-graphs-div[data-division="2"]')!.click();
+    expect(document.querySelectorAll('.legend-item')).toHaveLength(1);
+
+    g.onSnapshot(race({
+      league_division_names: ['Premier'],
+      horses: [horse('a', 'Alpha', 1, 1), horse('b', 'Beta', 2, 1)],
+    }));
+    await vi.waitFor(() => expect(document.querySelector('.chart-svg')).toBeTruthy());
+    const allBtn = document.querySelector<HTMLButtonElement>('.race-graphs-div[data-division="all"]')!;
+    expect(allBtn.getAttribute('aria-selected')).toBe('true');
+    expect(document.querySelectorAll('.legend-item')).toHaveLength(2);
+    g.destroy();
+  });
 });

@@ -50,6 +50,7 @@ export function createRaceGraphs(opts: Opts): RaceGraphs {
   let cached: GetRaceSeriesResponse | null = null;
   let abort: AbortController | null = null;
   let dialog: HTMLElement | null = null;
+  let failed = false;
 
   const button = doc.createElement('button');
   button.type = 'button';
@@ -90,6 +91,7 @@ export function createRaceGraphs(opts: Opts): RaceGraphs {
     const host = dialog.querySelector<HTMLElement>('.race-graphs-divisions')!;
     host.innerHTML = '';
     const names = snapshot?.league_division_names;
+    if (division !== null && (!names || division > names.length)) division = null;
     if (!names || names.length === 0) return;   // non-league race: no row at all
     const entries: Array<{ value: number | null; label: string }> = [
       { value: null, label: 'All' },
@@ -112,18 +114,36 @@ export function createRaceGraphs(opts: Opts): RaceGraphs {
     }
   }
 
-  function render(): void {
-    if (!dialog || !snapshot) return;
+  function showMessage(text: string): void {
+    if (!dialog) return;
     const body = dialog.querySelector<HTMLElement>('.race-graphs-body')!;
     body.innerHTML = '';
+    const p = doc.createElement('p');
+    p.className = 'race-graphs-empty';
+    p.textContent = text;
+    body.appendChild(p);
+  }
+
+  function render(): void {
+    if (!dialog || !snapshot) return;
+    if (failed) { showMessage("Couldn't load the graphs — retrying shortly."); return; }
     if (!cached) return;
     const horses = visibleHorses();
+    if (horses.length === 0) { showMessage('No data for this division yet.'); return; }
     const colours = colourMap(snapshot.horses);   // colours stay stable across filters
     const faces = buildChartFaces(doc, cached, horses, {
       modes: [mode],
       endMs: windowEnd(cached, now()),
       colourOf: (h) => colours.get(h.horse_id) ?? LINE_PALETTE[0]!,
     });
+    if (faces.length === 0) {
+      showMessage(division === null
+        ? 'No token data yet — check back in a minute.'
+        : 'No data for this division yet.');
+      return;
+    }
+    const body = dialog.querySelector<HTMLElement>('.race-graphs-body')!;
+    body.innerHTML = '';
     for (const f of faces) body.appendChild(f);
   }
 
@@ -134,10 +154,13 @@ export function createRaceGraphs(opts: Opts): RaceGraphs {
     try {
       const res = await fetchSeries(opts.joinCode);
       if (ctrl.signal.aborted) return;
+      failed = false;
       cached = res;
       render();
     } catch (err) {
       if (ctrl.signal.aborted) return;
+      failed = true;
+      render();
       if (typeof process === 'undefined' || process.env.NODE_ENV !== 'production') {
         console.warn('[race-graphs] series load failed', err);
       }
