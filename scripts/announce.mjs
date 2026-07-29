@@ -12,7 +12,9 @@ function loadDotEnv() {
   if (!existsSync(p)) return;
   for (const line of readFileSync(p, 'utf8').split('\n')) {
     const m = /^([A-Z0-9_]+)=(.*)$/.exec(line.trim());
-    if (m && !process.env[m[1]]) process.env[m[1]] = m[2];
+    if (m && !process.env[m[1]]) {
+      process.env[m[1]] = m[2].replace(/^(['"])(.*)\1$/, '$2');
+    }
   }
 }
 
@@ -69,7 +71,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   try {
     const res = await announce(component, version);
     if (res.announced) console.log(`✓ announced ${component} v${version} to ${res.orgs_notified} org(s).`);
-    else console.log(`• ${component} v${version} was already announced — nothing posted.`);
+    else console.log(`• ${component} v${version} is already claimed — no message was sent. If this release was never announced, the marker must be cleared before a retry can post.`);
   } catch (e) {
     console.error(`✗ announcement failed: ${e.message}`);
     process.exit(1);

@@ -24,7 +24,8 @@ const rl = createInterface({ input, output });
 const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
 const current = pkg.version;
 console.log(`\n${component} is at v${current}`);
-console.log(`  patch → ${bumpVersion(current, 'patch')}    minor → ${bumpVersion(current, 'minor')}    major → ${bumpVersion(current, 'major')}    none → no version change`);
+const noneOption = component === 'site' ? '    none → no version change' : '';
+console.log(`  patch → ${bumpVersion(current, 'patch')}    minor → ${bumpVersion(current, 'minor')}    major → ${bumpVersion(current, 'major')}${noneOption}`);
 
 const decision = resolveBump(component, current, await rl.question('bump [patch/minor/major/none]: '));
 if (decision.action === 'reject') {
@@ -105,7 +106,7 @@ console.log(`\n✓ ${component} v${next} released.`);
 try {
   const res = await announce(component, next);
   if (res.announced) console.log(`  Slack: announced to ${res.orgs_notified} org(s).`);
-  else console.log('  Slack: already announced — nothing posted.');
+  else console.log('  Slack: already claimed — no message was sent. If this release was never announced, the marker must be cleared before a retry can post.');
 } catch (e) {
   console.warn(`  ⚠ Slack announcement failed: ${e.message}`);
   console.warn(`     retry with: make announce-release COMPONENT=${component} VERSION=${next}`);

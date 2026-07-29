@@ -209,10 +209,10 @@ export class TokenDerbyStack extends cdk.Stack {
     const adminRenameHorseFn = makeFn('AdminRenameHorseFn', 'admin-rename-horse');
     const adminRemoveHatFn = makeFn('AdminRemoveHatFn', 'admin-remove-hat');
     const adminDeleteHorseFn = makeFn('AdminDeleteHorseFn', 'admin-delete-horse');
-    const announceReleaseFn = makeFn('AnnounceReleaseFn', 'admin-announce-release');
+    const adminAnnounceReleaseFn = makeFn('AdminAnnounceReleaseFn', 'admin-announce-release', { timeout: cdk.Duration.seconds(60) });
 
     const adminSsmArn = `arn:aws:ssm:${this.region}:${this.account}:parameter${config.ssmPrefix}/*`;
-    for (const fn of [adminLoginFn, adminListUsersFn, adminListOrgsFn, adminRenameUserFn, adminRenameHorseFn, adminRemoveHatFn, adminDeleteHorseFn, announceReleaseFn]) {
+    for (const fn of [adminLoginFn, adminListUsersFn, adminListOrgsFn, adminRenameUserFn, adminRenameHorseFn, adminRemoveHatFn, adminDeleteHorseFn, adminAnnounceReleaseFn]) {
       fn.addToRolePolicy(new cdk.aws_iam.PolicyStatement({
         actions: ['ssm:GetParameter'],
         resources: [adminSsmArn],
@@ -332,7 +332,7 @@ export class TokenDerbyStack extends cdk.Stack {
     httpApi.addRoutes({ path: '/api/admin/users/{user_id}/horses/{stable_horse_id}', methods: [HttpMethod.PUT], integration: new HttpLambdaIntegration('AdminRenameHorseInt', adminRenameHorseFn) });
     httpApi.addRoutes({ path: '/api/admin/users/{user_id}/horses/{stable_horse_id}/hats/{index}', methods: [HttpMethod.DELETE], integration: new HttpLambdaIntegration('AdminRemoveHatInt', adminRemoveHatFn) });
     httpApi.addRoutes({ path: '/api/admin/users/{user_id}/horses/{stable_horse_id}', methods: [HttpMethod.DELETE], integration: new HttpLambdaIntegration('AdminDeleteHorseInt', adminDeleteHorseFn) });
-    httpApi.addRoutes({ path: '/api/admin/releases', methods: [HttpMethod.POST], integration: new HttpLambdaIntegration('AnnounceReleaseInt', announceReleaseFn) });
+    httpApi.addRoutes({ path: '/api/admin/releases', methods: [HttpMethod.POST], integration: new HttpLambdaIntegration('AdminAnnounceReleaseInt', adminAnnounceReleaseFn) });
 
     // API throttling (rate-limit guardrails, not hard security)
     const defaultStage = httpApi.defaultStage!.node.defaultChild as apigatewayv2.CfnStage;

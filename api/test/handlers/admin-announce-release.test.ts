@@ -9,12 +9,13 @@ vi.mock('../../src/lib/admin-config.js', () => ({
 }));
 
 const sent: any[] = [];
+const failingOrgIds = new Set<string>();
 vi.mock('../../src/lib/slack/send.js', () => ({
-  sendOrgRelease: vi.fn(async (org: any) => { sent.push(org.org_id); return true; }),
+  sendOrgRelease: vi.fn(async (org: any) => { sent.push(org.org_id); return !failingOrgIds.has(org.org_id); }),
 }));
 
 import { handler } from '../../src/handlers/admin-announce-release.js';
-import { putOrganisation, setOrgSlack, type OrgSlackConfig } from '../../src/db/organisations.js';
+import { putOrganisation, setOrgSlack, clearOrgSlack, type OrgSlackConfig } from '../../src/db/organisations.js';
 
 const token = () => signSession(SECRET, { sub: 'admin', exp: Math.floor(Date.now() / 1000) + 60 });
 
@@ -65,12 +66,45 @@ describe('admin-announce-release', () => {
     expect(first.statusCode).toBe(200);
     const body = JSON.parse(first.body);
     expect(body.announced).toBe(true);
-    expect(body.orgs_notified).toBeGreaterThanOrEqual(1);
+    expect(body.orgs_notified).toBe(1);
     expect(sent).toContain(id);
 
     const before = sent.length;
     const second = await call(good(version), token());
     expect(JSON.parse(second.body)).toEqual({ announced: false, reason: 'duplicate' });
     expect(sent.length).toBe(before);
+
+    await clearOrgSlack(id);
+  });
+
+  it('counts only successful sends, not attempted ones', async () => {
+    sent.length = 0;
+    failingOrgIds.clear();
+    const okId = `ann-ok-${Date.now()}`;
+    const failId = `ann-fail-${Date.now()}`;
+    await putOrganisation({ org_id: okId, org_name: `AnnOk${Date.now()}`, creator_user_id: 'u1', created_at: 'now' } as any, `jt-${okId}`);
+    await putOrganisation({ org_id: failId, org_name: `AnnFail${Date.now()}`, creator_user_id: 'u1', created_at: 'now' } as any, `jt-${failId}`);
+    const cfg: OrgSlackConfig = {
+      bot_token: 'xoxb', channel_id: 'C1',
+      messages: { race_created: false, race_ended: false, league_season_ended: false, weekly_digest: false, release_published: true },
+    };
+    await setOrgSlack(okId, cfg);
+    await setOrgSlack(failId, cfg);
+    failingOrgIds.add(failId);
+
+    const version = uniq();
+    const res = await call(good(version), token());
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.announced).toBe(true);
+    // Both orgs are attempted (present in `sent`), but only the successful
+    // one counts — an unconditional `orgs_notified += 1` would report 2 here.
+    expect(sent).toContain(okId);
+    expect(sent).toContain(failId);
+    expect(body.orgs_notified).toBe(1);
+
+    failingOrgIds.delete(failId);
+    await clearOrgSlack(okId);
+    await clearOrgSlack(failId);
   });
 });

@@ -15,7 +15,7 @@ A pixel-art daily horse race where each horse is a participant and every length 
 ## Install the CLI
 
 ```bash
-npm i -g @mauricode/token-derby
+npm i -g @mauricode/token-derby@latest
 token-derby --help
 ```
 

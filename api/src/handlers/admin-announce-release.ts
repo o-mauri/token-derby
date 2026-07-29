@@ -2,7 +2,7 @@ import type { APIGatewayProxyHandlerV2 } from 'aws-lambda';
 import type { AnnounceReleaseRequest, AnnounceReleaseResponse, ReleaseComponent } from '@token-derby/shared';
 import { requireAdmin } from '../lib/admin-auth.js';
 import { loadAdminConfig } from '../lib/admin-config.js';
-import { claimRelease } from '../db/releases.js';
+import { claimRelease, unclaimRelease } from '../db/releases.js';
 import { listOrgsWithSlackRelease } from '../db/organisations.js';
 import { sendOrgRelease } from '../lib/slack/send.js';
 import { ok, err, parseJson } from '../lib/http.js';
@@ -43,10 +43,16 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
     return ok(dup);
   }
 
-  const orgs = await listOrgsWithSlackRelease();
   let orgs_notified = 0;
-  for (const org of orgs) {
-    if (await sendOrgRelease(org, release)) orgs_notified += 1;
+  try {
+    for (const org of await listOrgsWithSlackRelease()) {
+      if (await sendOrgRelease(org, release)) orgs_notified += 1;
+    }
+  } catch (e) {
+    // sendOrgRelease never throws (it catches internally and returns false),
+    // so the only way here is the Scan failing before any post — safe to unclaim.
+    await unclaimRelease(release);
+    throw e;
   }
 
   const response: AnnounceReleaseResponse = { announced: true, orgs_notified };

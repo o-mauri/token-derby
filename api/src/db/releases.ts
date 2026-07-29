@@ -1,4 +1,4 @@
-import { PutCommand } from '@aws-sdk/lib-dynamodb';
+import { PutCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb';
 import { ddb, TABLE } from './client.js';
 import { releaseKey } from './keys.js';
 import type { AnnounceReleaseRequest } from '@token-derby/shared';
@@ -21,4 +21,13 @@ export async function claimRelease(rec: AnnounceReleaseRequest): Promise<boolean
     if (err?.name === 'ConditionalCheckFailedException') return false;
     throw err;
   }
+}
+
+// Releases a claim so a retry can re-announce. Only for failures that happen
+// before any Slack post — never after a partial fan-out, which would duplicate.
+export async function unclaimRelease(rec: AnnounceReleaseRequest): Promise<void> {
+  await ddb.send(new DeleteCommand({
+    TableName: TABLE,
+    Key: releaseKey(rec.component, rec.version),
+  }));
 }
