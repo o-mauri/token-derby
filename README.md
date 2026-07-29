@@ -46,6 +46,25 @@ npx cdk bootstrap aws://<account>/us-east-1
 npx cdk deploy
 ```
 
+## Releases
+
+`make deploy` releases the site, `make publish-cli` releases the CLI. Both bump
+the version, prepend a `site/src/changelog.json` entry, publish, then announce
+the release to every org that has "Release published" enabled in its Slackbot
+settings. `make deploy` also accepts a `none` bump to deploy without a version
+change.
+
+The announcement needs these in the root `.env` (gitignored):
+
+```
+ADMIN_USERNAME=...
+ADMIN_PASSWORD=...
+TOKEN_DERBY_API_BASE=https://token-derby.mauricode.co.uk/api   # optional, this is the default
+```
+
+If the announcement fails after a successful publish, the release still
+succeeds — retry with `make announce-release COMPONENT=cli VERSION=2.13.0`.
+
 ## Admin dashboard
 
 The admin dashboard at `admin.token-derby.mauricode.co.uk` reads its single

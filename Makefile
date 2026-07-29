@@ -1,4 +1,4 @@
-.PHONY: install build build-site test dynamodb-up dynamodb-down bootstrap deploy _deploy-site deploy-staging destroy destroy-staging smoke-api publish-cli
+.PHONY: install build build-site test dynamodb-up dynamodb-down bootstrap deploy _deploy-site deploy-staging destroy destroy-staging smoke-api publish-cli announce-release
 
 # AWS profile for all deployment targets. Override with: make deploy AWS_PROFILE=other
 AWS_PROFILE ?= personal
@@ -52,3 +52,8 @@ smoke-api:
 # Bump the CLI version, record a changelog entry, then publish to npm.
 publish-cli:
 	node scripts/release.mjs cli
+
+# Re-send a release announcement (e.g. after a failed post-publish Slack call).
+announce-release:
+	@test -n "$(COMPONENT)" -a -n "$(VERSION)" || (echo "usage: make announce-release COMPONENT=<cli|site> VERSION=<x.y.z>" && exit 1)
+	node scripts/announce.mjs $(COMPONENT) $(VERSION)

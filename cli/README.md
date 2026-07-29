@@ -11,7 +11,7 @@ Token Derby runs on the **real** output tokens your Claude Code produces — tha
 ## Install
 
 ```bash
-npm i -g @mauricode/token-derby
+npm i -g @mauricode/token-derby@latest
 ```
 
 Requires Node 20+.
