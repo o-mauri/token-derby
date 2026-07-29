@@ -1723,3 +1723,45 @@ label.label input:disabled, label.label select:disabled { opacity: 0.5; }
 .about-changes li { margin: 2px 0; }
 .about-home { color: var(--muted); text-decoration: none; }
 .about-home:hover { color: var(--accent); }
+
+/* ── Mid-race graph popup ─────────────────────────────────────────────── */
+.graphs-btn { font-size: 1.1rem; line-height: 1; padding: 0.15rem 0.55rem; }
+
+.race-graphs { position: fixed; inset: 0; z-index: 200; }
+.race-graphs-backdrop { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.72); }
+.race-graphs-panel {
+  position: absolute;
+  inset: 6% 5%;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border: 2px solid var(--border);
+  padding: 0.8rem 1rem 1rem;
+}
+.race-graphs-top { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.race-graphs-tabs, .race-graphs-divisions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.race-graphs-divisions { margin-top: 0.7rem; }
+.race-graphs-tab, .race-graphs-div, .race-graphs-close {
+  background: transparent;
+  color: var(--text);
+  border: 2px solid var(--border);
+  font-family: inherit;
+  font-size: 0.95rem;
+  padding: 0.2rem 0.7rem;
+  cursor: pointer;
+}
+.race-graphs-tab:hover, .race-graphs-div:hover, .race-graphs-close:hover { border-color: var(--accent); }
+.race-graphs-tab:focus-visible, .race-graphs-div:focus-visible, .race-graphs-close:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.race-graphs-tab[aria-selected='true'], .race-graphs-div[aria-selected='true'] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.race-graphs-body { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }
+/* Override the end-screen sizing, which is set by unscoped `.chart-face` rules. */
+.race-graphs-body .chart-face { width: 100%; gap: 10px; }
+.race-graphs-body .chart-face .chart-svg { height: 52vh; }
+.race-graphs-body .chart-face .chart-title { font-size: 1.05rem; }
+.race-graphs-empty { color: #999; font-size: 1.1rem; text-align: center; }
