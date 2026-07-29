@@ -4,11 +4,24 @@ import { handler as createHandler } from '../../src/handlers/create-race.js';
 import { handler as joinHandler } from '../../src/handlers/join-race.js';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { listHorses } from '../../src/db/horses.js';
+import { ddb, TABLE } from '../../src/db/client.js';
+import { raceMetaKey } from '../../src/db/keys.js';
+import { UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { makeUser, makeHorse, type TestUser } from '../helpers/auth-helper.js';
 import type { ModelKey } from '@token-derby/shared';
 import { CURRENT_CLI_VERSION, SAME_MINOR_CLI_VERSION, MISMATCHED_MINOR_CLI_VERSION, OUTDATED_CLI_VERSION } from '../helpers/cli-version.js';
 
 const COLORS = { body: '#8B4513', mane: '#000', tail: '#000', saddle: '#C0392B' };
+
+// Rewrite a live race's end_time so it reads as stale, without a real wait.
+async function setRaceEndTime(race_id: string, end_time: string) {
+  await ddb.send(new UpdateCommand({
+    TableName: TABLE,
+    Key: raceMetaKey(race_id),
+    UpdateExpression: 'SET end_time = :e',
+    ExpressionAttributeValues: { ':e': end_time },
+  }));
+}
 
 async function setup(cliVersion = CURRENT_CLI_VERSION) {
   const user = await makeUser('HB_User');
@@ -231,10 +244,11 @@ describe('heartbeat handler', () => {
       body: JSON.stringify({
         name: 'HB Finalise',
         start_time: new Date(Date.now() - 60_000).toISOString(),
-        end_time: new Date(Date.now() + 250).toISOString(),
+        end_time: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
         tz: 'UTC',
       }),
     });
+    expect(createRes.statusCode).toBe(200);
     const { join_code, race_id } = JSON.parse(createRes.body);
     const joinRes: any = await joinHandler({
       version: '2.0', routeKey: 'POST /races/{join_code}/join', rawPath: `/races/${join_code}/join`, rawQueryString: '',
@@ -243,10 +257,13 @@ describe('heartbeat handler', () => {
       requestContext: {} as any, isBase64Encoded: false,
       body: JSON.stringify({ stable_horse_id: horse.stable_horse_id }),
     });
+    expect(joinRes.statusCode).toBe(200);
     const { horse_id, heartbeat_token } = JSON.parse(joinRes.body);
     await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { seq: 1, delta: 4242 }));
 
-    await new Promise(r => setTimeout(r, 400));
+    // Go stale by moving end_time into the past rather than waiting on it, so
+    // the join above is never racing the race it is joining.
+    await setRaceEndTime(race_id, new Date(Date.now() - 1_000).toISOString());
 
     const res: any = await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { seq: 2, delta: 9999 }));
     expect(res.statusCode).toBe(200);
