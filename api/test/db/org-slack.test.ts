@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import './../setup.js';
 import { QueryCommand } from '@aws-sdk/lib-dynamodb';
 import { ddb, TABLE } from '../../src/db/client.js';
-import { putOrganisation, getOrganisationById, setOrgSlack, clearOrgSlack, markDigestSent } from '../../src/db/organisations.js';
+import { putOrganisation, getOrganisationById, setOrgSlack, clearOrgSlack, markDigestSent, listOrgsWithSlackDigest } from '../../src/db/organisations.js';
 import type { OrgSlackConfig } from '../../src/db/organisations.js';
 
 // Reads the sparse index directly: the index name and marker value are a
@@ -38,6 +38,22 @@ describe('org slack db', () => {
     await clearOrgSlack(id);
     org = await getOrganisationById(id);
     expect(org!.slack).toBeUndefined();
+  });
+
+  it('lists only orgs with the weekly digest enabled', async () => {
+    const on = `digest-on-${Date.now()}`;
+    const off = `digest-off-${Date.now()}`;
+    await seedOrg(on);
+    await seedOrg(off);
+    await setOrgSlack(on, CONFIG);
+    await setOrgSlack(off, { ...CONFIG, messages: { ...CONFIG.messages, weekly_digest: false } });
+
+    const ids = (await listOrgsWithSlackDigest()).map((o) => o.org_id);
+    expect(ids).toContain(on);
+    expect(ids).not.toContain(off);
+
+    await clearOrgSlack(on);
+    await clearOrgSlack(off);
   });
 
   it('indexes the org on SlackOrgsIndex while slack is configured', async () => {
