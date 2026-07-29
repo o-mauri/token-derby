@@ -2,6 +2,11 @@ import type { GetRaceResponse, GetRaceSeriesResponse, HorseView } from '@token-d
 import { fetchRaceSeries } from '../api.js';
 import { buildChartFaces, LINE_PALETTE, type Mode } from './race-chart.js';
 
+const TAB_LABELS: ReadonlyArray<{ mode: Mode; label: string }> = [
+  { mode: 'cumulative', label: 'Cumulative' },
+  { mode: 'throughput', label: 'Tokens / min' },
+];
+
 export type RaceGraphs = {
   button: HTMLButtonElement;
   onSnapshot(race: GetRaceResponse): void;
@@ -52,6 +57,27 @@ export function createRaceGraphs(opts: Opts): RaceGraphs {
   button.textContent = '📈';
 
   const onKeydown = (e: KeyboardEvent) => { if (e.key === 'Escape') close(); };
+
+  function renderTabs(): void {
+    if (!dialog) return;
+    const host = dialog.querySelector<HTMLElement>('.race-graphs-tabs')!;
+    host.innerHTML = '';
+    for (const { mode: m, label } of TAB_LABELS) {
+      const b = doc.createElement('button');
+      b.type = 'button';
+      b.className = 'race-graphs-tab';
+      b.dataset.mode = m;
+      b.textContent = label;
+      b.setAttribute('aria-selected', String(m === mode));
+      b.addEventListener('click', () => {
+        if (mode === m) return;
+        mode = m;
+        renderTabs();
+        render();
+      });
+      host.appendChild(b);
+    }
+  }
 
   function render(): void {
     if (!dialog || !snapshot) return;
@@ -109,6 +135,7 @@ export function createRaceGraphs(opts: Opts): RaceGraphs {
       .addEventListener('click', () => close());
     doc.addEventListener('keydown', onKeydown);
     (button.parentElement?.closest('.race') ?? doc.body).appendChild(dialog);
+    renderTabs();
     void load();
   }
 

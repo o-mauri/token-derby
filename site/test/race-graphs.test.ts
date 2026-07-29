@@ -124,4 +124,28 @@ describe('race graphs popup', () => {
     g.onSnapshot(race());
     expect(fetchSeries).toHaveBeenCalledTimes(1);
   });
+
+  it('renders two tabs with cumulative active by default', async () => {
+    const { g } = setup();
+    g.onSnapshot(race());
+    g.button.click();
+    await vi.waitFor(() => expect(document.querySelector('.race-graphs-tab')).toBeTruthy());
+    const tabs = Array.from(document.querySelectorAll<HTMLButtonElement>('.race-graphs-tab'));
+    expect(tabs.map((t) => t.dataset.mode)).toEqual(['cumulative', 'throughput']);
+    expect(tabs[0]!.getAttribute('aria-selected')).toBe('true');
+    g.destroy();
+  });
+
+  it('switching tab re-renders without refetching', async () => {
+    const { g, fetchSeries } = setup();
+    g.onSnapshot(race());
+    g.button.click();
+    await vi.waitFor(() => expect(fetchSeries).toHaveBeenCalledTimes(1));
+    expect(document.querySelector('.chart-title')!.textContent).toContain('Cumulative');
+
+    document.querySelector<HTMLButtonElement>('.race-graphs-tab[data-mode="throughput"]')!.click();
+    expect(document.querySelector('.chart-title')!.textContent).toContain('Tokens / min');
+    expect(fetchSeries).toHaveBeenCalledTimes(1);
+    g.destroy();
+  });
 });
