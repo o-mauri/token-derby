@@ -1725,7 +1725,7 @@ label.label input:disabled, label.label select:disabled { opacity: 0.5; }
 .about-home:hover { color: var(--accent); }
 
 /* ── Mid-race graph popup ─────────────────────────────────────────────── */
-.graphs-btn { font-size: 1.1rem; line-height: 1; padding: 0.15rem 0.55rem; }
+/* Sizing comes from .btn so it matches the Org/Home buttons beside it. */
 
 .race-graphs { position: fixed; inset: 0; z-index: 200; }
 .race-graphs-backdrop { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.72); }

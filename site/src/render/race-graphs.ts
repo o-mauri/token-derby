@@ -59,8 +59,7 @@ export function createRaceGraphs(opts: Opts): RaceGraphs {
   const button = doc.createElement('button');
   button.type = 'button';
   button.className = 'btn graphs-btn';
-  button.setAttribute('aria-label', 'Show race graphs');
-  button.textContent = '📈';
+  button.textContent = 'Graphs';
 
   const onKeydown = (e: KeyboardEvent) => { if (e.key === 'Escape') close(); };
 
