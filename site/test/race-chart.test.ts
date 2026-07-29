@@ -119,3 +119,45 @@ describe('buildChartFaces', () => {
     expect((chips[1] as HTMLElement).style.background).toBe(lineColor(1));
   });
 });
+
+describe('buildChartFaces options', () => {
+  it('builds only the requested face', () => {
+    const doc = document;
+    const horses = [horse('a', 'Alpha', 1), horse('b', 'Beta', 2)];
+    const faces = buildChartFaces(doc, series, horses, { modes: ['throughput'] });
+    expect(faces).toHaveLength(1);
+    expect(faces[0]!.querySelector('.chart-title')!.textContent).toContain('Tokens / min');
+  });
+
+  it('clamps the x-axis to endMs instead of series.end_ms', () => {
+    const doc = document;
+    const horses = [horse('a', 'Alpha', 1)];
+    const full = buildChartFaces(doc, series, horses, { modes: ['cumulative'] })[0]!;
+    const clamped = buildChartFaces(doc, series, horses, { modes: ['cumulative'], endMs: 180_000 })[0]!;
+    // The last x-axis tick label is the window end, so clamping must change it.
+    const labels = (el: HTMLElement) =>
+      [...el.querySelectorAll('.chart-axis')].map((n) => n.textContent).join('|');
+    expect(labels(clamped)).not.toBe(labels(full));
+  });
+
+  it('uses colourOf when supplied', () => {
+    const doc = document;
+    const horses = [horse('a', 'Alpha', 1), horse('b', 'Beta', 2)];
+    const faces = buildChartFaces(doc, series, horses, {
+      modes: ['cumulative'],
+      colourOf: (h) => (h.horse_id === 'a' ? '#123456' : '#654321'),
+    });
+    const strokes = [...faces[0]!.querySelectorAll('path.chart-line')].map((p) => p.getAttribute('stroke'));
+    expect(strokes).toContain('#123456');
+    expect(strokes).toContain('#654321');
+  });
+
+  it('with no options reproduces the existing two faces and rank colours', () => {
+    const doc = document;
+    const horses = [horse('a', 'Alpha', 1), horse('b', 'Beta', 2)];
+    const faces = buildChartFaces(doc, series, horses);
+    expect(faces).toHaveLength(2);
+    const strokes = [...faces[0]!.querySelectorAll('path.chart-line')].map((p) => p.getAttribute('stroke'));
+    expect(strokes[0]).toBe(lineColor(0));
+  });
+});
