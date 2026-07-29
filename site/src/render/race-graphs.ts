@@ -45,6 +45,7 @@ export function createRaceGraphs(opts: Opts): RaceGraphs {
 
   let open = false;
   let mode: Mode = 'cumulative';
+  let division: number | null = null;   // null = All
   let snapshot: GetRaceResponse | null = null;
   let cached: GetRaceSeriesResponse | null = null;
   let abort: AbortController | null = null;
@@ -79,13 +80,46 @@ export function createRaceGraphs(opts: Opts): RaceGraphs {
     }
   }
 
+  function visibleHorses(): readonly HorseView[] {
+    const all = snapshot?.horses ?? [];
+    return division === null ? all : all.filter((h) => h.division === division);
+  }
+
+  function renderDivisions(): void {
+    if (!dialog) return;
+    const host = dialog.querySelector<HTMLElement>('.race-graphs-divisions')!;
+    host.innerHTML = '';
+    const names = snapshot?.league_division_names;
+    if (!names || names.length === 0) return;   // non-league race: no row at all
+    const entries: Array<{ value: number | null; label: string }> = [
+      { value: null, label: 'All' },
+      ...names.map((label, i) => ({ value: i + 1, label })),
+    ];
+    for (const { value, label } of entries) {
+      const b = doc.createElement('button');
+      b.type = 'button';
+      b.className = 'race-graphs-div';
+      b.dataset.division = value === null ? 'all' : String(value);
+      b.textContent = label;
+      b.setAttribute('aria-selected', String(value === division));
+      b.addEventListener('click', () => {
+        if (division === value) return;
+        division = value;
+        renderDivisions();
+        render();          // from cache — deliberately no load()
+      });
+      host.appendChild(b);
+    }
+  }
+
   function render(): void {
     if (!dialog || !snapshot) return;
     const body = dialog.querySelector<HTMLElement>('.race-graphs-body')!;
     body.innerHTML = '';
     if (!cached) return;
-    const colours = colourMap(snapshot.horses);
-    const faces = buildChartFaces(doc, cached, snapshot.horses, {
+    const horses = visibleHorses();
+    const colours = colourMap(snapshot.horses);   // colours stay stable across filters
+    const faces = buildChartFaces(doc, cached, horses, {
       modes: [mode],
       endMs: windowEnd(cached, now()),
       colourOf: (h) => colours.get(h.horse_id) ?? LINE_PALETTE[0]!,
@@ -136,6 +170,7 @@ export function createRaceGraphs(opts: Opts): RaceGraphs {
     doc.addEventListener('keydown', onKeydown);
     (button.parentElement?.closest('.race') ?? doc.body).appendChild(dialog);
     renderTabs();
+    renderDivisions();
     void load();
   }
 
@@ -155,6 +190,7 @@ export function createRaceGraphs(opts: Opts): RaceGraphs {
     button,
     onSnapshot(race) {
       snapshot = race;
+      if (open) renderDivisions();
       if (open) void load();
     },
     destroy() { close(); button.remove(); },

@@ -148,4 +148,46 @@ describe('race graphs popup', () => {
     expect(fetchSeries).toHaveBeenCalledTimes(1);
     g.destroy();
   });
+
+  it('renders no division buttons for a non-league race', async () => {
+    const { g } = setup();
+    g.onSnapshot(race());   // no league_division_names
+    g.button.click();
+    await vi.waitFor(() => expect(document.querySelector('.chart-svg')).toBeTruthy());
+    expect(document.querySelectorAll('.race-graphs-div')).toHaveLength(0);
+    g.destroy();
+  });
+
+  it('renders All plus one button per division, labelled from the league', async () => {
+    const { g } = setup();
+    g.onSnapshot(race({
+      league_division_names: ['Premier', 'Championship'],
+      horses: [horse('a', 'Alpha', 1, 1), horse('b', 'Beta', 2, 2)],
+    }));
+    g.button.click();
+    await vi.waitFor(() => expect(document.querySelector('.race-graphs-div')).toBeTruthy());
+    const btns = Array.from(document.querySelectorAll<HTMLButtonElement>('.race-graphs-div'));
+    expect(btns.map((b) => b.textContent)).toEqual(['All', 'Premier', 'Championship']);
+    expect(btns.map((b) => b.dataset.division)).toEqual(['all', '1', '2']);
+    expect(btns[0]!.getAttribute('aria-selected')).toBe('true');
+    g.destroy();
+  });
+
+  it('selecting a division charts only that division, without refetching', async () => {
+    const { g, fetchSeries } = setup();
+    g.onSnapshot(race({
+      league_division_names: ['Premier', 'Championship'],
+      horses: [horse('a', 'Alpha', 1, 1), horse('b', 'Beta', 2, 2)],
+    }));
+    g.button.click();
+    await vi.waitFor(() => expect(fetchSeries).toHaveBeenCalledTimes(1));
+    expect(document.querySelectorAll('.legend-item')).toHaveLength(2);
+
+    document.querySelector<HTMLButtonElement>('.race-graphs-div[data-division="1"]')!.click();
+    const names = Array.from(document.querySelectorAll('.legend-item')).map((n) => n.textContent);
+    expect(names).toHaveLength(1);
+    expect(names[0]).toContain('Alpha');
+    expect(fetchSeries).toHaveBeenCalledTimes(1);
+    g.destroy();
+  });
 });
