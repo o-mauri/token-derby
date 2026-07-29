@@ -73,7 +73,7 @@ export function bearerToken(event: APIGatewayProxyEventV2): string | null {
       const v = headers[k];
       if (typeof v !== 'string') return null;
       const m = /^Bearer\s+(.+)$/i.exec(v.trim());
-      return m ? m[1].trim() : null;
+      return m?.[1]?.trim() ?? null;
     }
   }
   return null;
