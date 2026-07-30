@@ -1,5 +1,22 @@
 [
   {
+    "version": "2.12.4",
+    "date": "2026-07-30",
+    "component": "cli",
+    "changes": [
+      "race status screen shows division position",
+      "race status screen shows division leader & tokens"
+    ]
+  },
+  {
+    "version": "0.12.2",
+    "date": "2026-07-29",
+    "component": "site",
+    "changes": [
+      "added option to view token graphs mid race"
+    ]
+  },
+  {
     "version": "0.12.1",
     "date": "2026-07-28",
     "component": "site",
