@@ -1,5 +1,14 @@
 [
   {
+    "version": "0.13.0",
+    "date": "2026-08-06",
+    "component": "site",
+    "changes": [
+      "horse stamina system [BETA]",
+      "horse stamina displays on race UI"
+    ]
+  },
+  {
     "version": "2.12.4",
     "date": "2026-07-30",
     "component": "cli",
