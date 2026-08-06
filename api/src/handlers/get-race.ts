@@ -87,6 +87,8 @@ export const handler: ApiHandler = async (event) => {
     ...(race.league_season !== undefined ? { league_season: race.league_season } : {}),
     ...(race.league_round !== undefined ? { league_round: race.league_round } : {}),
     ...(league_division_names ? { league_division_names } : {}),
+    ...(race.stamina ? { stamina: true } : {}),
+    ...(race.stamina_config ? { stamina_config: race.stamina_config } : {}),
   };
   return ok(response);
 };

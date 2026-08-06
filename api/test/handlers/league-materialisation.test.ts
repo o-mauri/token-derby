@@ -58,6 +58,20 @@ describe('league fixture materialisation (via schedule-tick)', () => {
     expect(races.length).toBe(1);
   });
 
+  it('stamps stamina from the league config onto each fixture', async () => {
+    const user = await makeUser('LgTickStamina');
+    const org_id = await createOrg(user, 'LgTickOrgSt');
+    await putLeague(baseLeague(org_id, { stamina: true }));
+
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-06T10:00:00Z')); // Monday, inside 09:00–17:30
+
+    await runTick();
+    const races = await listRacesByOrgId(org_id);
+    expect(races.length).toBe(1);
+    expect(races[0]!.stamina).toBe(true);
+  });
+
   it('does not create a fixture outside the weekday window', async () => {
     const user = await makeUser('LgTickOwn2');
     const org_id = await createOrg(user, 'LgTickOrg2');

@@ -1,5 +1,5 @@
-import type { GetRaceResponse, HorseView } from '@token-derby/shared';
-import { levelFromXp, hatById } from '@token-derby/shared';
+import type { GetRaceResponse, HorseView, ResolvedStaminaConfig } from '@token-derby/shared';
+import { levelFromXp, hatById, scoredOf, resolveStaminaConfig } from '@token-derby/shared';
 import { elapsedPct, horseXPct } from '../position.js';
 import { buildHorseSvg } from '../sprite-svg.js';
 import { buildHatGroup } from '../hat-svg.js';
@@ -22,6 +22,9 @@ export function reconcileHorses(
   const visible = sortHorses(race.horses);
   const visibleIds = new Set(visible.map((h) => h.horse_id));
   const pct = elapsedPct(race.start_time, race.end_time, now);
+  // Snapshotted at race creation — never the STAMINA defaults directly, or a
+  // tuned org's bar disagrees with the server that's already scoring it.
+  const staminaCfg = resolveStaminaConfig(race);
 
   const existing = new Map<string, HTMLElement>();
   for (const lane of Array.from(track.querySelectorAll<HTMLElement>('.lane'))) {
@@ -36,7 +39,7 @@ export function reconcileHorses(
   for (const horse of visible) {
     let lane = existing.get(horse.horse_id);
     if (!lane) {
-      lane = createLane(track.ownerDocument, horse, race.league_id != null);
+      lane = createLane(track.ownerDocument, horse, race.league_id != null, race.stamina === true);
     }
     track.appendChild(lane);
     updateLane(
@@ -46,6 +49,7 @@ export function reconcileHorses(
       pct,
       paceByHorseId.get(horse.horse_id) ?? null,
       race.league_division_names,
+      staminaCfg,
     );
   }
 }
@@ -56,7 +60,7 @@ export function sortHorses(horses: readonly HorseView[]): HorseView[] {
     .sort((a, b) => new Date(a.joined_at).getTime() - new Date(b.joined_at).getTime());
 }
 
-function createLane(doc: Document, horse: HorseView, isLeague: boolean): HTMLElement {
+function createLane(doc: Document, horse: HorseView, isLeague: boolean, staminaEnabled: boolean): HTMLElement {
   const lane = doc.createElement('div');
   lane.className = 'lane';
   lane.dataset.horseId = horse.horse_id;
@@ -169,9 +173,37 @@ function createLane(doc: Document, horse: HorseView, isLeague: boolean): HTMLEle
   }
   wrap.appendChild(horseSvg);
 
+  // Stamina reserve, a child of the sprite so it tracks it with no positioning
+  // maths of its own (see .stamina-bar geometry in styles.css).
+  if (staminaEnabled) {
+    const bar = doc.createElement('div');
+    bar.className = 'stamina-bar';
+    const fill = doc.createElement('div');
+    fill.className = 'stamina-bar-fill';
+    bar.appendChild(fill);
+    wrap.appendChild(bar);
+  }
+
   trackStrip.appendChild(wrap);
   lane.appendChild(trackStrip);
   return lane;
+}
+
+const STAMINA_BAR_PX = 38;
+
+// Bands at the race's own taper floor (where scoring actually starts costing,
+// snapshotted per-org — not the STAMINA default) and the halfway point. No
+// multiplier text here — the design settled on "bar only" for the race page;
+// the CLI (a terminal line, with room for it) shows the multiplier instead.
+function updateStaminaBar(bar: HTMLElement, stamina: number, cfg: ResolvedStaminaConfig): void {
+  const floor = cfg.taper_floor;
+  const band = stamina > 50 ? 'green' : stamina >= floor ? 'amber' : 'red';
+  bar.dataset.band = band;
+
+  const fill = bar.querySelector<HTMLElement>('.stamina-bar-fill')!;
+  // 2px minimum while alive, or a near-empty horse reads as already dead.
+  const fillPx = stamina <= 0 ? 0 : Math.max(2, Math.round((STAMINA_BAR_PX * stamina) / 100));
+  fill.style.width = `${fillPx}px`;
 }
 
 function updateLane(
@@ -180,7 +212,8 @@ function updateLane(
   allHorses: readonly HorseView[],
   pct: number,
   pace: number | null,
-  leagueDivisionNames?: string[],
+  leagueDivisionNames: string[] | undefined,
+  staminaCfg: ResolvedStaminaConfig,
 ): void {
   const wrap = lane.querySelector<HTMLElement>('.horse')!;
   const x = horseXPct(horse, allHorses, pct);
@@ -188,9 +221,14 @@ function updateLane(
   wrap.classList.toggle('live', pct > 0 && pct < 1);
   wrap.classList.toggle('pending', pct === 0);
 
-  // Labels live in the fixed lane-info column, not on the moving horse.
+  // Labels live in the fixed lane-info column, not on the moving horse. Scored,
+  // not raw, so this always agrees with lane position and ranking.
   const tokensEl = lane.querySelector<HTMLElement>('.horse-tokens')!;
-  tokensEl.textContent = `${tokenFmt.format(horse.current_tokens)} tok`;
+  const displayTokens = horse.final_scored_tokens ?? scoredOf(horse);
+  tokensEl.textContent = `${tokenFmt.format(displayTokens)} tok`;
+
+  const staminaBar = wrap.querySelector<HTMLElement>('.stamina-bar');
+  if (staminaBar) updateStaminaBar(staminaBar, horse.stamina ?? 100, staminaCfg);
 
   const paceEl = lane.querySelector<HTMLElement>('.horse-pace')!;
   paceEl.textContent = pace === null ? '—' : `+${tokenFmt.format(pace)}/min`;
@@ -200,10 +238,11 @@ function updateLane(
     levelEl.textContent = `Lvl. ${levelFromXp(horse.xp + (horse.live_xp ?? 0))}`;
   }
 
-  // Race position by tokens (competition ranking: ties share a place).
+  // Race position by scored distance (competition ranking: ties share a
+  // place) — must agree with the track and the ticker, both scored now.
   const posEl = lane.querySelector<HTMLElement>('.horse-position');
   if (posEl) {
-    const rank = 1 + allHorses.filter((h) => h.current_tokens > horse.current_tokens).length;
+    const rank = 1 + allHorses.filter((h) => scoredOf(h) > scoredOf(horse)).length;
     posEl.textContent = ordinal(rank);
     posEl.className = 'horse-position' + (rank <= 3 ? ` pos-${rank}` : '');
   }
@@ -212,7 +251,7 @@ function updateLane(
   const lpEl = lane.querySelector<HTMLElement>('.horse-league-pos');
   if (lpEl && horse.division !== undefined && leagueDivisionNames) {
     const inDiv = allHorses.filter((h) => h.division === horse.division);
-    const rank = 1 + inDiv.filter((h) => h.current_tokens > horse.current_tokens).length;
+    const rank = 1 + inDiv.filter((h) => scoredOf(h) > scoredOf(horse)).length;
     const name = leagueDivisionNames[horse.division - 1] ?? `Div ${horse.division}`;
     lpEl.textContent = `${ordinal(rank)} (${name})`;
   }

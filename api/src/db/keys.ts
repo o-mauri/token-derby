@@ -56,6 +56,12 @@ export function orgScheduleKey(org_id: string) {
   return { pk: `${ORG_PK_PREFIX}${org_id}`, sk: SCHEDULE_SK };
 }
 
+export const RACE_SETTINGS_SK = 'RACE_SETTINGS';
+
+export function orgRaceSettingsKey(org_id: string) {
+  return { pk: `${ORG_PK_PREFIX}${org_id}`, sk: RACE_SETTINGS_SK };
+}
+
 export const LEAGUE_SK = 'LEAGUE';
 
 export function orgLeagueKey(org_id: string) {

@@ -8,6 +8,7 @@ import { renderMembers } from './org-manager/render/tabs/members.js';
 import { renderRacing } from './org-manager/render/tabs/racing.js';
 import { renderWebhook } from './org-manager/render/tabs/webhook.js';
 import { renderSlackbot } from './org-manager/render/tabs/slackbot.js';
+import { renderRaceSettings } from './org-manager/render/tabs/race-settings.js';
 
 const app = document.getElementById('app')!;
 
@@ -142,4 +143,25 @@ renderSlackbot(tabSection('Slackbot tab (non-owner)'), {
   isOwner: false,
   onSave: () => {},
   onClear: () => {},
+});
+
+renderRaceSettings(tabSection('Race Settings tab (owner, saved override)'), {
+  settings: {
+    org_id: 'o1',
+    // drain_per_min stays below the default max_drain_per_min cap here, so its
+    // own effect on the time-to-red readout is visible rather than swallowed by the cap.
+    stamina_config: { drain_per_min: 5, taper_floor: 40 },
+    updated_at: '2026-06-01T00:00:00Z',
+    updated_by_user_id: 'u1',
+  },
+  staminaOn: true,
+  isOwner: true,
+  onSave: () => {}, onReset: () => {}, onToggleStamina: () => {},
+});
+
+renderRaceSettings(tabSection('Race Settings tab (owner, no override — defaults)'), {
+  settings: null,
+  staminaOn: false,
+  isOwner: true,
+  onSave: () => {}, onReset: () => {}, onToggleStamina: () => {},
 });

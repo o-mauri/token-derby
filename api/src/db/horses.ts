@@ -28,6 +28,8 @@ export async function listHorses(race_id: string): Promise<Horse[]> {
   return Items.map(pickHorse);
 }
 
+// No production callers (test helper only). Sets current_tokens without
+// touching scored_tokens — a real caller would desync the two accumulators.
 export async function updateHorseHeartbeat(
   race_id: string,
   horse_id: string,
@@ -91,14 +93,15 @@ export async function setHorseFinalTokens(
   race_id: string,
   horse_id: string,
   final_tokens: number,
+  final_scored_tokens: number,
 ): Promise<void> {
   try {
     await ddb.send(new UpdateCommand({
       TableName: TABLE,
       Key: horseKey(race_id, horse_id),
-      UpdateExpression: 'SET final_tokens = :f',
+      UpdateExpression: 'SET final_tokens = :f, final_scored_tokens = :s',
       ConditionExpression: 'attribute_not_exists(final_tokens)',
-      ExpressionAttributeValues: { ':f': final_tokens },
+      ExpressionAttributeValues: { ':f': final_tokens, ':s': final_scored_tokens },
     }));
   } catch (e: any) {
     if (e?.name !== 'ConditionalCheckFailedException') throw e;
@@ -129,6 +132,8 @@ export async function setHorseXpAwarded(
 
 export type HorseHeartbeatRecord = {
   current_tokens: number;
+  scored_tokens?: number;
+  stamina?: number;
   last_heartbeat: string;
   last_seq: number;
   primary_model?: ModelKey;
@@ -160,6 +165,8 @@ export async function getHorseForHeartbeat(
   if (!Item || Item.heartbeat_token !== heartbeat_token) return null;
   return {
     current_tokens: Number(Item.current_tokens ?? 0),
+    scored_tokens: Item.scored_tokens === undefined ? undefined : Number(Item.scored_tokens),
+    stamina: Item.stamina === undefined ? undefined : Number(Item.stamina),
     last_heartbeat: String(Item.last_heartbeat ?? ''),
     last_seq: Number(Item.last_seq ?? 0),
     primary_model: Item.primary_model as ModelKey | undefined,
@@ -212,17 +219,43 @@ export async function countHorses(race_id: string): Promise<number> {
   return Count;
 }
 
+// Seeds scored_tokens from the row's own current_tokens on a horse's first
+// heartbeat; a no-op once scored_tokens exists. A separate conditional write
+// so the seed value is read server-side, atomically, under any interleaving.
+async function seedScoredTokens(race_id: string, horse_id: string): Promise<void> {
+  try {
+    await ddb.send(new UpdateCommand({
+      TableName: TABLE,
+      Key: horseKey(race_id, horse_id),
+      UpdateExpression: 'SET scored_tokens = current_tokens',
+      ConditionExpression: 'attribute_exists(pk) AND attribute_not_exists(scored_tokens)',
+    }));
+  } catch (e: any) {
+    if (e?.name !== 'ConditionalCheckFailedException') throw e;
+  }
+}
+
+export type ApplyHeartbeatDeltaInput = {
+  race_id: string;
+  horse_id: string;
+  seq: number;
+  applied: number;
+  scored_applied: number;
+  stamina: number | undefined;
+  last_heartbeat: string;
+  state: AchievementState;
+  // True only on a horse's first-ever apply (scored_tokens not yet on the row).
+  // Skips the redundant seed round-trip on every later heartbeat.
+  needsSeed: boolean;
+};
+
 // Atomic, idempotent heartbeat apply. Adds `applied` to current_tokens and
 // advances last_seq ONLY when the incoming seq is newer. Returns false (no
 // mutation) for a duplicate/out-of-order seq.
-export async function applyHeartbeatDelta(
-  race_id: string,
-  horse_id: string,
-  seq: number,
-  applied: number,
-  last_heartbeat: string,
-  state: AchievementState,
-): Promise<boolean> {
+export async function applyHeartbeatDelta(input: ApplyHeartbeatDeltaInput): Promise<boolean> {
+  const { race_id, horse_id, seq, applied, scored_applied, stamina, last_heartbeat, state, needsSeed } = input;
+  if (needsSeed) await seedScoredTokens(race_id, horse_id);
+
   const eav: Record<string, unknown> = {
     ':seq': seq,
     ':applied': applied,
@@ -248,6 +281,8 @@ export async function applyHeartbeatDelta(
     'recent_events = :re',
   ];
   const removeParts: string[] = [];
+  const addParts = ['current_tokens :applied', 'scored_tokens :sapplied'];
+  eav[':sapplied'] = scored_applied;
 
   if (state.last_stampede_at !== undefined) {
     setParts.push('last_stampede_at = :sa');
@@ -263,10 +298,14 @@ export async function applyHeartbeatDelta(
   } else {
     removeParts.push('last_gap_in_1st');
   }
+  if (stamina !== undefined) {
+    setParts.push('stamina = :stam');
+    eav[':stam'] = stamina;
+  }
 
   const updateExpression =
     'SET ' + setParts.join(', ') +
-    ' ADD current_tokens :applied' +
+    ' ADD ' + addParts.join(', ') +
     (removeParts.length > 0 ? ' REMOVE ' + removeParts.join(', ') : '');
 
   try {

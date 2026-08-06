@@ -179,6 +179,8 @@ export class TokenDerbyStack extends cdk.Stack {
     const deleteOrgSlackFn = makeFn('DeleteOrgSlackFn', 'delete-org-slack');
     const setOrgScheduleFn = makeFn('SetOrgScheduleFn', 'set-org-schedule');
     const getOrgScheduleFn = makeFn('GetOrgScheduleFn', 'get-org-schedule');
+    const setOrgRaceSettingsFn = makeFn('SetOrgRaceSettingsFn', 'set-org-race-settings');
+    const getOrgRaceSettingsFn = makeFn('GetOrgRaceSettingsFn', 'get-org-race-settings');
     const deleteOrgScheduleFn = makeFn('DeleteOrgScheduleFn', 'delete-org-schedule');
     const setOrgLeagueFn = makeFn('SetOrgLeagueFn', 'set-org-league');
     const getOrgLeagueFn = makeFn('GetOrgLeagueFn', 'get-org-league');
@@ -299,6 +301,16 @@ export class TokenDerbyStack extends cdk.Stack {
       path: '/api/organisations/{org_name}/schedule',
       methods: [HttpMethod.DELETE],
       integration: new HttpLambdaIntegration('DeleteOrgScheduleInt', deleteOrgScheduleFn),
+    });
+    httpApi.addRoutes({
+      path: '/api/organisations/{org_name}/race-settings',
+      methods: [HttpMethod.PUT],
+      integration: new HttpLambdaIntegration('SetOrgRaceSettingsInt', setOrgRaceSettingsFn),
+    });
+    httpApi.addRoutes({
+      path: '/api/organisations/{org_name}/race-settings',
+      methods: [HttpMethod.GET],
+      integration: new HttpLambdaIntegration('GetOrgRaceSettingsInt', getOrgRaceSettingsFn),
     });
     httpApi.addRoutes({
       path: '/api/organisations/{org_name}/league',

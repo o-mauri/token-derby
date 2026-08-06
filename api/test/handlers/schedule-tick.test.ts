@@ -119,6 +119,34 @@ describe('schedule-tick', () => {
     expect(races[0]!.primary_top5).toBeUndefined();
   });
 
+  it('stamps stamina from the schedule onto the created race', async () => {
+    const user = await makeUser('TickStamina');
+    const org_id = await createOrg(user, 'TickStamOrg');
+    await putSchedule({ ...baseSchedule(org_id), stamina: true });
+
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2024-07-01T10:00:00Z'));
+    await runTick();
+
+    const races = await listRacesByOrgId(org_id);
+    expect(races.length).toBe(1);
+    expect(races[0]!.stamina).toBe(true);
+  });
+
+  it('legacy schedule without stamina → race defaults to off', async () => {
+    const user = await makeUser('TickNoStamina');
+    const org_id = await createOrg(user, 'TickNoStamOr');
+    await putSchedule(baseSchedule(org_id)); // no stamina prop
+
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2024-07-01T10:00:00Z'));
+    await runTick();
+
+    const races = await listRacesByOrgId(org_id);
+    expect(races.length).toBe(1);
+    expect(races[0]!.stamina).toBeUndefined();
+  });
+
   it('isolates failures: a bad schedule does not block a good one', async () => {
     const badUser = await makeUser('TickBad');
     const badOrg = await createOrg(badUser, 'TickBadOrg');

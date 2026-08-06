@@ -277,9 +277,9 @@ describe('listOrgRaces handler', () => {
 
     const loserHorse = await joinHorse(join_code, loser, 'Loser');
     const winnerHorse = await joinHorse(join_code, winnerUser, 'Winner');
-    await setHorseFinalTokens(race_id, loserHorse.horse_id, 100);
-    await setHorseFinalTokens(race_id, winnerHorse.horse_id, 500);
-    // current_tokens drives ranking; final_tokens equals frozen current_tokens.
+    await setHorseFinalTokens(race_id, loserHorse.horse_id, 100, 100);
+    await setHorseFinalTokens(race_id, winnerHorse.horse_id, 500, 500);
+    // scored distance drives ranking; both figures are equal with no stamina toggle.
     await setHorseTokens(race_id, loserHorse.horse_id, 100);
     await setHorseTokens(race_id, winnerHorse.horse_id, 500);
 

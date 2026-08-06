@@ -5,6 +5,7 @@ import type {
   JoinOrganisationResponse,
   GetOrgLeagueResponse, SetOrgLeagueRequest, SetOrgLeagueResponse, DeleteOrgLeagueResponse,
   GetOrgSlackResponse, SetOrgSlackRequest,
+  GetOrgRaceSettingsResponse, SetOrgRaceSettingsRequest, SetOrgRaceSettingsResponse,
 } from '@token-derby/shared';
 import { getSession, setSession, clearSession } from './session.js';
 
@@ -95,6 +96,10 @@ export const setSlack = (name: string, body: SetOrgSlackRequest, f: FetchFn = fe
   authed<GetOrgSlackResponse>('PUT', `/api/organisations/${u(name)}/slack`, body, f);
 export const clearSlack = (name: string, f: FetchFn = fetch) =>
   authed<{ ok?: boolean }>('DELETE', `/api/organisations/${u(name)}/slack`, undefined, f);
+export const getRaceSettings = (name: string, f: FetchFn = fetch) =>
+  authed<GetOrgRaceSettingsResponse>('GET', `/api/organisations/${u(name)}/race-settings`, undefined, f);
+export const setRaceSettings = (name: string, body: SetOrgRaceSettingsRequest, f: FetchFn = fetch) =>
+  authed<SetOrgRaceSettingsResponse>('PUT', `/api/organisations/${u(name)}/race-settings`, body, f);
 export const createOrganisation = (name: string, f: FetchFn = fetch) =>
   authed<CreateOrganisationResponse>('POST', '/api/organisations', { name }, f);
 export const joinOrganisation = (token: string, f: FetchFn = fetch) =>

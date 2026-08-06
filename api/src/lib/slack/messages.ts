@@ -44,7 +44,8 @@ function rankPrefix(rank: number): string {
 }
 
 function leaderboardLine(r: RaceEndedResult): string {
-  return `${rankPrefix(r.rank)}  ${r.rank}.  *${r.name}*  ${r.final_tokens} tokens  ·  ${r.user_name}`;
+  const tokens = r.final_scored_tokens ?? r.final_tokens;
+  return `${rankPrefix(r.rank)}  ${r.rank}.  *${r.name}*  ${tokens} tokens  ·  ${r.user_name}`;
 }
 
 export function buildRaceEndedMessage(event: RaceEndedEvent, spriteUrl?: string): SlackMessage {

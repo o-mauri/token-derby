@@ -3,6 +3,7 @@ import { DEFAULT_MAX_PARTICIPANTS } from '@token-derby/shared';
 import { randomUUID } from 'node:crypto';
 import { generateRaceId, generateJoinCode, generateAdminCode } from './codes.js';
 import { putRace, getRaceByJoinCode, listRacesByOrgId } from '../db/races.js';
+import { getRaceSettings } from '../db/race-settings.js';
 import { sendOrgWebhook } from './webhook.js';
 import { sendOrgSlack } from './slack/send.js';
 import type { OrgSlackConfig } from '../db/organisations.js';
@@ -23,6 +24,7 @@ export type CreateRaceInput = {
   max_participants?: number;
   counts_input?: boolean;
   primary_top5?: boolean;
+  stamina?: boolean;
   creator_user_id: string;
   creator_user_name: string;
   cli_version?: string;
@@ -63,6 +65,12 @@ export async function createRace(input: CreateRaceInput): Promise<CreateRaceResu
   const created_at = new Date().toISOString();
   const max_participants = input.max_participants ?? DEFAULT_MAX_PARTICIPANTS;
 
+  // Snapshot the org's stamina config at creation time, not a live read —
+  // scored_tokens accumulates under whatever values were stamped here, so a
+  // later org config change must never rescore or alter an in-flight race.
+  const settings = input.org ? await getRaceSettings(input.org.org_id) : null;
+  const stamina_config = settings?.stamina_config;
+
   await putRace(
     {
       race_id,
@@ -79,6 +87,8 @@ export async function createRace(input: CreateRaceInput): Promise<CreateRaceResu
       ...(input.org ? { org_id: input.org.org_id, organisation_name: input.org.org_name } : {}),
       ...(input.counts_input ? { counts_input: true } : {}),
       ...(input.primary_top5 ? { primary_top5: true } : {}),
+      ...(input.stamina ? { stamina: true } : {}),
+      ...(stamina_config ? { stamina_config } : {}),
       ...(input.league
         ? { league_id: input.league.league_id, league_season: input.league.season, league_round: input.league.round }
         : {}),

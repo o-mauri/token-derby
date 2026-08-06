@@ -126,7 +126,7 @@ describe('buildChartFaces options', () => {
     const horses = [horse('a', 'Alpha', 1), horse('b', 'Beta', 2)];
     const faces = buildChartFaces(doc, series, horses, { modes: ['throughput'] });
     expect(faces).toHaveLength(1);
-    expect(faces[0]!.querySelector('.chart-title')!.textContent).toContain('Tokens / min');
+    expect(faces[0]!.querySelector('.chart-title')!.textContent).toContain('Tokens produced / min');
   });
 
   it('clamps the x-axis to endMs instead of series.end_ms', () => {

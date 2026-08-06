@@ -1,5 +1,5 @@
 import type { Horse, Race, RaceEndedEvent } from '@token-derby/shared';
-import { xpForRaceFinish, raceXpMultiplier, buildSeasonStandings } from '@token-derby/shared';
+import { xpForRaceFinish, raceXpMultiplier, buildSeasonStandings, scoredOf } from '@token-derby/shared';
 import { listHorses, setHorseFinalTokens, setHorseXpAwarded } from '../db/horses.js';
 import { awardHorseXp, recordHorseRaceResult } from '../db/stable.js';
 import { setRaceEndedIfAbsent } from '../db/races.js';
@@ -38,19 +38,25 @@ export async function finaliseRace(race: Race, now: Date): Promise<FinaliseResul
   await Promise.all(
     horses.map(h =>
       h.final_tokens === undefined
-        ? setHorseFinalTokens(race.race_id, h.horse_id, h.current_tokens)
+        ? setHorseFinalTokens(race.race_id, h.horse_id, h.current_tokens, scoredOf(h))
         : Promise.resolve(),
     ),
   );
 
-  // Rank by final_tokens (using current_tokens for horses we just stamped),
+  // Rank by scored distance (using scoredOf for horses we just stamped),
   // tie-break by earlier join time — same rule as the live race view.
-  const stamped = horses.map(h => ({ ...h, final_tokens: h.final_tokens ?? h.current_tokens }));
+  const stamped = horses.map(h => ({
+    ...h,
+    final_tokens: h.final_tokens ?? h.current_tokens,
+    final_scored_tokens: h.final_scored_tokens ?? scoredOf(h),
+  }));
   const ranked = [...stamped].sort((a, b) => {
-    if (b.final_tokens !== a.final_tokens) return b.final_tokens - a.final_tokens;
+    if (b.final_scored_tokens !== a.final_scored_tokens) {
+      return b.final_scored_tokens - a.final_scored_tokens;
+    }
     return new Date(a.joined_at).getTime() - new Date(b.joined_at).getTime();
   });
-  const winner_tokens = ranked[0]?.final_tokens ?? 0;
+  const winner_tokens = ranked[0]?.final_scored_tokens ?? 0;
 
   // Anti-farm gate: persistent XP (the currency that buys hat rolls) is only
   // awarded for a real, sustained competition. A solo or instant self-race —
@@ -75,13 +81,13 @@ export async function finaliseRace(race: Race, now: Date): Promise<FinaliseResul
 
   await Promise.all(ranked.map(async (h, i) => {
     const rank = i + 1;
-    const xp = Math.round(xpForRaceFinish(rank, h.final_tokens, winner_tokens, h.live_xp) * xp_multiplier);
+    const xp = Math.round(xpForRaceFinish(rank, h.final_scored_tokens, winner_tokens, h.live_xp) * xp_multiplier);
     const isFirstAward = await setHorseXpAwarded(race.race_id, h.horse_id, xp);
     if (isFirstAward && h.user_id && h.stable_horse_id) {
       await Promise.all([
         awardHorseXp(h.user_id, h.stable_horse_id, xp),
         recordHorseRaceResult(h.user_id, h.stable_horse_id, {
-          final_tokens: h.final_tokens,
+          final_tokens: h.final_scored_tokens,
           rank,
         }),
       ]);
@@ -105,7 +111,8 @@ export async function finaliseRace(race: Race, now: Date): Promise<FinaliseResul
         name: h.name,
         colors: h.colors,
         final_tokens: h.final_tokens,
-        xp_awarded: Math.round(xpForRaceFinish(i + 1, h.final_tokens, winner_tokens, h.live_xp) * xp_multiplier),
+        final_scored_tokens: h.final_scored_tokens,
+        xp_awarded: Math.round(xpForRaceFinish(i + 1, h.final_scored_tokens, winner_tokens, h.live_xp) * xp_multiplier),
         user_id: h.user_id,
         user_name: h.user_name,
       }));
@@ -162,7 +169,7 @@ export async function finaliseRace(race: Race, now: Date): Promise<FinaliseResul
 
   return {
     race: { ...race, ended_at },
-    horses: horses.map(h => (h.final_tokens === undefined ? { ...h, final_tokens: h.current_tokens } : h)),
+    horses: stamped,
     newly_finalised,
   };
 }

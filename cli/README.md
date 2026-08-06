@@ -64,6 +64,16 @@ The CLI sums `message.usage.output_tokens` across every `*.jsonl` under `~/.clau
 
 Races can optionally also count *fresh input tokens* — i.e. `input_tokens + cache_creation_input_tokens` (your new context this turn) in addition to output. `cache_read_input_tokens` is never counted, since those reflect passive context size rather than work. The race creator opts in at `token-derby create` time; thresholds for Stampede!, Pulled Away!, and the heartbeat rate cap scale 10× in these races so the achievement cadence stays comparable.
 
+## Stamina
+
+Some races turn on stamina. Push a horse far above a sustainable pace and it tires — its tokens still count, but at a fraction of face value until it recovers. A normal working pace never triggers this; stamina only bites once you're running well past what the race considers sustainable.
+
+Staying connected and easing off is how you recover. Disconnecting does not — a long gap since your last heartbeat earns the same recovery as one ordinary tick, not a bonus for the time you were away, so crashing is not a rest strategy. That's on top of the crash penalty above: you lose the tokens from the gap *and* you don't recover any faster for it.
+
+Nothing here asks you to hold work back. A flat-out day still beats a lazy one — it just doesn't beat it by as much as the raw token count would suggest once your horse tires.
+
+Stamina is off by default; org owners turn it on and tune it from the Race Settings tab of `token-derby web`. When it's on, the live view shows your horse's stamina as a percentage and bar, plus a multiplier once you're actually losing score to fatigue.
+
 ## Other models (Codex, Gemini)
 
 At join you pick one **primary** model — Claude, Codex, or Gemini — counted 1:1.

@@ -519,6 +519,30 @@ html, body {
   100% { opacity: 0;    transform: translate(-16px, -5px) scale(1.6); }
 }
 
+/* Stamina reserve, a child of .horse so it tracks the sprite with no
+   positioning maths of its own. Geometry settled against real screenshots
+   at 6x zoom — see the stamina task brief before changing any of it. */
+.stamina-bar {
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  transform: translate(calc(-50% - 10px), 3px);  /* 10px back, 3px below the sprite */
+  width: 38px;
+  height: 3px;
+  background: rgba(255, 255, 255, .34);          /* light channel, see below */
+  border-radius: 999px;                          /* true capsule at any height */
+  overflow: hidden;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, .85);      /* NOT outline — see below */
+  pointer-events: none;
+}
+.stamina-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+}
+.stamina-bar[data-band="green"] .stamina-bar-fill { background: #7ee081; }
+.stamina-bar[data-band="amber"] .stamina-bar-fill { background: #ff9f1c; }
+.stamina-bar[data-band="red"]   .stamina-bar-fill { background: #ff3b30; }
+
 
 .horse-label {
   color: var(--text);
@@ -1477,6 +1501,15 @@ label.label input:disabled, label.label select:disabled { opacity: 0.5; }
 }
 .org-day:has(input:checked) { border-color: var(--accent); color: var(--accent); }
 .org-day input[type="checkbox"] { accent-color: var(--accent); }
+
+.org-stamina-toggle { flex-direction: row !important; align-items: center; gap: 8px; max-width: none !important; }
+.org-sliders { display: flex; flex-direction: column; gap: 14px; }
+.org-slider-row { display: flex; flex-direction: column; gap: 4px; }
+.org-slider-row input[type="range"] { width: 100%; accent-color: var(--accent); }
+.org-slider-value { font-size: 0.85rem; color: var(--text); }
+.org-readout { display: flex; flex-direction: column; gap: 4px; font-size: 0.9rem; }
+.org-readout p { margin: 0; }
+.org-readout strong { color: var(--accent); }
 
 .org-secret {
   display: flex;

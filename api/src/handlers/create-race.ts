@@ -67,6 +67,7 @@ export const handler: ApiHandler = async (event) => {
     max_participants: body.max_participants,
     counts_input: body.counts_input,
     primary_top5: body.primary_top5,
+    stamina: body.stamina,
     creator_user_id: auth.user_id,
     creator_user_name: auth.display_name,
     cli_version,

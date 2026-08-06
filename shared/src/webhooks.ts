@@ -32,6 +32,7 @@ export type RaceEndedResult = {
   name: string;
   colors: HorseColors;
   final_tokens: number;
+  final_scored_tokens?: number;
   xp_awarded: number;
   user_id: string;
   user_name: string;
@@ -44,6 +45,7 @@ export type LeagueRaceOrderRow = {
   horse_name: string;
   user_name: string;
   final_tokens: number;
+  final_scored_tokens?: number;
   points_awarded: number;    // fixed-table league points earned this fixture
 };
 
