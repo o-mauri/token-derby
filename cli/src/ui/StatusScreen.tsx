@@ -1,7 +1,7 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import type { GetRaceResponse, HorseColors, HorseView } from '@token-derby/shared';
-import { levelInfo, MODEL_KEYS, SECONDARY_WEIGHT, type ModelKey } from '@token-derby/shared';
+import { levelInfo, MODEL_KEYS, resolveStaminaConfig, scoredOf, SECONDARY_WEIGHT, type ModelKey } from '@token-derby/shared';
 import { HorseSprite } from './HorseSprite.js';
 import { MINI_SPRITE } from './sprite.js';
 
@@ -64,8 +64,11 @@ export function StatusScreen(props: Props) {
   const divisionRank = own ? divisionField.indexOf(own) + 1 : 0;
   const showDivision = (race.league_division_names?.length ?? 0) > 0 && divisionRank > 0;
 
+  const staminaRow = race.stamina === true ? staminaLine(own, race) : null;
+
   const rows: StatRow[] = [
-    { label: 'Tokens (race):', value: String(own?.current_tokens ?? 0) },
+    { label: 'Tokens (race):', value: String(own?.final_scored_tokens ?? (own ? scoredOf(own) : 0)) },
+    ...(staminaRow ? [staminaRow] : []),
     { label: 'Position:', value: `${own?.rank ?? '—'} of ${race.horses.length}` },
     ...(showDivision
       ? [{ label: 'Position (Division):', value: `${divisionRank} of ${divisionField.length}` }]
@@ -141,7 +144,7 @@ function StatLines(props: { rows: StatRow[] }) {
 
 function leaderText(h: HorseView | undefined): string {
   if (!h) return '—';
-  return `${h.name}${h.user_name ? ` (${h.user_name})` : ''} — ${h.current_tokens}`;
+  return `${h.name}${h.user_name ? ` (${h.user_name})` : ''} — ${h.final_scored_tokens ?? scoredOf(h)}`;
 }
 
 function elapsed(race: GetRaceResponse): number {
@@ -156,6 +159,33 @@ function elapsed(race: GetRaceResponse): number {
 function bar(pct: number, width: number): string {
   const filled = Math.round(pct * width);
   return '▓'.repeat(filled) + '░'.repeat(width - filled);
+}
+
+// Bands match the race page exactly: green above 50, amber down to the org's
+// taper floor, red below it — where scoring actually starts costing.
+function staminaLine(own: HorseView | undefined, race: GetRaceResponse): StatRow {
+  const stamina = own?.stamina ?? 100;
+  const cfg = resolveStaminaConfig(race);
+  const floor = cfg.taper_floor;
+  const band = stamina > 50 ? 'green' : stamina >= floor ? 'amber' : 'red';
+  const color = band === 'green' ? 'green' : band === 'amber' ? 'yellow' : 'red';
+  const pct = Math.max(0, Math.min(1, stamina / 100));
+
+  // Multiplier only in the red band: it's the number their output is being
+  // scaled by right now, so it only matters once tapering has begun.
+  const multiplier = band === 'red'
+    ? cfg.tired_multiplier + (1 - cfg.tired_multiplier) * (stamina / floor)
+    : null;
+
+  return {
+    label: 'Stamina:',
+    value: (
+      <Text color={color}>
+        {`${Math.round(stamina)}%  ${bar(pct, 20)}`}
+        {multiplier !== null ? `  ×${multiplier.toFixed(2)}` : ''}
+      </Text>
+    ),
+  };
 }
 
 function statusColor(status: GetRaceResponse['status']): string {

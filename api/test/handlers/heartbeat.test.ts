@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { handler as hbHandler } from '../../src/handlers/heartbeat.js';
 import { handler as createHandler } from '../../src/handlers/create-race.js';
 import { handler as joinHandler } from '../../src/handlers/join-race.js';
@@ -47,6 +47,38 @@ async function setup(cliVersion = CURRENT_CLI_VERSION) {
   });
   const { horse_id, heartbeat_token } = JSON.parse(joinRes.body);
   return { join_code, race_id, horse_id, heartbeat_token };
+}
+
+/** Like setup() but stamps race-level toggles (e.g. stamina) onto the race row. */
+async function setupLiveRaceWithHorse(
+  opts: { stamina?: boolean } = {},
+): Promise<{ join_code: string; race_id: string; horse_id: string; token: string }> {
+  const { join_code, race_id, horse_id, heartbeat_token } = await setup();
+  if (opts.stamina) {
+    await ddb.send(new UpdateCommand({
+      TableName: TABLE,
+      Key: raceMetaKey(race_id),
+      UpdateExpression: 'SET stamina = :s',
+      ExpressionAttributeValues: { ':s': true },
+    }));
+  }
+  return { join_code, race_id, horse_id, token: heartbeat_token };
+}
+
+/**
+ * Advances the (already-faked) clock by advanceMs and sends one heartbeat.
+ * Callers must call vi.useFakeTimers() once themselves — re-installing it on
+ * every call would reset the clock instead of accumulating time.
+ */
+async function heartbeat(opts: {
+  join_code: string; horse_id: string; token: string; seq: number; delta: number; advanceMs: number;
+}): Promise<Record<string, any>> {
+  vi.advanceTimersByTime(opts.advanceMs);
+  const res: any = await hbHandler(hbEvent(opts.join_code, opts.horse_id, opts.token, { seq: opts.seq, delta: opts.delta }));
+  if (res.statusCode !== 200) {
+    throw new Error(`heartbeat failed: ${res.statusCode} ${res.body}`);
+  }
+  return JSON.parse(res.body);
 }
 
 /** Like setup() but locks a specific primary_model at join time. */
@@ -103,7 +135,7 @@ function hbEvent(
 
 describe('heartbeat handler', () => {
   beforeEach(() => { process.env.TOKEN_DERBY_MAX_RATE = '1000000000'; });
-  afterEach(() => { delete process.env.TOKEN_DERBY_MAX_RATE; });
+  afterEach(() => { delete process.env.TOKEN_DERBY_MAX_RATE; vi.useRealTimers(); });
 
   it('accumulates applied deltas onto current_tokens and returns last_seq', async () => {
     const { join_code, race_id, horse_id, heartbeat_token } = await setup();
@@ -132,6 +164,34 @@ describe('heartbeat handler', () => {
     const pts = await listSeriesPoints(race_id, horse_id);
     expect(pts).toHaveLength(1);
     expect(pts[0]?.d).toBe(750);
+  });
+
+  it('accumulates scored_tokens alongside current_tokens with no mechanics enabled', async () => {
+    const { join_code, race_id, horse_id, heartbeat_token } = await setup();
+    await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { seq: 1, delta: 5_000 }));
+    await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { seq: 2, delta: 3_000 }));
+    const horses = await listHorses(race_id);
+    expect(horses[0]?.current_tokens).toBe(8_000);
+    expect(horses[0]?.scored_tokens).toBe(8_000);
+  });
+
+  it('seeds scored_tokens from current_tokens on a horse\'s first heartbeat', async () => {
+    // Every horse row starts without scored_tokens — this isn't a deploy-time
+    // migration, it's every horse's first heartbeat.
+    const { join_code, race_id } = await setup();
+    const { putHorse } = await import('../../src/db/horses.js');
+    await putHorse(race_id, {
+      horse_id: 'h-seed', stable_horse_id: 'sh-seed', name: 'Seed_Gary',
+      colors: COLORS, current_tokens: 50_000, last_heartbeat: new Date().toISOString(),
+      joined_at: new Date().toISOString(), user_id: 'seed-user', user_name: 'Seed_User', xp: 0,
+    } as any, 'seed-tok');
+
+    const res: any = await hbHandler(hbEvent(join_code, 'h-seed', 'seed-tok', { seq: 1, delta: 1_000 }));
+    expect(res.statusCode).toBe(200);
+    const horses = await listHorses(race_id);
+    const own = horses.find(h => h.horse_id === 'h-seed');
+    expect(own?.current_tokens).toBe(51_000);
+    expect(own?.scored_tokens).toBe(51_000);
   });
 
   it('rejects a negative delta or non-positive seq', async () => {
@@ -419,5 +479,26 @@ describe('heartbeat handler', () => {
     const own = body.horses.find((h: any) => h.horse_id === hid);
     expect(own.live_xp ?? 0).toBe(0);
     expect(own.recent_events ?? []).toEqual([]);
+  });
+
+  // --- stamina ---
+
+  it('tires a horse on a stamina race and scores its later output lower', async () => {
+    const { join_code, horse_id, token, race_id } = await setupLiveRaceWithHorse({ stamina: true });
+
+    vi.useFakeTimers();
+    // Twenty minutes of flat-out pace: 40,000/min is 10x sustainable, so drain
+    // clamps at 6/min and the horse is well past the taper floor by the end.
+    let body: Record<string, any> = {};
+    for (let seq = 1; seq <= 20; seq++) {
+      body = await heartbeat({ join_code, horse_id, token, seq, delta: 40_000, advanceMs: 60_000 });
+    }
+
+    const [horse] = await listHorses(race_id);
+    expect(horse!.stamina!).toBeLessThan(25);
+    expect(horse!.scored_tokens!).toBeLessThan(horse!.current_tokens);
+
+    const ownInResponse = body.horses.find((h: any) => h.horse_id === horse_id);
+    expect(ownInResponse.stamina).toBe(horse!.stamina);
   });
 });

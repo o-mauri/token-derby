@@ -49,6 +49,7 @@ export const handler = async (): Promise<void> => {
         max_participants: sched.max_participants,
         counts_input: sched.counts_input,
         primary_top5: sched.primary_top5,
+        stamina: sched.stamina,
         creator_user_id: sched.creator_user_id,
         creator_user_name: sched.creator_user_name,
         org: {
@@ -134,6 +135,7 @@ export const handler = async (): Promise<void> => {
         max_participants: league.max_participants,
         counts_input: league.counts_input,
         primary_top5: league.primary_top5,
+        stamina: league.stamina,
         creator_user_id: league.creator_user_id,
         creator_user_name: league.creator_user_name,
         org: {

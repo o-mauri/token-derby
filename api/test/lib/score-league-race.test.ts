@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { handler as createOrgHandler } from '../../src/handlers/create-organisation.js';
-import { scoreLeagueRace } from '../../src/lib/score-league-race.js';
+import { scoreLeagueRace, type FinishedHorse } from '../../src/lib/score-league-race.js';
 import { putLeague } from '../../src/db/leagues.js';
 import { listSeasonStandings, ensureStanding } from '../../src/db/league-standings.js';
 import { makeUser, type TestUser } from '../helpers/auth-helper.js';
@@ -28,13 +28,15 @@ function baseLeague(org_id: string, over: Partial<League> = {}): League {
   };
 }
 
-function horse(over: Partial<Horse>): Horse {
+function horse(over: Partial<Horse>): FinishedHorse {
   return {
     horse_id: over.horse_id ?? 'h', stable_horse_id: over.stable_horse_id ?? 'sh', name: over.name ?? 'Bolt',
     colors: { body: '#000', mane: '#000', tail: '#000', saddle: '#000' },
     current_tokens: over.final_tokens ?? 0, last_heartbeat: 'x', joined_at: over.joined_at ?? '2026-07-07T09:00:00.000Z',
-    final_tokens: over.final_tokens ?? 0, user_id: over.user_id ?? 'u', user_name: over.user_name ?? 'U', xp: 0,
-  } as Horse;
+    final_tokens: over.final_tokens ?? 0,
+    final_scored_tokens: over.final_scored_tokens ?? over.final_tokens ?? 0,
+    user_id: over.user_id ?? 'u', user_name: over.user_name ?? 'U', xp: 0,
+  };
 }
 
 function leagueRace(org_id: string, round = 1): Race {
@@ -160,7 +162,7 @@ describe('scoreLeagueRace return value', () => {
     const div3 = result!.divisions.find(d => d.division === 3)!;
     expect(div3.order.map(o => o.stable_horse_id)).toEqual(['s1', 's2']); // ranked by tokens
     expect(div3.order.map(o => o.points_awarded)).toEqual([20, 15]);      // 1st, 2nd
-    expect(div3.order[0]).toMatchObject({ position: 1, horse_name: 'Fast', final_tokens: 900 });
+    expect(div3.order[0]).toMatchObject({ position: 1, horse_name: 'Fast', final_tokens: 900, final_scored_tokens: 900 });
   });
 
   it('returns null when the race is not a league fixture', async () => {

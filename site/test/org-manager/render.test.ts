@@ -54,6 +54,18 @@ describe('renderSchedule', () => {
     renderSchedule(root, { schedule: null, isOwner: true, onSave: vi.fn(), onClear: vi.fn() });
     expect(root.querySelector('button[data-action="save"]')).toBeTruthy();
   });
+  it('preserves a pre-set stamina flag through a save from this tab', () => {
+    const onSave = vi.fn();
+    const schedule = {
+      org_id: 'o1', weekdays: [1, 2], start_local: '09:00', end_local: '17:30', tz: 'Europe/London',
+      created_at: '2026-01-01T00:00:00Z', creator_user_id: 'u1', creator_user_name: 'omar',
+      stamina: true,
+    };
+    renderSchedule(root, { schedule, isOwner: true, onSave, onClear: vi.fn() });
+    (root.querySelector('[data-action="save"]') as HTMLElement).click();
+    expect(onSave).toHaveBeenCalledTimes(1);
+    expect(onSave.mock.calls[0]![0].stamina).toBe(true);
+  });
 });
 
 describe('renderWebhook', () => {
@@ -250,6 +262,14 @@ describe('renderLeagueEditor', () => {
     renderLeagueEditor(root, { league: twoDivLeague, isOwner: true, onSave: vi.fn(), onClear });
     (root.querySelector('[data-action="delete-league"]') as HTMLElement).click();
     expect(onClear).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserves a pre-set stamina flag through a save from this tab', () => {
+    const onSave = vi.fn();
+    renderLeagueEditor(root, { league: { ...twoDivLeague, stamina: true }, isOwner: true, onSave, onClear: vi.fn() });
+    (root.querySelector('[data-action="save-league"]') as HTMLElement).click();
+    expect(onSave).toHaveBeenCalledTimes(1);
+    expect(onSave.mock.calls[0]![0].stamina).toBe(true);
   });
 
   it('notes that shape changes apply next season when editing an existing league', () => {

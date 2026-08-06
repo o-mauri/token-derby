@@ -109,7 +109,7 @@ function buildFace(
   face.className = 'detail-face chart-face';
   const title = doc.createElement('div');
   title.className = 'chart-title';
-  title.textContent = mode === 'cumulative' ? 'Cumulative tokens' : 'Tokens / min (30-min avg)';
+  title.textContent = mode === 'cumulative' ? 'Cumulative tokens produced' : 'Tokens produced / min (30-min avg)';
   face.appendChild(title);
   face.appendChild(svg);
 

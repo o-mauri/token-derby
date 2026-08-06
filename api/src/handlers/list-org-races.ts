@@ -1,6 +1,6 @@
 import type { ApiHandler } from '../lib/http.js';
 import type { ListOrgRacesResponse, RaceSummary, RaceHighlight } from '@token-derby/shared';
-import { ORG_NAME_PATTERN } from '@token-derby/shared';
+import { ORG_NAME_PATTERN, scoredOf } from '@token-derby/shared';
 import { getOrganisationByName } from '../db/organisations.js';
 import { listRacesByOrgId } from '../db/races.js';
 import { listHorses } from '../db/horses.js';
@@ -44,15 +44,14 @@ export const handler: ApiHandler = async (event) => {
 
       try {
         const horses = await listHorses(race.race_id);
-        // rankHorses sorts by current_tokens desc, joined_at asc. The top horse
-        // is the winner (finished) or current leader (live). Zero-horse races
-        // have no leader, so they get no highlight.
+        // rankHorses sorts by scored distance desc, joined_at asc. The top horse
+        // is the winner (finished) or current leader (live).
         const leader = rankHorses(horses)[0];
-        if (!leader) return summary;
+        if (!leader) return summary; // zero-horse races have no leader
         const tokens =
           status === 'finished'
-            ? leader.final_tokens ?? leader.current_tokens
-            : leader.current_tokens;
+            ? leader.final_scored_tokens ?? scoredOf(leader)
+            : scoredOf(leader);
         const highlight: RaceHighlight = {
           horse_name: leader.name,
           tokens,

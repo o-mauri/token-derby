@@ -171,7 +171,7 @@ describe('race graphs popup', () => {
     expect(document.querySelector('.chart-title')!.textContent).toContain('Cumulative');
 
     document.querySelector<HTMLButtonElement>('.race-graphs-tab[data-mode="throughput"]')!.click();
-    expect(document.querySelector('.chart-title')!.textContent).toContain('Tokens / min');
+    expect(document.querySelector('.chart-title')!.textContent).toContain('Tokens produced / min');
     expect(fetchSeries).toHaveBeenCalledTimes(1);
     g.destroy();
   });

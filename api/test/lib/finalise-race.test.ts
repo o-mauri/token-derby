@@ -135,7 +135,7 @@ describe('finaliseRace', () => {
     // and ended_at was never written.
     const alpha = findHorse(horses, 'Alpha');
     const { setHorseFinalTokens } = await import('../../src/db/horses.js');
-    await setHorseFinalTokens(race.race_id, alpha.horse_id, 100);
+    await setHorseFinalTokens(race.race_id, alpha.horse_id, 100, 100);
 
     const now = new Date();
     const result = await finaliseRace(race, now);
@@ -167,6 +167,27 @@ describe('finaliseRace', () => {
     // Total: 65 + 6 + 12 = 83
     expect(alpha.xp_awarded).toBe(83);
     expect(result.newly_finalised).toBe(true);
+  });
+
+  it('stamps final_scored_tokens and ranks the finish by scored distance', async () => {
+    const rawLeader = makeHorse('RawLeader', 10_000, { scored_tokens: 5_000 });
+    const scoredLeader = makeHorse('ScoredLeader', 8_000, { scored_tokens: 8_000 });
+    const race = await setupRace([rawLeader, scoredLeader]);
+
+    // Finalise well past the anti-farm gate's duration threshold so xp_awarded
+    // reflects rank rather than being zeroed out by the gate.
+    await finaliseRace(race, new Date(Date.now() + 3 * 3_600_000 + 60_000));
+
+    const horses = await listHorses(race.race_id);
+    const raw = findHorse(horses, 'RawLeader');
+    const scored = findHorse(horses, 'ScoredLeader');
+
+    expect(raw.final_tokens).toBe(10_000);
+    expect(raw.final_scored_tokens).toBe(5_000);
+    expect(scored.final_scored_tokens).toBe(8_000);
+
+    // The winner is the scored leader — XP awards follow scored rank.
+    expect(scored.xp_awarded!).toBeGreaterThan(raw.xp_awarded!);
   });
 });
 

@@ -8,9 +8,10 @@ import { renderMembers } from './render/tabs/members.js';
 import { renderRacing } from './render/tabs/racing.js';
 import { renderWebhook } from './render/tabs/webhook.js';
 import { renderSlackbot } from './render/tabs/slackbot.js';
+import { renderRaceSettings } from './render/tabs/race-settings.js';
 import type { OrganisationSummary } from '@token-derby/shared';
 
-type Tab = 'overview' | 'members' | 'racing' | 'webhook' | 'slackbot';
+type Tab = 'overview' | 'members' | 'racing' | 'webhook' | 'slackbot' | 'race-settings';
 
 export function renderOrgManager(root: HTMLElement): () => void {
   let disposed = false;
@@ -66,7 +67,7 @@ export function renderOrgManager(root: HTMLElement): () => void {
       const name = selected;
       mainEl.innerHTML = `
         <nav class="org-tabs">
-          ${(['overview', 'members', 'racing', 'webhook', 'slackbot'] as Tab[]).map((t) =>
+          ${(['overview', 'members', 'racing', 'race-settings', 'webhook', 'slackbot'] as Tab[]).map((t) =>
             `<button type="button" class="org-tab${t === tab ? ' on' : ''}" data-tab="${t}">${t}</button>`).join('')}
         </nav>
         <div class="org-tabbody"></div>`;
@@ -103,6 +104,26 @@ export function renderOrgManager(root: HTMLElement): () => void {
               void guard(async () => { if (schedule) await api.clearSchedule(name); await api.setLeague(name, b); });
             },
             onClearLeague: () => void guard(() => api.clearLeague(name)),
+          });
+        }
+        else if (tab === 'race-settings') {
+          const settings = isOwner ? ((await api.getRaceSettings(name)).settings ?? null) : null;
+          const schedule = isOwner ? ((await api.getSchedule(name)).schedule ?? null) : null;
+          const league = isOwner ? ((await api.getLeague(name)).league ?? null) : null;
+          const staminaOn = Boolean(league?.stamina ?? schedule?.stamina);
+          const guard = async (fn: () => Promise<unknown>) => {
+            try { await fn(); void drawMain(); } catch (e) { alert(String((e as Error).message)); }
+          };
+          renderRaceSettings(bodyEl, {
+            settings, staminaOn, isOwner,
+            onSave: (b) => void guard(() => api.setRaceSettings(name, b)),
+            onReset: () => void guard(() => api.setRaceSettings(name, {})),
+            onToggleStamina: (on) => void guard(() => {
+              if (league) return api.setLeague(name, { ...league, stamina: on });
+              if (schedule) return api.setSchedule(name, { ...schedule, stamina: on });
+              alert('Set up scheduled races or a league on the Racing tab first.');
+              return Promise.resolve();
+            }),
           });
         }
         else if (tab === 'webhook') {

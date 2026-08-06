@@ -1,4 +1,5 @@
-import type { CollectedHat, HatId, HorseColors, HorseView, Race, RaceStatus, RaceSummary, RaceView, OrganisationSummary, StableHorse, RaceSchedule, League, DivisionConfig, ModelKey, SeasonStandings } from './types.js';
+import type { CollectedHat, HatId, HorseColors, HorseView, Race, RaceStatus, RaceSummary, RaceView, OrganisationSummary, StableHorse, RaceSchedule, League, DivisionConfig, ModelKey, SeasonStandings, RaceSettings } from './types.js';
+import type { StaminaConfig } from './scoring.js';
 
 export type CreateRaceRequest = {
   name: string;
@@ -9,6 +10,7 @@ export type CreateRaceRequest = {
   organisation_name?: string;
   counts_input?: boolean;
   primary_top5?: boolean;
+  stamina?: boolean;
 };
 
 export type CreateRaceResponse = {
@@ -225,6 +227,7 @@ export type SetOrgScheduleRequest = {
   max_participants?: number;
   counts_input?: boolean;
   primary_top5?: boolean;
+  stamina?: boolean;
 };
 export type SetOrgScheduleResponse = { schedule: RaceSchedule };
 export type GetOrgScheduleResponse = { schedule: RaceSchedule | null };
@@ -242,9 +245,14 @@ export type SetOrgLeagueRequest = {
   max_participants?: number;
   counts_input?: boolean;
   primary_top5?: boolean;
+  stamina?: boolean;
 };
 export type SetOrgLeagueResponse = { league: League };
 export type GetOrgLeagueResponse = { league: League | null };
 export type DeleteOrgLeagueResponse = { ok: true };
 
 export type GetLeagueStandingsResponse = { standings: SeasonStandings | null };
+
+export type GetOrgRaceSettingsResponse = { settings: RaceSettings | null };
+export type SetOrgRaceSettingsRequest = { stamina_config?: StaminaConfig };
+export type SetOrgRaceSettingsResponse = { settings: RaceSettings };

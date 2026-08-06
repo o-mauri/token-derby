@@ -1,4 +1,5 @@
 import type { RecentEvent } from './midrace.js';
+import type { StaminaConfig } from './scoring.js';
 
 export type ModelKey = 'claude' | 'codex' | 'gemini';
 
@@ -40,6 +41,11 @@ export type Horse = {
   last_pulled_away_at?: number;
   recent_events?: RecentEvent[];
   equipped_hat?: CollectedHat;        // snapshot from stable horse at join time
+  // Scored distance — raw tokens passed through the scoring multiplier chain.
+  // Absent on rows written before the feature; read via scoredOf().
+  scored_tokens?: number;
+  final_scored_tokens?: number;
+  stamina?: number;
 };
 
 export type RaceStatus = 'pending' | 'live' | 'finished';
@@ -77,6 +83,11 @@ export type Race = {
   // (top flight). Lets clients label the division-grouped order without a
   // separate config fetch. Absent for non-league races.
   league_division_names?: string[];
+  // Stamina: a horse above a sustainable pace tires and scores less until it
+  // recovers. Locked at race creation.
+  stamina?: boolean;
+  // Per-org stamina tuning, snapshotted at race creation.
+  stamina_config?: StaminaConfig;
 };
 
 export type HorseView = Horse & {
@@ -92,7 +103,7 @@ export type HorseView = Horse & {
 
 export type RaceHighlight = {
   horse_name: string;
-  tokens: number;     // finished: final_tokens (fallback current_tokens); live: current_tokens
+  tokens: number;     // finished: final_scored_tokens (fallback scored/current tokens); live: scored/current tokens
   colors: HorseColors;
   hat?: CollectedHat; // equipped hat so the mini sprite matches the race page
 };
@@ -191,11 +202,20 @@ export type StableHorse = {
   races_entered?: number;
   wins?: number;                     // count of rank-1 finishes
   podiums?: number;                  // count of rank ≤ 3 finishes
-  total_tokens?: number;             // sum of final_tokens across all races
+  total_tokens?: number;             // sum of final_scored_tokens across all races
   total_finishing_position?: number; // sum of ranks; avg = sum / races_entered
   hats?: CollectedHat[];
   equipped_hat?: number | null;   // number = equipped index into hats[]; null = explicitly unequipped; undefined = pre-feature stable horses
   last_rolled_level?: number;         // high-water mark for pending rolls
+};
+
+// Per-org tuning for the scoring mechanics. Its own row rather than living on
+// SCHEDULE or LEAGUE, because it applies to both and is exclusive with neither.
+export type RaceSettings = {
+  org_id: string;
+  stamina_config?: StaminaConfig;
+  updated_at: string;
+  updated_by_user_id: string;
 };
 
 // One repeating race schedule per org. Stored on the org's SCHEDULE row.
@@ -209,6 +229,7 @@ export type RaceSchedule = {
   max_participants?: number;
   counts_input?: boolean;
   primary_top5?: boolean;    // stamped onto each scheduled race (see Race.primary_top5)
+  stamina?: boolean;         // stamped onto each scheduled race (see Race.stamina)
   created_at: string;
   creator_user_id: string;   // stamped onto each scheduled race
   creator_user_name: string; // stamped onto each scheduled race
@@ -245,6 +266,7 @@ export type League = {
   max_participants?: number;
   counts_input?: boolean;
   primary_top5?: boolean;
+  stamina?: boolean;         // stamped onto each fixture (see Race.stamina)
   current_season: number;         // 1-based; the season fixtures accrue into
   status: LeagueStatus;           // 'complete' is transient during rollover
   pending_structural?: PendingStructural; // shape edits staged mid-season, applied at rollover

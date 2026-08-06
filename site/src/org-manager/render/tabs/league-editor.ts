@@ -170,6 +170,7 @@ export function renderLeagueEditor(root: HTMLElement, deps: LeagueEditorDeps): v
         ...(maxRaw ? { max_participants: Number(maxRaw) } : {}),
         ...(root.querySelector<HTMLInputElement>('input[name="primary_top5"]')!.checked ? { primary_top5: true } : {}),
         ...(root.querySelector<HTMLInputElement>('input[name="counts_input"]')!.checked ? { counts_input: true } : {}),
+        ...(src?.stamina ? { stamina: true } : {}),
       };
       // Reuse the shared validator so client rules never drift from the server's.
       const msg = validateLeagueConfig(body);

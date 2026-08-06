@@ -3,6 +3,8 @@ import { handler } from '../../src/handlers/create-race.js';
 import { handler as createOrgHandler } from '../../src/handlers/create-organisation.js';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { getRaceByJoinCode, getRaceByAdminCode, setRaceEnded } from '../../src/db/races.js';
+import { getOrganisationByName } from '../../src/db/organisations.js';
+import { putRaceSettings } from '../../src/db/race-settings.js';
 import { makeUser, type TestUser } from '../helpers/auth-helper.js';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
@@ -157,6 +159,33 @@ describe('createRace handler', () => {
     expect(res.statusCode).toBe(200);
     const race = await getRaceByJoinCode(JSON.parse(res.body).join_code);
     expect(race?.primary_top5).toBeUndefined();
+  });
+
+  it('persists the stamina flag from the create request', async () => {
+    const user = await makeUser('CR_Stamina');
+    const res: any = await handler(event({
+      name: 'Stamina Derby',
+      start_time: '2026-04-22T09:00:00Z',
+      end_time: '2026-04-22T17:00:00Z',
+      tz: 'Europe/London',
+      stamina: true,
+    }, user));
+    expect(res.statusCode).toBe(200);
+    const race = await getRaceByJoinCode(JSON.parse(res.body).join_code);
+    expect(race?.stamina).toBe(true);
+  });
+
+  it('omits stamina when not requested', async () => {
+    const user = await makeUser('CR_NoStamina');
+    const res: any = await handler(event({
+      name: 'No Stamina Derby',
+      start_time: '2026-04-22T09:00:00Z',
+      end_time: '2026-04-22T17:00:00Z',
+      tz: 'Europe/London',
+    }, user));
+    expect(res.statusCode).toBe(200);
+    const race = await getRaceByJoinCode(JSON.parse(res.body).join_code);
+    expect(race?.stamina).toBeUndefined();
   });
 
   it('rejects missing fields with BAD_REQUEST', async () => {
@@ -402,6 +431,67 @@ describe('createRace handler', () => {
       tz: 'UTC',
     }, user));
     expect(res.statusCode).toBe(200);
+  });
+
+  it('stamps the org stamina config onto a new org race', async () => {
+    const user = await makeUser('CR_StampCfg');
+    await createOrgHandler(orgEvent({ name: 'CRStampCfg' }, user));
+    const org = await getOrganisationByName('CRStampCfg');
+    await putRaceSettings({
+      org_id: org!.org_id,
+      stamina_config: { drain_per_min: 7 },
+      updated_at: new Date().toISOString(),
+      updated_by_user_id: user.user_id,
+    });
+
+    const res: any = await handler(event({
+      name: 'Stamped Derby',
+      start_time: '2026-04-22T09:00:00Z',
+      end_time: '2026-04-22T17:00:00Z',
+      tz: 'Europe/London',
+      organisation_name: 'CRStampCfg',
+    }, user));
+    expect(res.statusCode).toBe(200);
+    const race = await getRaceByJoinCode(JSON.parse(res.body).join_code);
+    expect(race?.stamina_config).toEqual({ drain_per_min: 7 });
+  });
+
+  it('leaves stamina_config absent for a race with no org', async () => {
+    const user = await makeUser('CR_StampNoOrg');
+    const res: any = await handler(event({
+      name: 'Unstamped Derby',
+      start_time: '2026-04-22T09:00:00Z',
+      end_time: '2026-04-22T17:00:00Z',
+      tz: 'Europe/London',
+    }, user));
+    expect(res.statusCode).toBe(200);
+    const race = await getRaceByJoinCode(JSON.parse(res.body).join_code);
+    expect(race?.stamina_config).toBeUndefined();
+  });
+
+  it('does not retroactively change a race when the org config changes later', async () => {
+    const user = await makeUser('CR_StampLater');
+    await createOrgHandler(orgEvent({ name: 'CRStampLtr' }, user));
+    const org = await getOrganisationByName('CRStampLtr');
+
+    const res: any = await handler(event({
+      name: 'Early Derby',
+      start_time: '2026-04-22T09:00:00Z',
+      end_time: '2026-04-22T17:00:00Z',
+      tz: 'Europe/London',
+      organisation_name: 'CRStampLtr',
+    }, user));
+    expect(res.statusCode).toBe(200);
+
+    await putRaceSettings({
+      org_id: org!.org_id,
+      stamina_config: { drain_per_min: 12 },
+      updated_at: new Date().toISOString(),
+      updated_by_user_id: user.user_id,
+    });
+
+    const race = await getRaceByJoinCode(JSON.parse(res.body).join_code);
+    expect(race?.stamina_config).toBeUndefined();
   });
 
   it('fires the race.created webhook for org-linked races when configured', async () => {

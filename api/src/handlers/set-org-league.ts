@@ -64,6 +64,7 @@ export const handler: ApiHandler = async (event) => {
       ...(body.max_participants !== undefined ? { max_participants: body.max_participants } : {}),
       ...(body.counts_input ? { counts_input: true } : {}),
       ...(body.primary_top5 ? { primary_top5: true } : {}),
+      ...(body.stamina ? { stamina: true } : {}),
       current_season: 1,
       status: 'active',
       created_at: new Date().toISOString(),
@@ -102,6 +103,7 @@ export const handler: ApiHandler = async (event) => {
     max_participants: body.max_participants,
     counts_input: body.counts_input,
     primary_top5: body.primary_top5,
+    stamina: body.stamina,
     // structural fields stay as the live (existing) shape; edits are staged
     ...(structurallyEqual ? {} : { pending_structural: pending }),
   };

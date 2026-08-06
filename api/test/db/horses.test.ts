@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   putHorse, listHorses, updateHorseHeartbeat, setHorseFinalTokens,
   getHorseForHeartbeat, findHorseByUser, rotateHeartbeatToken, applyHeartbeatDelta,
@@ -55,13 +55,14 @@ describe('horses db', () => {
     expect(updated?.last_heartbeat).toBe(now);
   });
 
-  it('sets final_tokens', async () => {
+  it('sets final_tokens and final_scored_tokens', async () => {
     const race_id = `r-${Math.random().toString(36).slice(2)}`;
     const h = makeHorse({ current_tokens: 1200 });
     await putHorse(race_id, h, 'tok');
-    await setHorseFinalTokens(race_id, h.horse_id, 1200);
+    await setHorseFinalTokens(race_id, h.horse_id, 1200, 1200);
     const [updated] = await listHorses(race_id);
     expect(updated?.final_tokens).toBe(1200);
+    expect(updated?.final_scored_tokens).toBe(1200);
   });
 
   it('returns horse heartbeat state on valid token, null otherwise', async () => {
@@ -123,7 +124,10 @@ describe('horses db', () => {
     const h = makeHorse({ current_tokens: 100 });
     await putHorse(race_id, h, 'tok');
     const now = new Date().toISOString();
-    const applied = await applyHeartbeatDelta(race_id, h.horse_id, 1, 50, now, emptyState);
+    const applied = await applyHeartbeatDelta({
+      race_id, horse_id: h.horse_id, seq: 1, applied: 50, scored_applied: 50,
+      stamina: undefined, last_heartbeat: now, state: emptyState, needsSeed: true,
+    });
     expect(applied).toBe(true);
     const [u] = await listHorses(race_id);
     expect(u?.current_tokens).toBe(150);
@@ -135,14 +139,35 @@ describe('horses db', () => {
     const h = makeHorse({ current_tokens: 100 });
     await putHorse(race_id, h, 'tok');
     const now = new Date().toISOString();
-    await applyHeartbeatDelta(race_id, h.horse_id, 2, 50, now, emptyState); // -> 150, last_seq 2
-    const dup = await applyHeartbeatDelta(race_id, h.horse_id, 2, 50, now, emptyState);
-    const older = await applyHeartbeatDelta(race_id, h.horse_id, 1, 50, now, emptyState);
+    const call = (seq: number) => applyHeartbeatDelta({
+      race_id, horse_id: h.horse_id, seq, applied: 50, scored_applied: 50,
+      stamina: undefined, last_heartbeat: now, state: emptyState, needsSeed: true,
+    });
+    await call(2); // -> 150, last_seq 2
+    const dup = await call(2);
+    const older = await call(1);
     expect(dup).toBe(false);
     expect(older).toBe(false);
     const [u] = await listHorses(race_id);
     expect(u?.current_tokens).toBe(150); // unchanged
     expect(u?.last_seq).toBe(2);
+  });
+
+  it('does not attempt a seed write when needsSeed is false', async () => {
+    const race_id = `r-${Math.random().toString(36).slice(2)}`;
+    const h = makeHorse({ current_tokens: 100 });
+    await putHorse(race_id, h, 'tok');
+    const now = new Date().toISOString();
+    const { ddb } = await import('../../src/db/client.js');
+    const sendSpy = vi.spyOn(ddb, 'send');
+    await applyHeartbeatDelta({
+      race_id, horse_id: h.horse_id, seq: 1, applied: 50, scored_applied: 50,
+      stamina: undefined, last_heartbeat: now, state: emptyState, needsSeed: false,
+    });
+    const seedAttempted = sendSpy.mock.calls.some(([cmd]: any) =>
+      cmd?.input?.UpdateExpression === 'SET scored_tokens = current_tokens');
+    expect(seedAttempted).toBe(false);
+    sendSpy.mockRestore();
   });
 
   it('getHorseForHeartbeat returns last_seq (0 when absent)', async () => {
