@@ -1,5 +1,13 @@
 [
   {
+    "version": "0.13.1",
+    "date": "2026-08-06",
+    "component": "site",
+    "changes": [
+      "added race ui theme picker (adefreitas)"
+    ]
+  },
+  {
     "version": "0.13.0",
     "date": "2026-08-06",
     "component": "site",

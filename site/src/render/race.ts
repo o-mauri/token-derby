@@ -32,11 +32,11 @@ export function renderRace(root: HTMLElement, joinCode: string, opts: RenderRace
   frame.className = 'race';
   frame.innerHTML = `
     <header class="race-header">
-      <h1>${horseFaceSvg()} <span class="race-name">Loading…</span></h1>
+      <h1>${horseFaceSvg()} <span class="race-name-row"><span class="row-scroll race-name-scroll"><span class="race-name">Loading…</span></span></span></h1>
       <div class="meta">
-        <span>Status: <b class="race-status">—</b></span>
-        <span>Time left: <b class="race-time-left">—</b></span>
-        <span>Join code: <b>${joinCode}</b></span>
+        <span class="status-item"><span class="meta-label">Status: </span><b class="race-status">—</b></span>
+        <span><span class="meta-label">Time left: </span><b class="race-time-left">—</b></span>
+        <span class="join-code"><span class="meta-label">Join code: </span><b>${joinCode}</b></span>
         <button type="button" class="btn org-btn" hidden>← Org</button>
         <button type="button" class="btn home-btn">← Home</button>
       </div>
@@ -102,6 +102,22 @@ export function renderRace(root: HTMLElement, joinCode: string, opts: RenderRace
       });
   };
   const nameEl = frame.querySelector<HTMLElement>('.race-name')!;
+  const nameRow = frame.querySelector<HTMLElement>('.race-name-row')!;
+  const nameScroll = frame.querySelector<HTMLElement>('.race-name-scroll')!;
+  // Same marquee the lane name-tags use: clip the row, slide the content by
+  // exactly its overflow, and only when it actually overflows.
+  const syncNameMarquee = (): void => {
+    const overflow = nameScroll.scrollWidth - nameRow.clientWidth;
+    if (overflow > 1) {
+      nameScroll.style.setProperty('--shift', `${-overflow}px`);
+      nameScroll.classList.add('is-scrolling');
+    } else {
+      nameScroll.classList.remove('is-scrolling');
+      nameScroll.style.removeProperty('--shift');
+    }
+  };
+  const nameRo = new ResizeObserver(syncNameMarquee);
+  nameRo.observe(nameRow);
   const statusEl = frame.querySelector<HTMLElement>('.race-status')!;
   const timeLeftEl = frame.querySelector<HTMLElement>('.race-time-left')!;
   const homeBtn = frame.querySelector<HTMLButtonElement>('.home-btn')!;
@@ -127,6 +143,7 @@ export function renderRace(root: HTMLElement, joinCode: string, opts: RenderRace
   const ctrl = new AbortController();
   let finishedTeardown: (() => void) | null = null;
   ctrl.signal.addEventListener('abort', () => ticker.destroy(), { once: true });
+  ctrl.signal.addEventListener('abort', () => nameRo.disconnect(), { once: true });
   startAutoScroll({ signal: ctrl.signal, target: track });
 
   const crowd = frame.querySelector<HTMLElement>('.crowd');
@@ -157,6 +174,10 @@ export function renderRace(root: HTMLElement, joinCode: string, opts: RenderRace
     const now = new Date();
     const nowMs = now.getTime();
     nameEl.textContent = race.name;
+    // Race names are unbounded, so the heading clips — keep the full name
+    // reachable on hover as well as via the marquee.
+    nameEl.title = race.name;
+    syncNameMarquee();
     if (race.organisation_name) {
       orgName = race.organisation_name;
       orgBtn.textContent = `← ${race.organisation_name}`;
