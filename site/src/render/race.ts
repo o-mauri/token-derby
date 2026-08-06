@@ -10,6 +10,7 @@ import { horseFaceSvg } from '../horse-face.js';
 import { createTicker, collectFreshItems, leagueOrderCells, leagueStandingsCells, type TickerCell } from './ticker.js';
 import { applyCheerJitter, crowdColumns, syncSpectators, TILE_PX } from './crowd.js';
 import { createRaceGraphs } from './race-graphs.js';
+import { createThemePicker } from './theme-picker.js';
 
 const POLL_INTERVAL_MS = 60_000;
 const TIMER_TICK_MS = 1_000;
@@ -48,6 +49,11 @@ export function renderRace(root: HTMLElement, joinCode: string, opts: RenderRace
     <div class="track"></div>
   `;
   root.appendChild(frame);
+
+  // Sits after the meta readouts but before the back-buttons, so those stay at
+  // the header's trailing edge.
+  const meta = frame.querySelector<HTMLElement>('.race-header .meta')!;
+  meta.insertBefore(createThemePicker(root.ownerDocument), meta.querySelector('.org-btn'));
 
   const track = frame.querySelector<HTMLElement>('.track')!;
   const ticker = createTicker(root.ownerDocument);

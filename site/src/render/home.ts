@@ -1,4 +1,5 @@
 import { horseFaceSvg } from '../horse-face.js';
+import { createThemePicker } from './theme-picker.js';
 
 export function renderHome(root: HTMLElement): void {
   root.innerHTML = '';
@@ -19,6 +20,7 @@ export function renderHome(root: HTMLElement): void {
     <p class="home-divider">— or browse the —</p>
     <a class="catalog-link" href="/catalog" id="catalog-link">Hat catalog →</a>
     <a class="catalog-link" href="/about" id="about-link">About / What's new →</a>
+    <div class="home-theme"></div>
     <div class="install-line terminal" role="note" aria-label="Install command">
       <span class="terminal-prompt">$</span>
       <span class="terminal-cmd">npm i -g @mauricode/token-derby</span>
@@ -26,6 +28,9 @@ export function renderHome(root: HTMLElement): void {
     </div>
   `;
   root.appendChild(section);
+
+  section.querySelector<HTMLElement>('.home-theme')!
+    .appendChild(createThemePicker(root.ownerDocument));
 
   const raceForm = section.querySelector<HTMLFormElement>('#race-form')!;
   const raceInput = section.querySelector<HTMLInputElement>('#race-code')!;

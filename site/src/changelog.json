@@ -26,6 +26,15 @@
     ]
   },
   {
+    "version": "0.13.0",
+    "date": "2026-07-28",
+    "component": "site",
+    "changes": [
+      "added a theme picker on the home page and race header",
+      "new themes: Midnight, Turf, Photo Finish and the animated Chromatic Circuit (the original look is now 'Derby')"
+    ]
+  },
+  {
     "version": "0.12.1",
     "date": "2026-07-28",
     "component": "site",

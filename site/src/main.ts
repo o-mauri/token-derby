@@ -6,12 +6,14 @@ import { renderOrgLive } from './render/org-live.js';
 import { renderCatalog } from './render/catalog.js';
 import { renderAbout } from './render/about.js';
 import { renderOrgManager } from './org-manager/index.js';
+import { initTheme } from './theme.js';
 
 // Legendary hat keyframes are installed lazily on the first buildHatGroup
 // call (see hat-svg.ts), so every entry point — main.ts, preview-race.ts,
 // preview-finished.ts — gets animated legendaries automatically.
 
 document.body.classList.add('tv'); // TV is the only mode
+initTheme();
 
 let activeCleanup: (() => void) | null = null;
 
