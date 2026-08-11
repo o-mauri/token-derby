@@ -6,7 +6,8 @@ import { handler as joinOrgHandler } from '../../src/handlers/join-organisation.
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { listHorses } from '../../src/db/horses.js';
 import { setRaceEnded } from '../../src/db/races.js';
-import { equipHat as dbEquipHat, applyRollResult } from '../../src/db/stable.js';
+import { equipHat as dbEquipHat, applyRollResult, recordHorseRaceResult } from '../../src/db/stable.js';
+import { FIELD_MEDIAN_PACE } from '@token-derby/shared';
 import { makeUser, makeHorse, type TestUser } from '../helpers/auth-helper.js';
 import { CURRENT_CLI_VERSION } from '../helpers/cli-version.js';
 
@@ -308,5 +309,35 @@ describe('joinRace handler', () => {
     const horses = await listHorses(race_id);
     expect(horses).toHaveLength(1);
     expect(horses[0]?.primary_model).toBe('gemini');
+  });
+
+  // --- prior_pace stamping ---
+  it('stamps prior_pace at the field median for a debutant with no race history', async () => {
+    const creator = await makeUser('PP_Debut_C');
+    const joiner = await makeUser('PP_Debut_J');
+    const horse = await makeHorse(joiner, 'Newcomer', COLORS);
+    const { join_code, race_id } = await createTestRace(creator);
+    const res: any = await joinHandler(joinEvent(join_code, joiner, { stable_horse_id: horse.stable_horse_id }));
+    expect(res.statusCode).toBe(200);
+    const horses = await listHorses(race_id);
+    expect(horses[0]?.prior_pace).toBe(FIELD_MEDIAN_PACE);
+  });
+
+  it('stamps prior_pace from the mean of recent_paces, frozen at join time', async () => {
+    const creator = await makeUser('PP_Vet_C');
+    const joiner = await makeUser('PP_Vet_J');
+    const horse = await makeHorse(joiner, 'Veteran', COLORS);
+    await recordHorseRaceResult(joiner.user_id, horse.stable_horse_id, { final_tokens: 1000, rank: 1, pace: 100 });
+    await recordHorseRaceResult(joiner.user_id, horse.stable_horse_id, { final_tokens: 2000, rank: 2, pace: 300 });
+    const { join_code, race_id } = await createTestRace(creator);
+    const res: any = await joinHandler(joinEvent(join_code, joiner, { stable_horse_id: horse.stable_horse_id }));
+    expect(res.statusCode).toBe(200);
+    const horses = await listHorses(race_id);
+    expect(horses[0]?.prior_pace).toBe(200); // mean of [100, 300]
+
+    // A later race result on the stable horse must not move the frozen value.
+    await recordHorseRaceResult(joiner.user_id, horse.stable_horse_id, { final_tokens: 3000, rank: 1, pace: 900 });
+    const horsesAfter = await listHorses(race_id);
+    expect(horsesAfter[0]?.prior_pace).toBe(200);
   });
 });

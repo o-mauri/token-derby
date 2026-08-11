@@ -2,7 +2,11 @@ import { tokenMultiplier } from '@token-derby/shared';
 
 const DEFAULT_MAX_RATE_PER_SECOND = 750;
 
-function envRate(): number {
+// The per-second rate actually enforced right now (env override or default),
+// before the race's own token multiplier. Exported so anything reasoning
+// about what a horse *can* produce — e.g. the market's "race is decided"
+// check — agrees with the clamp that governs what it actually does produce.
+export function envRate(): number {
   const n = Number(process.env.TOKEN_DERBY_MAX_RATE);
   return Number.isFinite(n) && n > 0 ? n : DEFAULT_MAX_RATE_PER_SECOND;
 }

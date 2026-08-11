@@ -4,11 +4,10 @@ import { PACE_WINDOW_MS, trailingPace } from '@token-derby/shared';
 import { getRaceByJoinCode } from '../db/races.js';
 import { listHorses } from '../db/horses.js';
 import { listRecentSeriesPoints } from '../db/series.js';
-import { getLeague } from '../db/leagues.js';
-import { listSeasonStandings } from '../db/league-standings.js';
 import { computeStatus, timeLeftSeconds } from '../lib/status.js';
 import { finaliseRace } from '../lib/finalise-race.js';
 import { rankHorses } from '../lib/rank-horses.js';
+import { stampDivisions } from '../lib/divisions.js';
 import { ok, err } from '../lib/http.js';
 
 // Last ~30 points comfortably cover the 15-min window (heartbeats are ≤1/min).
@@ -37,21 +36,7 @@ export const handler: ApiHandler = async (event) => {
 
   // League fixtures: stamp each horse's division (unscored new entrants default to
   // the bottom division) so clients can group the field by division.
-  let league_division_names: string[] | undefined;
-  if (race.league_id && race.league_season !== undefined) {
-    const league = await getLeague(race.league_id); // league_id === org_id
-    if (league) {
-      league_division_names = league.divisions.map((d) => d.name);
-      const bottom = league.divisions.length;
-      const divByHorse = new Map<string, number>();
-      for (const s of await listSeasonStandings(race.league_id, race.league_season)) {
-        divByHorse.set(s.stable_horse_id, s.division);
-      }
-      for (const h of ranked) {
-        if (h.stable_horse_id) h.division = divByHorse.get(h.stable_horse_id) ?? bottom;
-      }
-    }
-  }
+  const league_division_names = await stampDivisions(race, ranked);
 
   // Trailing 15-min pace, computed from the series points. Live races only —
   // meaningless before a race starts or after it ends. The window is clamped to

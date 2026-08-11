@@ -1,6 +1,6 @@
 import type { ApiHandler } from '../lib/http.js';
 import type { JoinRaceRequest, JoinRaceResponse, CollectedHat, ModelKey } from '@token-derby/shared';
-import { minorMatches, isModelKey } from '@token-derby/shared';
+import { minorMatches, isModelKey, recentPacePrior, FIELD_MEDIAN_PACE } from '@token-derby/shared';
 import { generateHorseId, generateHeartbeatToken } from '../lib/codes.js';
 import { getRaceByJoinCode } from '../db/races.js';
 import { putHorse, countHorses, findHorseByUser, rotateHeartbeatToken } from '../db/horses.js';
@@ -117,6 +117,9 @@ export const handler: ApiHandler = async (event) => {
       user_name: auth.display_name,
       xp: stable_horse.xp,
       primary_model,
+      // Frozen at join so pricing needs no extra reads later, and so replaying
+      // a settled race can't produce different odds because the stable record moved on.
+      prior_pace: recentPacePrior(stable_horse.recent_paces, FIELD_MEDIAN_PACE),
       ...(equipped_hat ? { equipped_hat } : {}),
     },
     heartbeat_token,

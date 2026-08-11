@@ -1,4 +1,4 @@
-import type { CollectedHat, HatId, HorseColors, HorseView, Race, RaceStatus, RaceSummary, RaceView, OrganisationSummary, StableHorse, RaceSchedule, League, DivisionConfig, ModelKey, SeasonStandings, RaceSettings } from './types.js';
+import type { CollectedHat, HatId, HorseColors, HorseView, MarketSnapshot, Race, RaceStatus, RaceSummary, RaceView, OrganisationSummary, StableHorse, RaceSchedule, League, DivisionConfig, ModelKey, SeasonStandings, RaceSettings } from './types.js';
 import type { StaminaConfig } from './scoring.js';
 
 export type CreateRaceRequest = {
@@ -256,3 +256,21 @@ export type GetLeagueStandingsResponse = { standings: SeasonStandings | null };
 export type GetOrgRaceSettingsResponse = { settings: RaceSettings | null };
 export type SetOrgRaceSettingsRequest = { stamina_config?: StaminaConfig };
 export type SetOrgRaceSettingsResponse = { settings: RaceSettings };
+
+export type MarketHorse = {
+  horse_id: string;
+  name: string;
+  colors: HorseColors;
+  division?: number;
+  scored_tokens: number;
+};
+
+// `open: false` before MARKET_OPEN_MIN has elapsed (with a countdown) and
+// again once the race has finished (no countdown — it's simply over).
+export type GetMarketsResponse =
+  | { open: false; opens_in_seconds?: number }
+  | { open: true; snapshot: MarketSnapshot; horses: MarketHorse[] };
+
+export type GetMarketHistoryResponse = {
+  history: MarketSnapshot[];
+};

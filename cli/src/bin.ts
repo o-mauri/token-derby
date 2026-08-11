@@ -10,6 +10,7 @@ import { updateCommand } from './commands/update.js';
 import { rollCommand } from './commands/roll.js';
 import { orgJoinCommand } from './commands/org-join.js';
 import { webCommand } from './commands/web.js';
+import { derbymarketCommand } from './commands/derbymarket.js';
 import { envCommand } from './commands/env.js';
 import { CLI_VERSION } from './version.js';
 import { loadIdentity } from './identity/identity.js';
@@ -35,6 +36,7 @@ Organisations:
   token-derby organisation join <token>   Join an organisation with a join token
   token-derby web                         Open the web org manager (create orgs,
                                           manage schedules, webhooks, members)
+  token-derby derbymarket                 Open the Derbymarket to view live race odds
 
 Races:
   token-derby create [--organisation <name>]
@@ -108,6 +110,7 @@ async function main(): Promise<number> {
   if (cmd === 'end')    return endCommand(argv[1]);
   if (cmd === 'roll')      return rollCommand();
   if (cmd === 'web')    return webCommand();
+  if (cmd === 'derbymarket') return derbymarketCommand();
 
   console.error(`Unknown command: ${cmd}`);
   console.error(HELP);

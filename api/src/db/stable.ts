@@ -7,6 +7,7 @@ import {
   STABLE_HORSE_SK_PREFIX,
 } from './keys.js';
 import type { CollectedHat, StableHorse } from '@token-derby/shared';
+import { RECENT_PACES_WINDOW } from '@token-derby/shared';
 import { adjustEquippedAfterRemoval } from '../lib/hat-removal.js';
 
 /**
@@ -172,19 +173,23 @@ export async function awardHorseXp(
  * Atomically increment lifetime race stats. Called once per (horse, race)
  * at finalisation, gated by the per-race xp_awarded marker. If the horse
  * has been deleted, the conditional check fails and the call is a no-op.
+ * `pace` is null for a race too brief to mean anything — the counters still
+ * record, but nothing is appended to recent_paces.
  */
 export async function recordHorseRaceResult(
   user_id: string,
   stable_horse_id: string,
-  result: { final_tokens: number; rank: number },
+  result: { final_tokens: number; rank: number; pace: number | null },
 ): Promise<void> {
+  const appendPace = result.pace !== null;
   try {
     await ddb.send(new UpdateCommand({
       TableName: TABLE,
       Key: stableHorseKey(user_id, stable_horse_id),
       UpdateExpression:
         'ADD races_entered :one, wins :w, podiums :p, ' +
-        'total_tokens :t, total_finishing_position :r',
+        'total_tokens :t, total_finishing_position :r' +
+        (appendPace ? ' SET recent_paces = list_append(if_not_exists(recent_paces, :empty), :pace)' : ''),
       ConditionExpression: 'attribute_exists(pk)',
       ExpressionAttributeValues: {
         ':one': 1,
@@ -192,12 +197,16 @@ export async function recordHorseRaceResult(
         ':p': result.rank <= 3 ? 1 : 0,
         ':t': Math.max(0, result.final_tokens),
         ':r': result.rank,
+        ...(appendPace ? { ':empty': [] as number[], ':pace': [Math.max(0, result.pace!)] } : {}),
       },
     }));
   } catch (e: any) {
     if (e?.name === 'ConditionalCheckFailedException') return;
     throw e;
   }
+  if (!appendPace) return;
+  // recent_paces is append-only; reads are bounded on access via
+  // recentPacePrior's RECENT_PACES_WINDOW slice.
 }
 
 export type ApplyRollInput = {

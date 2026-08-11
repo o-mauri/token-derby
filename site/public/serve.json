@@ -4,6 +4,8 @@
     { "source": "org/:name", "destination": "/index.html" },
     { "source": "org/:name/live", "destination": "/index.html" },
     { "source": "catalog", "destination": "/index.html" },
-    { "source": "about", "destination": "/index.html" }
+    { "source": "about", "destination": "/index.html" },
+    { "source": "org-manager", "destination": "/index.html" },
+    { "source": "derbymarket", "destination": "/index.html" }
   ]
 }

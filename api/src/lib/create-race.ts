@@ -1,8 +1,9 @@
-import type { RaceCreatedEvent } from '@token-derby/shared';
+import type { RaceCreatedEvent, Race } from '@token-derby/shared';
 import { DEFAULT_MAX_PARTICIPANTS } from '@token-derby/shared';
 import { randomUUID } from 'node:crypto';
 import { generateRaceId, generateJoinCode, generateAdminCode } from './codes.js';
 import { putRace, getRaceByJoinCode, listRacesByOrgId } from '../db/races.js';
+import { countHorses } from '../db/horses.js';
 import { getRaceSettings } from '../db/race-settings.js';
 import { sendOrgWebhook } from './webhook.js';
 import { sendOrgSlack } from './slack/send.js';
@@ -43,9 +44,12 @@ export async function createRace(input: CreateRaceInput): Promise<CreateRaceResu
   const start_ms = new Date(input.start_time).getTime();
   const end_ms = new Date(input.end_time).getTime();
 
+  // Reused below to seed expected_field — the overlap check already pays for
+  // this race-list read, so only the horse counts below are extra.
+  let orgRaces: Race[] = [];
   if (input.org) {
-    const existing = await listRacesByOrgId(input.org.org_id);
-    const clash = existing.find((r) => {
+    orgRaces = await listRacesByOrgId(input.org.org_id);
+    const clash = orgRaces.find((r) => {
       const otherStart = new Date(r.start_time).getTime();
       const otherEnd = new Date(r.ended_at ?? r.end_time).getTime();
       return start_ms < otherEnd && end_ms > otherStart;
@@ -58,6 +62,7 @@ export async function createRace(input: CreateRaceInput): Promise<CreateRaceResu
       };
     }
   }
+  const expected_field = input.org ? await meanExpectedField(orgRaces) : undefined;
 
   const join_code = await findUniqueJoinCode();
   const race_id = generateRaceId();
@@ -89,6 +94,7 @@ export async function createRace(input: CreateRaceInput): Promise<CreateRaceResu
       ...(input.primary_top5 ? { primary_top5: true } : {}),
       ...(input.stamina ? { stamina: true } : {}),
       ...(stamina_config ? { stamina_config } : {}),
+      ...(expected_field !== undefined ? { expected_field } : {}),
       ...(input.league
         ? { league_id: input.league.league_id, league_season: input.league.season, league_round: input.league.round }
         : {}),
@@ -120,6 +126,19 @@ export async function createRace(input: CreateRaceInput): Promise<CreateRaceResu
   }
 
   return { ok: true, race_id, join_code, admin_code };
+}
+
+const EXPECTED_FIELD_WINDOW = 10;
+
+// Mean actual attendance (horse count) across the org's most recent finished
+// races. Gated on `ended_at`, not `end_time` — the latter is set at
+// scheduling and says nothing about whether the race actually played out.
+async function meanExpectedField(races: Race[]): Promise<number | undefined> {
+  const finished = races.filter((r) => r.ended_at !== undefined).slice(0, EXPECTED_FIELD_WINDOW);
+  if (finished.length === 0) return undefined;
+  const counts = await Promise.all(finished.map((r) => countHorses(r.race_id)));
+  const mean = counts.reduce((a, b) => a + b, 0) / counts.length;
+  return Math.round(mean);
 }
 
 async function findUniqueJoinCode(): Promise<string> {

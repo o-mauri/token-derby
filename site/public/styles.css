@@ -1606,6 +1606,261 @@ label.label input:disabled, label.label select:disabled { opacity: 0.5; }
   .org-sidebar .org-create, .org-sidebar .org-join { width: auto; flex: 1; }
 }
 
+/* ── Derbymarket board (derbymarket/render/board.ts) ─────────────────── */
+
+.dm { flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 24px 32px; overflow-y: auto; }
+
+.dm-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+  font-size: 0.95rem;
+  font-variant-numeric: tabular-nums;
+  flex-wrap: wrap;
+}
+.dm-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--live);
+  box-shadow: 0 0 0 4px rgba(123, 237, 159, 0.18);
+  flex-shrink: 0;
+}
+.dm-race-name { color: var(--accent); }
+.dm-status-meta { color: var(--muted); }
+
+.dm-section-head {
+  margin: 14px 0 2px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.7rem;
+  font-weight: bold;
+}
+.dm-section-head:first-of-type { margin-top: 4px; }
+
+.dm-stack { display: flex; flex-direction: column; gap: 10px; }
+
+.dm-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  background: var(--panel);
+  border: 2px solid var(--border);
+  border-radius: 4px;
+  padding: 12px 16px;
+  /* Rows are <button>s (native Enter/Space + focus) — reset the UA chrome. */
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.12s;
+}
+.dm-row:hover, .dm-row:focus-visible { border-color: var(--accent); }
+.dm-row:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.dm-row-left { flex: 0 0 178px; min-width: 0; }
+.dm-market-name { font-weight: bold; font-size: 0.95rem; color: var(--text); }
+.dm-market-meta {
+  margin-top: 3px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.65rem;
+}
+
+/* position:relative makes it the offsetParent for its chips, so fitChips'
+   offsetLeft reads container-relative rather than climbing to <body>. */
+.dm-chips { position: relative; flex: 1 1 auto; display: flex; align-items: center; gap: 8px; min-width: 0; overflow: hidden; }
+.dm-chip {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  flex-shrink: 0;
+  min-width: 0;
+  padding: 6px 10px;
+  border: 2px solid var(--border);
+  border-radius: 3px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.dm-chip[hidden] { display: none; }
+.dm-chip-name { color: var(--muted); font-size: 0.72rem; overflow: hidden; text-overflow: ellipsis; }
+.dm-chip-price { color: var(--text); font-size: 0.85rem; font-weight: bold; }
+.dm-chip--lead { border-color: var(--accent); }
+.dm-chip--rest { opacity: 0.45; }
+.dm-silk { display: inline-block; width: 4px; height: 12px; border-radius: 1px; flex-shrink: 0; }
+
+.dm-chev { flex: 0 0 auto; color: var(--muted); font-size: 1.1rem; }
+
+.dm-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 32px;
+  text-align: center;
+}
+.dm-empty h2 { margin: 0; color: var(--accent); font-size: 1.4rem; letter-spacing: 0.05em; }
+.dm-empty p { margin: 0; color: var(--muted); max-width: 42ch; }
+.dm-empty .cmd { margin-top: 4px; }
+
+@media (max-width: 720px) {
+  .dm { padding: 16px; }
+  .dm-row { flex-wrap: wrap; }
+  .dm-row-left { flex: 1 1 100%; }
+  .dm-chev { display: none; }
+}
+
+/* ── Derbymarket price chart (derbymarket/render/chart.ts) ───────────── */
+
+.dm-pc-crumb { margin-bottom: 2px; }
+.dm-pc-back {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 4px 0;
+}
+.dm-pc-back:hover, .dm-pc-back:focus-visible { color: var(--accent); }
+.dm-pc-back:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.dm-pc-title { color: var(--accent); font-weight: bold; font-size: 1.1rem; margin-top: 2px; }
+.dm-pc-meta {
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.65rem;
+  margin-top: 2px;
+}
+
+.dm-pc-wrap {
+  position: relative;
+  border: 2px solid var(--border);
+  border-radius: 4px;
+  padding: 10px 8px 4px;
+  margin-top: 12px;
+  background: var(--panel);
+}
+.dm-pc-svg { width: 100%; height: auto; display: block; }
+
+.dm-pc-grid { stroke: var(--muted); opacity: 0.18; stroke-width: 1; }
+.dm-pc-axis { font-size: 9.5px; fill: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* Lines rest at low weight/opacity so the whole field reads at once; focusing
+   one pulls it forward and fades the rest — dimmed, never hidden. */
+.dm-pc-trace {
+  fill: none;
+  stroke-width: 1.2;
+  opacity: 0.62;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  transition: opacity 0.12s, stroke-width 0.12s;
+}
+.dm-pc-svg.dm-pc-focused .dm-pc-trace { opacity: 0.12; }
+.dm-pc-svg.dm-pc-focused .dm-pc-trace.on { opacity: 1; stroke-width: 3; }
+
+/* Invisible ~11px hit-stroke, layered above the visible lines — a 1.2px path
+   is unusable to hover directly. */
+.dm-pc-hit { fill: none; stroke: transparent; stroke-width: 11; cursor: crosshair; pointer-events: stroke; }
+
+.dm-pc-xh { stroke-dasharray: 2 3; stroke-width: 1; opacity: 0; transition: opacity 0.1s; }
+.dm-pc-xh.on { opacity: 0.75; }
+.dm-pc-marker { opacity: 0; stroke-width: 2; transition: opacity 0.1s; }
+.dm-pc-marker.on { opacity: 1; }
+.dm-pc-tagbg { opacity: 0; transition: opacity 0.1s; }
+.dm-pc-tagbg.on { opacity: 1; }
+.dm-pc-tag {
+  font-size: 10.5px;
+  font-weight: bold;
+  opacity: 0;
+  transition: opacity 0.1s;
+  pointer-events: none;
+  font-variant-numeric: tabular-nums;
+}
+.dm-pc-tag.on { opacity: 1; }
+.dm-pc-flag {
+  font-size: 11.5px;
+  font-weight: bold;
+  opacity: 0;
+  transition: opacity 0.12s;
+  pointer-events: none;
+  paint-order: stroke;
+  stroke-width: 3px;
+}
+.dm-pc-flag.on { opacity: 1; }
+
+.dm-pc-rows { display: flex; flex-direction: column; gap: 7px; margin-top: 14px; }
+.dm-pc-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  background: var(--panel);
+  border: 2px solid var(--border);
+  border-radius: 4px;
+  padding: 8px 14px 8px 10px;
+  color: inherit;
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+.dm-pc-row:hover, .dm-pc-row.dm-pc-row--lit { background: var(--panel); border-color: var(--silk, var(--accent)); }
+.dm-pc-row.dm-pc-row--lit { box-shadow: inset 3px 0 0 var(--silk); }
+.dm-pc-row:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.dm-pc-sprite { flex: 0 0 auto; width: 58px; height: 50px; image-rendering: pixelated; }
+.dm-pc-who { flex: 1 1 auto; min-width: 0; }
+.dm-pc-name {
+  font-size: 0.85rem;
+  font-weight: bold;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dm-pc-sub {
+  font-size: 0.68rem;
+  color: var(--muted);
+  margin-top: 2px;
+  font-variant-numeric: tabular-nums;
+}
+.dm-pc-silk { display: inline-block; width: 3px; height: 11px; border-radius: 1px; margin-right: 6px; vertical-align: -1px; flex: none; }
+
+.dm-pc-div {
+  flex: 0 0 auto;
+  font-size: 0.6rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  font-weight: bold;
+  opacity: 0.6;
+  color: var(--text);
+  border: 1px solid currentColor;
+  border-radius: 2px;
+  padding: 2px 6px;
+  white-space: nowrap;
+}
+.dm-pc-div[hidden], .dm-pc-banked[hidden] { display: none; }
+
+.dm-pc-banked { flex: 0 0 92px; text-align: right; font-variant-numeric: tabular-nums; }
+.dm-pc-banked .v { font-size: 0.82rem; font-weight: 650; color: var(--text); }
+.dm-pc-banked .l { font-size: 0.55rem; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.55; color: var(--muted); font-weight: bold; margin-top: 1px; }
+
+.dm-pc-prices { flex: 0 0 auto; display: flex; gap: 7px; }
+.dm-pc-price { width: 66px; text-align: center; border-radius: 2px; padding: 5px 2px; font-variant-numeric: tabular-nums; border: 1px solid var(--border); }
+.dm-pc-price .lb { font-size: 0.5rem; letter-spacing: 0.11em; text-transform: uppercase; opacity: 0.55; font-weight: bold; color: var(--muted); }
+.dm-pc-price .vv { font-size: 1rem; font-weight: bold; margin-top: 1px; color: var(--text); }
+.dm-pc-yes { border-color: rgba(31, 157, 85, 0.45); }
+.dm-pc-no { border-color: rgba(200, 16, 46, 0.35); }
+
+@media (max-width: 760px) {
+  .dm-pc-div, .dm-pc-banked { display: none; }
+}
+
 /* Live-order ticker rows — share the achievement-ticker container/track. */
 .ticker-order {
   display: inline-flex;

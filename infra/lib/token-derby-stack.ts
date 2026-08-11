@@ -134,13 +134,13 @@ export class TokenDerbyStack extends cdk.Stack {
     const apiDir = path.resolve(__dirname, '..', '..', 'api', 'src', 'handlers');
     const commonEnv = { TABLE_NAME, NODE_OPTIONS: '--enable-source-maps', ADMIN_SSM_PREFIX: config.ssmPrefix };
 
-    const makeFn = (name: string, fileBase: string, opts?: { timeout?: cdk.Duration }) => {
+    const makeFn = (name: string, fileBase: string, opts?: { timeout?: cdk.Duration; memorySize?: number }) => {
       const fn = new NodejsFunction(this, name, {
         runtime: lambda.Runtime.NODEJS_22_X,
         entry: path.join(apiDir, `${fileBase}.ts`),
         handler: 'handler',
         timeout: opts?.timeout ?? cdk.Duration.seconds(10),
-        memorySize: 256,
+        memorySize: opts?.memorySize ?? 256,
         environment: commonEnv,
         bundling: {
           target: 'node22',
@@ -155,6 +155,11 @@ export class TokenDerbyStack extends cdk.Stack {
     const createRaceFn = makeFn('CreateRaceFn', 'create-race');
     const getRaceFn = makeFn('GetRaceFn', 'get-race');
     const getSeriesFn = makeFn('GetSeriesFn', 'get-series');
+    // Simulation is single-threaded — Lambda scales CPU with memory, so at the
+    // default 256MB (~14% of a vCPU) a ~15ms simulation exceeds 100ms on the
+    // request path. 1024MB keeps it fast without paying for a full vCPU.
+    const getMarketsFn = makeFn('GetMarketsFn', 'get-markets', { memorySize: 1024 });
+    const getMarketHistoryFn = makeFn('GetMarketHistoryFn', 'get-market-history');
     const joinRaceFn = makeFn('JoinRaceFn', 'join-race');
     const heartbeatFn = makeFn('HeartbeatFn', 'heartbeat');
     const endRaceFn = makeFn('EndRaceFn', 'end-race');
@@ -248,6 +253,8 @@ export class TokenDerbyStack extends cdk.Stack {
     httpApi.addRoutes({ path: '/api/races', methods: [HttpMethod.POST], integration: new HttpLambdaIntegration('CreateRaceInt', createRaceFn) });
     httpApi.addRoutes({ path: '/api/races/{join_code}', methods: [HttpMethod.GET], integration: new HttpLambdaIntegration('GetRaceInt', getRaceFn) });
     httpApi.addRoutes({ path: '/api/races/{join_code}/series', methods: [HttpMethod.GET], integration: new HttpLambdaIntegration('GetSeriesInt', getSeriesFn) });
+    httpApi.addRoutes({ path: '/api/races/{join_code}/markets', methods: [HttpMethod.GET], integration: new HttpLambdaIntegration('GetMarketsInt', getMarketsFn) });
+    httpApi.addRoutes({ path: '/api/races/{join_code}/markets/history', methods: [HttpMethod.GET], integration: new HttpLambdaIntegration('GetMarketHistoryInt', getMarketHistoryFn) });
     httpApi.addRoutes({ path: '/api/races/{join_code}/join', methods: [HttpMethod.POST], integration: new HttpLambdaIntegration('JoinRaceInt', joinRaceFn) });
     httpApi.addRoutes({ path: '/api/races/{join_code}/horses/{horse_id}/heartbeat', methods: [HttpMethod.POST], integration: new HttpLambdaIntegration('HeartbeatInt', heartbeatFn) });
     httpApi.addRoutes({ path: '/api/races/admin/{admin_code}', methods: [HttpMethod.DELETE], integration: new HttpLambdaIntegration('EndRaceInt', endRaceFn) });

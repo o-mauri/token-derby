@@ -60,6 +60,15 @@ describe('parseRoute', () => {
     expect(parseRoute('/about/')).toEqual({ type: 'about' });
   });
 
+  it('routes /derbymarket', () => {
+    expect(parseRoute('/derbymarket')).toEqual({ type: 'derbymarket' });
+    expect(parseRoute('/derbymarket/')).toEqual({ type: 'derbymarket' });
+  });
+
+  it('does not route a lookalike', () => {
+    expect(parseRoute('/derbymarket/foo').type).toBe('not-found');
+  });
+
   it('returns not-found for unknown paths', () => {
     expect(parseRoute('/foo')).toEqual({ type: 'not-found' });
     expect(parseRoute('/race/')).toEqual({ type: 'not-found' });

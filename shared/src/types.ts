@@ -1,5 +1,6 @@
 import type { RecentEvent } from './midrace.js';
 import type { StaminaConfig } from './scoring.js';
+import type { MarketPrice } from './markets.js';
 
 export type ModelKey = 'claude' | 'codex' | 'gemini';
 
@@ -46,6 +47,10 @@ export type Horse = {
   scored_tokens?: number;
   final_scored_tokens?: number;
   stamina?: number;
+  prior_pace?: number;       // stamped at join, output-equivalent tokens/min
+  // League fixtures only: computed per-request from season standings (see
+  // HorseView). Absent for non-league races and outside that enrichment step.
+  division?: number;
 };
 
 export type RaceStatus = 'pending' | 'live' | 'finished';
@@ -88,6 +93,11 @@ export type Race = {
   stamina?: boolean;
   // Per-org stamina tuning, snapshotted at race creation.
   stamina_config?: StaminaConfig;
+  // Mean ACTUAL ATTENDANCE (horse count, not the max_participants cap) of the
+  // org's last 10 finished races, stamped at creation so pricing never has to
+  // read race history. Absent for non-org races and for an org's first race;
+  // the market then falls back to the field's current size.
+  expected_field?: number;
 };
 
 export type HorseView = Horse & {
@@ -128,6 +138,15 @@ export type RaceView = Race & {
   horses: HorseView[];
   server_time: string;
   time_left_seconds: number;
+};
+
+// A race's prices for every horse at one bucket, as stored in the snapshot.
+export type MarketSnapshot = {
+  race_id: string;
+  bucket: number;                 // floor(computed_at_ms / 60_000)
+  computed_at: string;
+  phantoms: number;
+  prices: MarketPrice[];
 };
 
 export type Organisation = {
@@ -207,6 +226,7 @@ export type StableHorse = {
   hats?: CollectedHat[];
   equipped_hat?: number | null;   // number = equipped index into hats[]; null = explicitly unequipped; undefined = pre-feature stable horses
   last_rolled_level?: number;         // high-water mark for pending rolls
+  recent_paces?: number[];   // output-equivalent tokens/min, oldest first
 };
 
 // Per-org tuning for the scoring mechanics. Its own row rather than living on

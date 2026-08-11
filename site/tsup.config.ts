@@ -9,6 +9,7 @@ export default defineConfig({
     'preview-finished': 'src/preview-finished.ts',
     'preview-org': 'src/preview-org.ts',
     'preview-org-manager': 'src/preview-org-manager.ts',
+    'preview-derbymarket': 'src/preview-derbymarket.ts',
     'preview-race': 'src/preview-race.ts',
     'preview-league': 'src/preview-league.ts',
     'preview-toasts': 'src/preview-toasts.ts',
