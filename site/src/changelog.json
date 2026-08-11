@@ -1,5 +1,14 @@
 [
   {
+    "version": "2.13.0",
+    "date": "2026-08-06",
+    "component": "cli",
+    "changes": [
+      "horse stamina mechanic [BETA]",
+      "stamina drain shows in terminal"
+    ]
+  },
+  {
     "version": "0.13.1",
     "date": "2026-08-06",
     "component": "site",
