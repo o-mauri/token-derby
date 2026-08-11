@@ -1,4 +1,4 @@
-import type { APIGatewayProxyHandlerV2 } from 'aws-lambda';
+import type { ApiHandler } from '../lib/http.js';
 import type { DeleteOrgLeagueResponse } from '@token-derby/shared';
 import { ORG_NAME_PATTERN, parseSemver } from '@token-derby/shared';
 import { getOrganisationByName } from '../db/organisations.js';
@@ -7,7 +7,7 @@ import { ok, err } from '../lib/http.js';
 import { readCliVersion, meetsMinimumCliVersion, versionMismatchMessage } from '../lib/version.js';
 import { resolveCaller } from '../lib/auth.js';
 
-export const handler: APIGatewayProxyHandlerV2 = async (event) => {
+export const handler: ApiHandler = async (event) => {
   const auth = await resolveCaller(event);
   if ('error' in auth) return err('UNAUTHENTICATED', auth.error);
 

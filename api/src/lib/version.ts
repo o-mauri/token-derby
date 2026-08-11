@@ -1,7 +1,7 @@
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { CLI_VERSION_HEADER, CLIENT_HEADER, CLIENT_VERSION_HEADER, gteSemver, type ClientId } from '@token-derby/shared';
 
-export const MIN_CLI_VERSION_DEFAULT = '2.10.0';
+export const MIN_CLI_VERSION_DEFAULT = '2.12.2';
 export const MIN_DESKTOP_VERSION_DEFAULT = '0.1.0';
 
 // API Gateway lowercases header names, but be defensive.

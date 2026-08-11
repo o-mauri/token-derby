@@ -1,5 +1,5 @@
 import type { GetRaceResponse, GetRaceSeriesResponse, HorseView, SeasonStandings } from '@token-derby/shared';
-import { levelInfo, levelFromXp } from '@token-derby/shared';
+import { levelInfo, levelFromXp, scoredOf } from '@token-derby/shared';
 import { fetchRaceSeries, fetchOrgLeagueStandings } from '../api.js';
 import { buildChartFaces } from './race-chart.js';
 import { renderLeagueStandings } from './league-standings.js';
@@ -123,7 +123,7 @@ function buildPodiumCard(doc: Document, horse: HorseView, idx: number): HTMLElem
 
   const tokens = doc.createElement('div');
   tokens.className = 'tokens';
-  tokens.textContent = `${(horse.final_tokens ?? horse.current_tokens).toLocaleString()} tokens`;
+  tokens.textContent = `${(horse.final_scored_tokens ?? scoredOf(horse)).toLocaleString()} tokens`;
   li.appendChild(tokens);
 
   const xpLine = doc.createElement('div');
@@ -195,7 +195,7 @@ function buildStandingsTable(doc: Document, horses: HorseView[]): HTMLElement {
     const tr = doc.createElement('tr');
     appendCell(doc, tr, String(h.rank ?? '—'), 'rank');
     tr.appendChild(buildHorseCell(doc, h));
-    appendCell(doc, tr, (h.final_tokens ?? h.current_tokens).toLocaleString());
+    appendCell(doc, tr, (h.final_scored_tokens ?? scoredOf(h)).toLocaleString());
     const liveXp = h.live_xp ?? 0;
     const xpText = xpAwarded > 0 ? `+${xpAwarded}${liveXp > 0 ? ` (+${liveXp} from achievements)` : ''}` : '0';
     appendCell(doc, tr, xpText);

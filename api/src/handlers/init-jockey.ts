@@ -1,4 +1,4 @@
-import type { APIGatewayProxyHandlerV2 } from 'aws-lambda';
+import type { ApiHandler } from '../lib/http.js';
 import type { InitJockeyRequest, InitJockeyResponse } from '@token-derby/shared';
 import { USER_NAME_MAX_LENGTH, parseSemver } from '@token-derby/shared';
 import { generateUserId, generateSecretToken } from '../lib/codes.js';
@@ -7,7 +7,7 @@ import { putUser } from '../db/users.js';
 import { ok, err, parseJson } from '../lib/http.js';
 import { readClient, readClientVersion, meetsMinimumVersion, versionMismatchMessage } from '../lib/version.js';
 
-export const handler: APIGatewayProxyHandlerV2 = async (event) => {
+export const handler: ApiHandler = async (event) => {
   const client = readClient(event);
   const version = readClientVersion(event);
   if (!version) {

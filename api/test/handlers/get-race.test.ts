@@ -317,4 +317,40 @@ describe('getRace handler', () => {
     const body = JSON.parse(res.body);
     expect(body.league_division_names).toBeUndefined();
   });
+
+  it('returns stamina and stamina_config for a race created with them', async () => {
+    const creator = await makeUser('GR_StaminaCreator');
+    const join_code = generateJoinCode();
+    await putRace({
+      race_id: generateRaceId(),
+      name: 'Stamina Fixture',
+      start_time: new Date(Date.now() - 60_000).toISOString(),
+      end_time: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      tz: 'UTC',
+      max_participants: 20,
+      join_code,
+      created_at: new Date().toISOString(),
+      creator_user_id: creator.user_id,
+      creator_user_name: creator.display_name,
+      stamina: true,
+      stamina_config: { sustainable_pace: 5000, taper_floor: 30 },
+    }, generateAdminCode());
+
+    const res: any = await getRaceHandler(evt(null, `/races/${join_code}`, 'GET /races/{join_code}', { join_code }));
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.stamina).toBe(true);
+    expect(body.stamina_config).toEqual({ sustainable_pace: 5000, taper_floor: 30 });
+  });
+
+  it('omits stamina and stamina_config for a race created without them', async () => {
+    const creator = await makeUser('GR_NoStamina');
+    const { join_code } = await setupRace(creator);
+
+    const res: any = await getRaceHandler(evt(null, `/races/${join_code}`, 'GET /races/{join_code}', { join_code }));
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.stamina).toBeUndefined();
+    expect(body.stamina_config).toBeUndefined();
+  });
 });

@@ -7,6 +7,16 @@
   --border: #3a3a3a;
   --lane: #3d2856;
   --lane-alt: #362248;
+  /* track-1.png is fully opaque, so --lane only shows through when a theme opts
+     into a blend mode. Derby keeps `normal` — the sprite renders untouched. */
+  --track-blend: normal;
+  --track-shade: transparent;
+  --track-wash: linear-gradient(var(--track-shade), var(--track-shade));
+  --wash-blend: normal;
+  --rail: #ffffff;
+  --label-box: #1d1d24;
+  --live: #7bed9f;
+  --ticker-accent: #ffd166;
   --track-gap: 0px;
   --horse-height: 60px;
   --sprite-scale: 2;
@@ -271,24 +281,67 @@ html, body {
 
 .race {
   display: grid;
+  /* minmax(0, 1fr), not the implicit auto: an auto track sizes to its widest
+     item's max-content, so one long race name stretched this column — and the
+     whole page — far past the viewport. */
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto auto 1fr;
   min-height: 100vh;
 }
 .race-header {
+  min-width: 0;   /* grid items default to min-width:auto, which re-blows the track */
   padding: 6px 24px;
   border-bottom: 2px solid var(--panel);
   display: flex;
   justify-content: space-between;
   align-items: center;
+  /* Title and controls share one line while the title can still hold its
+     floor (see h1 min-width). Once it can't, the controls wrap to a second
+     row rather than the title being squeezed to nothing — no breakpoint
+     needed, flexbox picks the moment from the two widths. */
   flex-wrap: wrap;
   gap: 16px;
 }
-.race-header h1 { margin: 0; color: var(--accent); font-size: 1.25rem; letter-spacing: 0.05em; display: flex; align-items: center; gap: 0.4em; }
-.race-header .meta { color: var(--muted); display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+.race-header .meta { flex-shrink: 0; }
+/* min-width is the wrap trigger: the title shrinks and marquees down to this
+   floor, and below it the controls take a second row instead. ~16rem keeps a
+   useful amount of name on screen — roughly small-laptop width and up stays
+   on one line. */
+.race-header h1 { margin: 0; color: var(--accent); font-size: 1.25rem; letter-spacing: 0.05em; display: flex; align-items: center; gap: 0.4em; min-width: 16rem; max-width: 100%; flex: 1 1 0; }
+/* Race names have no server-side length limit, so the heading must not be able
+   to set the header's size. Without this an unbroken name overflows the page
+   horizontally, and a long one wraps to several lines and shoves the crowd and
+   track down. The row clips and marquees the name — the same treatment the
+   lane name-tags get — so a long name is still readable in full. */
+.race-header h1 .race-name-row {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+/* Reduced motion: no marquee, so fall back to an ellipsis rather than a name
+   that is silently cut mid-word. The title attribute carries the full text. */
+@media (prefers-reduced-motion: reduce) {
+  .race-header h1 .race-name-scroll {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    animation: none;
+  }
+}
+/* nowrap on purpose: the header must stay one row. Everything inside is
+   allowed to shrink or drop out (see the narrow-screen block at the end of
+   this file) rather than pushing a button onto a second line. */
+.race-header .meta { color: var(--muted); display: flex; align-items: center; gap: 20px; flex-wrap: nowrap; min-width: 0; }
+/* Buttons keep their labels — a truncated "Gra…" is worse than no Graphs at
+   all. The select is the only thing allowed to shrink; everything else that
+   cannot fit is dropped outright further down. */
+.race-header .meta .btn { white-space: nowrap; flex-shrink: 0; }
+.race-header .meta .theme-select { min-width: 0; }
+.race-header .meta > span { white-space: nowrap; flex-shrink: 0; }
 .race-header .meta b { color: var(--text); font-weight: normal; }
 .race-status { text-transform: uppercase; letter-spacing: 0.1em; }
 .race-status--pending { color: var(--accent); }
-.race-status--live { color: #7bed9f; }
+.race-status--live { color: var(--live); }
 .race-status--finished { color: var(--muted); }
 
 .crowd {
@@ -296,28 +349,30 @@ html, body {
   justify-self: center;
   height: calc(var(--sprite-scale) * 32px);
   display: flex;
+  overflow: hidden;
   image-rendering: pixelated;
 }
-.crowd-cap, .crowd-body {
+.crowd-cap, .crowd-person {
+  flex: 0 0 calc(var(--sprite-scale) * 32px);
   height: 100%;
   background-size: calc(var(--sprite-scale) * 32px) calc(var(--sprite-scale) * 128px);
   background-position: 0 0;
-  image-rendering: pixelated;
-  animation: crowd-cheer 1s steps(4) infinite;
-}
-.crowd-cap {
-  flex: 0 0 calc(var(--sprite-scale) * 32px);
   background-repeat: no-repeat;
+  image-rendering: pixelated;
+  /* Cycle length and start offset are per-sprite (see render/crowd.ts) so the
+     crowd cheers out of step instead of as one block. */
+  animation: crowd-cheer var(--cheer-duration, 1s) steps(4) infinite;
+  animation-delay: var(--cheer-delay, 0s);
 }
 .crowd-cap-left  { background-image: url('img/crowd-1-left.png'); }
 .crowd-cap-right { background-image: url('img/crowd-1-right.png'); }
 .crowd-body {
   flex: 1 1 auto;
-  background-image: url('img/crowd-1.png');
-  background-repeat: repeat-x;
+  display: flex;
 }
+.crowd-person { background-image: url('img/crowd-1.png'); }
 .race.finished .crowd-cap,
-.race.finished .crowd-body { animation-play-state: paused; }
+.race.finished .crowd-person { animation-play-state: paused; }
 @keyframes crowd-cheer {
   from { background-position-y: 0; }
   to   { background-position-y: calc(var(--sprite-scale) * -128px); }
@@ -358,7 +413,7 @@ html, body {
   flex-direction: column;
   gap: 0;
   padding: 1px 6px;
-  background: #1d1d24;          /* slightly lifted off the page's pure black */
+  background: var(--label-box); /* slightly lifted off the page's pure black */
   border: 1px solid var(--border);
   border-radius: 4px;
   overflow: hidden;
@@ -433,7 +488,18 @@ html, body {
 .lane-track {
   position: relative;
   flex: 1 1 auto;
-  background: var(--lane) url('img/track-1.png') repeat-x center / auto 100%;
+  /* Two layers over --lane: a wash, then the dirt sprite. --track-blend re-tints
+     the (opaque) sprite from --lane; the wash then adjusts the result, because
+     `luminosity` preserves the sprite's own high luminance. Most themes only need
+     a flat darkening colour (--track-shade), so that is the default wash; a theme
+     wanting real colour variation across the lane replaces the whole image via
+     --track-wash (see Rainbow Road). Blending is confined to this element's own
+     backgrounds — .horse children are untouched (a `filter` here would have
+     recoloured the horses too). */
+  background:
+    var(--track-wash),
+    var(--lane) url('img/track-1.png') repeat-x center / auto 100%;
+  background-blend-mode: var(--wash-blend), var(--track-blend);
   image-rendering: pixelated;
   border-radius: 4px;
 }
@@ -442,7 +508,7 @@ html, body {
   position: absolute;
   left: 0; top: 0; bottom: 0;
   width: 4px;
-  background: #fff;
+  background: var(--rail);
 }
 .lane-track::after {
   content: "";
@@ -516,6 +582,30 @@ html, body {
   20%  { opacity: 0.75;                                              }
   100% { opacity: 0;    transform: translate(-16px, -5px) scale(1.6); }
 }
+
+/* Stamina reserve, a child of .horse so it tracks the sprite with no
+   positioning maths of its own. Geometry settled against real screenshots
+   at 6x zoom — see the stamina task brief before changing any of it. */
+.stamina-bar {
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  transform: translate(calc(-50% - 10px), 3px);  /* 10px back, 3px below the sprite */
+  width: 38px;
+  height: 3px;
+  background: rgba(255, 255, 255, .34);          /* light channel, see below */
+  border-radius: 999px;                          /* true capsule at any height */
+  overflow: hidden;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, .85);      /* NOT outline — see below */
+  pointer-events: none;
+}
+.stamina-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+}
+.stamina-bar[data-band="green"] .stamina-bar-fill { background: #7ee081; }
+.stamina-bar[data-band="amber"] .stamina-bar-fill { background: #ff9f1c; }
+.stamina-bar[data-band="red"]   .stamina-bar-fill { background: #ff3b30; }
 
 
 .horse-label {
@@ -1163,7 +1253,7 @@ body.tv .race-header .meta .btn {
   overflow: hidden;
   z-index: 9999;
   background: linear-gradient(180deg, rgba(12, 12, 12, 0.94), rgba(20, 20, 20, 0.98));
-  border-top: 2px solid #ffd166;
+  border-top: 2px solid var(--ticker-accent);
   box-shadow: 0 -4px 18px rgba(0, 0, 0, 0.45);
   white-space: nowrap;
   transition: opacity 0.3s ease;
@@ -1193,10 +1283,10 @@ body.tv .race-header .meta .btn {
 }
 .achievement-ticker-xp {
   font-weight: bold;
-  color: #ffd166;
+  color: var(--ticker-accent);
 }
 .achievement-ticker-horse { font-weight: bold; }
-.achievement-ticker-name { color: #ffd166; }
+.achievement-ticker-name { color: var(--ticker-accent); }
 .achievement-ticker-desc { color: #aaa; }
 
 /* Bullet between achievements within a pass. */
@@ -1206,7 +1296,7 @@ body.tv .race-header .meta .btn {
   align-items: center;
   height: 100%;
   padding: 0 1.5rem;
-  color: #ffd166;
+  color: var(--ticker-accent);
   opacity: 0.55;
 }
 
@@ -1476,6 +1566,15 @@ label.label input:disabled, label.label select:disabled { opacity: 0.5; }
 .org-day:has(input:checked) { border-color: var(--accent); color: var(--accent); }
 .org-day input[type="checkbox"] { accent-color: var(--accent); }
 
+.org-stamina-toggle { flex-direction: row !important; align-items: center; gap: 8px; max-width: none !important; }
+.org-sliders { display: flex; flex-direction: column; gap: 14px; }
+.org-slider-row { display: flex; flex-direction: column; gap: 4px; }
+.org-slider-row input[type="range"] { width: 100%; accent-color: var(--accent); }
+.org-slider-value { font-size: 0.85rem; color: var(--text); }
+.org-readout { display: flex; flex-direction: column; gap: 4px; font-size: 0.9rem; }
+.org-readout p { margin: 0; }
+.org-readout strong { color: var(--accent); }
+
 .org-secret {
   display: flex;
   flex-direction: column;
@@ -1721,3 +1820,251 @@ label.label input:disabled, label.label select:disabled { opacity: 0.5; }
 .about-changes li { margin: 2px 0; }
 .about-home { color: var(--muted); text-decoration: none; }
 .about-home:hover { color: var(--accent); }
+
+/* ── Mid-race graph popup ─────────────────────────────────────────────── */
+/* Sizing comes from .btn so it matches the Org/Home buttons beside it. */
+
+.race-graphs { position: fixed; inset: 0; z-index: 200; }
+.race-graphs-backdrop { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.72); }
+.race-graphs-panel {
+  position: absolute;
+  inset: 6% 5%;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border: 2px solid var(--border);
+  padding: 0.8rem 1rem 1rem;
+}
+.race-graphs-top { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.race-graphs-tabs, .race-graphs-divisions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.race-graphs-divisions { margin-top: 0.7rem; }
+.race-graphs-tab, .race-graphs-div, .race-graphs-close {
+  background: transparent;
+  color: var(--text);
+  border: 2px solid var(--border);
+  font-family: inherit;
+  font-size: 0.95rem;
+  padding: 0.2rem 0.7rem;
+  cursor: pointer;
+}
+.race-graphs-tab:hover, .race-graphs-div:hover, .race-graphs-close:hover { border-color: var(--accent); }
+.race-graphs-tab:focus-visible, .race-graphs-div:focus-visible, .race-graphs-close:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.race-graphs-tab[aria-selected='true'], .race-graphs-div[aria-selected='true'] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.race-graphs-body { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }
+/* Override the end-screen sizing, which is set by unscoped `.chart-face` rules.
+   buildFace's faces also carry `.detail-face` (shared with the end-screen
+   cycler), but the end-screen hiding rules at lines 731 and 747 both require
+   a `.detail-cycle` ancestor, which these popup faces never have — they live
+   under `.race-graphs-body`, not `.detail-cycle`. Loosening either rule to
+   drop that `.detail-cycle` qualifier would make it apply here too and blank
+   the popup (opacity: 0, never given `.is-active`). */
+.race-graphs-body .chart-face { width: 100%; gap: 10px; }
+.race-graphs-body .chart-face .chart-svg { height: 52vh; }
+.race-graphs-body .chart-face .chart-title { font-size: 1.05rem; }
+.race-graphs-empty { color: #999; font-size: 1.1rem; text-align: center; }
+
+/* ── Themes ─────────────────────────────────────────── */
+
+/* "Derby" — the original palette — lives in :root above, so it is also the
+   no-JS / pre-hydration default. Each theme below only overrides the tokens it
+   changes; anything unlisted falls through to :root.
+
+   --track-blend re-tints the opaque dirt sprite: `luminosity` keeps the pixel
+   art's luminance and takes hue/saturation from --lane, so one PNG serves every
+   theme. Derby stays `normal` (sprite untouched, byte-identical rendering). */
+
+:root[data-theme="midnight"] {
+  --bg: #05070f;
+  --panel: #101627;
+  --text: #dce6f5;
+  --muted: #7b8aa5;
+  --accent: #7dd3fc;
+  --border: #26334d;
+  --lane: #1b3a5c;
+  --track-blend: luminosity;
+  --track-shade: rgba(4, 10, 24, 0.55);
+  --rail: #cfe6ff;
+  --label-box: #121a2b;
+  --live: #5eead4;
+  --ticker-accent: #7dd3fc;
+}
+
+:root[data-theme="turf"] {
+  --bg: #06120a;
+  --panel: #102015;
+  --text: #eaf7e2;
+  --muted: #8aa88f;
+  --accent: #86efac;
+  --border: #22412c;
+  --lane: #2f6b32;
+  --track-blend: luminosity;
+  --track-shade: rgba(3, 18, 8, 0.35);
+  --rail: #f2fff2;
+  --label-box: #12241a;
+  --live: #bef264;
+  --ticker-accent: #fde047;
+}
+
+:root[data-theme="photo"] {
+  --bg: #0a0a0a;
+  --panel: #191919;
+  --text: #ededed;
+  --muted: #8f8f8f;
+  --accent: #ffffff;
+  --border: #3d3d3d;
+  --lane: #6b6b6b;   /* zero saturation → luminosity blend greys the dirt out */
+  --track-blend: luminosity;
+  --track-shade: rgba(0, 0, 0, 0.30);
+  --rail: #ffffff;
+  --label-box: #1c1c1c;
+  --live: #d4d4d4;
+  --ticker-accent: #e5e5e5;
+}
+
+/* A neutral --lane + luminosity flattens the dirt to greyscale texture; the wash
+   then paints hue/saturation back across the lane's width with `color` (which
+   takes hue+sat from the gradient and luminosity from the backdrop), so the
+   spectrum keeps every pixel of the sprite's shading and rails. */
+:root[data-theme="chromatic"] {
+  --bg: #06040f;
+  --panel: #171029;
+  --text: #f4ecff;
+  --muted: #9d92c4;
+  --accent: #ff7ae0;
+  --border: #3a2a5e;
+  --lane: #8a8a8a;
+  --track-blend: luminosity;
+  /* First and last stop are the same red, so one tile butts seamlessly against
+     the next and the scroll below has no visible seam. Stops are positioned
+     rather than evenly spaced so the magenta end of the spectrum stays a narrow
+     band instead of taking a full even share alongside the red seam. */
+  --track-wash: linear-gradient(
+    90deg,
+    #ff004d 0%, #ff7a00 15%, #ffe600 32%, #00d95f 50%,
+    #00c2ff 68%, #6a5cff 85%, #ff3ea5 95%, #ff004d 100%
+  );
+  --wash-blend: color;
+  --wash-tile: 480px;
+  --rail: #ffffff;
+  --label-box: #1a1230;
+  --live: #7dffcf;
+  --ticker-accent: #ffe600;
+}
+
+/* Size the wash to one spectrum tile (it repeats; the sprite layer keeps its own
+   `auto 100%`), then drift it against the direction the horses run, so the colours
+   rush backwards past them and read as speed. Shifting by exactly one tile width
+   means the end state matches the start, so the loop is invisible. */
+:root[data-theme="chromatic"] .lane-track {
+  background-size: var(--wash-tile) 100%, auto 100%;
+}
+/* Stepped rather than linear, matching the crowd's steps(4) cheer — a smooth
+   slide would read as the only non-pixel motion on the page. 24 steps over the
+   480px tile lands each jump on a round 10 sprite-pixels (tile ÷ --sprite-scale
+   ÷ 24), so the bands snap along the same grid the art is drawn on. */
+@media (prefers-reduced-motion: no-preference) {
+  :root[data-theme="chromatic"] .lane-track {
+    animation: chromatic-scroll 3s steps(24) infinite;
+  }
+}
+@keyframes chromatic-scroll {
+  from { background-position: 0 0, center; }
+  to   { background-position: calc(-1 * var(--wash-tile)) 0, center; }
+}
+/* Same rule the crowd follows — the spectacle stops once the race is over. */
+.race.finished .lane-track { animation-play-state: paused; }
+
+/* ── Theme picker ───────────────────────────────────── */
+
+.theme-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.theme-picker-caption {
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  font-size: 0.75rem;
+}
+.theme-select {
+  background: var(--panel);
+  color: var(--text);
+  border: 2px solid var(--border);
+  border-radius: 3px;
+  padding: 4px 8px;
+  font: inherit;
+  font-size: 0.85rem;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+}
+.theme-select:hover { border-color: var(--accent); }
+.theme-select:focus-visible { outline: none; border-color: var(--accent); }
+
+/* In the race header the picker sits among the meta items, so it matches the
+   button scale there rather than the roomier home-page sizing. */
+.race-header .meta .theme-picker { gap: 6px; }
+.race-header .meta .theme-select { padding: 2px 6px; font-size: 0.8rem; }
+body.tv .race-header .meta .theme-select { padding: 3px 10px; font-size: 0.9rem; }
+
+/* ── One row, always ─────────────────────────────────────────────────────
+   The title and the controls share a single line. Measured at 1280px with a
+   real 42-character race name: the controls alone were 1044px and the title
+   544px, so with the "Status:/Time left:/Join code:" labels shown the pair
+   needed 1700px — impossible on any laptop. The labels are therefore off by
+   default rather than at a breakpoint; the values read fine unintroduced.
+   Everything below sheds further as width drops, so the row never wraps. */
+.race-header .meta .meta-label { display: none; }
+.race-header .meta .theme-picker-caption { display: none; }
+.race-header .meta { gap: 12px; font-size: 0.9rem; }
+.race-header .meta .btn { padding: 3px 8px; font-size: 0.75rem; }
+
+@media (max-width: 1200px) {
+  .race-header { padding: 6px 14px; }
+  .race-header .meta { gap: 10px; }
+  .race-header h1 { font-size: 1.05rem; }
+}
+
+@media (max-width: 900px) {
+  /* Let the two variable-width controls give ground before anything is cut:
+     the theme select (its longest option is "Chromatic Circuit") and the org
+     button (org names run to 12 characters). */
+  .race-header .meta .theme-select { max-width: 7rem; }
+  .race-header .meta .org-btn { max-width: 7.5rem; }
+}
+
+@media (max-width: 820px) {
+  /* The join code is already in the address bar — /race/WUEF98 — so it is the
+     one readout that costs nothing to drop. */
+  .race-header .meta .join-code { display: none; }
+  .race-header .meta { gap: 8px; }
+  .race-header { padding: 6px 10px; }
+}
+
+/* Past here the row can only stay on one line by giving things up. Dropped in
+   order of what a racer can most afford to lose, and each is reachable
+   elsewhere: the theme picker also lives on the home page, and a running
+   countdown already tells you the race is live. */
+@media (max-width: 660px) {
+  .race-header .meta .theme-picker { display: none; }
+  .race-header .meta { gap: 8px; font-size: 0.85rem; }
+}
+
+@media (max-width: 520px) {
+  .race-header .meta .status-item { display: none; }
+  .race-header .meta .org-btn { max-width: 6rem; overflow: hidden; text-overflow: ellipsis; }
+}
+
+@media (max-width: 440px) {
+  /* Last thing to go. Home still gets you out, and the org page is one click
+     from there — whereas nothing else here has a second route to it. */
+  .race-header .meta .org-btn { display: none; }
+  .race-header .meta .btn { padding: 3px 6px; }
+}

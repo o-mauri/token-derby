@@ -19,7 +19,7 @@ export function lineColor(rankIndex: number): string {
   return LINE_PALETTE[rankIndex % LINE_PALETTE.length]!;
 }
 
-type Mode = 'cumulative' | 'throughput';
+export type Mode = 'cumulative' | 'throughput';
 
 function el(doc: Document, tag: string, attrs: Record<string, string>): SVGElement {
   const n = doc.createElementNS(SVG_NS, tag);
@@ -55,13 +55,24 @@ function valuesFor(
   ];
 }
 
+export type ChartOptions = {
+  // Window end. Live races pass `now` so the chart does not run flat to the
+  // scheduled end. Defaults to series.end_ms (finished-race behaviour).
+  endMs?: number;
+  // Colour per horse. Live races pass a stable per-horse map so colours do not
+  // swap when positions change. Defaults to rank-based lineColor.
+  colourOf?: (h: HorseView) => string;
+  modes?: readonly Mode[];
+};
+
 function buildFace(
   doc: Document, mode: Mode, series: GetRaceSeriesResponse, horses: readonly HorseView[],
+  endMs: number, colourOf: (h: HorseView, rankIndex: number) => string,
 ): HTMLElement {
   const byId = new Map(series.horses.map((h) => [h.horse_id, h.points]));
   const ranked = [...horses].sort((a, b) => (a.rank ?? 99) - (b.rank ?? 99));
 
-  const valuesByHorse = ranked.map((h) => ({ h, vals: valuesFor(mode, byId.get(h.horse_id) ?? [], series.start_ms, series.end_ms) }));
+  const valuesByHorse = ranked.map((h) => ({ h, vals: valuesFor(mode, byId.get(h.horse_id) ?? [], series.start_ms, endMs) }));
   const maxV = Math.max(1, ...valuesByHorse.flatMap((x) => x.vals.map((p) => p.v)));
 
   const svg = el(doc, 'svg', { viewBox: `0 0 ${W} ${H}`, class: 'chart-svg' });
@@ -69,11 +80,11 @@ function buildFace(
   for (const y of [PAD_T, (PAD_T + (H - PAD_B)) / 2, H - PAD_B]) {
     svg.appendChild(el(doc, 'line', { x1: `${PAD_L}`, y1: `${y}`, x2: `${W - PAD_R}`, y2: `${y}`, class: 'chart-grid' }));
   }
-  const sx = (t: number) => scale(t, series.start_ms, series.end_ms, PAD_L, W - PAD_R);
+  const sx = (t: number) => scale(t, series.start_ms, endMs, PAD_L, W - PAD_R);
   const sy = (v: number) => scale(v, 0, maxV, H - PAD_B, PAD_T);
 
-  valuesByHorse.forEach(({ vals }, i) => {
-    const stroke = lineColor(i);
+  valuesByHorse.forEach(({ h, vals }, i) => {
+    const stroke = colourOf(h, i);
     // Idle horses resample to an all-zero tick series, so this is naturally a
     // flat baseline at y=0 spanning the window — no special-casing needed.
     const pts: [number, number][] = vals.map((p) => [sx(p.t), sy(p.v)]);
@@ -90,7 +101,7 @@ function buildFace(
     svg.appendChild(t);
   };
   axis(PAD_L, H - 8, fmtClock(series.start_ms));
-  axis(W - PAD_R - 30, H - 8, fmtClock(series.end_ms));
+  axis(W - PAD_R - 30, H - 8, fmtClock(endMs));
   axis(2, PAD_T + 6, mode === 'cumulative' ? `${Math.round(maxV)}` : `${Math.round(maxV)}/m`);
 
   // face wrapper: title + chart + legend
@@ -98,7 +109,7 @@ function buildFace(
   face.className = 'detail-face chart-face';
   const title = doc.createElement('div');
   title.className = 'chart-title';
-  title.textContent = mode === 'cumulative' ? 'Cumulative tokens' : 'Tokens / min (30-min avg)';
+  title.textContent = mode === 'cumulative' ? 'Cumulative tokens produced' : 'Tokens produced / min (30-min avg)';
   face.appendChild(title);
   face.appendChild(svg);
 
@@ -109,7 +120,7 @@ function buildFace(
     item.className = 'legend-item';
     const chip = doc.createElement('span');
     chip.className = 'legend-chip';
-    chip.style.background = lineColor(i);
+    chip.style.background = colourOf(h, i);
     item.appendChild(chip);
     item.appendChild(doc.createTextNode(h.name));
     legend.appendChild(item);
@@ -118,10 +129,15 @@ function buildFace(
   return face;
 }
 
+const ALL_MODES: readonly Mode[] = ['cumulative', 'throughput'];
+
 export function buildChartFaces(
   doc: Document, series: GetRaceSeriesResponse, horses: readonly HorseView[],
+  opts: ChartOptions = {},
 ): HTMLElement[] {
   const hasData = series.horses.some((h) => h.points.length > 0);
   if (!hasData) return [];
-  return [buildFace(doc, 'cumulative', series, horses), buildFace(doc, 'throughput', series, horses)];
+  const endMs = opts.endMs ?? series.end_ms;
+  const colourOf = opts.colourOf ?? ((_h: HorseView, i: number) => lineColor(i));
+  return (opts.modes ?? ALL_MODES).map((m) => buildFace(doc, m, series, horses, endMs, colourOf));
 }

@@ -10,6 +10,22 @@ export function setTranscriptDirs(dirs: Partial<TranscriptDirs>): void {
   }
 }
 
+let scanCacheRoot: string | null = null;
+
+// The CLI and the desktop app keep separate homes, so each points the scan cache
+// at its own; pass null to fall back to the default below.
+export function setScanCacheDir(dir: string | null): void {
+  scanCacheRoot = dir;
+}
+
+// Where the incremental scan cache is stored. The TOKEN_DERBY_HOME fallback keeps
+// a caller that never sets a root (and the engine's own tests) predictable.
+export function scanCacheDir(): string {
+  if (scanCacheRoot) return scanCacheRoot;
+  const home = process.env.TOKEN_DERBY_HOME ?? path.join(os.homedir(), '.token-derby');
+  return path.join(home, 'scan-cache');
+}
+
 export function claudeProjectsDir(): string {
   return override.claude ?? process.env.TOKEN_DERBY_CLAUDE_DIR ?? path.join(os.homedir(), '.claude', 'projects');
 }

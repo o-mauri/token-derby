@@ -22,8 +22,9 @@ export function localDateInTz(now: Date, tz: string): string {
 // Wall-clock local date "YYYY-MM-DD" + "HH:MM" in IANA `tz` -> UTC epoch ms.
 // DST-correct via a two-pass offset correction.
 export function localDateTimeToUtcMs(localDate: string, hhmm: string, tz: string): number {
-  const [y, mo, d] = localDate.split('-').map(Number);
-  const [h, mi] = hhmm.split(':').map(Number);
+  // NaN defaults keep malformed input producing a NaN timestamp, as before.
+  const [y = NaN, mo = NaN, d = NaN] = localDate.split('-').map(Number);
+  const [h = NaN, mi = NaN] = hhmm.split(':').map(Number);
   const wallUtc = Date.UTC(y, mo - 1, d, h, mi, 0);
   let ts = wallUtc;
   for (let i = 0; i < 2; i++) {
@@ -52,8 +53,9 @@ function tzOffsetMinutes(at: Date, tz: string): number {
   }).formatToParts(at);
   const map: Record<string, number> = {};
   for (const p of parts) if (p.type !== 'literal') map[p.type] = Number(p.value);
-  let hour = map.hour;
+  const part = (k: string) => map[k] ?? NaN;
+  let hour = part('hour');
   if (hour === 24) hour = 0; // some ICU builds emit "24" for midnight
-  const asUtc = Date.UTC(map.year, map.month - 1, map.day, hour, map.minute, map.second);
+  const asUtc = Date.UTC(part('year'), part('month') - 1, part('day'), hour, part('minute'), part('second'));
   return Math.round((asUtc - at.getTime()) / 60_000);
 }

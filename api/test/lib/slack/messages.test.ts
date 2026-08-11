@@ -46,6 +46,20 @@ describe('message builders', () => {
     expect(m.blocks.some((b: any) => b.type === 'image')).toBe(false);
   });
 
+  it('race ended prints the scored figure, not raw tokens, on a stamina race', () => {
+    const staminaEnded = {
+      ...ENDED,
+      results: [
+        { rank: 1, horse_id: 'h1', stable_horse_id: 's1', name: 'Bolt', colors: COLORS, final_tokens: 10_000, final_scored_tokens: 8_000, xp_awarded: 10, user_id: 'u1', user_name: 'Al' },
+        { rank: 2, horse_id: 'h2', stable_horse_id: 's2', name: 'Dobbin', colors: COLORS, final_tokens: 9_000, final_scored_tokens: 9_000, xp_awarded: 5, user_id: 'u2', user_name: 'Bo' },
+      ],
+    } as unknown as RaceEndedEvent;
+    const m = buildRaceEndedMessage(staminaEnded);
+    const text = m.blocks.find((b: any) => b.type === 'section')!.text.text as string;
+    expect(text).toContain('8000 tokens');
+    expect(text).not.toContain('10000 tokens');
+  });
+
   it('weekly digest ranks by wins/podiums/xp', () => {
     const m = buildWeeklyDigestMessage(LEADERBOARD);
     expect(m.text).toContain('TeamFoo');

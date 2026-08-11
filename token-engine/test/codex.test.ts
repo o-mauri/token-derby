@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -11,8 +11,15 @@ async function tmpCodex(): Promise<string> {
   process.env.TOKEN_DERBY_CODEX_DIR = d;
   return d;
 }
+beforeEach(async () => {
+  // Isolate the scan cache so tests never read or prune the real ~/.token-derby.
+  const h = await fs.mkdtemp(path.join(os.tmpdir(), 'td-cdx-home-'));
+  dirs.push(h);
+  process.env.TOKEN_DERBY_HOME = h;
+});
 afterEach(async () => {
   delete process.env.TOKEN_DERBY_CODEX_DIR;
+  delete process.env.TOKEN_DERBY_HOME;
   for (const d of dirs.splice(0)) await fs.rm(d, { recursive: true, force: true });
 });
 
@@ -106,5 +113,45 @@ describe('sumCodexByConversation', () => {
   it('throws when the codex dir does not exist (fail-loud)', async () => {
     process.env.TOKEN_DERBY_CODEX_DIR = path.join(os.tmpdir(), 'td-cdx-missing-' + Math.random());
     await expect(sumCodexByConversation()).rejects.toThrow();
+  });
+});
+
+describe('incremental scanning', () => {
+  it('lets an appended token_count REPLACE the cached total, never add to it', async () => {
+    // total_token_usage is cumulative per session, so folding must be last-wins.
+    const root = await tmpCodex();
+    await writeRollout(root, 'sessions/2026/06/23/rollout-a.jsonl', [tokenCountEvent(300, 100, 80)]);
+    expect(await sumCodexTokens()).toEqual({ input: 200, output: 80 });
+
+    await fs.appendFile(
+      path.join(root, 'sessions/2026/06/23/rollout-a.jsonl'),
+      tokenCountEvent(500, 100, 130) + '\n',
+    );
+    expect(await sumCodexTokens()).toEqual({ input: 400, output: 130 }); // not 600/210
+  });
+
+  it('keeps the cached total when appended lines carry no token_count event', async () => {
+    const root = await tmpCodex();
+    await writeRollout(root, 'sessions/2026/06/23/rollout-a.jsonl', [tokenCountEvent(300, 100, 80)]);
+    expect(await sumCodexTokens()).toEqual({ input: 200, output: 80 });
+
+    await fs.appendFile(
+      path.join(root, 'sessions/2026/06/23/rollout-a.jsonl'),
+      JSON.stringify({ payload: { type: 'message', text: 'hi' } }) + '\n',
+    );
+    expect(await sumCodexTokens()).toEqual({ input: 200, output: 80 });
+  });
+
+  it('serves an unchanged rollout from cache instead of re-reading it', async () => {
+    const root = await tmpCodex();
+    const rel = 'sessions/2026/06/23/rollout-a.jsonl';
+    await writeRollout(root, rel, [tokenCountEvent(300, 100, 80)]);
+    const f = path.join(root, rel);
+    await fs.utimes(f, 1_700_000_000, 1_700_000_000);
+    expect(await sumCodexTokens()).toEqual({ input: 200, output: 80 });
+
+    await fs.writeFile(f, tokenCountEvent(999, 100, 999) + '\n');
+    await fs.utimes(f, 1_700_000_000, 1_700_000_000);
+    expect(await sumCodexTokens()).toEqual({ input: 200, output: 80 });
   });
 });

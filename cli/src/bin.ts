@@ -13,6 +13,9 @@ import { webCommand } from './commands/web.js';
 import { envCommand } from './commands/env.js';
 import { CLI_VERSION } from './version.js';
 import { loadIdentity } from './identity/identity.js';
+import * as path from 'node:path';
+import { setScanCacheDir } from '@token-derby/token-engine';
+import { homeDir } from './paths.js';
 
 const HELP = `token-derby v${CLI_VERSION}
 
@@ -58,6 +61,10 @@ Environment:
 `;
 
 async function main(): Promise<number> {
+  // Keep the scan cache inside the selected env's home, so prod and staging
+  // don't share one cache file.
+  setScanCacheDir(path.join(homeDir(), 'scan-cache'));
+
   const argv = process.argv.slice(2);
   const cmd = argv[0];
 

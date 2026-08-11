@@ -215,6 +215,32 @@ describe('reconcileHorses', () => {
     expect(track.querySelector('.horse-stats-row.is-league')).toBeNull();
     expect(track.querySelectorAll('.horse-stats-row .stat-view')).toHaveLength(4);
   });
+
+  it('ranks the .horse-position badge by scored tokens, not raw ones', () => {
+    // Alpha has more raw tokens but is heavily tapered; Bravo's scored figure
+    // is ahead. The badge must agree with the track (also scored) and ticker.
+    const r = race({ horses: [
+      horse('a', 900, 'Alpha', '2026-04-22T09:00:00Z', { scored_tokens: 200 }),
+      horse('b', 600, 'Bravo', '2026-04-22T09:01:00Z', { scored_tokens: 500 }),
+    ] });
+    reconcileHorses(track, r, new Date('2026-04-22T13:00:00Z'));
+    expect(track.querySelector('.lane[data-horse-id="a"] .horse-position')?.textContent).toBe('2nd');
+    expect(track.querySelector('.lane[data-horse-id="b"] .horse-position')?.textContent).toBe('1st');
+  });
+
+  it('ranks the .horse-league-pos badge by scored tokens, not raw ones', () => {
+    const r = race({
+      league_id: 'org-1',
+      league_division_names: ['Premier'],
+      horses: [
+        horse('a', 900, 'Alpha', '2026-04-22T09:00:00Z', { division: 1, scored_tokens: 200 }),
+        horse('b', 600, 'Bravo', '2026-04-22T09:01:00Z', { division: 1, scored_tokens: 500 }),
+      ],
+    });
+    reconcileHorses(track, r, new Date('2026-04-22T13:00:00Z'));
+    expect(track.querySelector('.lane[data-horse-id="a"] .horse-league-pos')?.textContent).toBe('2nd (Premier)');
+    expect(track.querySelector('.lane[data-horse-id="b"] .horse-league-pos')?.textContent).toBe('1st (Premier)');
+  });
 });
 
 describe('sortHorses', () => {

@@ -54,6 +54,18 @@ describe('renderSchedule', () => {
     renderSchedule(root, { schedule: null, isOwner: true, onSave: vi.fn(), onClear: vi.fn() });
     expect(root.querySelector('button[data-action="save"]')).toBeTruthy();
   });
+  it('preserves a pre-set stamina flag through a save from this tab', () => {
+    const onSave = vi.fn();
+    const schedule = {
+      org_id: 'o1', weekdays: [1, 2], start_local: '09:00', end_local: '17:30', tz: 'Europe/London',
+      created_at: '2026-01-01T00:00:00Z', creator_user_id: 'u1', creator_user_name: 'omar',
+      stamina: true,
+    };
+    renderSchedule(root, { schedule, isOwner: true, onSave, onClear: vi.fn() });
+    (root.querySelector('[data-action="save"]') as HTMLElement).click();
+    expect(onSave).toHaveBeenCalledTimes(1);
+    expect(onSave.mock.calls[0]![0].stamina).toBe(true);
+  });
 });
 
 describe('renderWebhook', () => {
@@ -70,19 +82,19 @@ describe('renderWebhook', () => {
 });
 
 describe('renderSlackbot', () => {
-  it('renders four message checkboxes, digest controls, and Save/Clear for owners', () => {
+  it('renders five message checkboxes, digest controls, and Save/Clear for owners', () => {
     renderSlackbot(root, {
       slack: {
         configured: true,
         channel_id: 'C0123',
-        messages: { race_created: true, race_ended: true, league_season_ended: false, weekly_digest: true },
+        messages: { race_created: true, race_ended: true, league_season_ended: false, weekly_digest: true, release_published: false },
         digest: { weekday: 5, time_local: '15:00', tz: 'Europe/London' },
       },
       isOwner: true,
       onSave: vi.fn(),
       onClear: vi.fn(),
     });
-    expect(root.querySelectorAll('input[name="msg"]').length).toBe(4);
+    expect(root.querySelectorAll('input[name="msg"]').length).toBe(5);
     expect(root.querySelector<HTMLInputElement>('input[name="bot_token"]')!.placeholder).toMatch(/configured/i);
     expect(root.querySelector('select[name="weekday"]')).toBeTruthy();
     expect(root.querySelector('input[name="time_local"]')).toBeTruthy();
@@ -104,7 +116,7 @@ describe('renderSlackbot', () => {
       slack: {
         configured: true,
         channel_id: 'C0123',
-        messages: { race_created: true, race_ended: true, league_season_ended: false, weekly_digest: true },
+        messages: { race_created: true, race_ended: true, league_season_ended: false, weekly_digest: true, release_published: false },
         digest: { weekday: 5, time_local: '15:00', tz: 'Europe/London' },
       },
       isOwner: true,
@@ -250,6 +262,14 @@ describe('renderLeagueEditor', () => {
     renderLeagueEditor(root, { league: twoDivLeague, isOwner: true, onSave: vi.fn(), onClear });
     (root.querySelector('[data-action="delete-league"]') as HTMLElement).click();
     expect(onClear).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserves a pre-set stamina flag through a save from this tab', () => {
+    const onSave = vi.fn();
+    renderLeagueEditor(root, { league: { ...twoDivLeague, stamina: true }, isOwner: true, onSave, onClear: vi.fn() });
+    (root.querySelector('[data-action="save-league"]') as HTMLElement).click();
+    expect(onSave).toHaveBeenCalledTimes(1);
+    expect(onSave.mock.calls[0]![0].stamina).toBe(true);
   });
 
   it('notes that shape changes apply next season when editing an existing league', () => {

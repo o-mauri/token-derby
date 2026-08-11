@@ -14,6 +14,7 @@ const ALL_ON: OrgSlackMessages = {
   race_ended: true,
   league_season_ended: true,
   weekly_digest: false,
+  release_published: true,
 };
 
 function event(
@@ -158,6 +159,19 @@ describe('org-slack handlers', () => {
     }));
     expect(res.statusCode).toBe(400);
     expect(JSON.parse(res.body).code).toBe('BAD_REQUEST');
+  });
+
+  it('PUT rejects a messages object missing release_published', async () => {
+    const user = await makeUser('SlRel');
+    await createOrg(user, 'SlRel1');
+    const res: any = await setHandler(event('PUT', 'SlRel1', user, {
+      bot_token: 'xoxb-secret-token',
+      channel_id: 'C123456',
+      // deliberately the old four-key shape
+      messages: { race_created: true, race_ended: true, league_season_ended: true, weekly_digest: false },
+    }));
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).message).toMatch(/five/);
   });
 
   it('DELETE as owner clears configuration', async () => {

@@ -1,11 +1,11 @@
-import type { APIGatewayProxyHandlerV2 } from 'aws-lambda';
+import type { ApiHandler } from '../lib/http.js';
 import type { GetRaceSeriesResponse } from '@token-derby/shared';
 import { getRaceByJoinCode } from '../db/races.js';
 import { listHorses } from '../db/horses.js';
 import { listSeriesPoints } from '../db/series.js';
 import { ok, err } from '../lib/http.js';
 
-export const handler: APIGatewayProxyHandlerV2 = async (event) => {
+export const handler: ApiHandler = async (event) => {
   const join_code = event.pathParameters?.join_code;
   if (!join_code) return err('BAD_REQUEST', 'join_code required');
 

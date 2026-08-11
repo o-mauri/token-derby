@@ -1,8 +1,11 @@
 {
   "extends": "../tsconfig.base.json",
   "compilerOptions": {
-    "outDir": "./dist",
-    "rootDir": ".",
+    // Lambdas are bundled from src by esbuild (infra makeFn), so nothing
+    // consumes an emit here. Emitting also wrote stray .js into shared/src,
+    // which then shadowed the .ts sources under vitest.
+    "noEmit": true,
+    "declaration": false,
     "types": ["node"],
     "paths": {
       "@token-derby/shared": ["../shared/src/index.ts"]

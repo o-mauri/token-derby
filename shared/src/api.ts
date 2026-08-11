@@ -1,4 +1,5 @@
-import type { CollectedHat, HatId, HorseColors, HorseView, Race, RaceStatus, RaceSummary, RaceView, OrganisationSummary, StableHorse, RaceSchedule, League, DivisionConfig, ModelKey, SeasonStandings } from './types.js';
+import type { CollectedHat, HatId, HorseColors, HorseView, Race, RaceStatus, RaceSummary, RaceView, OrganisationSummary, StableHorse, RaceSchedule, League, DivisionConfig, ModelKey, SeasonStandings, RaceSettings } from './types.js';
+import type { StaminaConfig } from './scoring.js';
 
 export type CreateRaceRequest = {
   name: string;
@@ -9,6 +10,7 @@ export type CreateRaceRequest = {
   organisation_name?: string;
   counts_input?: boolean;
   primary_top5?: boolean;
+  stamina?: boolean;
 };
 
 export type CreateRaceResponse = {
@@ -175,6 +177,7 @@ export type OrgSlackMessages = {
   race_ended: boolean;
   league_season_ended: boolean;
   weekly_digest: boolean;
+  release_published: boolean;
 };
 export type OrgSlackDigest = { weekday: number; time_local: string; tz: string };
 export type SetOrgSlackRequest = {
@@ -190,6 +193,19 @@ export type GetOrgSlackResponse = {
   digest: OrgSlackDigest | null;
 };
 export type DeleteOrgSlackResponse = { ok: true };
+
+export type ReleaseComponent = 'cli' | 'site';
+
+export type AnnounceReleaseRequest = {
+  component: ReleaseComponent;
+  version: string;    // x.y.z
+  date: string;       // YYYY-MM-DD
+  changes: string[];  // 1-20 non-empty entries
+};
+
+export type AnnounceReleaseResponse =
+  | { announced: true; orgs_notified: number }
+  | { announced: false; reason: 'duplicate' };
 
 export type RollHatResponse =
   | { result: 'hat'; collected: CollectedHat; hat_index: number; remaining_rolls: number }
@@ -211,6 +227,7 @@ export type SetOrgScheduleRequest = {
   max_participants?: number;
   counts_input?: boolean;
   primary_top5?: boolean;
+  stamina?: boolean;
 };
 export type SetOrgScheduleResponse = { schedule: RaceSchedule };
 export type GetOrgScheduleResponse = { schedule: RaceSchedule | null };
@@ -228,9 +245,14 @@ export type SetOrgLeagueRequest = {
   max_participants?: number;
   counts_input?: boolean;
   primary_top5?: boolean;
+  stamina?: boolean;
 };
 export type SetOrgLeagueResponse = { league: League };
 export type GetOrgLeagueResponse = { league: League | null };
 export type DeleteOrgLeagueResponse = { ok: true };
 
 export type GetLeagueStandingsResponse = { standings: SeasonStandings | null };
+
+export type GetOrgRaceSettingsResponse = { settings: RaceSettings | null };
+export type SetOrgRaceSettingsRequest = { stamina_config?: StaminaConfig };
+export type SetOrgRaceSettingsResponse = { settings: RaceSettings };

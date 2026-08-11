@@ -14,11 +14,12 @@ const MSGS: Array<[keyof NonNullable<GetOrgSlackResponse['messages']>, string]> 
   ['race_ended', 'Race ended'],
   ['league_season_ended', 'League season ended'],
   ['weekly_digest', 'Weekly org update'],
+  ['release_published', 'Release published'],
 ];
 
 export function renderSlackbot(root: HTMLElement, deps: SlackbotDeps): void {
   const s = deps.slack;
-  const m = s?.messages ?? { race_created: true, race_ended: true, league_season_ended: true, weekly_digest: false };
+  const m = s?.messages ?? { race_created: true, race_ended: true, league_season_ended: true, weekly_digest: false, release_published: false };
   const d = s?.digest ?? { weekday: 5, time_local: '15:00', tz: 'Europe/London' };
   const dis = deps.isOwner ? '' : ' disabled';
 

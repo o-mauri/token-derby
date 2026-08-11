@@ -103,6 +103,15 @@ export class TokenDerbyStack extends cdk.Stack {
       sortKey: { name: 'org_id', type: dynamodb.AttributeType.STRING },
     });
 
+    // Sparse — only Slack-configured org meta rows carry `slack_marker`, so the
+    // per-minute digest sweep queries a handful of entries instead of scanning
+    // the whole table.
+    table.addGlobalSecondaryIndex({
+      indexName: 'SlackOrgsIndex',
+      partitionKey: { name: 'slack_marker', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'org_id', type: dynamodb.AttributeType.STRING },
+    });
+
     // ── Winner sprite bucket (public, content-addressed) ────────────────
     const spriteBucket = new s3.Bucket(this, 'WinnerSprites', {
       blockPublicAccess: new s3.BlockPublicAccess({
@@ -170,6 +179,8 @@ export class TokenDerbyStack extends cdk.Stack {
     const deleteOrgSlackFn = makeFn('DeleteOrgSlackFn', 'delete-org-slack');
     const setOrgScheduleFn = makeFn('SetOrgScheduleFn', 'set-org-schedule');
     const getOrgScheduleFn = makeFn('GetOrgScheduleFn', 'get-org-schedule');
+    const setOrgRaceSettingsFn = makeFn('SetOrgRaceSettingsFn', 'set-org-race-settings');
+    const getOrgRaceSettingsFn = makeFn('GetOrgRaceSettingsFn', 'get-org-race-settings');
     const deleteOrgScheduleFn = makeFn('DeleteOrgScheduleFn', 'delete-org-schedule');
     const setOrgLeagueFn = makeFn('SetOrgLeagueFn', 'set-org-league');
     const getOrgLeagueFn = makeFn('GetOrgLeagueFn', 'get-org-league');
@@ -209,9 +220,10 @@ export class TokenDerbyStack extends cdk.Stack {
     const adminRenameHorseFn = makeFn('AdminRenameHorseFn', 'admin-rename-horse');
     const adminRemoveHatFn = makeFn('AdminRemoveHatFn', 'admin-remove-hat');
     const adminDeleteHorseFn = makeFn('AdminDeleteHorseFn', 'admin-delete-horse');
+    const adminAnnounceReleaseFn = makeFn('AdminAnnounceReleaseFn', 'admin-announce-release', { timeout: cdk.Duration.seconds(60) });
 
     const adminSsmArn = `arn:aws:ssm:${this.region}:${this.account}:parameter${config.ssmPrefix}/*`;
-    for (const fn of [adminLoginFn, adminListUsersFn, adminListOrgsFn, adminRenameUserFn, adminRenameHorseFn, adminRemoveHatFn, adminDeleteHorseFn]) {
+    for (const fn of [adminLoginFn, adminListUsersFn, adminListOrgsFn, adminRenameUserFn, adminRenameHorseFn, adminRemoveHatFn, adminDeleteHorseFn, adminAnnounceReleaseFn]) {
       fn.addToRolePolicy(new cdk.aws_iam.PolicyStatement({
         actions: ['ssm:GetParameter'],
         resources: [adminSsmArn],
@@ -291,6 +303,16 @@ export class TokenDerbyStack extends cdk.Stack {
       integration: new HttpLambdaIntegration('DeleteOrgScheduleInt', deleteOrgScheduleFn),
     });
     httpApi.addRoutes({
+      path: '/api/organisations/{org_name}/race-settings',
+      methods: [HttpMethod.PUT],
+      integration: new HttpLambdaIntegration('SetOrgRaceSettingsInt', setOrgRaceSettingsFn),
+    });
+    httpApi.addRoutes({
+      path: '/api/organisations/{org_name}/race-settings',
+      methods: [HttpMethod.GET],
+      integration: new HttpLambdaIntegration('GetOrgRaceSettingsInt', getOrgRaceSettingsFn),
+    });
+    httpApi.addRoutes({
       path: '/api/organisations/{org_name}/league',
       methods: [HttpMethod.PUT],
       integration: new HttpLambdaIntegration('SetOrgLeagueInt', setOrgLeagueFn),
@@ -331,6 +353,7 @@ export class TokenDerbyStack extends cdk.Stack {
     httpApi.addRoutes({ path: '/api/admin/users/{user_id}/horses/{stable_horse_id}', methods: [HttpMethod.PUT], integration: new HttpLambdaIntegration('AdminRenameHorseInt', adminRenameHorseFn) });
     httpApi.addRoutes({ path: '/api/admin/users/{user_id}/horses/{stable_horse_id}/hats/{index}', methods: [HttpMethod.DELETE], integration: new HttpLambdaIntegration('AdminRemoveHatInt', adminRemoveHatFn) });
     httpApi.addRoutes({ path: '/api/admin/users/{user_id}/horses/{stable_horse_id}', methods: [HttpMethod.DELETE], integration: new HttpLambdaIntegration('AdminDeleteHorseInt', adminDeleteHorseFn) });
+    httpApi.addRoutes({ path: '/api/admin/releases', methods: [HttpMethod.POST], integration: new HttpLambdaIntegration('AdminAnnounceReleaseInt', adminAnnounceReleaseFn) });
 
     // API throttling (rate-limit guardrails, not hard security)
     const defaultStage = httpApi.defaultStage!.node.defaultChild as apigatewayv2.CfnStage;

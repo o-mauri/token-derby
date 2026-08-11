@@ -1,4 +1,4 @@
-import type { APIGatewayProxyHandlerV2 } from 'aws-lambda';
+import type { ApiHandler } from '../lib/http.js';
 import type { RollHatResponse } from '@token-derby/shared';
 import { levelFromXp, levelInfo } from '@token-derby/shared';
 import { authenticate } from '../lib/auth.js';
@@ -6,7 +6,7 @@ import { getStableHorse, applyRollResult } from '../db/stable.js';
 import { rollHat, DUPLICATE_XP_FRACTION, NO_HAT_XP_FRACTION } from '../lib/roll-hat.js';
 import { ok, err } from '../lib/http.js';
 
-export const handler: APIGatewayProxyHandlerV2 = async (event) => {
+export const handler: ApiHandler = async (event) => {
   const auth = await authenticate(event);
   if ('error' in auth) return err('UNAUTHENTICATED', auth.error);
 

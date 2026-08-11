@@ -46,12 +46,16 @@ export async function createRaceCommand(organisationName?: string): Promise<numb
     const top5Raw = (await rl.question('Count only each racer\'s 5 most-active conversations toward their primary model\'s score? [y/N]: ')).trim().toLowerCase();
     const primary_top5 = top5Raw === 'y' || top5Raw === 'yes';
 
+    const staminaRaw = (await rl.question('Stamina — horses that run flat out tire and score less until they recover? [y/N]: ')).trim().toLowerCase();
+    const stamina = staminaRaw === 'y' || staminaRaw === 'yes';
+
     const resp = await createRace({
       name, start_time: start, end_time: end, tz,
       ...(max !== undefined ? { max_participants: max } : {}),
       ...(org ? { organisation_name: org } : {}),
       ...(counts_input ? { counts_input: true } : {}),
       ...(primary_top5 ? { primary_top5: true } : {}),
+      ...(stamina ? { stamina: true } : {}),
     });
 
     console.log('');
@@ -70,6 +74,9 @@ export async function createRaceCommand(organisationName?: string): Promise<numb
     }
     if (primary_top5) {
       console.log('  Primary score counts only each racer\'s top 5 conversations per beat.');
+    }
+    if (stamina) {
+      console.log('  Stamina on — horses running above a sustainable pace will tire.');
     }
     console.log(`  Share with participants:  token-derby join ${resp.join_code}`);
     return 0;

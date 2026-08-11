@@ -18,10 +18,13 @@
   },
   "scripts": {
     "build": "npm -ws run build",
-    "test": "npm -ws --if-present run test",
+    "test": "npm -ws --if-present run test && vitest run",
     "lint": "npm -ws --if-present run lint"
   },
   "dependencies": {
     "@mauricode/token-derby": "^2.10.0"
+  },
+  "devDependencies": {
+    "vitest": "^2.1.9"
   }
 }

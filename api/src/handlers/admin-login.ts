@@ -1,4 +1,4 @@
-import type { APIGatewayProxyHandlerV2 } from 'aws-lambda';
+import type { ApiHandler } from '../lib/http.js';
 import type { AdminLoginRequest, AdminLoginResponse } from '@token-derby/shared';
 import { verifyPassword, signSession } from '../lib/admin-auth.js';
 import { loadAdminConfig } from '../lib/admin-config.js';
@@ -6,7 +6,7 @@ import { ok, err, parseJson } from '../lib/http.js';
 
 const SESSION_TTL_SECONDS = 8 * 60 * 60; // 8 hours
 
-export const handler: APIGatewayProxyHandlerV2 = async (event) => {
+export const handler: ApiHandler = async (event) => {
   const body = parseJson<AdminLoginRequest>(event.body);
   if (!body || typeof body.username !== 'string' || typeof body.password !== 'string') {
     return err('BAD_REQUEST', 'username and password are required');

@@ -1,4 +1,5 @@
 import type { HorseView } from '@token-derby/shared';
+import { scoredOf } from '@token-derby/shared';
 
 export function elapsedPct(start_time: string, end_time: string, now: Date): number {
   const s = new Date(start_time).getTime();
@@ -8,10 +9,13 @@ export function elapsedPct(start_time: string, end_time: string, now: Date): num
   return Math.max(0, Math.min(1, raw));
 }
 
+// Scored, not raw, distance — a tired horse's lane position must match its
+// scored token count everywhere else on the page.
 export function leaderTokens(horses: readonly HorseView[]): number {
   let max = 0;
   for (const h of horses) {
-    if (h.current_tokens > max) max = h.current_tokens;
+    const scored = scoredOf(h);
+    if (scored > max) max = scored;
   }
   return max || 1;
 }
@@ -22,5 +26,5 @@ export function horseXPct(
   elapsed: number,
 ): number {
   const leader = leaderTokens(horses);
-  return (horse.current_tokens / leader) * elapsed * 100;
+  return (scoredOf(horse) / leader) * elapsed * 100;
 }

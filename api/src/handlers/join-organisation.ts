@@ -1,11 +1,11 @@
-import type { APIGatewayProxyHandlerV2 } from 'aws-lambda';
+import type { ApiHandler } from '../lib/http.js';
 import type { JoinOrganisationRequest, JoinOrganisationResponse } from '@token-derby/shared';
 import { getOrganisationByJoinToken, addMember, isMember } from '../db/organisations.js';
 import { ok, err, parseJson } from '../lib/http.js';
 import { readClient, readClientVersion, meetsMinimumVersion, versionMismatchMessage } from '../lib/version.js';
 import { resolveCaller } from '../lib/auth.js';
 
-export const handler: APIGatewayProxyHandlerV2 = async (event) => {
+export const handler: ApiHandler = async (event) => {
   const client = readClient(event);
   const version = readClientVersion(event);
   if (version && !meetsMinimumVersion(client, version)) {

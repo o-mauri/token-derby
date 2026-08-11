@@ -56,6 +56,12 @@ export function orgScheduleKey(org_id: string) {
   return { pk: `${ORG_PK_PREFIX}${org_id}`, sk: SCHEDULE_SK };
 }
 
+export const RACE_SETTINGS_SK = 'RACE_SETTINGS';
+
+export function orgRaceSettingsKey(org_id: string) {
+  return { pk: `${ORG_PK_PREFIX}${org_id}`, sk: RACE_SETTINGS_SK };
+}
+
 export const LEAGUE_SK = 'LEAGUE';
 
 export function orgLeagueKey(org_id: string) {
@@ -106,4 +112,16 @@ export function webGrantKey(code: string) {
 
 export function webSessionKey(token: string) {
   return { pk: `${WEB_SESSION_PK_PREFIX}${token}`, sk: 'META' };
+}
+
+export const RELEASE_PK_PREFIX = 'RELEASE#';
+
+export function releaseKey(component: string, version: string) {
+  return { pk: `${RELEASE_PK_PREFIX}${component}#${version}`, sk: 'META' };
+}
+
+// Shares the release's partition so every recipient of a release can be read
+// with one Query alongside its META row.
+export function releaseOrgKey(component: string, version: string, org_id: string) {
+  return { pk: `${RELEASE_PK_PREFIX}${component}#${version}`, sk: `ORG#${org_id}` };
 }

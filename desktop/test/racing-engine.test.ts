@@ -25,7 +25,7 @@ vi.mock('@token-derby/token-engine', async (orig) => ({
 }));
 
 const { DEFAULT_CONFIG, saveConfig } = await import('../electron/config.js');
-const { applyTranscriptDirs } = await import('../electron/racing/transcripts.js');
+const { applyEngineConfig } = await import('../electron/racing/engine-config.js');
 const { loadActiveRace } = await import('../electron/racing/active-race.js');
 const engine = await import('../electron/racing/engine.js');
 const actualTokenEngine = await vi.importActual<typeof import('@token-derby/token-engine')>('@token-derby/token-engine');
@@ -88,7 +88,7 @@ beforeEach(async () => {
   // and re-applies transcript-dir overrides on every startRace/prepareBeat,
   // which would otherwise wipe an in-memory-only override on the first tick.
   saveConfig({ claudeDir });
-  applyTranscriptDirs({ ...DEFAULT_CONFIG, claudeDir });
+  applyEngineConfig({ ...DEFAULT_CONFIG, claudeDir });
 
   stubApi = { getRace: vi.fn(), joinRace: vi.fn(), heartbeat: vi.fn() };
   mockCreateEndpoints.mockReturnValue(stubApi);
@@ -97,7 +97,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await engine.stopRace();
-  applyTranscriptDirs(DEFAULT_CONFIG);
+  applyEngineConfig(DEFAULT_CONFIG);
   delete process.env.TOKEN_DERBY_DESKTOP_HOME;
   delete process.env.TOKEN_DERBY_HEARTBEAT_INTERVAL_MS;
   await fs.rm(tmpHome, { recursive: true, force: true });

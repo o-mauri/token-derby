@@ -46,8 +46,8 @@ describe('league-standings db', () => {
     await addStandingPointsForRound(org, 1, 3, 'a', 5, 1000, 1);
     await addStandingPointsForRound(org, 1, 3, 'a', 5, 1000, 1); // same round → no-op
     const [row] = await listSeasonStandings(org, 1);
-    expect(row.points).toBe(5);
-    expect(row.season_tokens).toBe(1000);
+    expect(row!.points).toBe(5);
+    expect(row!.season_tokens).toBe(1000);
   });
 
   it('accumulates across rounds', async () => {

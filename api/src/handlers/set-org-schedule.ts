@@ -1,4 +1,4 @@
-import type { APIGatewayProxyHandlerV2 } from 'aws-lambda';
+import type { ApiHandler } from '../lib/http.js';
 import type { SetOrgScheduleRequest, SetOrgScheduleResponse, RaceSchedule } from '@token-derby/shared';
 import { ORG_NAME_PATTERN, parseSemver } from '@token-derby/shared';
 import { getOrganisationByName } from '../db/organisations.js';
@@ -11,7 +11,7 @@ import { resolveCaller } from '../lib/auth.js';
 
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
 
-export const handler: APIGatewayProxyHandlerV2 = async (event) => {
+export const handler: ApiHandler = async (event) => {
   const auth = await resolveCaller(event);
   if ('error' in auth) return err('UNAUTHENTICATED', auth.error);
 
@@ -74,6 +74,7 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
     ...(body.max_participants !== undefined ? { max_participants: body.max_participants } : {}),
     ...(body.counts_input ? { counts_input: true } : {}),
     ...(body.primary_top5 ? { primary_top5: true } : {}),
+    ...(body.stamina ? { stamina: true } : {}),
     created_at: new Date().toISOString(),
     creator_user_id: auth.user_id,
     creator_user_name: auth.display_name,

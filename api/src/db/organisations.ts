@@ -1,7 +1,12 @@
-import { PutCommand, GetCommand, QueryCommand, BatchGetCommand, UpdateCommand, ScanCommand } from '@aws-sdk/lib-dynamodb';
+import { PutCommand, GetCommand, QueryCommand, BatchGetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { ddb, TABLE } from './client.js';
 import { orgMetaKey, orgMemberKey, ORG_PK_PREFIX, MEMBER_SK_PREFIX, parseOrgId } from './keys.js';
 import type { Organisation, OrganisationSummary, OrgSlackMessages, OrgSlackDigest } from '@token-derby/shared';
+
+// Sparse index over org meta rows that have Slack configured. Only those rows
+// carry `slack_marker`, so the index holds one entry per Slack-enabled org.
+export const SLACK_ORGS_INDEX = 'SlackOrgsIndex';
+const SLACK_MARKER = 'SLACK';
 
 export type OrgSlackConfig = {
   bot_token: string;
@@ -180,9 +185,9 @@ export async function setOrgSlack(org_id: string, config: OrgSlackConfig): Promi
   await ddb.send(new UpdateCommand({
     TableName: TABLE,
     Key: orgMetaKey(org_id),
-    UpdateExpression: 'SET slack = :s',
+    UpdateExpression: 'SET slack = :s, slack_marker = :m',
     ConditionExpression: 'attribute_exists(pk)',
-    ExpressionAttributeValues: { ':s': config },
+    ExpressionAttributeValues: { ':s': config, ':m': SLACK_MARKER },
   }));
 }
 
@@ -190,7 +195,7 @@ export async function clearOrgSlack(org_id: string): Promise<void> {
   await ddb.send(new UpdateCommand({
     TableName: TABLE,
     Key: orgMetaKey(org_id),
-    UpdateExpression: 'REMOVE slack',
+    UpdateExpression: 'REMOVE slack, slack_marker',
     ConditionExpression: 'attribute_exists(pk)',
   }));
 }
@@ -213,29 +218,39 @@ export async function markDigestSent(org_id: string, localDate: string): Promise
   }
 }
 
-// Digest sending runs once/minute over org count — a filtered Scan is
-// acceptable at this scale, consistent with `listAllSchedules`/`listAllLeagues`.
-// Org meta rows are the only rows in the table that ever carry a `slack`
-// attribute, so this filter uniquely selects org-with-slack meta rows.
-export async function listOrgsWithSlackDigest(): Promise<OrgRecord[]> {
+// Queries the sparse index rather than scanning the table: only Slack-enabled
+// org meta rows carry `slack_marker`, so this reads one entry per such org.
+// Every org that reaches here was written by setOrgSlack, which maintains the
+// marker — a row with `slack` but no marker is invisible to this path.
+async function listSlackOrgs(match: (org: OrgRecord) => boolean): Promise<OrgRecord[]> {
   const out: OrgRecord[] = [];
   let ExclusiveStartKey: Record<string, any> | undefined;
   do {
-    const res = await ddb.send(new ScanCommand({
+    const res = await ddb.send(new QueryCommand({
       TableName: TABLE,
-      FilterExpression: 'attribute_exists(slack)',
+      IndexName: SLACK_ORGS_INDEX,
+      KeyConditionExpression: 'slack_marker = :m',
+      ExpressionAttributeValues: { ':m': SLACK_MARKER },
       ExclusiveStartKey,
     }));
     for (const it of res.Items ?? []) {
       const org = pickOrgRecord(it);
-      if (org.slack?.messages.weekly_digest && org.slack.digest) out.push(org);
+      if (match(org)) out.push(org);
     }
     ExclusiveStartKey = res.LastEvaluatedKey;
   } while (ExclusiveStartKey);
   return out;
 }
 
+export async function listOrgsWithSlackDigest(): Promise<OrgRecord[]> {
+  return listSlackOrgs((org) => Boolean(org.slack?.messages.weekly_digest && org.slack.digest));
+}
+
+export async function listOrgsWithSlackRelease(): Promise<OrgRecord[]> {
+  return listSlackOrgs((org) => Boolean(org.slack?.messages.release_published));
+}
+
 function pickOrgRecord(item: Record<string, any>): OrgRecord {
-  const { pk: _pk, sk: _sk, ...rest } = item;
+  const { pk: _pk, sk: _sk, slack_marker: _m, ...rest } = item;
   return rest as OrgRecord;
 }

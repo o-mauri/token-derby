@@ -1,4 +1,4 @@
-import type { APIGatewayProxyHandlerV2 } from 'aws-lambda';
+import type { ApiHandler } from '../lib/http.js';
 import type { WebSessionExchangeRequest, WebSessionExchangeResponse } from '@token-derby/shared';
 import { consumeWebGrant, putWebSession } from '../db/web-sessions.js';
 import { generateWebSessionToken } from '../lib/codes.js';
@@ -6,7 +6,7 @@ import { ok, err, parseJson } from '../lib/http.js';
 
 const SESSION_TTL_SECONDS = 24 * 60 * 60; // 24 hours
 
-export const handler: APIGatewayProxyHandlerV2 = async (event) => {
+export const handler: ApiHandler = async (event) => {
   const body = parseJson<WebSessionExchangeRequest>(event.body);
   if (!body || typeof body.code !== 'string' || !body.code) {
     return err('BAD_REQUEST', 'code is required');

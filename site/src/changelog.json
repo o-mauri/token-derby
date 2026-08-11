@@ -1,5 +1,96 @@
 [
   {
+    "version": "0.13.1",
+    "date": "2026-08-06",
+    "component": "site",
+    "changes": [
+      "added race ui theme picker (adefreitas)"
+    ]
+  },
+  {
+    "version": "0.13.0",
+    "date": "2026-08-06",
+    "component": "site",
+    "changes": [
+      "horse stamina system [BETA]",
+      "horse stamina displays on race UI"
+    ]
+  },
+  {
+    "version": "2.12.4",
+    "date": "2026-07-30",
+    "component": "cli",
+    "changes": [
+      "race status screen shows division position",
+      "race status screen shows division leader & tokens"
+    ]
+  },
+  {
+    "version": "0.12.2",
+    "date": "2026-07-29",
+    "component": "site",
+    "changes": [
+      "added option to view token graphs mid race"
+    ]
+  },
+  {
+    "version": "0.13.0",
+    "date": "2026-07-28",
+    "component": "site",
+    "changes": [
+      "added a theme picker on the home page and race header",
+      "new themes: Midnight, Turf, Photo Finish and the animated Chromatic Circuit (the original look is now 'Derby')"
+    ]
+  },
+  {
+    "version": "0.12.1",
+    "date": "2026-07-28",
+    "component": "site",
+    "changes": [
+      "added crowd animation jitter"
+    ]
+  },
+  {
+    "version": "0.12.0",
+    "date": "2026-07-28",
+    "component": "site",
+    "changes": [
+      "added return to org button on race screen"
+    ]
+  },
+  {
+    "version": "2.12.3",
+    "date": "2026-07-28",
+    "component": "cli",
+    "changes": [
+      "multiple fixes to prevent stuck cli with large cli usage folders"
+    ]
+  },
+  {
+    "version": "0.11.2",
+    "date": "2026-07-20",
+    "component": "site",
+    "changes": [
+      "set back minimum cli version"
+    ]
+  },
+  {
+    "version": "0.11.1",
+    "date": "2026-07-18",
+    "component": "site",
+    "changes": [
+      "updated minimum cli version"
+    ]
+  },
+  {
+    "version": "2.12.2",
+    "date": "2026-07-18",
+    "component": "cli",
+    "changes": [
+      "hidden incorrect model counts"
+    ]
+  },
+  {
     "version": "0.11.0",
     "date": "2026-07-16",
     "component": "site",

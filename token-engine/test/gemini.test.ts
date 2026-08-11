@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -11,8 +11,15 @@ async function tmpGemini(): Promise<string> {
   process.env.TOKEN_DERBY_GEMINI_DIR = d;
   return d;
 }
+beforeEach(async () => {
+  // Isolate the scan cache so tests never read or prune the real ~/.token-derby.
+  const h = await fs.mkdtemp(path.join(os.tmpdir(), 'td-gem-home-'));
+  dirs.push(h);
+  process.env.TOKEN_DERBY_HOME = h;
+});
 afterEach(async () => {
   delete process.env.TOKEN_DERBY_GEMINI_DIR;
+  delete process.env.TOKEN_DERBY_HOME;
   for (const d of dirs.splice(0)) await fs.rm(d, { recursive: true, force: true });
 });
 
@@ -90,5 +97,33 @@ describe('sumGeminiByConversation', () => {
   it('throws when the gemini dir does not exist (fail-loud)', async () => {
     process.env.TOKEN_DERBY_GEMINI_DIR = path.join(os.tmpdir(), 'td-gem-missing-' + Math.random());
     await expect(sumGeminiByConversation()).rejects.toThrow();
+  });
+});
+
+describe('change-gated scanning', () => {
+  it('serves an unchanged chat from cache instead of re-parsing it', async () => {
+    // Gemini chats are rewritten whole, so the gate is mtime+size, not an offset.
+    const root = await tmpGemini();
+    await writeJson(root, 'hash1', 'session-a.json', [{ tokens: { input: 100, cached: 40, output: 30 } }]);
+    const f = path.join(root, 'hash1', 'chats', 'session-a.json');
+    await fs.utimes(f, 1_700_000_000, 1_700_000_000);
+    expect(await sumGeminiTokens()).toEqual({ input: 60, output: 30 });
+
+    const stale = await fs.readFile(f, 'utf8');
+    await fs.writeFile(f, stale.replace('"output":30', '"output":99'));
+    await fs.utimes(f, 1_700_000_000, 1_700_000_000);
+    expect(await sumGeminiTokens()).toEqual({ input: 60, output: 30 });
+  });
+
+  it('recomputes a chat that was rewritten', async () => {
+    const root = await tmpGemini();
+    await writeJson(root, 'hash1', 'session-a.json', [{ tokens: { input: 100, cached: 40, output: 30 } }]);
+    expect(await sumGeminiTokens()).toEqual({ input: 60, output: 30 });
+
+    await writeJson(root, 'hash1', 'session-a.json', [
+      { tokens: { input: 100, cached: 40, output: 30 } },
+      { tokens: { input: 10, cached: 0, output: 5 } },
+    ]);
+    expect(await sumGeminiTokens()).toEqual({ input: 70, output: 35 });
   });
 });

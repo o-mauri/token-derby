@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -11,8 +11,15 @@ async function tmpProjects(): Promise<string> {
   process.env.TOKEN_DERBY_CLAUDE_DIR = d;
   return d;
 }
+beforeEach(async () => {
+  // Isolate the scan cache so tests never read or prune the real ~/.token-derby.
+  const h = await fs.mkdtemp(path.join(os.tmpdir(), 'td-tx-home-'));
+  dirs.push(h);
+  process.env.TOKEN_DERBY_HOME = h;
+});
 afterEach(async () => {
   delete process.env.TOKEN_DERBY_CLAUDE_DIR;
+  delete process.env.TOKEN_DERBY_HOME;
   for (const d of dirs.splice(0)) await fs.rm(d, { recursive: true, force: true });
 });
 
@@ -61,6 +68,47 @@ describe('sumTokens (fail-loud)', () => {
 
     const t = await sumTokens();
     expect(t.output).toBe(777); // 111 main + 222 subagent + 444 workflow
+  });
+});
+
+describe('incremental scanning', () => {
+  it('re-parses only the lines appended since the previous scan', async () => {
+    const root = await tmpProjects();
+    const proj = path.join(root, 'proj1');
+    await fs.mkdir(proj, { recursive: true });
+    const f = path.join(proj, 'a.jsonl');
+    await fs.writeFile(f, line(100) + '\n');
+    expect((await sumTokens()).output).toBe(100);
+
+    await fs.appendFile(f, line(25) + '\n');
+    expect((await sumTokens()).output).toBe(125); // 100 from cache + 25 newly parsed
+  });
+
+  it('serves an unchanged transcript from cache instead of re-reading it', async () => {
+    const root = await tmpProjects();
+    const proj = path.join(root, 'proj1');
+    await fs.mkdir(proj, { recursive: true });
+    const f = path.join(proj, 'a.jsonl');
+    await fs.writeFile(f, line(100) + '\n');
+    await fs.utimes(f, 1_700_000_000, 1_700_000_000);
+    expect((await sumTokens()).output).toBe(100);
+
+    // Same size, same mtime, different tokens: only a re-read would see 999.
+    await fs.writeFile(f, line(999) + '\n');
+    await fs.utimes(f, 1_700_000_000, 1_700_000_000);
+    expect((await sumTokens()).output).toBe(100);
+  });
+
+  it('picks up a transcript that was rewritten shorter', async () => {
+    const root = await tmpProjects();
+    const proj = path.join(root, 'proj1');
+    await fs.mkdir(proj, { recursive: true });
+    const f = path.join(proj, 'a.jsonl');
+    await fs.writeFile(f, line(100) + '\n' + line(200) + '\n');
+    expect((await sumTokens()).output).toBe(300);
+
+    await fs.writeFile(f, line(7) + '\n');
+    expect((await sumTokens()).output).toBe(7);
   });
 });
 

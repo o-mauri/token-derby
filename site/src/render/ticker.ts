@@ -1,5 +1,5 @@
 import type { GetRaceResponse, HorseView, SeasonStandings } from '@token-derby/shared';
-import { describeAchievement, leaguePoints } from '@token-derby/shared';
+import { describeAchievement, leaguePoints, scoredOf } from '@token-derby/shared';
 
 export type TickerItem = {
   horseName: string;
@@ -155,13 +155,13 @@ export type TickerCell =
 // labelled group per division.
 export type OrderGroup = { label?: { text: string; groupClass?: string }; horses: HorseView[] };
 
-// Same ordering the track and finish ranking use: server rank, then tokens desc,
-// then earlier join. The tokens tie-break keeps previews (where every rank is 0)
-// sensible without any server change.
+// Same ordering the track and finish ranking use: server rank, then scored
+// distance desc, then earlier join. The tie-break keeps previews (where every
+// rank is 0) sensible without any server change.
 export function sortByRank(horses: HorseView[]): HorseView[] {
   return [...horses].sort((a, b) =>
     (a.rank - b.rank) ||
-    (b.current_tokens - a.current_tokens) ||
+    (scoredOf(b) - scoredOf(a)) ||
     (a.joined_at < b.joined_at ? -1 : a.joined_at > b.joined_at ? 1 : 0),
   );
 }
@@ -175,13 +175,13 @@ export function composeOrderCells(groups: OrderGroup[]): TickerCell[] {
   groups.forEach((group, gi) => {
     if (gi > 0) cells.push({ kind: 'groupsep' });
     if (group.label) cells.push({ kind: 'label', text: group.label.text, groupClass: group.label.groupClass });
-    const leaderTokens = group.horses[0]?.current_tokens ?? 0;
+    const leaderTokens = group.horses[0] ? scoredOf(group.horses[0]) : 0;
     group.horses.forEach((h, i) => {
       cells.push({
         kind: 'order',
         position: i + 1,
         horseName: h.name,
-        valueText: formatOrderValue(i === 0, h.current_tokens, leaderTokens),
+        valueText: formatOrderValue(i === 0, scoredOf(h), leaderTokens),
         isLeader: i === 0,
       });
     });
@@ -218,7 +218,7 @@ export function leagueOrderCells(race: GetRaceResponse): TickerCell[] {
 // Points each racer is on track to earn this fixture, keyed by stable_horse_id.
 // Mirrors the server's scoring (score-league-race): bucket by division, rank
 // within each by the live order, award the fixed points table by position. Also
-// carries current_tokens so standings can project a season-tokens tie-break.
+// carries scored tokens, matching the server's season-tokens tie-break.
 export function projectedGains(race: GetRaceResponse): Map<string, { gain: number; tokens: number }> {
   const bottom = race.league_division_names?.length ?? 1;
   const byDiv = new Map<number, HorseView[]>();
@@ -231,7 +231,7 @@ export function projectedGains(race: GetRaceResponse): Map<string, { gain: numbe
   const out = new Map<string, { gain: number; tokens: number }>();
   for (const hs of byDiv.values()) {
     sortByRank(hs).forEach((h, i) => {
-      out.set(h.stable_horse_id, { gain: leaguePoints(i + 1), tokens: h.current_tokens });
+      out.set(h.stable_horse_id, { gain: leaguePoints(i + 1), tokens: scoredOf(h) });
     });
   }
   return out;

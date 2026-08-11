@@ -1,4 +1,4 @@
-import type { APIGatewayProxyHandlerV2 } from 'aws-lambda';
+import type { ApiHandler } from '../lib/http.js';
 import type { SetOrgSlackRequest, GetOrgSlackResponse, OrgSlackMessages, OrgSlackDigest } from '@token-derby/shared';
 import { ORG_NAME_PATTERN } from '@token-derby/shared';
 import { getOrganisationByName, setOrgSlack, type OrgSlackConfig } from '../db/organisations.js';
@@ -10,7 +10,7 @@ const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 function validMessages(m: any): m is OrgSlackMessages {
   return m && typeof m === 'object'
-    && ['race_created', 'race_ended', 'league_season_ended', 'weekly_digest'].every((k) => typeof m[k] === 'boolean');
+    && ['race_created', 'race_ended', 'league_season_ended', 'weekly_digest', 'release_published'].every((k) => typeof m[k] === 'boolean');
 }
 function validDigest(d: any): d is OrgSlackDigest {
   return d && typeof d === 'object'
@@ -19,7 +19,7 @@ function validDigest(d: any): d is OrgSlackDigest {
     && typeof d.tz === 'string' && isValidTimeZone(d.tz);
 }
 
-export const handler: APIGatewayProxyHandlerV2 = async (event) => {
+export const handler: ApiHandler = async (event) => {
   const auth = await resolveCaller(event);
   if ('error' in auth) return err('UNAUTHENTICATED', auth.error);
 
@@ -30,7 +30,7 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
 
   const body = parseJson<SetOrgSlackRequest>(event.body);
   if (!body || typeof body.channel_id !== 'string' || body.channel_id.trim() === '') return err('BAD_REQUEST', 'channel_id (string) is required');
-  if (!validMessages(body.messages)) return err('BAD_REQUEST', 'messages must set all four boolean toggles');
+  if (!validMessages(body.messages)) return err('BAD_REQUEST', 'messages must set all five boolean toggles');
   if (body.digest !== undefined && !validDigest(body.digest)) return err('BAD_REQUEST', 'digest must be { weekday 1-7, time_local HH:MM, valid tz }');
   if (body.messages.weekly_digest && !body.digest) return err('BAD_REQUEST', 'digest schedule is required when weekly_digest is enabled');
 

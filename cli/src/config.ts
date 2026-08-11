@@ -9,5 +9,9 @@ export function apiBase(): string {
   return process.env.TOKEN_DERBY_API_BASE ?? ENVIRONMENTS[selectedEnv()].apiBase;
 }
 
-export const HEARTBEAT_INTERVAL_MS = 60_000;
-export const HEARTBEAT_RETRY_DELAYS_MS = [1_000, 2_000, 4_000, 8_000, 15_000];
+// Racing cadence lives in the engine so the CLI and desktop app share one set.
+export {
+  HEARTBEAT_INTERVAL_MS,
+  SCAN_TIMEOUT_MS,
+  HEARTBEAT_RETRY_DELAYS_MS,
+} from '@token-derby/token-engine';

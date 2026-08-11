@@ -15,7 +15,7 @@ A pixel-art daily horse race where each horse is a participant and every length 
 ## Install the CLI
 
 ```bash
-npm i -g @mauricode/token-derby
+npm i -g @mauricode/token-derby@latest
 token-derby --help
 ```
 
@@ -45,6 +45,26 @@ npx cdk bootstrap aws://<account>/eu-west-2
 npx cdk bootstrap aws://<account>/us-east-1
 npx cdk deploy
 ```
+
+## Releases
+
+`make deploy` releases the site, `make publish-cli` releases the CLI. Both bump
+the version, prepend a `site/src/changelog.json` entry, publish, then announce
+the release to every org that has "Release published" enabled in its Slackbot
+settings. `make deploy` also accepts a `none` bump, which deploys the site as-is
+with no version change, no changelog entry, and no announcement. `make
+publish-cli` rejects `none` — npm won't accept a duplicate version.
+
+The announcement needs these in the root `.env` (gitignored):
+
+```
+ADMIN_USERNAME=...
+ADMIN_PASSWORD=...
+TOKEN_DERBY_API_BASE=https://token-derby.mauricode.co.uk/api   # optional, this is the default
+```
+
+If the announcement fails after a successful publish, the release still
+succeeds — retry with `make announce-release COMPONENT=cli VERSION=2.13.0`.
 
 ## Admin dashboard
 

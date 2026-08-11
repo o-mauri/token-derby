@@ -1,6 +1,6 @@
-import type { APIGatewayProxyHandlerV2 } from 'aws-lambda';
+import type { ApiHandler } from '../lib/http.js';
 import type { HeartbeatRequest, HeartbeatResponse } from '@token-derby/shared';
-import { minorMatches, MIDRACE_THRESHOLDS } from '@token-derby/shared';
+import { minorMatches, MIDRACE_THRESHOLDS, scoreTick, scoredOf } from '@token-derby/shared';
 import { getRaceByJoinCode } from '../db/races.js';
 import { getHorseForHeartbeat, applyHeartbeatDelta, listHorses } from '../db/horses.js';
 import { appendSeriesPoint } from '../db/series.js';
@@ -13,7 +13,7 @@ import { finaliseRace } from '../lib/finalise-race.js';
 import { ok, err, parseJson } from '../lib/http.js';
 import { readCliVersion, meetsMinimumCliVersion, versionMismatchMessage } from '../lib/version.js';
 
-export const handler: APIGatewayProxyHandlerV2 = async (event) => {
+export const handler: ApiHandler = async (event) => {
   const join_code = event.pathParameters?.join_code;
   const horse_id = event.pathParameters?.horse_id;
   if (!join_code || !horse_id) return err('BAD_REQUEST', 'path params required');
@@ -71,11 +71,21 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
       return Number.isFinite(prevMs) ? now.getTime() - prevMs : 0;
     })();
     const applied = clampDelta({ delta: rawDelta, elapsedMs, counts_input: race.counts_input });
+    const scoring = scoreTick({
+      delta: applied,
+      dt_ms: elapsedMs,
+      race,
+      state: { stamina: horse.stamina },
+    });
+    const scoredApplied = scoring.scored_delta;
     const newTokens = prevTokens + applied;
+    const newScored = scoredOf(horse) + scoredApplied;
 
     const allHorsesBefore = await listHorses(race.race_id);
     const updatedHorses = allHorsesBefore.map(h =>
-      h.horse_id === horse_id ? { ...h, current_tokens: newTokens } : h,
+      h.horse_id === horse_id
+        ? { ...h, current_tokens: newTokens, scored_tokens: newScored, stamina: scoring.state.stamina }
+        : h,
     );
     const ranked = rankHorses(updatedHorses);
     const ownRanked = ranked.find(h => h.horse_id === horse_id)!;
@@ -104,18 +114,20 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
       },
       now_ms: now.getTime(),
       last_heartbeat_at_ms: lastHeartbeatMs,
-      current_tokens: newTokens,
-      prev_current_tokens: prevTokens,
+      current_tokens: newScored,
+      prev_current_tokens: scoredOf(horse),
       new_rank: ownRanked.rank,
       total_horses: ranked.length,
-      second_place_tokens: second?.current_tokens ?? null,
+      second_place_tokens: second ? scoredOf(second) : null,
       warm_up_active: now.getTime() < warmUpEnd,
       counts_input: race.counts_input ?? false,
     });
 
-    const didApply = await applyHeartbeatDelta(
-      race.race_id, horse_id, body.seq, applied, now.toISOString(), evalResult.next,
-    );
+    const didApply = await applyHeartbeatDelta({
+      race_id: race.race_id, horse_id, seq: body.seq, applied, scored_applied: scoredApplied,
+      stamina: scoring.state.stamina, last_heartbeat: now.toISOString(), state: evalResult.next,
+      needsSeed: horse.scored_tokens === undefined,
+    });
 
     if (didApply) {
       if (applied > 0) {
@@ -127,6 +139,8 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
           ? {
               ...h,
               current_tokens: newTokens,
+              scored_tokens: newScored,
+              stamina: scoring.state.stamina,
               last_seq: body.seq,
               live_xp: evalResult.next.live_xp,
               last_rank: evalResult.next.last_rank,

@@ -1,8 +1,12 @@
-import type { APIGatewayProxyResultV2 } from 'aws-lambda';
+import type { APIGatewayProxyEventV2, APIGatewayProxyStructuredResultV2 } from 'aws-lambda';
 import type { ErrorCode } from '@token-derby/shared';
 import { ERROR_STATUS } from '@token-derby/shared';
 
-export function ok<T>(body: T, status = 200): APIGatewayProxyResultV2 {
+// Handlers only ever read the event. Lambda passes context/callback too, but
+// typing them in would force every test call site to supply stubs.
+export type ApiHandler = (event: APIGatewayProxyEventV2) => Promise<APIGatewayProxyStructuredResultV2>;
+
+export function ok<T>(body: T, status = 200): APIGatewayProxyStructuredResultV2 {
   return {
     statusCode: status,
     headers: { 'content-type': 'application/json' },
@@ -10,7 +14,7 @@ export function ok<T>(body: T, status = 200): APIGatewayProxyResultV2 {
   };
 }
 
-export function err(code: ErrorCode, message: string): APIGatewayProxyResultV2 {
+export function err(code: ErrorCode, message: string): APIGatewayProxyStructuredResultV2 {
   return {
     statusCode: ERROR_STATUS[code],
     headers: { 'content-type': 'application/json' },

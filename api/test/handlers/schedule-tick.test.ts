@@ -10,10 +10,10 @@ import { makeUser, type TestUser } from '../helpers/auth-helper.js';
 import type { RaceSchedule, OrgSlackDigest, StableHorse } from '@token-derby/shared';
 import { CURRENT_CLI_VERSION } from '../helpers/cli-version.js';
 
-const slackPost = vi.fn(async () => ({ ok: true }));
+const slackPost = vi.fn(async (..._a: any[]) => ({ ok: true }));
 vi.mock('../../src/lib/slack/client.js', () => ({ postSlackMessage: (...a: any[]) => slackPost(...a) }));
 
-const runTick = () => (tick as unknown as () => Promise<void>)();
+const runTick = () => tick();
 
 async function createOrg(user: TestUser, name: string): Promise<string> {
   const ev: APIGatewayProxyEventV2 = {
@@ -36,7 +36,7 @@ function baseSchedule(org_id: string): RaceSchedule {
 function digestConfig(digest: OrgSlackDigest) {
   return {
     bot_token: 'xoxb-secret', channel_id: 'C1',
-    messages: { race_created: false, race_ended: false, league_season_ended: false, weekly_digest: true },
+    messages: { race_created: false, race_ended: false, league_season_ended: false, weekly_digest: true, release_published: false },
     digest,
   };
 }
@@ -117,6 +117,34 @@ describe('schedule-tick', () => {
     const races = await listRacesByOrgId(org_id);
     expect(races.length).toBe(1);
     expect(races[0]!.primary_top5).toBeUndefined();
+  });
+
+  it('stamps stamina from the schedule onto the created race', async () => {
+    const user = await makeUser('TickStamina');
+    const org_id = await createOrg(user, 'TickStamOrg');
+    await putSchedule({ ...baseSchedule(org_id), stamina: true });
+
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2024-07-01T10:00:00Z'));
+    await runTick();
+
+    const races = await listRacesByOrgId(org_id);
+    expect(races.length).toBe(1);
+    expect(races[0]!.stamina).toBe(true);
+  });
+
+  it('legacy schedule without stamina → race defaults to off', async () => {
+    const user = await makeUser('TickNoStamina');
+    const org_id = await createOrg(user, 'TickNoStamOr');
+    await putSchedule(baseSchedule(org_id)); // no stamina prop
+
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2024-07-01T10:00:00Z'));
+    await runTick();
+
+    const races = await listRacesByOrgId(org_id);
+    expect(races.length).toBe(1);
+    expect(races[0]!.stamina).toBeUndefined();
   });
 
   it('isolates failures: a bad schedule does not block a good one', async () => {

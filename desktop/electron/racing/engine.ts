@@ -5,7 +5,13 @@ import {
   readAllSources,
   isStall,
   runHeartbeatLoop,
+  scanWithTimeout,
+  ScanProgress,
+  diagnoseScanTimeout,
   RACING_COMPAT_VERSION,
+  HEARTBEAT_INTERVAL_MS,
+  HEARTBEAT_RETRY_DELAYS_MS,
+  SCAN_TIMEOUT_MS,
   type RaceScoreState,
   type BeatReading,
 } from '@token-derby/token-engine';
@@ -13,33 +19,33 @@ import type { GetRaceResponse, ModelKey } from '@token-derby/shared';
 import { loadConfig, resolveApiBase } from '../config.js';
 import * as identityStore from '../identity.js';
 import { loadActiveRace, saveActiveRace, clearActiveRace, type DesktopActiveRace } from './active-race.js';
-import { applyTranscriptDirs } from './transcripts.js';
+import { applyEngineConfig } from './engine-config.js';
 import { deriveStatus } from './status.js';
 import type { ActiveRaceStatus } from '../ipc.js';
 
-// The desktop app races one horse at a time: a normal 60s cadence per Token
-// Derby's server-side rate cap, with the CLI's own retry backoff on failure.
-const DEFAULT_INTERVAL_MS = 60_000;
-const RETRY_DELAYS_MS = [1_000, 2_000, 4_000, 8_000, 15_000] as const;
+// The desktop app races one horse at a time, on the engine's shared cadence and
+// retry backoff so it can't drift from the CLI's.
+const DEFAULT_INTERVAL_MS = HEARTBEAT_INTERVAL_MS;
 
 // Soft guard: a horse whose last heartbeat lands inside two beat intervals of
 // "now" is probably already being raced elsewhere (another device/process
 // for the same jockey) — starting a second loop would double-count tokens.
 const SOFT_GUARD_WINDOW_MS = 2 * DEFAULT_INTERVAL_MS;
 
-// Ports run-race.tsx's scanWithTimeout: an unbounded readAllSources() would
-// freeze the whole loop on a hung read (prepareBeat never resolves, so the
-// loop never reaches sendBeat/onError). Degrade a hang to a stall instead.
-const SCAN_TIMEOUT_MS = 10_000;
-
-async function scanWithTimeout(race: { counts_input?: boolean }, primary: ModelKey): Promise<BeatReading> {
+// An unbounded readAllSources() would freeze the whole loop on a hung read
+// (prepareBeat never resolves, so the loop never reaches sendBeat/onError).
+// The engine's scanWithTimeout degrades that to a stall naming whichever source
+// was still scanning when the budget expired.
+async function scanBeat(race: { counts_input?: boolean }, primary: ModelKey): Promise<BeatReading> {
+  const progress = new ScanProgress();
   try {
-    return await Promise.race([
-      readAllSources(race, primary),
-      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('scan timeout')), SCAN_TIMEOUT_MS)),
-    ]);
-  } catch {
-    return { stall: 'Token scan timed out' };
+    return await scanWithTimeout(
+      () => readAllSources(race, primary, progress),
+      SCAN_TIMEOUT_MS,
+      () => diagnoseScanTimeout(SCAN_TIMEOUT_MS, progress),
+    );
+  } catch (e: any) {
+    return { stall: `Token scan failed: ${e?.message ?? String(e)}` };
   }
 }
 
@@ -171,8 +177,8 @@ function beginLoop(api: RacingApi, active: DesktopActiveRace, raceTracker: RaceS
     prepareBeat: async () => {
       // Re-applied every beat (not just at start) so a transcript-dir
       // override saved in Settings mid-race takes effect on the next tick.
-      applyTranscriptDirs(loadConfig());
-      const reading = await scanWithTimeout({ counts_input: active.counts_input }, active.primary_model);
+      applyEngineConfig(loadConfig());
+      const reading = await scanBeat({ counts_input: active.counts_input }, active.primary_model);
       raceTracker.recordReading(reading);
       if (pending && !isStall(reading)) {
         raceTracker.reprime();
@@ -223,7 +229,7 @@ function beginLoop(api: RacingApi, active: DesktopActiveRace, raceTracker: RaceS
       setStatus(finished);
     },
     intervalMs: heartbeatIntervalMs(),
-    retryDelaysMs: RETRY_DELAYS_MS,
+    retryDelaysMs: HEARTBEAT_RETRY_DELAYS_MS,
     abortSignal: ctrl.signal,
   });
 }
@@ -235,7 +241,7 @@ export async function startRace(
   opts?: { confirm?: boolean },
 ): Promise<{ started: boolean; needsConfirm?: boolean }> {
   const code = joinCode.toUpperCase();
-  applyTranscriptDirs(loadConfig());
+  applyEngineConfig(loadConfig());
   const api = buildApi();
 
   // Skip the soft-guard round-trip entirely when the caller already confirmed
@@ -307,7 +313,7 @@ export async function resumeIfActive(): Promise<void> {
   const saved = await loadActiveRace();
   if (!saved) return;
 
-  applyTranscriptDirs(loadConfig());
+  applyEngineConfig(loadConfig());
   const api = buildApi();
   let race: GetRaceResponse | null;
   try {

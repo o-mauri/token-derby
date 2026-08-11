@@ -47,6 +47,7 @@ export function renderSchedule(root: HTMLElement, deps: ScheduleDeps): void {
         tz: (root.querySelector('input[name="tz"]') as HTMLInputElement).value.trim(),
         ...(maxRaw ? { max_participants: Number(maxRaw) } : {}),
         ...((root.querySelector('input[name="primary_top5"]') as HTMLInputElement).checked ? { primary_top5: true } : {}),
+        ...(s?.stamina ? { stamina: true } : {}),
       };
       deps.onSave(body);
     });

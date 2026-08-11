@@ -8,6 +8,9 @@ import { formatDuration, predictTimeLeftSeconds, type CountdownAnchor } from '..
 import { startAutoScroll } from './autoscroll.js';
 import { horseFaceSvg } from '../horse-face.js';
 import { createTicker, collectFreshItems, leagueOrderCells, leagueStandingsCells, type TickerCell } from './ticker.js';
+import { applyCheerJitter, crowdColumns, syncSpectators, TILE_PX } from './crowd.js';
+import { createRaceGraphs } from './race-graphs.js';
+import { createThemePicker } from './theme-picker.js';
 
 const POLL_INTERVAL_MS = 60_000;
 const TIMER_TICK_MS = 1_000;
@@ -15,6 +18,9 @@ const TIMER_TICK_MS = 1_000;
 type RenderRaceOpts = {
   // Injectable for previews/tests; defaults to the real standings endpoint.
   fetchStandings?: (orgName: string, season: number) => Promise<{ standings: SeasonStandings | null }>;
+  // Mid-race graph popup. Off by default so the org-live TV view, which has no
+  // pointer, does not get a control nobody can click.
+  showGraphs?: boolean;
 };
 
 export function renderRace(root: HTMLElement, joinCode: string, opts: RenderRaceOpts = {}): () => void {
@@ -26,11 +32,12 @@ export function renderRace(root: HTMLElement, joinCode: string, opts: RenderRace
   frame.className = 'race';
   frame.innerHTML = `
     <header class="race-header">
-      <h1>${horseFaceSvg()} <span class="race-name">Loading…</span></h1>
+      <h1>${horseFaceSvg()} <span class="race-name-row"><span class="row-scroll race-name-scroll"><span class="race-name">Loading…</span></span></span></h1>
       <div class="meta">
-        <span>Status: <b class="race-status">—</b></span>
-        <span>Time left: <b class="race-time-left">—</b></span>
-        <span>Join code: <b>${joinCode}</b></span>
+        <span class="status-item"><span class="meta-label">Status: </span><b class="race-status">—</b></span>
+        <span><span class="meta-label">Time left: </span><b class="race-time-left">—</b></span>
+        <span class="join-code"><span class="meta-label">Join code: </span><b>${joinCode}</b></span>
+        <button type="button" class="btn org-btn" hidden>← Org</button>
         <button type="button" class="btn home-btn">← Home</button>
       </div>
     </header>
@@ -42,6 +49,11 @@ export function renderRace(root: HTMLElement, joinCode: string, opts: RenderRace
     <div class="track"></div>
   `;
   root.appendChild(frame);
+
+  // Sits after the meta readouts but before the back-buttons, so those stay at
+  // the header's trailing edge.
+  const meta = frame.querySelector<HTMLElement>('.race-header .meta')!;
+  meta.insertBefore(createThemePicker(root.ownerDocument), meta.querySelector('.org-btn'));
 
   const track = frame.querySelector<HTMLElement>('.track')!;
   const ticker = createTicker(root.ownerDocument);
@@ -90,6 +102,22 @@ export function renderRace(root: HTMLElement, joinCode: string, opts: RenderRace
       });
   };
   const nameEl = frame.querySelector<HTMLElement>('.race-name')!;
+  const nameRow = frame.querySelector<HTMLElement>('.race-name-row')!;
+  const nameScroll = frame.querySelector<HTMLElement>('.race-name-scroll')!;
+  // Same marquee the lane name-tags use: clip the row, slide the content by
+  // exactly its overflow, and only when it actually overflows.
+  const syncNameMarquee = (): void => {
+    const overflow = nameScroll.scrollWidth - nameRow.clientWidth;
+    if (overflow > 1) {
+      nameScroll.style.setProperty('--shift', `${-overflow}px`);
+      nameScroll.classList.add('is-scrolling');
+    } else {
+      nameScroll.classList.remove('is-scrolling');
+      nameScroll.style.removeProperty('--shift');
+    }
+  };
+  const nameRo = new ResizeObserver(syncNameMarquee);
+  nameRo.observe(nameRow);
   const statusEl = frame.querySelector<HTMLElement>('.race-status')!;
   const timeLeftEl = frame.querySelector<HTMLElement>('.race-time-left')!;
   const homeBtn = frame.querySelector<HTMLButtonElement>('.home-btn')!;
@@ -98,19 +126,35 @@ export function renderRace(root: HTMLElement, joinCode: string, opts: RenderRace
     window.dispatchEvent(new PopStateEvent('popstate'));
   });
 
+  // Org back-button — revealed in onSnapshot once we know the race belongs to an org.
+  const orgBtn = frame.querySelector<HTMLButtonElement>('.org-btn')!;
+  let orgName: string | null = null;
+  orgBtn.addEventListener('click', () => {
+    if (!orgName) return;
+    window.history.pushState({}, '', `/org/${encodeURIComponent(orgName)}`);
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  });
+
+  const graphs = opts.showGraphs
+    ? createRaceGraphs({ doc: root.ownerDocument, joinCode })
+    : null;
+  if (graphs) frame.querySelector<HTMLElement>('.meta')!.prepend(graphs.button);
 
   const ctrl = new AbortController();
   let finishedTeardown: (() => void) | null = null;
   ctrl.signal.addEventListener('abort', () => ticker.destroy(), { once: true });
+  ctrl.signal.addEventListener('abort', () => nameRo.disconnect(), { once: true });
   startAutoScroll({ signal: ctrl.signal, target: track });
 
   const crowd = frame.querySelector<HTMLElement>('.crowd');
-  if (crowd) {
+  const crowdBody = frame.querySelector<HTMLElement>('.crowd-body');
+  if (crowd && crowdBody) {
+    frame.querySelectorAll<HTMLElement>('.crowd-cap').forEach((cap) => applyCheerJitter(cap));
     const fitCrowd = () => {
       const scale = parseFloat(getComputedStyle(crowd).getPropertyValue('--sprite-scale')) || 2;
-      const tile = scale * 32;
-      const w = Math.floor(frame.clientWidth / tile) * tile;
-      crowd.style.width = `${w}px`;
+      const cols = crowdColumns(frame.clientWidth, scale);
+      crowd.style.width = `${cols * scale * TILE_PX}px`;
+      syncSpectators(crowdBody, Math.max(0, cols - 2)); // the two caps take a tile each
     };
     fitCrowd();
     const ro = new ResizeObserver(fitCrowd);
@@ -130,8 +174,18 @@ export function renderRace(root: HTMLElement, joinCode: string, opts: RenderRace
     const now = new Date();
     const nowMs = now.getTime();
     nameEl.textContent = race.name;
+    // Race names are unbounded, so the heading clips — keep the full name
+    // reachable on hover as well as via the marquee.
+    nameEl.title = race.name;
+    syncNameMarquee();
+    if (race.organisation_name) {
+      orgName = race.organisation_name;
+      orgBtn.textContent = `← ${race.organisation_name}`;
+      orgBtn.hidden = false;
+    }
     statusEl.textContent = race.status;
     statusEl.className = `race-status race-status--${race.status}`;
+    graphs?.onSnapshot(race);
     countdownAnchor = { atMs: nowMs, timeLeftSeconds: race.time_left_seconds };
     timeLeftEl.textContent = formatDuration(race.time_left_seconds);
 
@@ -173,6 +227,7 @@ export function renderRace(root: HTMLElement, joinCode: string, opts: RenderRace
 
     if (race.status === 'finished') {
       if (!finishedTeardown) {
+        graphs?.close(); // podium takes over the view; the popup would be buried behind it
         finishedTeardown = renderFinishedOverlay(frame, race);
         ctrl.abort(); // stop polling, ticker, autoscroll, countdown — race is over
       }
@@ -199,5 +254,5 @@ export function renderRace(root: HTMLElement, joinCode: string, opts: RenderRace
     abortSignal: ctrl.signal,
   });
 
-  return () => { ctrl.abort(); finishedTeardown?.(); };
+  return () => { ctrl.abort(); finishedTeardown?.(); graphs?.destroy(); };
 }

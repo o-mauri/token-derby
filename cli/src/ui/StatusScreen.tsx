@@ -1,7 +1,7 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import type { GetRaceResponse, HorseColors, HorseView } from '@token-derby/shared';
-import { levelInfo, MODEL_KEYS, SECONDARY_WEIGHT, type ModelKey } from '@token-derby/shared';
+import { levelInfo, MODEL_KEYS, resolveStaminaConfig, scoredOf, SECONDARY_WEIGHT, type ModelKey } from '@token-derby/shared';
 import { HorseSprite } from './HorseSprite.js';
 import { MINI_SPRITE } from './sprite.js';
 
@@ -56,6 +56,47 @@ export function StatusScreen(props: Props) {
   const timeLeft = formatDuration(race.time_left_seconds);
   const lvl = levelInfo((own?.xp ?? 0) + (own?.live_xp ?? 0));
 
+  // Divisions exist only on league fixtures, and only once the horse has been
+  // placed in one. `race.horses` arrives rank-sorted, so filtering preserves order.
+  const divisionField = own?.division === undefined
+    ? []
+    : race.horses.filter(h => h.division === own.division);
+  const divisionRank = own ? divisionField.indexOf(own) + 1 : 0;
+  const showDivision = (race.league_division_names?.length ?? 0) > 0 && divisionRank > 0;
+
+  const staminaRow = race.stamina === true ? staminaLine(own, race) : null;
+
+  const rows: StatRow[] = [
+    { label: 'Tokens (race):', value: String(own?.final_scored_tokens ?? (own ? scoredOf(own) : 0)) },
+    ...(staminaRow ? [staminaRow] : []),
+    { label: 'Position:', value: `${own?.rank ?? '—'} of ${race.horses.length}` },
+    ...(showDivision
+      ? [{ label: 'Position (Division):', value: `${divisionRank} of ${divisionField.length}` }]
+      : []),
+    { label: 'Leader:', value: leaderText(leader) },
+    ...(showDivision
+      ? [{ label: 'Leader (Division):', value: leaderText(divisionField[0]) }]
+      : []),
+    { label: 'Race elapsed:', value: `${(elapsedPct * 100).toFixed(0)}%  ${bar(elapsedPct, 20)}` },
+    { label: 'Time left:', value: timeLeft },
+    {
+      label: 'XP:',
+      value: lvl.next_level_xp === null
+        ? `${lvl.xp} (max level)  ${bar(1, 20)}`
+        : `${lvl.xp_into_level}/${lvl.xp_for_level} → Lvl. ${lvl.level + 1}  ${bar(lvl.progress, 20)}`,
+    },
+    {
+      label: 'Last heartbeat:',
+      value: (
+        <>
+          {lastHeartbeatAgoSec === null ? '—' : `${lastHeartbeatAgoSec}s ago`}
+          {' '}
+          <Text color={lastHeartbeatOk ? 'green' : 'yellow'}>{lastHeartbeatOk ? '✓' : '⚠'}</Text>
+        </>
+      ),
+    },
+  ];
+
   return (
     <Box flexDirection="column" borderStyle="round" paddingX={1}>
       <Text>
@@ -71,25 +112,7 @@ export function StatusScreen(props: Props) {
       </Box>
 
       <Box flexDirection="column" marginTop={1}>
-        <Text>Tokens (race):  {own?.current_tokens ?? 0}</Text>
-        <Text>Position:       {own?.rank ?? '—'} of {race.horses.length}</Text>
-        <Text>
-          Leader:         {leader ? `${leader.name}${leader.user_name ? ` (${leader.user_name})` : ''} — ${leader.current_tokens}` : '—'}
-        </Text>
-        <Text>Race elapsed:   {(elapsedPct * 100).toFixed(0)}%  {bar(elapsedPct, 20)}</Text>
-        <Text>Time left:      {timeLeft}</Text>
-        <Text>
-          XP:             {lvl.next_level_xp === null
-            ? `${lvl.xp} (max level)  ${bar(1, 20)}`
-            : `${lvl.xp_into_level}/${lvl.xp_for_level} → Lvl. ${lvl.level + 1}  ${bar(lvl.progress, 20)}`}
-        </Text>
-        <Text>
-          Last heartbeat: {lastHeartbeatAgoSec === null ? '—' : `${lastHeartbeatAgoSec}s ago`}
-          {' '}
-          <Text color={lastHeartbeatOk ? 'green' : 'yellow'}>
-            {lastHeartbeatOk ? '✓' : '⚠'}
-          </Text>
-        </Text>
+        <StatLines rows={rows} />
         {stalled && (
           <Text color="yellow">⚠ {stallReason ?? "Can't read token usage"}. Your race continues.</Text>
         )}
@@ -104,6 +127,26 @@ export function StatusScreen(props: Props) {
   );
 }
 
+type StatRow = { label: string; value: React.ReactNode };
+
+// Values line up one space past the widest label actually rendered, so the
+// column tightens when the division rows are absent.
+function StatLines(props: { rows: StatRow[] }) {
+  const width = Math.max(...props.rows.map(r => r.label.length)) + 1;
+  return (
+    <>
+      {props.rows.map(r => (
+        <Text key={r.label}>{r.label.padEnd(width)}{r.value}</Text>
+      ))}
+    </>
+  );
+}
+
+function leaderText(h: HorseView | undefined): string {
+  if (!h) return '—';
+  return `${h.name}${h.user_name ? ` (${h.user_name})` : ''} — ${h.final_scored_tokens ?? scoredOf(h)}`;
+}
+
 function elapsed(race: GetRaceResponse): number {
   const start = new Date(race.start_time).getTime();
   const end = new Date(race.end_time).getTime();
@@ -116,6 +159,33 @@ function elapsed(race: GetRaceResponse): number {
 function bar(pct: number, width: number): string {
   const filled = Math.round(pct * width);
   return '▓'.repeat(filled) + '░'.repeat(width - filled);
+}
+
+// Bands match the race page exactly: green above 50, amber down to the org's
+// taper floor, red below it — where scoring actually starts costing.
+function staminaLine(own: HorseView | undefined, race: GetRaceResponse): StatRow {
+  const stamina = own?.stamina ?? 100;
+  const cfg = resolveStaminaConfig(race);
+  const floor = cfg.taper_floor;
+  const band = stamina > 50 ? 'green' : stamina >= floor ? 'amber' : 'red';
+  const color = band === 'green' ? 'green' : band === 'amber' ? 'yellow' : 'red';
+  const pct = Math.max(0, Math.min(1, stamina / 100));
+
+  // Multiplier only in the red band: it's the number their output is being
+  // scaled by right now, so it only matters once tapering has begun.
+  const multiplier = band === 'red'
+    ? cfg.tired_multiplier + (1 - cfg.tired_multiplier) * (stamina / floor)
+    : null;
+
+  return {
+    label: 'Stamina:',
+    value: (
+      <Text color={color}>
+        {`${Math.round(stamina)}%  ${bar(pct, 20)}`}
+        {multiplier !== null ? `  ×${multiplier.toFixed(2)}` : ''}
+      </Text>
+    ),
+  };
 }
 
 function statusColor(status: GetRaceResponse['status']): string {

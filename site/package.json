@@ -1,6 +1,6 @@
 {
   "name": "@token-derby/site",
-  "version": "0.11.0",
+  "version": "0.13.1",
   "private": true,
   "type": "module",
   "scripts": {
