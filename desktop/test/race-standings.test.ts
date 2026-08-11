@@ -73,6 +73,40 @@ describe('mapStandings', () => {
     expect(first.tokens).toBe(1000);
   });
 
+  // The server ranks by scored distance (api/src/lib/rank-horses.ts), so the
+  // number shown has to be the scored one or the list contradicts its own order.
+  it('shows scored tokens rather than raw while the race is live', () => {
+    const race = fakeRace([
+      fakeHorse({ horse_id: 'h-1', stable_horse_id: 'sh-1', rank: 1, current_tokens: 1000, scored_tokens: 800 }),
+    ]);
+    expect(mapStandings(race, new Set())[0].tokens).toBe(800);
+  });
+
+  it('falls back to raw tokens for rows written before scoring existed', () => {
+    const race = fakeRace([
+      fakeHorse({ horse_id: 'h-1', stable_horse_id: 'sh-1', rank: 1, current_tokens: 1000 }),
+    ]);
+    expect(mapStandings(race, new Set())[0].tokens).toBe(1000);
+  });
+
+  it('prefers final_scored_tokens once the race has finished', () => {
+    const race = fakeRace(
+      [
+        fakeHorse({
+          horse_id: 'h-1',
+          stable_horse_id: 'sh-1',
+          rank: 1,
+          current_tokens: 1000,
+          scored_tokens: 800,
+          final_tokens: 1234,
+          final_scored_tokens: 1500,
+        }),
+      ],
+      'finished',
+    );
+    expect(mapStandings(race, new Set())[0].tokens).toBe(1500);
+  });
+
   it('prefers final_tokens over current_tokens once the race has finished', () => {
     const race = fakeRace(
       [fakeHorse({ horse_id: 'h-1', stable_horse_id: 'sh-1', rank: 1, current_tokens: 1000, final_tokens: 1234 })],

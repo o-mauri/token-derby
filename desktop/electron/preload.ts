@@ -22,6 +22,7 @@ const api: DesktopApi = {
   getRaceSeries: (joinCode) => ipcRenderer.invoke(CHANNELS.getRaceSeries, joinCode),
   listOrganisations: () => ipcRenderer.invoke(CHANNELS.listOrganisations),
   getOrgLeaderboard: (orgName) => ipcRenderer.invoke(CHANNELS.getOrgLeaderboard, orgName),
+  getOrgLeagueStandings: (orgName) => ipcRenderer.invoke(CHANNELS.getOrgLeagueStandings, orgName),
   joinOrganisation: (token) => ipcRenderer.invoke(CHANNELS.joinOrganisation, token),
   createWebSession: () => ipcRenderer.invoke(CHANNELS.createWebSession),
   getConfig: () => ipcRenderer.invoke(CHANNELS.getConfig),
@@ -32,6 +33,7 @@ const api: DesktopApi = {
   chooseFolder: () => ipcRenderer.invoke(CHANNELS.chooseFolder),
   exportIdentity: () => ipcRenderer.invoke(CHANNELS.exportIdentity),
   quitApp: () => ipcRenderer.invoke(CHANNELS.quitApp),
+  joinRace: (joinCode, opts) => ipcRenderer.invoke(CHANNELS.joinRace, joinCode, opts),
   startRace: (joinCode, stableHorseId, primaryModel, opts) =>
     ipcRenderer.invoke(CHANNELS.startRace, joinCode, stableHorseId, primaryModel, opts),
   stopRace: () => ipcRenderer.invoke(CHANNELS.stopRace),

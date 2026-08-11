@@ -3,9 +3,10 @@ import { api } from './api.js';
 import Race from './screens/Race.js';
 import Stable from './screens/Stable.js';
 import Org from './screens/Org.js';
+import League from './screens/League.js';
 import Settings from './screens/Settings.js';
 
-type Tab = 'race' | 'stable' | 'org' | 'settings';
+type Tab = 'race' | 'stable' | 'org' | 'league' | 'settings';
 
 // Popover shell: header (identity + gear→settings) and the Race/Stable/Org
 // tab bar, all driven by local route state — this is a single fixed-size
@@ -14,6 +15,9 @@ export default function App() {
   const [tab, setTab] = useState<Tab>('race');
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [horseCount, setHorseCount] = useState<number | null>(null);
+  // Org whose league the League tab shows, or null when the jockey has none —
+  // which is also what hides the tab.
+  const [leagueOrgName, setLeagueOrgName] = useState<string | null>(null);
 
   // The popover is one long-lived BrowserWindow that's only ever show()/
   // hide()'d (see electron/windows.ts) — this component never remounts, so
@@ -32,6 +36,28 @@ export default function App() {
       (stable) => setHorseCount(stable.horses.length),
       () => setHorseCount(null),
     );
+    refreshLeague();
+  }
+
+  // The standings endpoint answers { standings: null } for an org with no league,
+  // so one call per org both detects a league and is the data the tab needs.
+  // Probed in parallel; the first org in list order that has one wins. Re-run
+  // alongside the header so a league created while the popover is open shows up.
+  function refreshLeague() {
+    api.listOrganisations().then(
+      async ({ organisations }) => {
+        const probed = await Promise.all(
+          organisations.map((o) =>
+            api.getOrgLeagueStandings(o.org_name).then(
+              (res) => (res.standings ? o.org_name : null),
+              () => null,
+            ),
+          ),
+        );
+        setLeagueOrgName(probed.find((name) => name !== null) ?? null);
+      },
+      () => setLeagueOrgName(null),
+    );
   }
 
   useEffect(() => {
@@ -42,6 +68,12 @@ export default function App() {
     window.addEventListener('focus', refreshHeader);
     return () => window.removeEventListener('focus', refreshHeader);
   }, []);
+
+  // The tab can vanish under the user (league deleted, or they left the org), which
+  // would otherwise leave the popover on a tab with nothing to render.
+  useEffect(() => {
+    if (tab === 'league' && !leagueOrgName) setTab('race');
+  }, [tab, leagueOrgName]);
 
   // The popover has no application menu (it's an accessory/tray-only app —
   // see main.ts's app.dock.hide()), so Cmd+Q needs its own handler here
@@ -86,6 +118,9 @@ export default function App() {
           <TabButton label="Race" active={tab === 'race'} onClick={() => setTab('race')} />
           <TabButton label="Stable" active={tab === 'stable'} onClick={() => setTab('stable')} />
           <TabButton label="Org" active={tab === 'org'} onClick={() => setTab('org')} />
+          {leagueOrgName && (
+            <TabButton label="League" active={tab === 'league'} onClick={() => setTab('league')} />
+          )}
         </nav>
       )}
 
@@ -93,6 +128,7 @@ export default function App() {
         {tab === 'race' && <Race />}
         {tab === 'stable' && <Stable />}
         {tab === 'org' && <Org />}
+        {tab === 'league' && leagueOrgName && <League orgName={leagueOrgName} />}
         {tab === 'settings' && (
           <Settings
             onBack={() => {

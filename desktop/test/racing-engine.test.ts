@@ -100,7 +100,10 @@ afterEach(async () => {
   applyEngineConfig(DEFAULT_CONFIG);
   delete process.env.TOKEN_DERBY_DESKTOP_HOME;
   delete process.env.TOKEN_DERBY_HEARTBEAT_INTERVAL_MS;
-  await fs.rm(tmpHome, { recursive: true, force: true });
+  // stopRace() only stops FUTURE scheduling — a prepareBeat already in flight
+  // still finishes, and its scan-cache save re-creates <home>/scan-cache while
+  // this walk is deleting it (ENOTEMPTY). Retry rather than fail the run.
+  await fs.rm(tmpHome, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
   vi.clearAllMocks();
 });
 

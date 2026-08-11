@@ -7,7 +7,7 @@ import type {
   EquipHatRequest,
   ModelKey,
 } from '@token-derby/shared';
-import type { DesktopApi, Bootstrap, Result, ActiveRaceStatus } from '../ipc.js';
+import type { DesktopApi, Bootstrap, Result, ActiveRaceStatus, JoinRaceResult } from '../ipc.js';
 import { loadConfig, saveConfig, resolveApiBase, type Config } from '../config.js';
 import * as identityStore from '../identity.js';
 import { createAppWindow } from '../windows.js';
@@ -204,6 +204,10 @@ async function getOrgLeaderboard(orgName: string) {
   return guard(() => getApi().getOrgLeaderboard(orgName));
 }
 
+async function getOrgLeagueStandings(orgName: string) {
+  return guard(() => getApi().getOrgLeagueStandings(orgName));
+}
+
 async function joinOrganisation(token: string) {
   return guard(() => getApi().joinOrganisation({ join_token: token }));
 }
@@ -286,6 +290,10 @@ async function checkForUpdate(): Promise<Result<UpdateCheckResult>> {
   return guard(() => runUpdateCheck(getClientVersion()));
 }
 
+async function joinRace(joinCode: string, opts?: { confirm?: boolean }): Promise<Result<JoinRaceResult>> {
+  return guard(() => racingEngine.joinRace(joinCode, opts));
+}
+
 async function startRace(
   joinCode: string,
   stableHorseId: string,
@@ -322,6 +330,7 @@ export const apiService = {
   getRaceSeries,
   listOrganisations,
   getOrgLeaderboard,
+  getOrgLeagueStandings,
   joinOrganisation,
   createWebSession,
   getConfig,
@@ -332,6 +341,7 @@ export const apiService = {
   chooseFolder,
   exportIdentity,
   quitApp,
+  joinRace,
   startRace,
   stopRace,
   getActiveRace,

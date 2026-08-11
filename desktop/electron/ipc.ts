@@ -7,6 +7,7 @@ import type {
   GetRaceSeriesResponse,
   ListOrganisationsResponse,
   GetOrgLeaderboardResponse,
+  GetLeagueStandingsResponse,
   JoinOrganisationResponse,
   GetJockeyResponse,
   UpdateJockeyResponse,
@@ -50,6 +51,7 @@ export const CHANNELS = {
   getRaceSeries: 'api:getRaceSeries',
   listOrganisations: 'api:listOrganisations',
   getOrgLeaderboard: 'api:getOrgLeaderboard',
+  getOrgLeagueStandings: 'api:getOrgLeagueStandings',
   joinOrganisation: 'api:joinOrganisation',
   createWebSession: 'api:createWebSession',
   getConfig: 'api:getConfig',
@@ -60,6 +62,7 @@ export const CHANNELS = {
   chooseFolder: 'api:chooseFolder',
   exportIdentity: 'api:exportIdentity',
   quitApp: 'api:quitApp',
+  joinRace: 'api:joinRace',
   startRace: 'api:startRace',
   stopRace: 'api:stopRace',
   getActiveRace: 'api:getActiveRace',
@@ -85,6 +88,14 @@ export type ActiveRaceStatus = {
   status: RaceStatus;
   stalled: boolean;
 };
+
+// Outcome of the join pre-flight. `resumed` means the heartbeat loop is already
+// running for the horse this jockey had in the race; `needsHorse` means the
+// caller should collect a horse + model and call startRace.
+export type JoinRaceResult =
+  | { resumed: true }
+  | { needsConfirm: true; horseName: string }
+  | { needsHorse: true };
 
 // Renderer-side subscribe callback for RACING_STATUS_CHANNEL pushes. Kept
 // separate from CHANNELS/DesktopApi — those are all invoke/Result round
@@ -137,6 +148,9 @@ export type DesktopApi = {
   getRaceSeries(joinCode: string): Promise<Result<GetRaceSeriesResponse>>;
   listOrganisations(): Promise<Result<ListOrganisationsResponse>>;
   getOrgLeaderboard(orgName: string): Promise<Result<GetOrgLeaderboardResponse>>;
+  // Responds { standings: null } when the org has no league, which is how the
+  // shell decides whether to show the League tab at all.
+  getOrgLeagueStandings(orgName: string): Promise<Result<GetLeagueStandingsResponse>>;
   joinOrganisation(token: string): Promise<Result<JoinOrganisationResponse>>;
   createWebSession(): Promise<Result<WebSessionHandoff>>;
   getConfig(): Promise<Result<Config>>;
@@ -149,6 +163,11 @@ export type DesktopApi = {
   // "<user_id>:<secret_token>" pair for Settings' "Copy identity" action.
   exportIdentity(): Promise<Result<{ token: string }>>;
   quitApp(): Promise<Result<{ ok: true }>>;
+  // Type-a-code-and-join: resumes the horse this jockey already has in the race,
+  // or reports that the caller needs to pick one. Same guard as startRace —
+  // unless opts.confirm, a horse still heartbeating elsewhere returns
+  // { needsConfirm: true } rather than being taken over.
+  joinRace(joinCode: string, opts?: { confirm?: boolean }): Promise<Result<JoinRaceResult>>;
   // Soft guard: unless opts.confirm, a horse heartbeating within the last two
   // intervals returns { started: false, needsConfirm: true } instead of joining.
   startRace(

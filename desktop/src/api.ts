@@ -1,4 +1,4 @@
-import type { ActiveRaceStatus, DesktopApi, Bootstrap, RacingStatusListener, Result, WebSessionHandoff } from '../electron/ipc.js';
+import type { ActiveRaceStatus, DesktopApi, Bootstrap, JoinRaceResult, RacingStatusListener, Result, WebSessionHandoff } from '../electron/ipc.js';
 import type { UpdateCheckResult } from '../electron/updater.js';
 import type { Config } from '../electron/config.js';
 import type {
@@ -6,6 +6,7 @@ import type {
   GetRaceSeriesResponse,
   ListOrganisationsResponse,
   GetOrgLeaderboardResponse,
+  GetLeagueStandingsResponse,
   JoinOrganisationResponse,
   GetJockeyResponse,
   UpdateJockeyResponse,
@@ -77,6 +78,8 @@ export const api = {
   listOrganisations: (): Promise<ListOrganisationsResponse> => window.api.listOrganisations().then(unwrap),
   getOrgLeaderboard: (orgName: string): Promise<GetOrgLeaderboardResponse> =>
     window.api.getOrgLeaderboard(orgName).then(unwrap),
+  getOrgLeagueStandings: (orgName: string): Promise<GetLeagueStandingsResponse> =>
+    window.api.getOrgLeagueStandings(orgName).then(unwrap),
   joinOrganisation: (token: string): Promise<JoinOrganisationResponse> =>
     window.api.joinOrganisation(token).then(unwrap),
   createWebSession: (): Promise<WebSessionHandoff> => window.api.createWebSession().then(unwrap),
@@ -88,6 +91,8 @@ export const api = {
   chooseFolder: (): Promise<{ path: string | null }> => window.api.chooseFolder().then(unwrap),
   exportIdentity: (): Promise<{ token: string }> => window.api.exportIdentity().then(unwrap),
   quitApp: (): Promise<{ ok: true }> => window.api.quitApp().then(unwrap),
+  joinRace: (joinCode: string, opts?: { confirm?: boolean }): Promise<JoinRaceResult> =>
+    window.api.joinRace(joinCode, opts).then(unwrap),
   startRace: (
     joinCode: string,
     stableHorseId: string,

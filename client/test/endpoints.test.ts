@@ -106,4 +106,27 @@ describe('endpoints', () => {
     expect(fetch.mock.calls[0]?.[0]).toBe('https://x/api/organisations/Acme/leaderboard');
     expect((fetch.mock.calls[0]?.[1] as RequestInit).method).toBe('GET');
   });
+
+  it('getOrgLeagueStandings GETs /organisations/<orgName>/league/standings', async () => {
+    const fetch = vi.fn().mockResolvedValue({
+      ok: true, status: 200,
+      headers: { get: () => 'application/json' },
+      text: async () => JSON.stringify({ standings: null }),
+    });
+    const { getOrgLeagueStandings } = makeEndpoints(fetch);
+    await getOrgLeagueStandings('Acme');
+    expect(fetch.mock.calls[0]?.[0]).toBe('https://x/api/organisations/Acme/league/standings');
+    expect((fetch.mock.calls[0]?.[1] as RequestInit).method).toBe('GET');
+  });
+
+  it('getOrgLeagueStandings encodes an org name with a space', async () => {
+    const fetch = vi.fn().mockResolvedValue({
+      ok: true, status: 200,
+      headers: { get: () => 'application/json' },
+      text: async () => JSON.stringify({ standings: null }),
+    });
+    const { getOrgLeagueStandings } = makeEndpoints(fetch);
+    await getOrgLeagueStandings('Acme Corp');
+    expect(fetch.mock.calls[0]?.[0]).toBe('https://x/api/organisations/Acme%20Corp/league/standings');
+  });
 });

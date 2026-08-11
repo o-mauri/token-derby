@@ -21,7 +21,7 @@ import * as identityStore from '../identity.js';
 import { loadActiveRace, saveActiveRace, clearActiveRace, type DesktopActiveRace } from './active-race.js';
 import { applyEngineConfig } from './engine-config.js';
 import { deriveStatus } from './status.js';
-import type { ActiveRaceStatus } from '../ipc.js';
+import type { ActiveRaceStatus, JoinRaceResult } from '../ipc.js';
 
 // The desktop app races one horse at a time, on the engine's shared cadence and
 // retry backoff so it can't drift from the CLI's.
@@ -232,6 +232,39 @@ function beginLoop(api: RacingApi, active: DesktopActiveRace, raceTracker: RaceS
     retryDelaysMs: HEARTBEAT_RETRY_DELAYS_MS,
     abortSignal: ctrl.signal,
   });
+}
+
+// Pre-flight for "type a code and join". Decides between resuming whichever
+// horse this jockey already has in the race and asking for one, so the caller
+// never shows a picker for a race you're already in. Matches on user_id rather
+// than stable_horse_id so a horse joined from another machine still counts.
+export async function joinRace(joinCode: string, opts?: { confirm?: boolean }): Promise<JoinRaceResult> {
+  const code = joinCode.toUpperCase();
+  applyEngineConfig(loadConfig());
+  const api = buildApi();
+
+  const race: GetRaceResponse = await api.getRace(code);
+  if (race.status === 'finished') throw new Error('This race has already finished.');
+
+  const identity = await identityStore.load(loadConfig());
+  if (!identity) throw new Error('No jockey identity yet — finish onboarding first.');
+
+  const own = race.horses.find(h => h.user_id === identity.user_id);
+  if (!own) return { needsHorse: true };
+
+  // A heartbeat inside the guard window means another process is still racing
+  // this horse; resuming silently would double-count its tokens.
+  if (!opts?.confirm) {
+    const lastHeartbeatMs = new Date(own.last_heartbeat).getTime();
+    if (Number.isFinite(lastHeartbeatMs) && Date.now() - lastHeartbeatMs < SOFT_GUARD_WINDOW_MS) {
+      return { needsConfirm: true, horseName: own.name };
+    }
+  }
+
+  // confirm: true — this pre-flight already made the decision, and startRace's
+  // own guard keys on stable_horse_id rather than identity.
+  await startRace(code, own.stable_horse_id, own.primary_model ?? 'claude', { confirm: true });
+  return { resumed: true };
 }
 
 export async function startRace(

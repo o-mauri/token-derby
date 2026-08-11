@@ -4,6 +4,7 @@ import type {
   HeartbeatRequest, HeartbeatResponse, EndRaceResponse,
   JoinOrganisationRequest, JoinOrganisationResponse,
   ListOrganisationsResponse, GetOrganisationResponse, GetOrgLeaderboardResponse,
+  GetLeagueStandingsResponse,
   InitJockeyRequest, InitJockeyResponse,
   GetJockeyResponse, UpdateJockeyRequest, UpdateJockeyResponse,
   ListStableResponse, CreateStableHorseRequest, CreateStableHorseResponse,
@@ -67,6 +68,19 @@ export function createEndpoints(t: Transport) {
       return t.request<GetOrgLeaderboardResponse>(
         'GET',
         `/organisations/${encodeURIComponent(orgName)}/leaderboard`,
+        undefined,
+        undefined,
+      );
+    },
+
+    // Season standings for an org's league. Responds { standings: null } when the
+    // org has no league, so callers can use this to detect one. `season` defaults
+    // to the league's current season.
+    getOrgLeagueStandings(orgName: string, season?: number) {
+      const query = season === undefined ? '' : `?season=${encodeURIComponent(String(season))}`;
+      return t.request<GetLeagueStandingsResponse>(
+        'GET',
+        `/organisations/${encodeURIComponent(orgName)}/league/standings${query}`,
         undefined,
         undefined,
       );

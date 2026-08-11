@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import type { ModelKey, StableHorse } from '@token-derby/shared';
 import { MODEL_KEYS } from '@token-derby/shared';
 import type { ActiveRaceStatus } from '../../electron/ipc.js';
@@ -9,6 +9,9 @@ import { formatTokens } from '../lib/format.js';
 import HorseSprite from '../sprites/HorseSprite.js';
 import { mapStandings } from './race-standings.js';
 import { raceStatusLabel } from './race-mode.js';
+import { phaseAfterJoin, picksHorse, type JoinPhase, type RaceIntent } from './race-join.js';
+import { detailRows } from './horse-detail.js';
+import { divisionFilters, applyDivisionFilter } from './race-divisions.js';
 
 const MODEL_LABELS: Record<ModelKey, string> = { claude: 'Claude', codex: 'Codex', gemini: 'Gemini' };
 
@@ -41,6 +44,12 @@ export default function Race() {
 
   const [activeRace, setActiveRace] = useState<ActiveRaceStatus | null>(null);
   const [activeRaceChecked, setActiveRaceChecked] = useState(false);
+
+  // Did the user ask to race or only to spectate, and where did the join land.
+  const [intent, setIntent] = useState<RaceIntent>('join');
+  const [joinPhase, setJoinPhase] = useState<JoinPhase | null>(null);
+  const [joining, setJoining] = useState(false);
+  const [joinError, setJoinError] = useState<string | null>(null);
 
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
@@ -88,19 +97,97 @@ export default function Race() {
     submittedCode !== '',
   );
 
-  const standings = useMemo(
+  const allStandings = useMemo(
     () => (race ? mapStandings(race, yourHorseIds) : []),
     [race, yourHorseIds],
   );
+
+  // League fixtures only: filter the field to one division, where rank means
+  // division position (what league points are actually awarded on).
+  const [division, setDivision] = useState<number | null>(null);
+  const filters = useMemo(() => (race ? divisionFilters(race) : []), [race]);
+
+  // A selected division can stop existing — changing race, or the league being
+  // resized under us. Fall back to All rather than showing an empty list.
+  useEffect(() => {
+    if (division !== null && !filters.some((f) => f.value === division)) setDivision(null);
+  }, [filters, division]);
+
+  const standings = useMemo(
+    () => applyDivisionFilter(allStandings, division),
+    [allStandings, division],
+  );
+
+  // Accordion: one horse's detail panel open at a time, so the fixed-size
+  // popover can't overflow.
+  const [expandedHorseId, setExpandedHorseId] = useState<string | null>(null);
+  const [autoExpanded, setAutoExpanded] = useState(false);
+
+  const horsesById = useMemo(
+    () => new Map((race?.horses ?? []).map((h) => [h.horse_id, h])),
+    [race],
+  );
+
+  // Open the jockey's own horse once, the first time standings arrive. Guarded
+  // by autoExpanded so collapsing it stays collapsed across the 60s poll.
+  useEffect(() => {
+    if (autoExpanded) return;
+    const own = standings.find((s) => s.isYou);
+    if (!own) return;
+    setExpandedHorseId(own.horse_id);
+    setAutoExpanded(true);
+  }, [standings, autoExpanded]);
 
   function resetSelectedModel() {
     setSelectedModel('claude');
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  // Join is the primary path: the code alone is enough. Already in the race →
+  // the engine resumes heartbeating and we land on the active panel; not in it
+  // → we collect a horse and model. The join runs BEFORE submittedCode is set
+  // so a bad code leaves the user on the form with an error, rather than
+  // dropping them into a broken standings view.
+  async function handleJoin(e: React.FormEvent) {
     e.preventDefault();
     const trimmed = joinCode.trim();
-    if (trimmed) setSubmittedCode(trimmed);
+    if (!trimmed) return;
+    setJoining(true);
+    setJoinError(null);
+    try {
+      const phase = phaseAfterJoin(await api.joinRace(trimmed));
+      setIntent('join');
+      setJoinPhase(phase);
+      setSubmittedCode(trimmed);
+      if (phase.kind === 'racing') setActiveRace(await api.getActiveRace());
+    } catch (err) {
+      setJoinError(messageFor(err));
+    } finally {
+      setJoining(false);
+    }
+  }
+
+  // Take over a horse the guard says is still being raced elsewhere.
+  async function handleConfirmTakeover() {
+    setJoining(true);
+    setJoinError(null);
+    try {
+      const phase = phaseAfterJoin(await api.joinRace(submittedCode, { confirm: true }));
+      setJoinPhase(phase);
+      if (phase.kind === 'racing') setActiveRace(await api.getActiveRace());
+    } catch (err) {
+      setJoinError(messageFor(err));
+    } finally {
+      setJoining(false);
+    }
+  }
+
+  function handleWatch() {
+    const trimmed = joinCode.trim();
+    if (!trimmed) return;
+    setIntent('watch');
+    setJoinPhase(null);
+    setJoinError(null);
+    setSubmittedCode(trimmed);
   }
 
   function reset() {
@@ -108,6 +195,12 @@ export default function Race() {
     setJoinCode('');
     setNeedsConfirm(false);
     setStartError(null);
+    setIntent('join');
+    setJoinPhase(null);
+    setJoinError(null);
+    setExpandedHorseId(null);
+    setAutoExpanded(false);
+    setDivision(null);
   }
 
   async function handleRace(confirm: boolean) {
@@ -125,6 +218,7 @@ export default function Race() {
         setNeedsConfirm(true);
       } else {
         setNeedsConfirm(false);
+        setJoinPhase({ kind: 'racing' });
         setActiveRace(await api.getActiveRace());
         // Standings still poll on their own 60s cadence — kick off an
         // immediate refetch so the just-joined horse's row shows up right
@@ -168,7 +262,7 @@ export default function Race() {
 
   if (!submittedCode) {
     return (
-      <form className="race-join" onSubmit={handleSubmit}>
+      <form className="race-join" onSubmit={handleJoin}>
         <label className="race-join-field">
           <span>Join code</span>
           <input
@@ -178,9 +272,18 @@ export default function Race() {
             autoFocus
           />
         </label>
-        <button type="submit" className="onboarding-button" disabled={!joinCode.trim()}>
-          Watch race
+        <button type="submit" className="onboarding-button" disabled={joining || !joinCode.trim()}>
+          {joining ? 'Joining…' : 'Join race'}
         </button>
+        <button
+          type="button"
+          className="onboarding-button-link"
+          onClick={handleWatch}
+          disabled={joining || !joinCode.trim()}
+        >
+          Just watch
+        </button>
+        {joinError && <p className="onboarding-error">{joinError}</p>}
       </form>
     );
   }
@@ -215,28 +318,177 @@ export default function Race() {
           isLive && <span className="race-live-indicator">LIVE · 60s</span>
         )}
       </div>
-      <ol className="race-standings">
-        {standings.map((s) => (
-          <li
-            key={s.horse_id}
-            className={
-              'race-standing-row' +
-              (s.isLeader ? ' race-standing-leader' : '') +
-              (s.isYou ? ' race-standing-you' : '')
-            }
+
+      {/* Join controls sit ABOVE the standings: the primary action must be
+          reachable without scrolling past a list of other people's horses. */}
+      {!activeRace && joinPhase?.kind === 'confirm' && (
+        <div className="race-confirm">
+          <p className="onboarding-error">
+            You're already racing {joinPhase.horseName} somewhere else — take over here?
+          </p>
+          <div className="race-active-actions">
+            <button
+              type="button"
+              className="onboarding-button"
+              onClick={handleConfirmTakeover}
+              disabled={joining}
+            >
+              {joining ? 'Taking over…' : 'Take over'}
+            </button>
+            <button type="button" className="onboarding-button-link" onClick={reset}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {!activeRace && picksHorse(intent, joinPhase) && (
+        stable.length === 0 ? (
+          <p className="popover-placeholder">Create a horse in the Stable tab to race.</p>
+        ) : (
+          <div className="race-mode-picker">
+            <label className="race-mode-field">
+              <span>Horse</span>
+              <select
+                className="org-select"
+                value={selectedHorseId}
+                onChange={(e) => setSelectedHorseId(e.target.value)}
+              >
+                {stable.map((h) => (
+                  <option key={h.stable_horse_id} value={h.stable_horse_id}>
+                    {h.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="settings-segmented" role="radiogroup" aria-label="Primary model">
+              {MODEL_KEYS.map((key) => (
+                <button
+                  key={key}
+                  type="button"
+                  role="radio"
+                  aria-checked={selectedModel === key}
+                  className={'settings-segment' + (selectedModel === key ? ' settings-segment-active' : '')}
+                  onClick={() => setSelectedModel(key)}
+                >
+                  {MODEL_LABELS[key]}
+                </button>
+              ))}
+            </div>
+
+            {needsConfirm ? (
+              <div className="race-confirm">
+                <p className="onboarding-error">
+                  This horse looks like it's already racing elsewhere — continue anyway?
+                </p>
+                <div className="race-active-actions">
+                  <button
+                    type="button"
+                    className="onboarding-button"
+                    onClick={() => handleRace(true)}
+                    disabled={starting}
+                  >
+                    {starting ? 'Starting…' : 'Race anyway'}
+                  </button>
+                  <button
+                    type="button"
+                    className="onboarding-button-link"
+                    onClick={() => setNeedsConfirm(false)}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                className="onboarding-button"
+                onClick={() => handleRace(false)}
+                disabled={starting || !selectedHorseId}
+              >
+                {starting ? 'Starting…' : 'Join'}
+              </button>
+            )}
+          </div>
+        )
+      )}
+
+      {filters.length > 0 && (
+        <label className="race-divisions">
+          <span>Division</span>
+          <select
+            className="org-select"
+            value={division === null ? 'all' : String(division)}
+            onChange={(e) => setDivision(e.target.value === 'all' ? null : Number(e.target.value))}
           >
-            <span className="race-standing-rank">{s.rank}</span>
-            <HorseSprite colors={s.colors} hat={s.hat} size={28} />
-            <span className="race-standing-name">
-              {s.name}
-              {s.isYou ? ' (you)' : ''}
-            </span>
-            <span className="race-standing-tokens">{formatTokens(s.tokens)}</span>
-          </li>
-        ))}
+            {filters.map((f) => (
+              <option key={String(f.value)} value={f.value === null ? 'all' : String(f.value)}>
+                {f.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+
+      {division !== null && standings.length === 0 && (
+        <p className="race-empty-message">No horses in this division.</p>
+      )}
+
+      <ol className="race-standings">
+        {standings.map((s) => {
+          const isOpen = expandedHorseId === s.horse_id;
+          const horse = horsesById.get(s.horse_id);
+          return (
+            <li
+              key={s.horse_id}
+              className={
+                'race-standing-item' +
+                (s.isLeader ? ' race-standing-leader' : '') +
+                (s.isYou ? ' race-standing-you' : '')
+              }
+            >
+              <button
+                type="button"
+                className="race-standing-row"
+                aria-expanded={isOpen}
+                onClick={() => setExpandedHorseId(isOpen ? null : s.horse_id)}
+              >
+                <span className="race-standing-rank">{s.rank}</span>
+                <HorseSprite colors={s.colors} hat={s.hat} size={28} />
+                <span className="race-standing-name">
+                  {s.name}
+                  {s.isYou ? ' (you)' : ''}
+                </span>
+                <span className="race-standing-tokens">{formatTokens(s.tokens)}</span>
+                <span className="race-standing-caret" aria-hidden="true">{isOpen ? '▾' : '▸'}</span>
+              </button>
+              {isOpen && horse && (
+                <dl className="horse-detail">
+                  {detailRows(race, horse).map((row) => (
+                    <Fragment key={row.label}>
+                      <dt className="horse-detail-label">{row.label}</dt>
+                      <dd
+                        className={
+                          'horse-detail-value' + (row.tone ? ` horse-detail-${row.tone}` : '')
+                        }
+                      >
+                        {row.bar !== undefined && (
+                          <span className="horse-detail-bar">
+                            <span style={{ width: `${row.bar * 100}%` }} />
+                          </span>
+                        )}
+                        {row.value}
+                      </dd>
+                    </Fragment>
+                  ))}
+                </dl>
+              )}
+            </li>
+          );
+        })}
       </ol>
 
-      {activeRace ? (
+      {activeRace && (
         <div className="race-active-actions">
           <button
             type="button"
@@ -255,75 +507,9 @@ export default function Race() {
             Open race track ↗
           </button>
         </div>
-      ) : stable.length === 0 ? (
-        <p className="popover-placeholder">Create a horse in the Stable tab to race.</p>
-      ) : (
-        <div className="race-mode-picker">
-          <label className="race-mode-field">
-            <span>Horse</span>
-            <select
-              className="org-select"
-              value={selectedHorseId}
-              onChange={(e) => setSelectedHorseId(e.target.value)}
-            >
-              {stable.map((h) => (
-                <option key={h.stable_horse_id} value={h.stable_horse_id}>
-                  {h.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <div className="settings-segmented" role="radiogroup" aria-label="Primary model">
-            {MODEL_KEYS.map((key) => (
-              <button
-                key={key}
-                type="button"
-                role="radio"
-                aria-checked={selectedModel === key}
-                className={'settings-segment' + (selectedModel === key ? ' settings-segment-active' : '')}
-                onClick={() => setSelectedModel(key)}
-              >
-                {MODEL_LABELS[key]}
-              </button>
-            ))}
-          </div>
-
-          {needsConfirm ? (
-            <div className="race-confirm">
-              <p className="onboarding-error">
-                This horse looks like it's already racing elsewhere — continue anyway?
-              </p>
-              <div className="race-active-actions">
-                <button
-                  type="button"
-                  className="onboarding-button"
-                  onClick={() => handleRace(true)}
-                  disabled={starting}
-                >
-                  {starting ? 'Starting…' : 'Race anyway'}
-                </button>
-                <button
-                  type="button"
-                  className="onboarding-button-link"
-                  onClick={() => setNeedsConfirm(false)}
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          ) : (
-            <button
-              type="button"
-              className="onboarding-button"
-              onClick={() => handleRace(false)}
-              disabled={starting || !selectedHorseId}
-            >
-              {starting ? 'Starting…' : 'Race'}
-            </button>
-          )}
-        </div>
       )}
 
+      {joinError && <p className="onboarding-error">{joinError}</p>}
       {startError && <p className="onboarding-error">{startError}</p>}
 
       {!activeRace && (

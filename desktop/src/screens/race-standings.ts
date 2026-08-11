@@ -1,4 +1,6 @@
 import type { CollectedHat, HorseColors, HorseView, RaceView } from '@token-derby/shared';
+import { scoredOf } from '@token-derby/shared';
+import { divisionOf } from './race-divisions.js';
 
 export type Standing = {
   rank: number;
@@ -9,14 +11,24 @@ export type Standing = {
   hat?: CollectedHat;
   isYou: boolean;
   isLeader: boolean;
+  // League fixtures only; null on a standard race. Carried here so filtering by
+  // division needs no second lookup into race.horses.
+  division: number | null;
 };
 
-// Once a race has finished, final_tokens is the authoritative score (falling
-// back to current_tokens for older rows); live/pending races only ever have
-// current_tokens. Mirrors the same rule used for RaceHighlight elsewhere.
-function tokensFor(race: RaceView, horse: HorseView): number {
-  if (race.status === 'finished') return horse.final_tokens ?? horse.current_tokens;
-  return horse.current_tokens;
+// SCORED distance, not raw tokens: the server ranks on scoredOf()
+// (api/src/lib/rank-horses.ts) and the site positions horses on the track the
+// same way, so showing raw here would let the list contradict its own order
+// once a stamina multiplier has been applied.
+//
+// Finished races carry final_scored_tokens (stamped by finalise-race, which also
+// ranks by it). The remaining fallbacks cover rows written before scoring
+// existed: scored_tokens for a live race, then final_tokens, then raw.
+export function tokensFor(race: RaceView, horse: HorseView): number {
+  if (race.status === 'finished') {
+    return horse.final_scored_tokens ?? horse.scored_tokens ?? horse.final_tokens ?? horse.current_tokens;
+  }
+  return scoredOf(horse);
 }
 
 // Pure mapping from a race + "your" stable horse ids to the standings list
@@ -35,5 +47,6 @@ export function mapStandings(race: RaceView, yourStableHorseIds: ReadonlySet<str
       hat: horse.equipped_hat,
       isYou: yourStableHorseIds.has(horse.stable_horse_id),
       isLeader: horse.rank === 1,
+      division: divisionOf(race, horse),
     }));
 }
