@@ -1,4 +1,4 @@
-export type ThemeId = 'derby' | 'midnight' | 'turf' | 'photo' | 'chromatic';
+export type ThemeId = 'derby' | 'midnight' | 'turf' | 'photo' | 'chromatic' | 'matrix';
 
 export type Theme = { id: ThemeId; label: string };
 
@@ -9,6 +9,7 @@ export const THEMES: readonly Theme[] = [
   { id: 'turf', label: 'Turf' },
   { id: 'photo', label: 'Photo Finish' },
   { id: 'chromatic', label: 'Chromatic Circuit' },
+  { id: 'matrix', label: 'Matrix' },
 ];
 
 export const DEFAULT_THEME: ThemeId = 'derby';
