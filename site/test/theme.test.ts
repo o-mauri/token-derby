@@ -90,7 +90,10 @@ describe('theme id duplication', () => {
 
   it('every non-default theme has a CSS block, and vice versa', () => {
     const css = read('../public/styles.css');
-    const inCss = [...css.matchAll(/:root\[data-theme="([a-z-]+)"\]/g)].map((m) => m[1]!);
+    // Not anchored to `:root[…]`: themes that share a palette are grouped as
+    // `:root:is([data-theme="a"], [data-theme="b"])`, where only the first
+    // attribute follows `:root`. What matters here is which ids appear at all.
+    const inCss = [...css.matchAll(/\[data-theme="([a-z-]+)"\]/g)].map((m) => m[1]!);
     // Derby is intentionally absent: it lives in plain :root so it is also the
     // no-JS default, and data-theme="derby" simply falls through to it.
     const expected = THEMES.map((t) => t.id).filter((id) => id !== DEFAULT_THEME);

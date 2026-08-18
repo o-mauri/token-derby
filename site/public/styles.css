@@ -1980,17 +1980,23 @@ label.label input:disabled, label.label select:disabled { opacity: 0.5; }
 /* Same rule the crowd follows — the spectacle stops once the race is over. */
 .race.finished .lane-track { animation-play-state: paused; }
 
-/* Phosphor-on-black CRT. Deliberately pushed away from Turf (the other dark
-   green theme): Turf is a desaturated grass palette on #06120a, this is a
-   saturated #00ff41 on true black with glow and scanlines, so the two never
-   read as variants of each other in the picker. */
-:root[data-theme="matrix"] {
+/* ── Matrix / Phosphor ──────────────────────────────────
+   Two intensities of one phosphor-on-black CRT, sharing a palette. Phosphor
+   keeps the glyph rain to the page backdrop; Matrix also runs it through the
+   lanes. Both are deliberately pushed away from Turf, the other dark green
+   theme: Turf is a desaturated grass palette on #06120a, these are a saturated
+   #00ff41 on true black with glow and scanlines, so no two of the three read as
+   variants of each other in the picker.
+
+   Neither is a reduced-motion option — both animate. OS-level
+   prefers-reduced-motion is honoured separately, in the gates below. */
+:root:is([data-theme="phosphor"], [data-theme="matrix"]) {
   --bg: #000000;
   --panel: #04140a;
   --text: #8affa8;
-  /* Lighter than a dark-theme muted would normally go: this is the one theme
-     with moving glyphs behind the text, and at the top of the rain's opacity
-     swing a dimmer muted stopped being readable on the home page. */
+  /* Lighter than a dark theme's muted would normally go: these are the only
+     themes with moving glyphs behind the text, and at the top of the rain's
+     opacity swing a dimmer muted stopped being readable on the home page. */
   --muted: #4fbf6e;
   --accent: #00ff41;
   --border: #10401f;
@@ -2006,15 +2012,14 @@ label.label input:disabled, label.label select:disabled { opacity: 0.5; }
   --ticker-accent: #00ff41;
 }
 
-/* The rain is a fixed backdrop behind the whole page, not a lane treatment:
-   .lane-track's background slots are already spent on the dirt sprite + wash,
-   and glyphs running under the sprites would fight the name tags for
-   legibility. Sitting at z-index 0 it shows through wherever the page is
-   transparent — the header strip, the margins, and everything below a short
-   field — while every panel keeps its own opaque background. */
-:root[data-theme="matrix"] #app { position: relative; z-index: 1; }
+/* The page backdrop — the whole effect in Phosphor, and what fills the page
+   around the track in Matrix. It is a fixed body-level layer, not a lane
+   treatment: sitting at z-index 0 it shows through wherever the page is
+   transparent (the header strip, the margins, everything below a short field)
+   while every panel keeps its own opaque background. */
+:root:is([data-theme="phosphor"], [data-theme="matrix"]) #app { position: relative; z-index: 1; }
 
-:root[data-theme="matrix"] body::before {
+:root:is([data-theme="phosphor"], [data-theme="matrix"]) body::before {
   content: '';
   position: fixed;
   inset: 0;
@@ -2048,7 +2053,7 @@ label.label input:disabled, label.label select:disabled { opacity: 0.5; }
   50%      { opacity: 0.28; }
 }
 @media (prefers-reduced-motion: no-preference) {
-  :root[data-theme="matrix"] body::before {
+  :root:is([data-theme="phosphor"], [data-theme="matrix"]) body::before {
     animation:
       matrix-rain-fall 6s linear infinite,
       matrix-rain-breathe 19s ease-in-out infinite;
@@ -2057,11 +2062,73 @@ label.label input:disabled, label.label select:disabled { opacity: 0.5; }
 /* Same rule the crowd and the chromatic wash follow — the spectacle stops once
    the race is over. Reached with :has() because the backdrop is a body-level
    layer, outside the .race subtree those rules can match directly. */
-:root[data-theme="matrix"]:has(.race.finished) body::before { animation-play-state: paused; }
+:root:is([data-theme="phosphor"], [data-theme="matrix"]):has(.race.finished) body::before {
+  animation-play-state: paused;
+}
+
+/* ── Matrix only: rain in the lanes ─────────────────────
+   A third background layer on .lane-track rather than an overlay element, for
+   two reasons. Backgrounds paint below an element's own children, so the horses
+   and their shadows stay above the rain with no z-index juggling. And
+   .lane-track's ::before/::after are already the left rail and the finish
+   chequer — there is no free pseudo-element to put an overlay in.
+
+   The layer is anchored to its own lane (default `scroll` attachment), so each
+   lane runs its own rain rather than all of them sampling one page-wide sheet.
+   That also means the rain travels with the lane, which is what makes it safe
+   in TV mode, where .track is a scroll container.
+
+   Anchoring per lane is why this uses its own tile: a lane is ~60px tall, so
+   the 600px backdrop tile would park the same frozen slice in every lane. The
+   lane tile is 180px — short enough to cycle through a lane, tall enough to
+   keep glyphs legible — and 900px wide, because one layer has nothing to
+   disguise its horizontal repeat the way the backdrop's three scales do. */
+:root[data-theme="matrix"] .lane-track {
+  background:
+    url('img/matrix-rain-lane.svg'),
+    var(--track-wash),
+    var(--lane) url('img/track-1.png') repeat-x center / auto 100%;
+  background-blend-mode: normal, var(--wash-blend), var(--track-blend);
+  background-size: 900px 180px, auto, auto 100%;
+  background-repeat: repeat, repeat, repeat-x;
+}
+/* Only the rain layer moves; the wash and the dirt sprite hold their positions.
+   Travelling exactly one tile height keeps the loop invisible. 180px over 1.8s
+   is 100px/s — the same fall speed as the backdrop's 600px over 6s, so the two
+   rains agree where they meet at the edge of the track.
+
+   The x offset comes from a variable rather than being animated, so each lane
+   can be shifted sideways without needing its own keyframes. */
+@keyframes matrix-lane-fall {
+  from { background-position: var(--rain-x, 0px) 0, 0 0, center; }
+  to   { background-position: var(--rain-x, 0px) 180px, 0 0, center; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  :root[data-theme="matrix"] .lane-track {
+    animation: matrix-lane-fall 1.8s linear infinite;
+  }
+}
+/* Without this every lane would run the identical tile in lockstep, which reads
+   as one sheet of wallpaper scrolling rather than as rain. Each lane gets a
+   different slice of the tile and a different point in the cycle; the delays are
+   negative so they start already offset instead of pausing first. Five variants,
+   which shares no common factor with the field sizes that show up in practice,
+   so the pattern doesn't line up into visible bands. */
+:root[data-theme="matrix"] .lane:nth-child(5n+1) .lane-track { --rain-x:    0px; animation-delay:  0s; }
+:root[data-theme="matrix"] .lane:nth-child(5n+2) .lane-track { --rain-x: -137px; animation-delay: -0.7s; }
+:root[data-theme="matrix"] .lane:nth-child(5n+3) .lane-track { --rain-x: -311px; animation-delay: -1.3s; }
+:root[data-theme="matrix"] .lane:nth-child(5n+4) .lane-track { --rain-x: -466px; animation-delay: -0.4s; }
+:root[data-theme="matrix"] .lane:nth-child(5n+5) .lane-track { --rain-x: -703px; animation-delay: -1.1s; }
+/* The generic `.race.finished .lane-track` pause further up cannot reach this:
+   it carries the same specificity as the rule above but comes earlier in the
+   file, and an `animation` shorthand resets animation-play-state to `running`.
+   Chromatic only escapes this because its animation is declared before that
+   rule. Anything that animates a lane from down here has to repeat the pause. */
+:root[data-theme="matrix"] .race.finished .lane-track { animation-play-state: paused; }
 
 /* Scanlines sit above the content (z-index 2 clears #app's 1) — a CRT's raster
    falls on the whole screen, not behind what it's drawing. */
-:root[data-theme="matrix"] body::after {
+:root:is([data-theme="phosphor"], [data-theme="matrix"]) body::after {
   content: '';
   position: fixed;
   inset: 0;
@@ -2079,13 +2146,11 @@ label.label input:disabled, label.label select:disabled { opacity: 0.5; }
    monochrome page. Greyscale first so the filter works off luminance only, then
    sepia+hue-rotate tints the result green. The horses are deliberately NOT
    filtered: their colours are how you tell the racers apart. */
-:root[data-theme="matrix"] .crowd {
+:root:is([data-theme="phosphor"], [data-theme="matrix"]) .crowd {
   filter: grayscale(1) sepia(1) hue-rotate(75deg) saturate(2.4) brightness(0.85);
 }
 
-:root[data-theme="matrix"] .home h1,
-:root[data-theme="matrix"] .race-header h1,
-:root[data-theme="matrix"] .race-status--live {
+:root:is([data-theme="phosphor"], [data-theme="matrix"]) :is(.home h1, .race-header h1, .race-status--live) {
   text-shadow: 0 0 8px rgba(0, 255, 65, 0.55);
 }
 
