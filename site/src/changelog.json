@@ -1,5 +1,13 @@
 [
   {
+    "version": "0.13.2",
+    "date": "2026-08-18",
+    "component": "site",
+    "changes": [
+      "Added matrix theme to race UI (adefreitas)"
+    ]
+  },
+  {
     "version": "2.13.0",
     "date": "2026-08-06",
     "component": "cli",
