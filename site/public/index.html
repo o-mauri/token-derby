@@ -15,7 +15,7 @@
     <script>
       try {
         var t = localStorage.getItem('td_theme');
-        if (['derby', 'midnight', 'turf', 'photo', 'chromatic'].indexOf(t) !== -1) {
+        if (['derby', 'midnight', 'turf', 'photo', 'chromatic', 'matrix'].indexOf(t) !== -1) {
           document.documentElement.dataset.theme = t;
         }
       } catch (e) { /* storage blocked — fall through to the :root default */ }

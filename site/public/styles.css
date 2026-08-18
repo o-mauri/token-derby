@@ -1980,6 +1980,115 @@ label.label input:disabled, label.label select:disabled { opacity: 0.5; }
 /* Same rule the crowd follows — the spectacle stops once the race is over. */
 .race.finished .lane-track { animation-play-state: paused; }
 
+/* Phosphor-on-black CRT. Deliberately pushed away from Turf (the other dark
+   green theme): Turf is a desaturated grass palette on #06120a, this is a
+   saturated #00ff41 on true black with glow and scanlines, so the two never
+   read as variants of each other in the picker. */
+:root[data-theme="matrix"] {
+  --bg: #000000;
+  --panel: #04140a;
+  --text: #8affa8;
+  /* Lighter than a dark-theme muted would normally go: this is the one theme
+     with moving glyphs behind the text, and at the top of the rain's opacity
+     swing a dimmer muted stopped being readable on the home page. */
+  --muted: #4fbf6e;
+  --accent: #00ff41;
+  --border: #10401f;
+  --lane: #0b6626;
+  --track-blend: luminosity;
+  /* Heavier than the other themes': the dirt sprite is pale tan, and luminosity
+     keeps that luminance, so without a strong shade the lanes come out grass-
+     bright — reading as Turf rather than as a phosphor track on black. */
+  --track-shade: rgba(0, 10, 3, 0.62);
+  --rail: #b9ffcb;
+  --label-box: #04160b;
+  --live: #00ff41;
+  --ticker-accent: #00ff41;
+}
+
+/* The rain is a fixed backdrop behind the whole page, not a lane treatment:
+   .lane-track's background slots are already spent on the dirt sprite + wash,
+   and glyphs running under the sprites would fight the name tags for
+   legibility. Sitting at z-index 0 it shows through wherever the page is
+   transparent — the header strip, the margins, and everything below a short
+   field — while every panel keeps its own opaque background. */
+:root[data-theme="matrix"] #app { position: relative; z-index: 1; }
+
+:root[data-theme="matrix"] body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  /* One tile, three layers at different scales and x-offsets. The tile repeats
+     every 20 glyphs, so staggering the layers is what stops the eye locking
+     onto that repeat. */
+  background-image:
+    url('img/matrix-rain.svg'),
+    url('img/matrix-rain.svg'),
+    url('img/matrix-rain.svg');
+  background-size: 300px 600px, 210px 420px, 420px 840px;
+  background-position: 0 0, 90px 0, 30px 0;
+  /* The page-wide `pixelated` would crunch the rasterised glyphs — the tile is
+     vector text, not sprite art, and the 420px layer is scaled up 1.4x. */
+  image-rendering: auto;
+  opacity: 0.2;
+}
+
+/* Each layer travels exactly its own tile height, so all three loop invisibly
+   despite running at three different speeds off one duration. */
+@keyframes matrix-rain-fall {
+  from { background-position: 0 0, 90px 0, 30px 0; }
+  to   { background-position: 0 600px, 90px 420px, 30px 840px; }
+}
+/* The "fading in and out" pass. Held well off any round multiple of the fall
+   duration so the swell drifts against the rain instead of pulsing with it. */
+@keyframes matrix-rain-breathe {
+  0%, 100% { opacity: 0.08; }
+  50%      { opacity: 0.28; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  :root[data-theme="matrix"] body::before {
+    animation:
+      matrix-rain-fall 6s linear infinite,
+      matrix-rain-breathe 19s ease-in-out infinite;
+  }
+}
+/* Same rule the crowd and the chromatic wash follow — the spectacle stops once
+   the race is over. Reached with :has() because the backdrop is a body-level
+   layer, outside the .race subtree those rules can match directly. */
+:root[data-theme="matrix"]:has(.race.finished) body::before { animation-play-state: paused; }
+
+/* Scanlines sit above the content (z-index 2 clears #app's 1) — a CRT's raster
+   falls on the whole screen, not behind what it's drawing. */
+:root[data-theme="matrix"] body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    180deg,
+    rgba(0, 0, 0, 0.22) 0 1px,
+    transparent 1px 3px
+  );
+}
+
+/* The crowd sprites carry their own baked-in shirt colours, which no palette
+   token can reach — left alone they're the one full-colour band on an otherwise
+   monochrome page. Greyscale first so the filter works off luminance only, then
+   sepia+hue-rotate tints the result green. The horses are deliberately NOT
+   filtered: their colours are how you tell the racers apart. */
+:root[data-theme="matrix"] .crowd {
+  filter: grayscale(1) sepia(1) hue-rotate(75deg) saturate(2.4) brightness(0.85);
+}
+
+:root[data-theme="matrix"] .home h1,
+:root[data-theme="matrix"] .race-header h1,
+:root[data-theme="matrix"] .race-status--live {
+  text-shadow: 0 0 8px rgba(0, 255, 65, 0.55);
+}
+
 /* ── Theme picker ───────────────────────────────────── */
 
 .theme-picker {
