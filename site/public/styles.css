@@ -1981,15 +1981,17 @@ label.label input:disabled, label.label select:disabled { opacity: 0.5; }
 .race.finished .lane-track { animation-play-state: paused; }
 
 /* ── Matrix / Phosphor ──────────────────────────────────
-   Two intensities of one phosphor-on-black CRT, sharing a palette. Phosphor
-   keeps the glyph rain to the page backdrop; Matrix also runs it through the
-   lanes. Both are deliberately pushed away from Turf, the other dark green
-   theme: Turf is a desaturated grass palette on #06120a, these are a saturated
-   #00ff41 on true black with glow and scanlines, so no two of the three read as
-   variants of each other in the picker.
+   One phosphor-on-black CRT palette, worn two ways. Phosphor is the bare
+   terminal: green on black, scanlines, glow, and no glyph rain anywhere. Matrix
+   adds the rain, both as a page backdrop and running through the lanes.
 
-   Neither is a reduced-motion option — both animate. OS-level
-   prefers-reduced-motion is honoured separately, in the gates below. */
+   Both are deliberately pushed away from Turf, the other dark green theme: Turf
+   is a desaturated grass palette on #06120a, these are a saturated #00ff41 on
+   true black, so no two of the three read as variants in the picker.
+
+   Phosphor being the still one does NOT make it a reduced-motion option — the
+   crowd still cheers and the horses still run. OS-level prefers-reduced-motion
+   is honoured separately, in the gates below. */
 :root:is([data-theme="phosphor"], [data-theme="matrix"]) {
   --bg: #000000;
   --panel: #04140a;
@@ -2012,14 +2014,15 @@ label.label input:disabled, label.label select:disabled { opacity: 0.5; }
   --ticker-accent: #00ff41;
 }
 
-/* The page backdrop — the whole effect in Phosphor, and what fills the page
-   around the track in Matrix. It is a fixed body-level layer, not a lane
-   treatment: sitting at z-index 0 it shows through wherever the page is
-   transparent (the header strip, the margins, everything below a short field)
-   while every panel keeps its own opaque background. */
-:root:is([data-theme="phosphor"], [data-theme="matrix"]) #app { position: relative; z-index: 1; }
+/* Matrix's page backdrop — what fills the page around the track. A fixed
+   body-level layer, not a lane treatment: sitting at z-index 0 it shows through
+   wherever the page is transparent (the header strip, the margins, everything
+   below a short field) while every panel keeps its own opaque background.
+   Raising #app above it is the only reason that rule exists, so both are scoped
+   to Matrix — Phosphor has no backdrop to sit in front of. */
+:root[data-theme="matrix"] #app { position: relative; z-index: 1; }
 
-:root:is([data-theme="phosphor"], [data-theme="matrix"]) body::before {
+:root[data-theme="matrix"] body::before {
   content: '';
   position: fixed;
   inset: 0;
@@ -2053,7 +2056,7 @@ label.label input:disabled, label.label select:disabled { opacity: 0.5; }
   50%      { opacity: 0.28; }
 }
 @media (prefers-reduced-motion: no-preference) {
-  :root:is([data-theme="phosphor"], [data-theme="matrix"]) body::before {
+  :root[data-theme="matrix"] body::before {
     animation:
       matrix-rain-fall 6s linear infinite,
       matrix-rain-breathe 19s ease-in-out infinite;
@@ -2062,7 +2065,7 @@ label.label input:disabled, label.label select:disabled { opacity: 0.5; }
 /* Same rule the crowd and the chromatic wash follow — the spectacle stops once
    the race is over. Reached with :has() because the backdrop is a body-level
    layer, outside the .race subtree those rules can match directly. */
-:root:is([data-theme="phosphor"], [data-theme="matrix"]):has(.race.finished) body::before {
+:root[data-theme="matrix"]:has(.race.finished) body::before {
   animation-play-state: paused;
 }
 
@@ -2126,8 +2129,9 @@ label.label input:disabled, label.label select:disabled { opacity: 0.5; }
    rule. Anything that animates a lane from down here has to repeat the pause. */
 :root[data-theme="matrix"] .race.finished .lane-track { animation-play-state: paused; }
 
-/* Scanlines sit above the content (z-index 2 clears #app's 1) — a CRT's raster
-   falls on the whole screen, not behind what it's drawing. */
+/* Scanlines sit above the page content — a CRT's raster falls on the whole
+   screen, not behind what it's drawing. z-index 2 is chosen to clear the
+   z-index 1 that Matrix puts on #app; in Phosphor anything positive would do. */
 :root:is([data-theme="phosphor"], [data-theme="matrix"]) body::after {
   content: '';
   position: fixed;
