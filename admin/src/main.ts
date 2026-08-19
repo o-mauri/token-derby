@@ -1,5 +1,8 @@
 import { getToken, setToken, clearToken } from './auth.js';
-import { login, fetchUsers, fetchOrganisations, renameUser, renameHorse, removeHat, deleteHorse } from './api.js';
+import {
+  login, fetchUsers, fetchOrganisations, renameUser, renameHorse, removeHat, deleteHorse,
+  fetchClaims, createClaim,
+} from './api.js';
 import { renderLogin } from './render/login.js';
 import { renderDashboard } from './render/dashboard.js';
 
@@ -15,6 +18,8 @@ export function boot(root: HTMLElement): void {
     renderDashboard(root, {
       fetchUsers: () => fetchUsers(),
       fetchOrganisations: () => fetchOrganisations(),
+      fetchClaims: () => fetchClaims(),
+      createClaim: (body) => createClaim(body),
       mutations: {
         renameUser: (userId, name) => renameUser(userId, name),
         renameHorse: (userId, horseId, name) => renameHorse(userId, horseId, name),

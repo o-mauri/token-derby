@@ -260,6 +260,32 @@ export async function applyRollResult(
 }
 
 /**
+ * Append a hat without touching last_rolled_level — a claim must not consume a
+ * pending roll. Returns the index the hat landed at, or null if the horse is gone.
+ */
+export async function appendStableHorseHat(
+  user_id: string,
+  stable_horse_id: string,
+  hat: CollectedHat,
+): Promise<number | null> {
+  try {
+    const { Attributes } = await ddb.send(new UpdateCommand({
+      TableName: TABLE,
+      Key: stableHorseKey(user_id, stable_horse_id),
+      UpdateExpression: 'SET hats = list_append(if_not_exists(hats, :empty), :new_hat)',
+      ConditionExpression: 'attribute_exists(pk)',
+      ExpressionAttributeValues: { ':empty': [], ':new_hat': [hat] },
+      ReturnValues: 'UPDATED_NEW',
+    }));
+    const hats = (Attributes?.hats ?? []) as CollectedHat[];
+    return hats.length - 1;
+  } catch (e: any) {
+    if (e?.name === 'ConditionalCheckFailedException') return null;
+    throw e;
+  }
+}
+
+/**
  * Set or clear the equipped_hat index on a stable horse.
  * Passing null clears the attribute entirely (reads back as undefined).
  */

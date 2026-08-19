@@ -173,6 +173,8 @@ export type Hat =
       anchor_x: number;
       rows: string[];
       variants: HatVariant[];
+      // false = obtainable only via a claim token, never from a roll.
+      rollable: boolean;
     }
   | {
       id: HatId;
@@ -183,6 +185,7 @@ export type Hat =
       rows: string[];
       colors: HatVariant;
       animation: HatAnimation;
+      rollable: boolean;
     };
 
 export type CollectedHat = {

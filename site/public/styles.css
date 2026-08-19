@@ -1106,6 +1106,16 @@ html, body {
 .rarity-badge.rarity-epic      { background: var(--rarity-epic); }
 .rarity-badge.rarity-legendary { background: var(--rarity-legendary); }
 
+.hat-exclusive {
+  margin-left: 0.5rem;
+  padding: 0.1rem 0.4rem;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  font-size: 0.7em;
+  letter-spacing: 0.08em;
+  opacity: 0.85;
+}
+
 .variants-strip {
   flex: 1;
   display: flex;

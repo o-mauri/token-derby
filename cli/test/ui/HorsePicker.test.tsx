@@ -67,4 +67,20 @@ describe('HorsePicker', () => {
     await tick();
     expect(lastFrame()).toContain('No horses in your stable');
   });
+
+  it('uses the default prompt when none is given', async () => {
+    const { lastFrame } = render(<HorsePicker horses={stable} onPick={() => {}} onCancel={() => {}} />);
+    await tick();
+    expect(lastFrame() ?? '').toContain('Pick a horse to race:');
+  });
+
+  it('uses a custom prompt when given', async () => {
+    const { lastFrame } = render(
+      <HorsePicker horses={stable} prompt="Which horse should wear it?" onPick={() => {}} onCancel={() => {}} />,
+    );
+    await tick();
+    const frame = lastFrame() ?? '';
+    expect(frame).toContain('Which horse should wear it?');
+    expect(frame).not.toContain('Pick a horse to race:');
+  });
 });

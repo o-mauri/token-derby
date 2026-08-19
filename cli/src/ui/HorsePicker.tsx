@@ -9,9 +9,10 @@ type Props = {
   horses: StableHorse[];
   onPick: (horse: StableHorse) => void;
   onCancel: () => void;
+  prompt?: string;
 };
 
-export function HorsePicker({ horses, onPick, onCancel }: Props) {
+export function HorsePicker({ horses, onPick, onCancel, prompt = 'Pick a horse to race:' }: Props) {
   const [idx, setIdx] = useState(0);
 
   useInput((input, key) => {
@@ -33,7 +34,7 @@ export function HorsePicker({ horses, onPick, onCancel }: Props) {
 
   return (
     <Box flexDirection="column">
-      <Text>Pick a horse to race:</Text>
+      <Text>{prompt}</Text>
       {horses.map((h, i) => (
         <Box key={h.stable_horse_id} flexDirection="column">
           <Box flexDirection="row">

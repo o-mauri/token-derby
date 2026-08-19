@@ -2,14 +2,14 @@ import { describe, it, expect } from 'vitest';
 import { HATS, hatById } from '../src/hats.js';
 
 describe('HATS catalog', () => {
-  it('contains exactly 39 hats', () => {
-    expect(HATS).toHaveLength(39);
+  it('contains exactly 40 hats', () => {
+    expect(HATS).toHaveLength(40);
   });
 
   it('has the expected rarity counts', () => {
     const counts = { common: 0, rare: 0, epic: 0, legendary: 0 };
     for (const h of HATS) counts[h.rarity]++;
-    expect(counts).toEqual({ common: 18, rare: 10, epic: 6, legendary: 5 });
+    expect(counts).toEqual({ common: 18, rare: 10, epic: 6, legendary: 6 });
   });
 
   it('every hat is 11×10 with width 11', () => {
@@ -48,5 +48,30 @@ describe('HATS catalog', () => {
 
   it('hatById returns undefined for an unknown id', () => {
     expect(hatById('not_a_hat')).toBeUndefined();
+  });
+
+  it('every hat declares whether it is rollable', () => {
+    for (const h of HATS) {
+      expect(typeof h.rollable, `${h.id} missing rollable`).toBe('boolean');
+    }
+  });
+
+  // Pins the claim-only roster. Adding another exclusive hat is expected to trip
+  // this — when it does, also revisit the site EXCLUSIVE badge and the admin
+  // (exclusive) label so both surfaces are checked against real data.
+  it('pins exactly which hats are claim-only', () => {
+    expect(HATS.filter(h => !h.rollable).map(h => h.id)).toEqual(['contributor_cap']);
+  });
+
+  it('the Contributor Cap is a claim-only animated legendary', () => {
+    const hat = hatById('contributor_cap');
+    expect(hat).toBeDefined();
+    expect(hat!.rarity).toBe('legendary');
+    expect(hat!.rollable).toBe(false);
+    if (hat!.rarity !== 'legendary') throw new Error('unreachable');
+    // Q is the static crown gold; keeping it out of the cycling A frames stops
+    // the logo merging into the crown mid-cycle.
+    expect(hat!.animation.frames).not.toContain(hat!.colors.Q);
+    expect(hat!.animation.frames.length).toBeGreaterThan(1);
   });
 });

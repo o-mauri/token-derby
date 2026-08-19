@@ -3,6 +3,9 @@ import type {
   AdminUsersResponse,
   AdminOrgsResponse,
   StableHorse,
+  CreateClaimRequest,
+  CreateClaimResponse,
+  AdminClaimsResponse,
 } from '@token-derby/shared';
 import { getToken } from './auth.js';
 
@@ -122,4 +125,14 @@ export function deleteHorse(
   userId: string, horseId: string, fetchImpl: FetchFn = fetch,
 ): Promise<{ deleted: boolean }> {
   return authedSend('DELETE', `/api/admin/users/${u(userId)}/horses/${u(horseId)}`, undefined, fetchImpl);
+}
+
+export function createClaim(
+  body: CreateClaimRequest, fetchImpl: FetchFn = fetch,
+): Promise<CreateClaimResponse> {
+  return authedSend('POST', '/api/admin/claims', body, fetchImpl);
+}
+
+export function fetchClaims(fetchImpl: FetchFn = fetch): Promise<AdminClaimsResponse> {
+  return authedGet<AdminClaimsResponse>('/api/admin/claims', fetchImpl);
 }

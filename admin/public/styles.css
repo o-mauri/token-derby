@@ -85,3 +85,19 @@ tr.user-row:hover { background: rgba(209,213,219,0.08); }
 .hat-eq { color: #67e8f9; font-size: .65rem; border: 1px solid #67e8f9; border-radius: 3px; padding: 0 5px; }
 .hat-remove { color: #ff6b6b; background: none; border: 1px solid #5a2a2a; border-radius: 4px; cursor: pointer; font-family: inherit; font-size: .8rem; padding: 1px 8px; }
 .hat-remove:hover { background: #2a1414; border-color: #ff6b6b; }
+
+/* claim tokens */
+.claim-form { display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
+.claim-form label { display: flex; flex-direction: column; gap: 4px; color: var(--muted); font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; }
+.claim-form select, .claim-form input { background: var(--panel); color: var(--text); border: 2px solid var(--border); padding: 8px 10px; font: inherit; font-size: .95rem; }
+.claim-form .claim-days { width: 90px; }
+.claim-form .claim-generate { background: var(--accent); color: #000; border: none; padding: 9px 20px; font: inherit; font-weight: bold; cursor: pointer; }
+.claim-form .claim-generate:hover { filter: brightness(1.1); }
+.claim-result { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 12px 16px; margin-bottom: 20px; }
+.claim-result label { display: flex; flex-direction: column; gap: 4px; color: var(--muted); font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; }
+.claim-code { font-family: "Courier New", ui-monospace, monospace; font-size: 1.1rem; letter-spacing: .08em; background: #000; color: var(--legendary); border: 2px solid var(--accent); padding: 8px 10px; width: 220px; }
+.claim-copy { background: none; color: var(--accent); border: 1px solid var(--border); border-radius: 4px; padding: 8px 14px; font: inherit; cursor: pointer; }
+.claim-copy:hover { border-color: var(--accent); }
+.claim-result p { margin: 0; width: 100%; }
+.claim-form label[hidden], .claim-result[hidden] { display: none; }
+.claim-list table code { font-family: "Courier New", ui-monospace, monospace; letter-spacing: .04em; }

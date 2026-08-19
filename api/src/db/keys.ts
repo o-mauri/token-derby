@@ -125,3 +125,15 @@ export function releaseKey(component: string, version: string) {
 export function releaseOrgKey(component: string, version: string, org_id: string) {
   return { pk: `${RELEASE_PK_PREFIX}${component}#${version}`, sk: `ORG#${org_id}` };
 }
+
+export const CLAIM_PK_PREFIX = 'CLAIM#';
+
+export function claimKey(code: string) {
+  return { pk: `${CLAIM_PK_PREFIX}${code}`, sk: 'META' };
+}
+
+export const RATELIMIT_PK_PREFIX = 'RATELIMIT#';
+
+export function rateLimitKey(bucket: string, subject: string, windowStart: number) {
+  return { pk: `${RATELIMIT_PK_PREFIX}${bucket}#${subject}`, sk: `WINDOW#${windowStart}` };
+}

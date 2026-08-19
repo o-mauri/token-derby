@@ -33,6 +33,11 @@ function deps(over: Partial<Parameters<typeof renderDashboard>[1]> = {}) {
   return {
     fetchUsers: vi.fn(async () => users),
     fetchOrganisations: vi.fn(async () => orgs),
+    fetchClaims: vi.fn(async () => ({ claims: [] })),
+    createClaim: vi.fn(async () => ({
+      code: 'ABCDEFGHJKLM', item_type: 'hat' as const, hat_id: 'flat_cap', variant: 0,
+      expires_at: '2026-09-17T00:00:00.000Z',
+    })),
     mutations: {
       renameUser: vi.fn(async (id: string, name: string) => ({ user_id: id, display_name: name })),
       renameHorse: vi.fn(async (_u: string, _h: string, name: string) => ({ ...users.users[0].horses[0], name })),

@@ -222,8 +222,13 @@ export class TokenDerbyStack extends cdk.Stack {
     const adminDeleteHorseFn = makeFn('AdminDeleteHorseFn', 'admin-delete-horse');
     const adminAnnounceReleaseFn = makeFn('AdminAnnounceReleaseFn', 'admin-announce-release', { timeout: cdk.Duration.seconds(60) });
 
+    const adminCreateClaimFn = makeFn('AdminCreateClaimFn', 'admin-create-claim');
+    const adminListClaimsFn = makeFn('AdminListClaimsFn', 'admin-list-claims');
+    const getClaimFn = makeFn('GetClaimFn', 'get-claim');
+    const redeemClaimFn = makeFn('RedeemClaimFn', 'redeem-claim');
+
     const adminSsmArn = `arn:aws:ssm:${this.region}:${this.account}:parameter${config.ssmPrefix}/*`;
-    for (const fn of [adminLoginFn, adminListUsersFn, adminListOrgsFn, adminRenameUserFn, adminRenameHorseFn, adminRemoveHatFn, adminDeleteHorseFn, adminAnnounceReleaseFn]) {
+    for (const fn of [adminLoginFn, adminListUsersFn, adminListOrgsFn, adminRenameUserFn, adminRenameHorseFn, adminRemoveHatFn, adminDeleteHorseFn, adminAnnounceReleaseFn, adminCreateClaimFn, adminListClaimsFn]) {
       fn.addToRolePolicy(new cdk.aws_iam.PolicyStatement({
         actions: ['ssm:GetParameter'],
         resources: [adminSsmArn],
@@ -354,6 +359,10 @@ export class TokenDerbyStack extends cdk.Stack {
     httpApi.addRoutes({ path: '/api/admin/users/{user_id}/horses/{stable_horse_id}/hats/{index}', methods: [HttpMethod.DELETE], integration: new HttpLambdaIntegration('AdminRemoveHatInt', adminRemoveHatFn) });
     httpApi.addRoutes({ path: '/api/admin/users/{user_id}/horses/{stable_horse_id}', methods: [HttpMethod.DELETE], integration: new HttpLambdaIntegration('AdminDeleteHorseInt', adminDeleteHorseFn) });
     httpApi.addRoutes({ path: '/api/admin/releases', methods: [HttpMethod.POST], integration: new HttpLambdaIntegration('AdminAnnounceReleaseInt', adminAnnounceReleaseFn) });
+    httpApi.addRoutes({ path: '/api/admin/claims', methods: [HttpMethod.POST], integration: new HttpLambdaIntegration('AdminCreateClaimInt', adminCreateClaimFn) });
+    httpApi.addRoutes({ path: '/api/admin/claims', methods: [HttpMethod.GET], integration: new HttpLambdaIntegration('AdminListClaimsInt', adminListClaimsFn) });
+    httpApi.addRoutes({ path: '/api/claims/{code}', methods: [HttpMethod.GET], integration: new HttpLambdaIntegration('GetClaimInt', getClaimFn) });
+    httpApi.addRoutes({ path: '/api/claims/{code}/redeem', methods: [HttpMethod.POST], integration: new HttpLambdaIntegration('RedeemClaimInt', redeemClaimFn) });
 
     // API throttling (rate-limit guardrails, not hard security)
     const defaultStage = httpApi.defaultStage!.node.defaultChild as apigatewayv2.CfnStage;

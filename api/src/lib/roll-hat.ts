@@ -41,7 +41,10 @@ export function rollHat(inventory: CollectedHat[], rng: () => number = Math.rand
   const tier = pickTier(rng);
   if (tier === 'no_hat') return { result: 'no_hat' };
 
-  const pool = HATS.filter(h => h.rarity === tier);
+  // Claim-only hats are excluded from rolls entirely. A tier whose every hat
+  // is claim-only degrades to no_hat rather than throwing.
+  const pool = HATS.filter(h => h.rarity === tier && h.rollable);
+  if (pool.length === 0) return { result: 'no_hat' };
   const hat = pool[pickIndex(pool, rng)]!;
 
   if (hat.rarity === 'legendary') {

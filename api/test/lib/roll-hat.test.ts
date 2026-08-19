@@ -1,7 +1,7 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { rollHat } from '../../src/lib/roll-hat.js';
 import { HATS } from '@token-derby/shared';
-import type { CollectedHat } from '@token-derby/shared';
+import type { CollectedHat, Hat } from '@token-derby/shared';
 
 function seededRng(values: number[]): () => number {
   let i = 0;
@@ -76,7 +76,9 @@ describe('rollHat', () => {
   });
 
   it('treats a legendary re-roll as a duplicate (no variant field)', () => {
-    const legendaries = HATS.filter(h => h.rarity === 'legendary');
+    // Must mirror rollHat's own pool, which excludes claim-only hats — otherwise
+    // an exclusive sorted before a rollable one would shift index 0 apart.
+    const legendaries = HATS.filter(h => h.rarity === 'legendary' && h.rollable);
     const target = legendaries[0]!;
     const inventory: CollectedHat[] = [
       { id: target.id, obtained_at: '2026-01-01T00:00:00.000Z' },
@@ -87,6 +89,35 @@ describe('rollHat', () => {
     if (decision.result === 'duplicate') {
       expect(decision.variant).toBeUndefined();
       expect(decision.hat_id).toBe(target.id);
+    }
+  });
+});
+
+describe('rollHat respects the rollable flag', () => {
+  it('never returns a non-rollable hat across a full sweep of the RNG', () => {
+    // Walk rng outputs across [0,1) so every tier and every hat inside it is
+    // selected at least once.
+    const seen = new Set<string>();
+    for (let i = 0; i < 2000; i++) {
+      const r = i / 2000;
+      const decision = rollHat([], () => r);
+      if (decision.result === 'hat') seen.add(decision.collected.id);
+      if (decision.result === 'duplicate') seen.add(decision.hat_id);
+    }
+    const nonRollable = new Set(HATS.filter(h => !h.rollable).map(h => h.id));
+    for (const id of seen) expect(nonRollable.has(id)).toBe(false);
+  });
+
+  it('falls through to no_hat when a tier has no rollable hats', () => {
+    // A catalog where the tier the rng picks is entirely claim-only.
+    const claimOnly: Hat[] = HATS.map(h => ({ ...h, rollable: false }));
+    const spy = vi.spyOn(HATS, 'filter');
+    spy.mockImplementation((fn: any) => claimOnly.filter(fn));
+    try {
+      // 0.5 lands in the 'common' band (no_hat is [0,0.40), common [0.40,0.77)).
+      expect(rollHat([], () => 0.5)).toEqual({ result: 'no_hat' });
+    } finally {
+      spy.mockRestore();
     }
   });
 });

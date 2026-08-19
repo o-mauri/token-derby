@@ -1,4 +1,4 @@
-import type { AdminUsersResponse, AdminOrgsResponse } from '@token-derby/shared';
+import type { AdminUsersResponse, AdminOrgsResponse, AdminClaimsResponse } from '@token-derby/shared';
 import { renderDashboard } from './render/dashboard.js';
 
 const users: AdminUsersResponse = {
@@ -18,12 +18,20 @@ const organisations: AdminOrgsResponse = {
     { org_id: 'o1', org_name: 'StackOne', created_at: '2026-04-22T00:00:00Z', creator_user_id: 'u1', creator_user_name: 'omar', members: [{ user_id: 'u1', user_name: 'omar', joined_at: 'x' }, { user_id: 'u2', user_name: 'alex', joined_at: 'x' }] },
   ],
 };
+const claims: AdminClaimsResponse = {
+  claims: [
+    { code: 'ABCDEFGHJKLM', item_type: 'hat', hat_id: 'flat_cap', variant: 0, created_at: '2026-08-01T00:00:00Z', expires_at: '2099-01-01T00:00:00Z' },
+    { code: 'MLKJHGFEDCBA', item_type: 'hat', hat_id: 'bicorne', variant: 0, created_at: '2026-08-01T00:00:00Z', expires_at: '2099-01-01T00:00:00Z', redeemed_at: '2026-08-02T00:00:00Z', redeemed_by: 'u2', redeemed_by_name: 'alex', redeemed_horse_id: 'b', redeemed_horse_name: 'Blue Streak', outcome: 'hat' },
+  ],
+};
 
 const root = document.querySelector<HTMLElement>('#app');
 if (root) {
   renderDashboard(root, {
     fetchUsers: async () => users,
     fetchOrganisations: async () => organisations,
+    fetchClaims: async () => claims,
+    createClaim: async (body) => ({ code: 'AAAABBBBCCCC', item_type: 'hat', hat_id: body.hat_id, variant: body.variant, expires_at: '2099-01-01T00:00:00Z' }),
     mutations: {
       renameUser: async (id, name) => ({ user_id: id, display_name: name }),
       renameHorse: async (_u, hid, name) => ({ ...users.users[0].horses[0], stable_horse_id: hid, name }),

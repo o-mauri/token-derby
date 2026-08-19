@@ -8,6 +8,7 @@ import { endCommand } from './commands/end.js';
 import { initCommand } from './commands/init.js';
 import { updateCommand } from './commands/update.js';
 import { rollCommand } from './commands/roll.js';
+import { claimCommand } from './commands/claim.js';
 import { orgJoinCommand } from './commands/org-join.js';
 import { webCommand } from './commands/web.js';
 import { envCommand } from './commands/env.js';
@@ -47,6 +48,8 @@ Races:
 Cosmetics:
   token-derby roll                        Spend a pending roll to try for a hat.
                                           Earn rolls by leveling up horses.
+  token-derby claim <token>               Redeem a claim token for a cosmetic
+                                          awarded to you by an admin.
 
 Environment:
   token-derby env                         Show the active environment (prod|staging)
@@ -107,6 +110,7 @@ async function main(): Promise<number> {
   if (cmd === 'join')   return joinCommand(argv[1], argv.slice(2));
   if (cmd === 'end')    return endCommand(argv[1]);
   if (cmd === 'roll')      return rollCommand();
+  if (cmd === 'claim')  return claimCommand(argv[1]);
   if (cmd === 'web')    return webCommand();
 
   console.error(`Unknown command: ${cmd}`);

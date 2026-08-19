@@ -10,6 +10,7 @@ import type {
   UpdateStableHorseRequest, UpdateStableHorseResponse, DeleteStableHorseResponse,
   RollHatResponse, EquipHatRequest, EquipHatResponse,
   WebSessionCreateResponse,
+  ClaimProbeResponse, RedeemClaimRequest, RedeemClaimResponse,
 } from '@token-derby/shared';
 import { request } from './client.js';
 
@@ -94,4 +95,12 @@ export function equipHat(stableHorseId: string, body: EquipHatRequest) {
 
 export function createWebSession() {
   return request<WebSessionCreateResponse>('POST', '/web-sessions', undefined, undefined);
+}
+
+export function probeClaim(code: string) {
+  return request<ClaimProbeResponse>('GET', `/claims/${encodeURIComponent(code)}`, undefined, undefined);
+}
+
+export function redeemClaim(code: string, body: RedeemClaimRequest) {
+  return request<RedeemClaimResponse>('POST', `/claims/${encodeURIComponent(code)}/redeem`, body, undefined);
 }

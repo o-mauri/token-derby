@@ -114,6 +114,7 @@ function renderHatRow(doc: Document, hat: Hat, palette: Palette): HTMLElement {
     <div class="hat-name-row">
       <span class="hat-name">${escapeHtml(hat.name)}</span>
       <span class="rarity-badge rarity-${hat.rarity}">${hat.rarity}</span>
+      ${hat.rollable ? '' : '<span class="hat-exclusive">EXCLUSIVE</span>'}
     </div>
     <div class="hat-id">${escapeHtml(hat.id)}</div>
     ${hat.rarity === 'legendary'
