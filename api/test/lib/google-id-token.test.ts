@@ -11,12 +11,21 @@ const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 20
 const jwk = { ...(publicKey.export({ format: 'jwk' }) as any), kid: KID, alg: 'RS256', use: 'sig' };
 const fetchJwks = async () => ({ keys: [jwk] });
 
+// Second keypair under a different kid, for exercising key-rotation re-fetch.
+const KID_2 = 'test-key-2';
+const rotated = generateKeyPairSync('rsa', { modulusLength: 2048 });
+const jwk2 = { ...(rotated.publicKey.export({ format: 'jwk' }) as any), kid: KID_2, alg: 'RS256', use: 'sig' };
+
 const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString('base64url');
 
-function signToken(payload: Record<string, unknown>, header: Record<string, unknown> = {}) {
+function signToken(
+  payload: Record<string, unknown>,
+  header: Record<string, unknown> = {},
+  signingKey = privateKey,
+) {
   const h = b64({ alg: 'RS256', typ: 'JWT', kid: KID, ...header });
   const p = b64(payload);
-  const sig = createSign('RSA-SHA256').update(`${h}.${p}`).sign(privateKey).toString('base64url');
+  const sig = createSign('RSA-SHA256').update(`${h}.${p}`).sign(signingKey).toString('base64url');
   return `${h}.${p}.${sig}`;
 }
 
@@ -72,6 +81,15 @@ describe('verifyGoogleIdToken', () => {
       .rejects.toThrow(/expired/i);
   });
 
+  it('rejects an iat implausibly far in the future', async () => {
+    await expect(
+      verifyGoogleIdToken(
+        signToken(goodPayload({ iat: Math.floor(now() / 1000) + 3600 })),
+        opts(),
+      ),
+    ).rejects.toThrow(/iat/i);
+  });
+
   it('rejects a mismatched nonce', async () => {
     await expect(verifyGoogleIdToken(signToken(goodPayload({ nonce: 'other' })), opts()))
       .rejects.toThrow(/nonce/i);
@@ -104,11 +122,41 @@ describe('verifyGoogleIdToken', () => {
     await expect(verifyGoogleIdToken('not.a.jwt.at.all', opts())).rejects.toThrow(/malformed/i);
   });
 
+  it('rejects a header segment that is valid base64url but invalid JSON', async () => {
+    const h = Buffer.from('not json').toString('base64url');
+    const p = b64(goodPayload());
+    await expect(verifyGoogleIdToken(`${h}.${p}.sig`, opts())).rejects.toThrow(/malformed/i);
+  });
+
+  it('rejects a header segment that decodes to JSON null', async () => {
+    const h = b64(null);
+    const p = b64(goodPayload());
+    await expect(verifyGoogleIdToken(`${h}.${p}.sig`, opts())).rejects.toThrow(/malformed/i);
+  });
+
   it('caches the JWKS across calls', async () => {
     let calls = 0;
     const counting = async () => { calls++; return { keys: [jwk] }; };
     await verifyGoogleIdToken(signToken(goodPayload()), opts({ fetchJwks: counting }));
     await verifyGoogleIdToken(signToken(goodPayload()), opts({ fetchJwks: counting }));
     expect(calls).toBe(1);
+  });
+
+  it('re-fetches the JWKS on a kid it does not recognise — key rotation', async () => {
+    // First fetch only knows the original key; the second (post-rotation)
+    // response adds the new one. The cache should miss on KID_2 and re-fetch.
+    let calls = 0;
+    const rotating = async () => {
+      calls++;
+      return calls === 1 ? { keys: [jwk] } : { keys: [jwk, jwk2] };
+    };
+    const rotOpts = opts({ fetchJwks: rotating });
+
+    await verifyGoogleIdToken(signToken(goodPayload()), rotOpts);
+    expect(calls).toBe(1);
+
+    const rotatedToken = signToken(goodPayload(), { kid: KID_2 }, rotated.privateKey);
+    await verifyGoogleIdToken(rotatedToken, rotOpts);
+    expect(calls).toBe(2);
   });
 });

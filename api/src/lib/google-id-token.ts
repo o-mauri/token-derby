@@ -57,6 +57,14 @@ export async function verifyGoogleIdToken(
   } catch {
     throw new Error('ID token is malformed');
   }
+  // JSON.parse succeeds on `null`/numbers/booleans without throwing, so the
+  // catch above doesn't cover a segment that decodes to a non-object.
+  if (typeof header !== 'object' || header === null || Array.isArray(header)) {
+    throw new Error('ID token is malformed');
+  }
+  if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) {
+    throw new Error('ID token is malformed');
+  }
 
   // Pin the algorithm before touching the signature, so `alg: none` and
   // symmetric-key confusion attacks cannot get past this point.
@@ -64,7 +72,11 @@ export async function verifyGoogleIdToken(
   if (typeof header.kid !== 'string') throw new Error('ID token has no kid');
 
   if (!jwksCache || !jwksCache.keys.some((k) => k.kid === header.kid)) {
-    jwksCache = await (opts.fetchJwks ?? defaultFetchJwks)();
+    const fetched = await (opts.fetchJwks ?? defaultFetchJwks)();
+    if (!fetched || !Array.isArray(fetched.keys)) {
+      throw new Error('JWKS response is malformed');
+    }
+    jwksCache = fetched;
   }
   const jwk = jwksCache.keys.find((k) => k.kid === header.kid);
   if (!jwk) throw new Error(`No JWKS key for kid ${header.kid}`);
@@ -88,6 +100,7 @@ export async function verifyGoogleIdToken(
     throw new Error('ID token iat is in the future');
   }
 
+  if (!opts.nonce) throw new Error('No nonce was stored for this sign-in attempt');
   const expected = Buffer.from(opts.nonce);
   const actual = Buffer.from(String(payload.nonce ?? ''));
   if (expected.length !== actual.length || !timingSafeEqual(expected, actual)) {
@@ -107,7 +120,7 @@ export async function verifyGoogleIdToken(
   return {
     sub: payload.sub,
     email: payload.email,
-    email_verified: true,
+    email_verified: payload.email_verified === true,
     name: typeof payload.name === 'string' ? payload.name : undefined,
     given_name: typeof payload.given_name === 'string' ? payload.given_name : undefined,
     hd: typeof payload.hd === 'string' ? payload.hd : undefined,
