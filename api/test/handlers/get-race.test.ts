@@ -239,7 +239,7 @@ describe('getRace handler', () => {
     // Horse with a season standing in division 2.
     const userA = await makeUser('GR_LgA');
     const horseA = await makeHorse(userA, 'LgHorseA');
-    await addMember(org_id, userA.user_id, userA.display_name, now);
+    await addMember(org_id, userA.user_id, now);
     const joinResA: any = await joinHandler(evt(
       { stable_horse_id: horseA.stable_horse_id }, `/races/${join_code}/join`, 'POST /races/{join_code}/join', { join_code }, userA,
     ));
@@ -253,7 +253,7 @@ describe('getRace handler', () => {
     // Horse with NO standing — should default to the bottom division (3).
     const userB = await makeUser('GR_LgB');
     const horseB = await makeHorse(userB, 'LgHorseB');
-    await addMember(org_id, userB.user_id, userB.display_name, now);
+    await addMember(org_id, userB.user_id, now);
     const joinResB: any = await joinHandler(evt(
       { stable_horse_id: horseB.stable_horse_id }, `/races/${join_code}/join`, 'POST /races/{join_code}/join', { join_code }, userB,
     ));
