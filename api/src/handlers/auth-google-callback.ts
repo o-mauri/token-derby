@@ -2,7 +2,7 @@ import type { APIGatewayProxyEventV2, APIGatewayProxyStructuredResultV2 } from '
 import type { ApiHandler } from '../lib/http.js';
 import { loadAuthConfig } from '../lib/auth-config.js';
 import { consumeAuthRequest } from '../db/auth-requests.js';
-import { verifyState, originOf, readStateCookie, stateCookieMatches } from '../lib/oauth.js';
+import { verifyState, originOf, hasStateCookie } from '../lib/oauth.js';
 import { verifyGoogleIdToken } from '../lib/google-id-token.js';
 import { resolveGoogleIdentity, EmailAlreadyLinkedError } from '../lib/identity-link.js';
 import { putWebGrant } from '../db/web-sessions.js';
@@ -53,7 +53,7 @@ export async function handleCallback(
 
     // Checked before the pending row is consumed, so a forged callback cannot
     // burn the single-use request belonging to the browser that started it.
-    if (!stateCookieMatches(readStateCookie(event), state)) return fail(origin, 'sso_failed');
+    if (!hasStateCookie(event, state)) return fail(origin, 'sso_failed');
 
     if (q.error) return fail(origin, 'sso_failed');
 

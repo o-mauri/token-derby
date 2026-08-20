@@ -13,7 +13,8 @@ import { putAuthRequest } from '../../src/db/auth-requests.js';
 import * as authRequests from '../../src/db/auth-requests.js';
 import { consumeWebGrant } from '../../src/db/web-sessions.js';
 import * as webSessions from '../../src/db/web-sessions.js';
-import { signState, STATE_COOKIE_NAME } from '../../src/lib/oauth.js';
+import { handler as googleStart } from '../../src/handlers/auth-google-start.js';
+import { signState, verifyState, stateCookie } from '../../src/lib/oauth.js';
 import { putUser, getUserById } from '../../src/db/users.js';
 import { hashSecretToken } from '../../src/lib/auth.js';
 import { getUserIdByEmail } from '../../src/db/identities.js';
@@ -21,19 +22,43 @@ import { getUserIdByEmail } from '../../src/db/identities.js';
 const REDIRECT = 'https://token-derby.mauricode.co.uk/api/auth/google/callback';
 const SECRET = 'a'.repeat(64);
 
-// `cookie` defaults to the state carried by signedState, i.e. the browser that
-// started the flow. Pass null for no cookie, or a string for a foreign one.
-function ev(code: string, signedState: string, cookie?: string | null): APIGatewayProxyEventV2 {
-  const value = cookie === undefined ? signedState.slice(0, signedState.lastIndexOf('.')) : cookie;
+// Exactly what /start puts in Set-Cookie, minus the attributes a browser strips.
+const cookiePair = (state: string) => stateCookie(state).split(';')[0]!;
+
+// `cookieFor` defaults to the state carried by signedState, i.e. the browser that
+// started the flow. Pass null for no cookie, or another state for a foreign one,
+// or an explicit jar of `name=value` pairs.
+function ev(
+  code: string,
+  signedState: string,
+  cookieFor?: string | null,
+  jar?: string[],
+): APIGatewayProxyEventV2 {
+  const state = cookieFor === undefined ? signedState.slice(0, signedState.lastIndexOf('.')) : cookieFor;
   return {
     version: '2.0', routeKey: 'GET /api/auth/google/callback',
     rawPath: '/api/auth/google/callback', rawQueryString: '',
     queryStringParameters: { code, state: signedState },
     headers: { host: 'token-derby.mauricode.co.uk' },
-    cookies: value === null ? [] : [`${STATE_COOKIE_NAME}=${value}`],
+    cookies: jar ?? (state === null ? [] : [cookiePair(state)]),
     requestContext: { domainName: 'token-derby.mauricode.co.uk' } as any,
     isBase64Encoded: false,
   } as APIGatewayProxyEventV2;
+}
+
+/** RFC 6265 storage rule, which is the whole point of this file's two-tab test:
+ *  a later Set-Cookie with the SAME name replaces the earlier one. */
+function cookieJar() {
+  const store = new Map<string, string>();
+  return {
+    accept(setCookies: string[]) {
+      for (const sc of setCookies) {
+        const pair = sc.split(';')[0]!.trim();
+        store.set(pair.slice(0, pair.indexOf('=')), pair);
+      }
+    },
+    pairs: () => [...store.values()],
+  };
 }
 
 async function seedRequest(over: { link_to_user_id?: string } = {}) {
@@ -270,5 +295,58 @@ describe('auth-google-callback', () => {
     expect(p.get('code_verifier')).toBe('v'.repeat(43));
     expect(p.get('redirect_uri')).toBe(REDIRECT);
     expect(p.get('client_secret')).toBe('GOCSPX-x');
+  });
+
+  // The regression this guards: one fixed cookie name let tab 2's /start evict
+  // tab 1's cookie, so only the most recently started tab could ever finish.
+  it('lets EITHER of two concurrently started tabs complete the flow', async () => {
+    const startEv = () => ({
+      version: '2.0', routeKey: 'GET /api/auth/google/start', rawPath: '/api/auth/google/start',
+      rawQueryString: '', headers: { host: 'token-derby.mauricode.co.uk' },
+      requestContext: { domainName: 'token-derby.mauricode.co.uk' } as any,
+      isBase64Encoded: false,
+    } as unknown as APIGatewayProxyEventV2);
+
+    const jar = cookieJar();
+    const tabs: { signed: string; state: string; nonce: string }[] = [];
+    for (let i = 0; i < 2; i++) {
+      const res: any = await googleStart(startEv());
+      jar.accept(res.cookies as string[]);
+      const url = new URL(res.headers.location as string);
+      const signed = url.searchParams.get('state')!;
+      tabs.push({ signed, state: verifyState(SECRET, signed)!, nonce: url.searchParams.get('nonce')! });
+    }
+
+    expect(tabs[0]!.state).not.toBe(tabs[1]!.state);
+    // Two distinct cookies survive in one browser; a fixed name would leave one.
+    expect(jar.pairs()).toHaveLength(2);
+
+    // Tab 1 FIRST — the older flow is the one the fixed name used to break.
+    for (const tab of tabs) {
+      const email = `twotab-${randomUUID()}@example.com`;
+      const res: any = await handleCallback(
+        ev('code', tab.signed, undefined, jar.pairs()),
+        deps(claimsFor(email, tab.nonce)),
+      );
+      expect(errOf(res.headers.location)).toBeNull();
+      expect(hashOf(res.headers.location)).toMatch(/^#code=/);
+      const consumed = await consumeWebGrant(hashOf(res.headers.location).replace('#code=', ''));
+      expect(consumed).not.toBeNull();
+      expect(await getUserIdByEmail(email)).toBe(consumed!.user_id);
+    }
+  });
+
+  it('still rejects a jar holding only another tab\'s cookie', async () => {
+    const mine = await seedRequest();
+    const other = await seedRequest();
+    const fetchSpy = vi.fn(tokenFetch('fake-id-token'));
+
+    const res: any = await handleCallback(
+      ev('code', mine.signed, undefined, [cookiePair(other.state)]),
+      { fetchImpl: fetchSpy, verifyIdToken: async () => claimsFor('x@y.com', mine.nonce) } as any,
+    );
+
+    expect(errOf(res.headers.location)).toBe('sso_failed');
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 });

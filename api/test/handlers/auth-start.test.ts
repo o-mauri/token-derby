@@ -13,7 +13,7 @@ import { handler as googleStart } from '../../src/handlers/auth-google-start.js'
 import { handler as linkStart } from '../../src/handlers/auth-link-start.js';
 import { consumeAuthRequest } from '../../src/db/auth-requests.js';
 import { putWebSession } from '../../src/db/web-sessions.js';
-import { verifyState, STATE_COOKIE_NAME } from '../../src/lib/oauth.js';
+import { verifyState, stateCookie, stateCookieName } from '../../src/lib/oauth.js';
 import { randomUUID } from 'node:crypto';
 
 function ev(over: Partial<APIGatewayProxyEventV2> = {}): APIGatewayProxyEventV2 {
@@ -42,9 +42,10 @@ describe('auth-google-start', () => {
 
     const state = verifyState('a'.repeat(64), stateFromUrl(loc));
     expect(state).not.toBeNull();
-    // The cookie is what binds the callback to this browser.
+    // The cookie is what binds the callback to this browser, and it is named
+    // after this flow's state so another tab's /start cannot evict it.
     expect(res.cookies).toEqual([
-      `${STATE_COOKIE_NAME}=${state}; HttpOnly; Secure; SameSite=Lax; Path=/api/auth; Max-Age=600`,
+      `td_auth_state_${state}=1; HttpOnly; Secure; SameSite=Lax; Path=/api/auth; Max-Age=660`,
     ]);
     const pending = await consumeAuthRequest(state!);
     expect(pending).not.toBeNull();
@@ -72,6 +73,23 @@ describe('auth-google-start', () => {
       if (before === undefined) delete process.env.SITE_ORIGIN;
       else process.env.SITE_ORIGIN = before;
     }
+  });
+
+  // A fixed cookie name made the second /start evict the first tab's cookie.
+  it('gives two concurrent starts differently NAMED cookies', async () => {
+    const a: any = await googleStart(ev());
+    const b: any = await googleStart(ev());
+    const sa = verifyState('a'.repeat(64), stateFromUrl(a.headers.location))!;
+    const sb = verifyState('a'.repeat(64), stateFromUrl(b.headers.location))!;
+    expect(sa).not.toBe(sb);
+
+    const nameOf = (setCookie: string) => setCookie.slice(0, setCookie.indexOf('='));
+    expect(nameOf(a.cookies[0])).toBe(stateCookieName(sa));
+    expect(nameOf(b.cookies[0])).toBe(stateCookieName(sb));
+    // Different names is what lets a browser keep both; same name overwrites.
+    expect(nameOf(a.cookies[0])).not.toBe(nameOf(b.cookies[0]));
+    expect(a.cookies[0]).toBe(stateCookie(sa));
+    expect(b.cookies[0]).toBe(stateCookie(sb));
   });
 });
 
@@ -111,7 +129,7 @@ describe('auth-link-start', () => {
 
     const state = verifyState('a'.repeat(64), stateFromUrl(authorize_url))!;
     expect(res.cookies).toEqual([
-      `${STATE_COOKIE_NAME}=${state}; HttpOnly; Secure; SameSite=Lax; Path=/api/auth; Max-Age=600`,
+      `td_auth_state_${state}=1; HttpOnly; Secure; SameSite=Lax; Path=/api/auth; Max-Age=660`,
     ]);
     const pending = await consumeAuthRequest(state);
     expect(pending!.link_to_user_id).toBe(user_id);

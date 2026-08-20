@@ -41,33 +41,40 @@ export function originOf(event: APIGatewayProxyEventV2): string {
   return `${scheme}://${host}`;
 }
 
-export const STATE_COOKIE_NAME = 'td_auth_state';
+export const STATE_COOKIE_PREFIX = 'td_auth_state_';
+const STATE_COOKIE_VALUE = '1';
+
+/** Sixty seconds past AUTH_REQUEST_TTL_SECONDS: the cookie is checked before the
+ *  pending row, so an equal lifetime turns a genuine timeout into sso_failed. */
+export const STATE_COOKIE_TTL_SECONDS = AUTH_REQUEST_TTL_SECONDS + 60;
+
+/** One cookie per flow. A fixed name would make a second tab's /start replace
+ *  the first tab's cookie, leaving only the newest tab able to finish. */
+export const stateCookieName = (state: string): string => `${STATE_COOKIE_PREFIX}${state}`;
 
 /** Binds the flow to the browser that started it: the signature proves we
- *  issued the state, this proves the callback is the same user agent. */
+ *  issued the state, this proves the callback is the same user agent.
+ *  `Path=/api/auth` rather than the `__Host-` prefix, which forbids Domain and
+ *  forces Path=/: a deliberate trade of related-domain isolation for scoping,
+ *  with the single-use AUTHREQ# row still bounding the damage. */
 export function stateCookie(state: string): string {
-  return `${STATE_COOKIE_NAME}=${state}; HttpOnly; Secure; SameSite=Lax; Path=/api/auth; Max-Age=${AUTH_REQUEST_TTL_SECONDS}`;
+  return `${stateCookieName(state)}=${STATE_COOKIE_VALUE}; HttpOnly; Secure; SameSite=Lax; Path=/api/auth; Max-Age=${STATE_COOKIE_TTL_SECONDS}`;
 }
 
-/** API Gateway v2 delivers cookies in `event.cookies`; the local harness passes
- *  the raw header. Read both, and never assume ours is first. */
-export function readStateCookie(event: APIGatewayProxyEventV2): string | null {
-  const raw = Array.isArray(event.cookies) && event.cookies.length > 0
-    ? event.cookies
-    : String(event.headers?.cookie ?? '').split(';');
-  const prefix = `${STATE_COOKIE_NAME}=`;
-  for (const entry of raw) {
-    const pair = String(entry).trim();
-    if (pair.startsWith(prefix)) return pair.slice(prefix.length);
-  }
-  return null;
+/** API Gateway v2 delivers cookies in `event.cookies`, one `name=value` per
+ *  entry; the local harness mirrors that. Order is never ours to assume. */
+function cookiePairs(event: APIGatewayProxyEventV2): string[] {
+  const raw = Array.isArray(event.cookies) ? event.cookies : [];
+  return raw.map((entry) => String(entry).trim());
 }
 
-export function stateCookieMatches(cookie: string | null, state: string): boolean {
-  if (!cookie) return false;
-  const a = Buffer.from(cookie);
-  const b = Buffer.from(state);
-  return a.length === b.length && timingSafeEqual(a, b);
+/** True only when the browser presents the cookie THIS flow's /start set. The
+ *  state is already HMAC-verified and travels in the callback URL, so there is
+ *  no secret here to leak through a plain comparison. */
+export function hasStateCookie(event: APIGatewayProxyEventV2, state: string): boolean {
+  if (!state) return false;
+  const expected = `${stateCookieName(state)}=${STATE_COOKIE_VALUE}`;
+  return cookiePairs(event).includes(expected);
 }
 
 export function buildAuthorizeUrl(o: {

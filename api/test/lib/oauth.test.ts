@@ -3,7 +3,8 @@ import { createHash } from 'node:crypto';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import {
   generatePkce, signState, verifyState, buildAuthorizeUrl, originOf,
-  stateCookie, readStateCookie, stateCookieMatches,
+  stateCookie, stateCookieName, hasStateCookie, STATE_COOKIE_PREFIX, STATE_COOKIE_TTL_SECONDS,
+  AUTH_REQUEST_TTL_SECONDS,
 } from '../../src/lib/oauth.js';
 
 describe('generatePkce', () => {
@@ -37,38 +38,50 @@ describe('state signing', () => {
 
 describe('the state cookie', () => {
   const withCookies = (cookies: string[]) => ({ cookies } as unknown as APIGatewayProxyEventV2);
-  const withHeader = (cookie: string) => ({ headers: { cookie } } as unknown as APIGatewayProxyEventV2);
 
-  it('names itself, is HttpOnly, Secure, SameSite=Lax and scoped to /api/auth', () => {
+  it('carries the state in its NAME so concurrent flows cannot overwrite each other', () => {
+    expect(stateCookieName('st-1')).toBe('td_auth_state_st-1');
     expect(stateCookie('st-1')).toBe(
-      'td_auth_state=st-1; HttpOnly; Secure; SameSite=Lax; Path=/api/auth; Max-Age=600',
+      'td_auth_state_st-1=1; HttpOnly; Secure; SameSite=Lax; Path=/api/auth; Max-Age=660',
     );
+    // Two flows produce two differently NAMED cookies, so a browser keeps both.
+    expect(stateCookie('st-2')).not.toBe(stateCookie('st-1'));
+    expect(stateCookieName('st-2')).not.toBe(stateCookieName('st-1'));
   });
 
-  it('reads the value out of event.cookies even when it is not first', () => {
-    expect(readStateCookie(withCookies(['other=1', 'td_auth_state=st-1', 'z=2']))).toBe('st-1');
+  it('outlives the pending request, so a slow consent screen reports expired not sso_failed', () => {
+    expect(STATE_COOKIE_TTL_SECONDS).toBeGreaterThan(AUTH_REQUEST_TTL_SECONDS);
+    expect(stateCookie('st-1')).toContain(`Max-Age=${STATE_COOKIE_TTL_SECONDS}`);
   });
 
-  it('reads the value out of a raw Cookie header, tolerating stray spaces', () => {
-    expect(readStateCookie(withHeader('other=1;  td_auth_state=st-1 ; z=2'))).toBe('st-1');
+  it('accepts its own cookie among others, in any position', () => {
+    expect(hasStateCookie(withCookies(['other=1', stateCookie('st-1').split(';')[0]!, 'z=2']), 'st-1'))
+      .toBe(true);
+    expect(hasStateCookie(withCookies(['td_auth_state_st-9=1', 'td_auth_state_st-1=1']), 'st-1'))
+      .toBe(true);
   });
 
-  it('is not confused by a cookie whose name merely ends with ours', () => {
-    expect(readStateCookie(withCookies(['xtd_auth_state=decoy']))).toBeNull();
+  it('rejects a cookie for a different flow', () => {
+    expect(hasStateCookie(withCookies(['td_auth_state_st-2=1']), 'st-1')).toBe(false);
   });
 
-  it('returns null when there is no cookie at all', () => {
-    expect(readStateCookie({} as APIGatewayProxyEventV2)).toBeNull();
-    expect(readStateCookie(withCookies([]))).toBeNull();
-    expect(readStateCookie(withHeader(''))).toBeNull();
+  it('rejects a name that merely contains the prefix rather than starting with it', () => {
+    expect(hasStateCookie(withCookies([`x${STATE_COOKIE_PREFIX}st-1=1`]), 'st-1')).toBe(false);
+    expect(hasStateCookie(withCookies(['td_auth_state_st-1-longer=1']), 'st-1')).toBe(false);
   });
 
-  it('matches only the exact state', () => {
-    expect(stateCookieMatches('st-1', 'st-1')).toBe(true);
-    expect(stateCookieMatches('st-2', 'st-1')).toBe(false);
-    expect(stateCookieMatches('st-1-longer', 'st-1')).toBe(false);
-    expect(stateCookieMatches('', 'st-1')).toBe(false);
-    expect(stateCookieMatches(null, 'st-1')).toBe(false);
+  it('rejects an empty value under the right name', () => {
+    expect(hasStateCookie(withCookies(['td_auth_state_st-1=']), 'st-1')).toBe(false);
+    expect(hasStateCookie(withCookies(['td_auth_state_st-1']), 'st-1')).toBe(false);
+  });
+
+  it('rejects when there is no cookie at all', () => {
+    expect(hasStateCookie({} as APIGatewayProxyEventV2, 'st-1')).toBe(false);
+    expect(hasStateCookie(withCookies([]), 'st-1')).toBe(false);
+  });
+
+  it('rejects an empty state, so a bare prefix cookie can never satisfy the guard', () => {
+    expect(hasStateCookie(withCookies([`${STATE_COOKIE_PREFIX}=1`]), '')).toBe(false);
   });
 });
 
