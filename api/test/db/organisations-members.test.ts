@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { putOrganisation, addMember, listOrgMembers } from '../../src/db/organisations.js';
+import { putOrganisation, addMember, listOrgMembers, listOrgMemberIds } from '../../src/db/organisations.js';
 import { putUser, updateUserDisplayName } from '../../src/db/users.js';
 
 const uid = () => `u-mem-${Math.random().toString(36).slice(2)}`;
@@ -68,5 +68,20 @@ describe('listOrgMembers', () => {
 
   it('returns an empty array for an org with no members', async () => {
     expect(await listOrgMembers(`org-empty-${Date.now()}`)).toEqual([]);
+  });
+});
+
+describe('listOrgMemberIds', () => {
+  it('returns the member ids for an org', async () => {
+    const creator = uid();
+    const bob = uid();
+    const org_id = await seedOrg([{ id: creator, name: 'Creator' }, { id: bob, name: 'Bob' }]);
+
+    const ids = await listOrgMemberIds(org_id);
+    expect(ids.sort()).toEqual([creator, bob].sort());
+  });
+
+  it('returns an empty array for an org with no members', async () => {
+    expect(await listOrgMemberIds(`org-empty-${Date.now()}`)).toEqual([]);
   });
 });

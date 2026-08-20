@@ -42,7 +42,7 @@ export const handler: ApiHandler = async (event) => {
     org_join_token: org.org_join_token,
     created_at: org.created_at,
     creator_user_id: org.creator_user_id,
-    creator_user_name: creator?.display_name ?? '',
+    creator_user_name: creator?.display_name ?? org.creator_user_name,
   };
   return ok(response);
 };

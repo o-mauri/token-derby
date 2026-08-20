@@ -38,7 +38,7 @@ export async function updateUserDisplayName(user_id: string, display_name: strin
 }
 
 /** Resolves display names from the user rows. Missing users are absent from the map. */
-export async function getUsersByIds(user_ids: string[]): Promise<Map<string, string>> {
+export async function getUserNamesByIds(user_ids: string[]): Promise<Map<string, string>> {
   const out = new Map<string, string>();
   const unique = [...new Set(user_ids.filter(id => id !== ''))];
   // BatchGet is limited to 100 keys per request — chunk to be safe.

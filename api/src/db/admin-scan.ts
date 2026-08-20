@@ -7,7 +7,7 @@ import {
   parseStableHorseId,
 } from './keys.js';
 import type { AdminUser, AdminOrg, AdminOrgMember, StableHorse } from '@token-derby/shared';
-import { getUsersByIds } from './users.js';
+import { getUserNamesByIds } from './users.js';
 
 // Paginates the full LastEvaluatedKey chain. NB: multi-page pagination is not
 // exercised by the test suite (would require >1MB of seed data on DynamoDB Local).
@@ -72,6 +72,7 @@ export async function scanOrganisations(): Promise<AdminOrg[]> {
   const items = await scanByPkPrefix(ORG_PK_PREFIX);
   const byOrg = new Map<string, AdminOrg>();
   const membersByOrg = new Map<string, AdminOrgMember[]>();
+  const creatorNameAtCreation = new Map<string, string>();
 
   const ensure = (org_id: string): AdminOrg => {
     let o = byOrg.get(org_id);
@@ -93,6 +94,7 @@ export async function scanOrganisations(): Promise<AdminOrg[]> {
       o.org_name = String(it.org_name ?? '');
       o.created_at = String(it.created_at ?? '');
       o.creator_user_id = String(it.creator_user_id ?? '');
+      creatorNameAtCreation.set(org_id, String(it.creator_user_name ?? ''));
       // org_join_token / webhook_secret deliberately ignored.
     } else if (sk.startsWith(MEMBER_SK_PREFIX)) {
       const list = membersByOrg.get(org_id) ?? [];
@@ -111,9 +113,13 @@ export async function scanOrganisations(): Promise<AdminOrg[]> {
   const ids: string[] = [];
   for (const o of byOrg.values()) ids.push(o.creator_user_id);
   for (const members of membersByOrg.values()) for (const m of members) ids.push(m.user_id);
-  const names = await getUsersByIds(ids);
+  const names = await getUserNamesByIds(ids);
 
-  for (const o of byOrg.values()) o.creator_user_name = names.get(o.creator_user_id) ?? '';
+  // Live name wins when the user row still exists; otherwise fall back to the
+  // name stamped on the org at creation time, rather than blanking it.
+  for (const o of byOrg.values()) {
+    o.creator_user_name = names.get(o.creator_user_id) ?? creatorNameAtCreation.get(o.org_id) ?? '';
+  }
 
   for (const [org_id, members] of membersByOrg) {
     for (const m of members) m.user_name = names.get(m.user_id) ?? '';

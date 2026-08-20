@@ -1,7 +1,7 @@
 import { PutCommand, GetCommand, QueryCommand, BatchGetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { ddb, TABLE } from './client.js';
 import { orgMetaKey, orgMemberKey, ORG_PK_PREFIX, MEMBER_SK_PREFIX, parseOrgId } from './keys.js';
-import { getUsersByIds } from './users.js';
+import { getUserNamesByIds } from './users.js';
 import type { Organisation, OrganisationSummary, OrgSlackMessages, OrgSlackDigest } from '@token-derby/shared';
 
 // Sparse index over org meta rows that have Slack configured. Only those rows
@@ -132,6 +132,23 @@ export async function listOrganisationsForUser(user_id: string): Promise<Organis
 
 export type OrgMember = { user_id: string; user_name: string; joined_at: string };
 
+// Membership-only lookup — no name resolution, no BatchGet. Use this when all
+// a caller needs is "is this user a member", not display names.
+export async function listOrgMemberIds(org_id: string): Promise<string[]> {
+  const { Items = [] } = await ddb.send(new QueryCommand({
+    TableName: TABLE,
+    KeyConditionExpression: 'pk = :pk AND begins_with(sk, :mp)',
+    ExpressionAttributeValues: {
+      ':pk': `${ORG_PK_PREFIX}${org_id}`,
+      ':mp': MEMBER_SK_PREFIX,
+    },
+    ProjectionExpression: 'member_user_id',
+  }));
+  return Items
+    .map(it => String(it.member_user_id ?? ''))
+    .filter(id => id !== '');
+}
+
 export async function listOrgMembers(org_id: string): Promise<OrgMember[]> {
   const { Items = [] } = await ddb.send(new QueryCommand({
     TableName: TABLE,
@@ -151,13 +168,13 @@ export async function listOrgMembers(org_id: string): Promise<OrgMember[]> {
 
   // Names come from the user rows, never from the member row — a copy there
   // would go stale on rename.
-  const names = await getUsersByIds(rows.map(r => r.user_id));
+  const names = await getUserNamesByIds(rows.map(r => r.user_id));
   return rows.map(r => ({ user_id: r.user_id, user_name: names.get(r.user_id) ?? '', joined_at: r.joined_at }));
 }
 
 // Stable for tests. Not used in handler paths.
 export async function listMembersForOrg(org_id: string): Promise<string[]> {
-  return (await listOrgMembers(org_id)).map(m => m.user_id);
+  return listOrgMemberIds(org_id);
 }
 
 export async function setOrgWebhook(

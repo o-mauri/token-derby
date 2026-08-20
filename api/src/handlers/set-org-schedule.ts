@@ -77,6 +77,7 @@ export const handler: ApiHandler = async (event) => {
     ...(body.stamina ? { stamina: true } : {}),
     created_at: new Date().toISOString(),
     creator_user_id: auth.user_id,
+    // Frozen at the moment the schedule was set — do not resolve live on rename.
     creator_user_name: auth.display_name,
   };
   await putSchedule(schedule);

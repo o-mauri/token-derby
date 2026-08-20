@@ -69,6 +69,7 @@ export const handler: ApiHandler = async (event) => {
       status: 'active',
       created_at: new Date().toISOString(),
       creator_user_id: auth.user_id,
+      // Records who set up the league at the time — not re-resolved if they rename later.
       creator_user_name: auth.display_name,
     };
     await putLeague(league);

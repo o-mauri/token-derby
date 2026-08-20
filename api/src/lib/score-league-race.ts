@@ -1,7 +1,7 @@
 import type { Race, Horse } from '@token-derby/shared';
 import { leaguePoints } from '@token-derby/shared';
 import { getLeague } from '../db/leagues.js';
-import { listOrgMembers } from '../db/organisations.js';
+import { listOrgMemberIds } from '../db/organisations.js';
 import { listSeasonStandings, ensureStanding, addStandingPointsForRound } from '../db/league-standings.js';
 
 // A finisher as scoreLeagueRace requires it: both token figures already
@@ -42,7 +42,7 @@ export async function scoreLeagueRace(
   const round = race.league_round;
   const bottom = league.divisions.length;
 
-  const members = new Set((await listOrgMembers(org_id)).map(m => m.user_id));
+  const members = new Set(await listOrgMemberIds(org_id));
   const participants = horses.filter(
     (h): h is FinishedHorse & { stable_horse_id: string; user_id: string } =>
       Boolean(h.stable_horse_id) && Boolean(h.user_id) && members.has(h.user_id),

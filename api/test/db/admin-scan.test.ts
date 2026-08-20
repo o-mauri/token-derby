@@ -95,4 +95,17 @@ describe('admin-scan', () => {
     // sorted by the *current* name, so the rename reorders them
     expect(org.members.map(m => m.user_name)).toEqual(['Aaron', 'Zach']);
   });
+
+  it('falls back to the stored creator name when the creator has no user row', async () => {
+    const id = oid();
+    const c1 = uid();
+    await putOrganisation(
+      { org_id: id, org_name: `NoRow${id.slice(2, 6)}`, created_at: '2026-04-22T00:00:00.000Z', creator_user_id: c1, creator_user_name: 'Ghost' },
+      'JT',
+    );
+    // No putUser for c1 — the creator's user row never existed (or is gone).
+
+    const org = (await scanOrganisations()).find(o => o.org_id === id)!;
+    expect(org.creator_user_name).toBe('Ghost');
+  });
 });
