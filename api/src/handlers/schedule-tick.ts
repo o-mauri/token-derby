@@ -2,6 +2,7 @@ import { listAllSchedules, tryClaimMaterialised } from '../db/schedules.js';
 import { listAllLeagues } from '../db/leagues.js';
 import { ensureLeagueSeason, tryClaimLeagueFixture, stampFinalFixtureEnd } from '../db/league-seasons.js';
 import { getOrganisationById, listOrgsWithSlackDigest, markDigestSent } from '../db/organisations.js';
+import { getUserNamesByIds } from '../db/users.js';
 import { isoWeekdayInTz, localDateInTz, localDateTimeToUtcMs } from '../lib/tz.js';
 import { createRace } from '../lib/create-race.js';
 import { rolloverDueLeague } from '../lib/rollover-league.js';
@@ -13,6 +14,13 @@ import { leagueFixtureName } from '@token-derby/shared';
 // time is inside an active weekday's window and not yet created today — both
 // repeating RaceSchedules and League fixtures (an org has at most one of the
 // two). One tick handles both since the work is the same shape.
+// Scheduled races stamp the creator's name as it is at materialisation, not as it
+// was when the schedule was set up, so a rename shows on races created afterwards.
+async function creatorName(user_id: string, storedAtConfig: string): Promise<string> {
+  const names = await getUserNamesByIds([user_id]);
+  return names.get(user_id) ?? storedAtConfig;
+}
+
 export const handler = async (): Promise<void> => {
   const now = new Date();
   const nowMs = now.getTime();
@@ -51,7 +59,7 @@ export const handler = async (): Promise<void> => {
         primary_top5: sched.primary_top5,
         stamina: sched.stamina,
         creator_user_id: sched.creator_user_id,
-        creator_user_name: sched.creator_user_name,
+        creator_user_name: await creatorName(sched.creator_user_id, sched.creator_user_name),
         org: {
           org_id: org.org_id,
           org_name: org.org_name,
@@ -137,7 +145,7 @@ export const handler = async (): Promise<void> => {
         primary_top5: league.primary_top5,
         stamina: league.stamina,
         creator_user_id: league.creator_user_id,
-        creator_user_name: league.creator_user_name,
+        creator_user_name: await creatorName(league.creator_user_id, league.creator_user_name),
         org: {
           org_id: org.org_id,
           org_name: org.org_name,

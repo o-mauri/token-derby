@@ -6,6 +6,7 @@ import { putLeague, getLeague } from '../../src/db/leagues.js';
 import { getLeagueSeason } from '../../src/db/league-seasons.js';
 import { listRacesByOrgId } from '../../src/db/races.js';
 import { makeUser, type TestUser } from '../helpers/auth-helper.js';
+import { updateUserDisplayName } from '../../src/db/users.js';
 import { CURRENT_CLI_VERSION } from '../helpers/cli-version.js';
 import type { League } from '@token-derby/shared';
 
@@ -56,6 +57,26 @@ describe('league fixture materialisation (via schedule-tick)', () => {
     await runTick(); // same day → no second fixture
     races = await listRacesByOrgId(org_id);
     expect(races.length).toBe(1);
+  });
+
+  it('stamps the creator name current at materialisation, not at league creation', async () => {
+    const user = await makeUser('LgRenameBef');
+    const org_id = await createOrg(user, 'LgRename');
+    await putLeague({
+      ...baseLeague(org_id, { race_name: 'Rename League' }),
+      creator_user_id: user.user_id,
+      creator_user_name: 'LgRenameBef',
+    });
+
+    await updateUserDisplayName(user.user_id, 'LgRenameAft');
+
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-01T10:00:00Z'));
+    await tick();
+
+    const races = await listRacesByOrgId(org_id);
+    expect(races.length).toBe(1);
+    expect(races[0]!.creator_user_name).toBe('LgRenameAft');
   });
 
   it('stamps stamina from the league config onto each fixture', async () => {

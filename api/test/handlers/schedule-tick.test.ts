@@ -6,6 +6,7 @@ import { putSchedule } from '../../src/db/schedules.js';
 import { listRacesByOrgId } from '../../src/db/races.js';
 import { setOrgSlack, getOrganisationByName } from '../../src/db/organisations.js';
 import { putStableHorse } from '../../src/db/stable.js';
+import { updateUserDisplayName } from '../../src/db/users.js';
 import { makeUser, type TestUser } from '../helpers/auth-helper.js';
 import type { RaceSchedule, OrgSlackDigest, StableHorse } from '@token-derby/shared';
 import { CURRENT_CLI_VERSION } from '../helpers/cli-version.js';
@@ -65,6 +66,40 @@ describe('schedule-tick', () => {
     await runTick();
     races = await listRacesByOrgId(org_id);
     expect(races.length).toBe(1);
+  });
+
+  it('stamps the creator name current at materialisation, not at schedule creation', async () => {
+    const user = await makeUser('TickRenameBef');
+    const org_id = await createOrg(user, 'TickRename');
+    await putSchedule({
+      ...baseSchedule(org_id),
+      creator_user_id: user.user_id,
+      creator_user_name: 'TickRenameBef',
+    });
+
+    await updateUserDisplayName(user.user_id, 'TickRenameAft');
+
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2024-07-01T10:00:00Z'));
+    await runTick();
+
+    const races = await listRacesByOrgId(org_id);
+    expect(races.length).toBe(1);
+    expect(races[0]!.creator_user_name).toBe('TickRenameAft');
+  });
+
+  it('falls back to the schedule\'s stored name when the creator has no user row', async () => {
+    const user = await makeUser('TickFallback');
+    const org_id = await createOrg(user, 'TickFallbk');
+    // baseSchedule's creator_user_id 'u1' has no USER# row.
+    await putSchedule(baseSchedule(org_id));
+
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2024-07-01T10:00:00Z'));
+    await runTick();
+
+    const races = await listRacesByOrgId(org_id);
+    expect(races[0]!.creator_user_name).toBe('Alice');
   });
 
   it('does nothing before the window opens', async () => {
