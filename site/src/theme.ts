@@ -42,6 +42,24 @@ export function readTheme(): ThemeId {
 
 export function applyTheme(id: ThemeId, doc: Document = document): void {
   doc.documentElement.dataset.theme = id;
+  ensureRainBackdrop(doc);
+}
+
+/** Matrix's glyph-rain backdrop, which every other theme hides in CSS.
+ *
+ *  Built here rather than written into the page shells because there are seven
+ *  of them (index plus the previews) and all of them honour the theme picker.
+ *  It is markup at all, where it used to be a `body::before`, because the fall
+ *  is a transform and a transform moves a whole element, so the three parallax
+ *  layers each need a box of their own. See .rain-backdrop in styles.css for
+ *  why the fall has to be a transform. */
+function ensureRainBackdrop(doc: Document): void {
+  if (!doc.body || doc.querySelector('.rain-backdrop')) return;
+  const backdrop = doc.createElement('div');
+  backdrop.className = 'rain-backdrop';
+  backdrop.setAttribute('aria-hidden', 'true');
+  for (let i = 0; i < 3; i++) backdrop.appendChild(doc.createElement('i'));
+  doc.body.prepend(backdrop);
 }
 
 export function setTheme(id: ThemeId, doc: Document = document): void {

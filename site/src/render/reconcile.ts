@@ -152,6 +152,12 @@ function createLane(doc: Document, horse: HorseView, isLeague: boolean, staminaE
   const trackStrip = doc.createElement('div');
   trackStrip.className = 'lane-track';
 
+  // Matrix's in-lane glyph rain; every other theme hides it. Always built so a
+  // theme switch is pure CSS — it costs one empty div per lane.
+  const rain = doc.createElement('div');
+  rain.className = 'lane-rain';
+  trackStrip.appendChild(rain);
+
   const wrap = doc.createElement('div');
   wrap.className = 'horse';
   wrap.dataset.horseId = horse.horse_id;
