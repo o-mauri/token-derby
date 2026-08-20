@@ -33,8 +33,10 @@ export async function loadAuthConfig(
   client: SSMClient = defaultClient,
 ): Promise<AuthConfig> {
   if (cache) return cache;
-  // Local harness: no AWS credentials, no SSM.
-  const fromEnv = process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET && process.env.AUTH_STATE_SECRET;
+  // Local harness only: DYNAMODB_ENDPOINT is the local-run marker (db/client.ts
+  // reads it too) and Lambda never sets it, so deployed code always uses SSM.
+  const fromEnv = Boolean(process.env.DYNAMODB_ENDPOINT)
+    && process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET && process.env.AUTH_STATE_SECRET;
   if (fromEnv) {
     cache = {
       clientId: process.env.GOOGLE_CLIENT_ID!,

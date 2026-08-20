@@ -48,7 +48,7 @@ export async function authenticate(
   // SSO-created users have no CLI credential at all. Without this guard the
   // length comparison below throws and the caller sees a 500 instead of a 401.
   if (typeof storedHash !== 'string' || storedHash.length === 0) {
-    return { error: 'This account has no CLI token — run `token-derby login`' };
+    return { error: 'Invalid token' };
   }
   if (providedHash.length !== storedHash.length) {
     return { error: 'Invalid token' };

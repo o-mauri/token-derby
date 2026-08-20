@@ -30,7 +30,9 @@ describe('authenticate with an SSO-created user', () => {
 
     const res = await authenticate(ev(user_id, 'any-token-at-all'));
     expect('error' in res).toBe(true);
-    expect((res as { error: string }).error).toMatch(/token/i);
+    // Indistinguishable from a wrong token, and it must not name a CLI command
+    // that does not exist yet.
+    expect((res as { error: string }).error).toBe('Invalid token');
   });
 
   it('still authenticates a legacy user that does have a hash', async () => {
