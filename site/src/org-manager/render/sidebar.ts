@@ -8,6 +8,7 @@ export type SidebarDeps = {
   onSelect: (orgName: string) => void;
   onCreate: () => void;
   onJoin: () => void;
+  onLinkGoogle: () => void;
   onLogout: () => void;
 };
 
@@ -25,6 +26,7 @@ export function renderSidebar(root: HTMLElement, deps: SidebarDeps): void {
       <div class="org-actions">
         <button type="button" class="org-create">+ Create</button>
         <button type="button" class="org-join">Join with token</button>
+        <button type="button" class="org-link-google">Link Google account</button>
       </div>
     </aside>
   `;
@@ -34,5 +36,6 @@ export function renderSidebar(root: HTMLElement, deps: SidebarDeps): void {
   });
   root.querySelector('.org-create')!.addEventListener('click', () => deps.onCreate());
   root.querySelector('.org-join')!.addEventListener('click', () => deps.onJoin());
+  root.querySelector('.org-link-google')!.addEventListener('click', () => deps.onLinkGoogle());
   root.querySelector('.org-logout')!.addEventListener('click', () => deps.onLogout());
 }

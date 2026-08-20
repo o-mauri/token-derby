@@ -16,7 +16,8 @@ type Tab = 'overview' | 'members' | 'racing' | 'webhook' | 'slackbot' | 'race-se
 export function renderOrgManager(root: HTMLElement): () => void {
   let disposed = false;
 
-  const showLogin = () => { if (!disposed) renderLogin(root); };
+  const authError = new URLSearchParams(window.location.search).get('auth_error');
+  const showLogin = () => { if (!disposed) renderLogin(root, { authError }); };
 
   const boot = async () => {
     // 1. If arriving from the CLI with a code, exchange it for a session.
@@ -58,6 +59,12 @@ export function renderOrgManager(root: HTMLElement): () => void {
         const token = prompt('Join token:')?.trim();
         if (!token) return;
         try { await api.joinOrganisation(token); location.reload(); } catch (e) { alert(String((e as Error).message)); }
+      },
+      onLinkGoogle: async () => {
+        try {
+          const { authorize_url } = await api.linkStart();
+          window.location.assign(authorize_url);
+        } catch (e) { alert(String((e as Error).message)); }
       },
       onLogout: async () => { await api.logout(); showLogin(); },
     });

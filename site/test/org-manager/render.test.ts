@@ -25,12 +25,33 @@ describe('renderSidebar', () => {
     renderSidebar(root, {
       orgs: [{ org_id: 'o1', org_name: 'Acme' }],
       selected: 'Acme', ownerOrgs: new Set(['Acme']),
-      onSelect, onCreate: vi.fn(), onJoin: vi.fn(), onLogout: vi.fn(),
+      onSelect, onCreate: vi.fn(), onJoin: vi.fn(), onLinkGoogle: vi.fn(), onLogout: vi.fn(),
     });
     expect(root.textContent).toContain('Acme');
     expect(root.textContent.toLowerCase()).toContain('owner');
     (root.querySelector('[data-org="Acme"]') as HTMLElement).click();
     expect(onSelect).toHaveBeenCalledWith('Acme');
+  });
+
+  it('renders a Link Google account button', () => {
+    renderSidebar(root, {
+      orgs: [],
+      selected: null, ownerOrgs: new Set(),
+      onSelect: vi.fn(), onCreate: vi.fn(), onJoin: vi.fn(), onLinkGoogle: vi.fn(), onLogout: vi.fn(),
+    });
+    expect(root.querySelector('.org-link-google')).not.toBeNull();
+    expect(root.textContent).toMatch(/link google account/i);
+  });
+
+  it('fires onLinkGoogle when the button is clicked', () => {
+    const onLinkGoogle = vi.fn();
+    renderSidebar(root, {
+      orgs: [],
+      selected: null, ownerOrgs: new Set(),
+      onSelect: vi.fn(), onCreate: vi.fn(), onJoin: vi.fn(), onLinkGoogle, onLogout: vi.fn(),
+    });
+    (root.querySelector('.org-link-google') as HTMLElement).click();
+    expect(onLinkGoogle).toHaveBeenCalledTimes(1);
   });
 });
 

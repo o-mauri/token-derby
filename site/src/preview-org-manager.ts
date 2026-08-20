@@ -43,7 +43,7 @@ renderSidebar(shell.querySelector<HTMLElement>('.org-side')!, {
   ],
   selected: 'Acme',
   ownerOrgs: new Set(['Acme']),
-  onSelect: () => {}, onCreate: () => {}, onJoin: () => {}, onLogout: () => {},
+  onSelect: () => {}, onCreate: () => {}, onJoin: () => {}, onLinkGoogle: () => {}, onLogout: () => {},
 });
 
 renderOverview(shell.querySelector<HTMLElement>('.org-tabbody')!, {

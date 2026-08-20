@@ -6,6 +6,7 @@ import type {
   GetOrgLeagueResponse, SetOrgLeagueRequest, SetOrgLeagueResponse, DeleteOrgLeagueResponse,
   GetOrgSlackResponse, SetOrgSlackRequest,
   GetOrgRaceSettingsResponse, SetOrgRaceSettingsRequest, SetOrgRaceSettingsResponse,
+  AuthLinkStartResponse,
 } from '@token-derby/shared';
 import { getSession, setSession, clearSession } from './session.js';
 
@@ -104,3 +105,5 @@ export const createOrganisation = (name: string, f: FetchFn = fetch) =>
   authed<CreateOrganisationResponse>('POST', '/api/organisations', { name }, f);
 export const joinOrganisation = (token: string, f: FetchFn = fetch) =>
   authed<JoinOrganisationResponse>('POST', '/api/organisations/join', { join_token: token }, f);
+export const linkStart = (f: FetchFn = fetch) =>
+  authed<AuthLinkStartResponse>('POST', '/api/auth/link/start', undefined, f);
