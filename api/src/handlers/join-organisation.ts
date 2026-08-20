@@ -25,7 +25,7 @@ export const handler: ApiHandler = async (event) => {
   // Idempotent — re-joining is a no-op that still returns the org info so the CLI
   // can tell the user which org they're in.
   if (!(await isMember(org.org_id, auth.user_id))) {
-    await addMember(org.org_id, auth.user_id, auth.display_name, new Date().toISOString());
+    await addMember(org.org_id, auth.user_id, new Date().toISOString());
   }
 
   const response: JoinOrganisationResponse = { org_id: org.org_id, org_name: org.org_name };

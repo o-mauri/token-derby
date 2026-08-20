@@ -48,7 +48,7 @@ export const handler: ApiHandler = async (event) => {
     org_join_token,
   );
 
-  await addMember(org_id, auth.user_id, auth.display_name, now);
+  await addMember(org_id, auth.user_id, now);
 
   const response: CreateOrganisationResponse = { org_id, org_name: name, org_join_token };
   return ok(response);

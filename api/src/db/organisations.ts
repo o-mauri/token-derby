@@ -1,6 +1,7 @@
 import { PutCommand, GetCommand, QueryCommand, BatchGetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { ddb, TABLE } from './client.js';
 import { orgMetaKey, orgMemberKey, ORG_PK_PREFIX, MEMBER_SK_PREFIX, parseOrgId } from './keys.js';
+import { getUsersByIds } from './users.js';
 import type { Organisation, OrganisationSummary, OrgSlackMessages, OrgSlackDigest } from '@token-derby/shared';
 
 // Sparse index over org meta rows that have Slack configured. Only those rows
@@ -73,7 +74,6 @@ export async function getOrganisationByJoinToken(join_token: string): Promise<Or
 export async function addMember(
   org_id: string,
   user_id: string,
-  user_name: string,
   joined_at: string,
 ): Promise<void> {
   await ddb.send(new PutCommand({
@@ -81,7 +81,6 @@ export async function addMember(
     Item: {
       ...orgMemberKey(org_id, user_id),
       member_user_id: user_id,
-      user_name,
       joined_at,
     },
   }));
@@ -141,13 +140,19 @@ export async function listOrgMembers(org_id: string): Promise<OrgMember[]> {
       ':pk': `${ORG_PK_PREFIX}${org_id}`,
       ':mp': MEMBER_SK_PREFIX,
     },
-    ProjectionExpression: 'member_user_id, user_name, joined_at',
+    ProjectionExpression: 'member_user_id, joined_at',
   }));
-  return Items.map(it => ({
-    user_id: String(it.member_user_id ?? ''),
-    user_name: String(it.user_name ?? ''),
-    joined_at: String(it.joined_at ?? ''),
-  })).filter(m => m.user_id !== '');
+  const rows = Items
+    .map(it => ({
+      user_id: String(it.member_user_id ?? ''),
+      joined_at: String(it.joined_at ?? ''),
+    }))
+    .filter(m => m.user_id !== '');
+
+  // Names come from the user rows, never from the member row — a copy there
+  // would go stale on rename.
+  const names = await getUsersByIds(rows.map(r => r.user_id));
+  return rows.map(r => ({ user_id: r.user_id, user_name: names.get(r.user_id) ?? '', joined_at: r.joined_at }));
 }
 
 // Stable for tests. Not used in handler paths.
