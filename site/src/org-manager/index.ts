@@ -1,7 +1,8 @@
 import * as api from './api.js';
 import { ApiError } from './api.js';
 import { getSession, getUid, setUid, clearSession, readCodeFromHash } from './session.js';
-import { renderLogin } from './render/login.js';
+import { renderLogin, authErrorMessage } from './render/login.js';
+import { esc } from '../esc.js';
 import { renderSidebar } from './render/sidebar.js';
 import { renderOverview } from './render/tabs/overview.js';
 import { renderMembers } from './render/tabs/members.js';
@@ -22,10 +23,21 @@ export async function startGoogleLink(): Promise<void> {
   } catch (e) { alert(String((e as Error).message)); }
 }
 
+/** Reads `?auth_error=` and strips it, so a reload does not re-show the error. */
+function consumeAuthError(): string | null {
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get('auth_error');
+  if (!code) return null;
+  params.delete('auth_error');
+  const query = params.toString();
+  history.replaceState(null, '', window.location.pathname + (query ? `?${query}` : '') + window.location.hash);
+  return code;
+}
+
 export function renderOrgManager(root: HTMLElement): () => void {
   let disposed = false;
 
-  const authError = new URLSearchParams(window.location.search).get('auth_error');
+  const authError = consumeAuthError();
   const showLogin = () => { if (!disposed) renderLogin(root, { authError }); };
 
   const boot = async () => {
@@ -52,7 +64,11 @@ export function renderOrgManager(root: HTMLElement): () => void {
     let tab: Tab = 'overview';
     const ownerOrgs = new Set<string>();
 
-    root.innerHTML = `<div class="org-manager"><div class="org-side"></div><div class="org-main"></div></div>`;
+    // The link flow always runs with a session, so its errors have to land here
+    // and not only on the signed-out screen.
+    const banner = authErrorMessage(authError);
+    root.innerHTML = `${banner ? `<p class="org-auth-error">${esc(banner)}</p>` : ''}`
+      + `<div class="org-manager"><div class="org-side"></div><div class="org-main"></div></div>`;
     const sideEl = root.querySelector<HTMLElement>('.org-side')!;
     const mainEl = root.querySelector<HTMLElement>('.org-main')!;
 

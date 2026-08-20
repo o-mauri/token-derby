@@ -1,16 +1,21 @@
 import { esc } from '../../esc.js';
 
-const MESSAGES: Record<string, string> = {
+export const MESSAGES: Record<string, string> = {
   email_already_linked: 'That Google account is already linked to a different jockey.',
   expired: 'That sign-in link expired. Please try again.',
   sso_failed: 'Google sign-in did not complete. Please try again.',
 };
 
+/** Shared by the signed-out login screen and the signed-in shell, so an unknown
+ *  code reads the same in both places. */
+export function authErrorMessage(code: string | null | undefined): string | null {
+  if (!code) return null;
+  return MESSAGES[code] ?? MESSAGES.sso_failed!;
+}
+
 export function renderLogin(root: HTMLElement, opts: { authError?: string | null } = {}): void {
-  const code = opts.authError ?? null;
-  const error = code
-    ? `<p class="org-login-error">${esc(MESSAGES[code] ?? MESSAGES.sso_failed!)}</p>`
-    : '';
+  const message = authErrorMessage(opts.authError);
+  const error = message ? `<p class="org-login-error">${esc(message)}</p>` : '';
 
   root.innerHTML = `
     <section class="org-login">
