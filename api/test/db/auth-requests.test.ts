@@ -34,6 +34,17 @@ describe('auth requests', () => {
     expect(await consumeAuthRequest(state)).toBeNull();
   });
 
+  it('lets exactly one of two concurrent consumers win', async () => {
+    const state = randomUUID();
+    await putAuthRequest(base(state));
+
+    const [a, b] = await Promise.all([consumeAuthRequest(state), consumeAuthRequest(state)]);
+
+    const winners = [a, b].filter((r) => r !== null);
+    expect(winners).toHaveLength(1);
+    expect(winners[0]!.code_verifier).toBe(base(state).code_verifier);
+  });
+
   it('returns null for an unknown state', async () => {
     expect(await consumeAuthRequest(randomUUID())).toBeNull();
   });
