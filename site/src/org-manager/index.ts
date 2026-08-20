@@ -13,6 +13,15 @@ import type { OrganisationSummary } from '@token-derby/shared';
 
 type Tab = 'overview' | 'members' | 'racing' | 'webhook' | 'slackbot' | 'race-settings';
 
+/** Exported so the link chain can be tested — it is the only route an existing
+ *  CLI user has to link, and a silent failure here is invisible. */
+export async function startGoogleLink(): Promise<void> {
+  try {
+    const { authorize_url } = await api.linkStart();
+    window.location.assign(authorize_url);
+  } catch (e) { alert(String((e as Error).message)); }
+}
+
 export function renderOrgManager(root: HTMLElement): () => void {
   let disposed = false;
 
@@ -60,12 +69,7 @@ export function renderOrgManager(root: HTMLElement): () => void {
         if (!token) return;
         try { await api.joinOrganisation(token); location.reload(); } catch (e) { alert(String((e as Error).message)); }
       },
-      onLinkGoogle: async () => {
-        try {
-          const { authorize_url } = await api.linkStart();
-          window.location.assign(authorize_url);
-        } catch (e) { alert(String((e as Error).message)); }
-      },
+      onLinkGoogle: startGoogleLink,
       onLogout: async () => { await api.logout(); showLogin(); },
     });
 
