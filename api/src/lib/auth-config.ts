@@ -33,6 +33,16 @@ export async function loadAuthConfig(
   client: SSMClient = defaultClient,
 ): Promise<AuthConfig> {
   if (cache) return cache;
+  // Local harness: no AWS credentials, no SSM.
+  const fromEnv = process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET && process.env.AUTH_STATE_SECRET;
+  if (fromEnv) {
+    cache = {
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      stateSecret: process.env.AUTH_STATE_SECRET!,
+    };
+    return cache;
+  }
   const [clientId, clientSecret, stateSecret] = await Promise.all([
     getParam(client, `${PREFIX}/google-client-id`),
     getParam(client, `${PREFIX}/google-client-secret`),

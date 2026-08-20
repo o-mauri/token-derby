@@ -1,4 +1,4 @@
-.PHONY: install build build-site build-admin test dynamodb-up dynamodb-down bootstrap deploy _deploy-site deploy-staging destroy destroy-staging smoke-api publish-cli announce-release
+.PHONY: install build build-site build-admin test dynamodb-up dynamodb-down local-api bootstrap deploy _deploy-site deploy-staging destroy destroy-staging smoke-api publish-cli announce-release
 
 # AWS profile for all deployment targets. Override with: make deploy AWS_PROFILE=other
 AWS_PROFILE ?= personal
@@ -24,6 +24,9 @@ dynamodb-up:
 
 dynamodb-down:
 	docker compose down
+
+local-api: build-site
+	npx tsx scripts/local-api.ts
 
 # One-time per account: bootstrap CDK in eu-west-2 AND us-east-1 (cert needs us-east-1)
 bootstrap:
