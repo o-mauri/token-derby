@@ -11,3 +11,7 @@ export type WebSessionExchangeResponse = {
   expires_at: string;
   user: { user_id: string; display_name: string };
 };
+
+export type AuthLinkStartResponse = {
+  authorize_url: string;
+};
