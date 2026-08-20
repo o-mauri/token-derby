@@ -13,7 +13,7 @@ let root: HTMLElement;
 beforeEach(() => { document.body.innerHTML = ''; root = document.createElement('div'); document.body.appendChild(root); });
 
 describe('renderLogin', () => {
-  it('shows the CLI instruction', () => {
+  it('warns CLI users in the muted aside', () => {
     renderLogin(root);
     expect(root.textContent).toContain('token-derby web');
   });
