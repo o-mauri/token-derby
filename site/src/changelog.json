@@ -1,5 +1,21 @@
 [
   {
+    "version": "2.13.1",
+    "date": "2026-08-19",
+    "component": "cli",
+    "changes": [
+      "Added token-derby claim command"
+    ]
+  },
+  {
+    "version": "0.13.3",
+    "date": "2026-08-18",
+    "component": "site",
+    "changes": [
+      "Added Phosphor theme (adefreitas)"
+    ]
+  },
+  {
     "version": "0.13.2",
     "date": "2026-08-18",
     "component": "site",
