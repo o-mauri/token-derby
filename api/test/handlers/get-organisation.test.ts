@@ -75,4 +75,16 @@ describe('getOrganisation handler', () => {
     const res: any = await getOrg(infoEvent('has%20space', alice));
     expect(res.statusCode).toBe(400);
   });
+
+  it('reflects a creator rename in creator_user_name', async () => {
+    const owner = await makeUser('GetOrg_BeforeName');
+    await createOrg(createEvent('RenameOrg1', owner));
+
+    const { updateUserDisplayName } = await import('../../src/db/users.js');
+    await updateUserDisplayName(owner.user_id, 'GetOrg_AfterName');
+
+    const res: any = await getOrg(infoEvent('RenameOrg1', owner));
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body).creator_user_name).toBe('GetOrg_AfterName');
+  });
 });
