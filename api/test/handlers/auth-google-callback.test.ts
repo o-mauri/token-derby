@@ -12,7 +12,8 @@ import { handleCallback } from '../../src/handlers/auth-google-callback.js';
 import { putAuthRequest } from '../../src/db/auth-requests.js';
 import * as authRequests from '../../src/db/auth-requests.js';
 import { consumeWebGrant } from '../../src/db/web-sessions.js';
-import { signState } from '../../src/lib/oauth.js';
+import * as webSessions from '../../src/db/web-sessions.js';
+import { signState, STATE_COOKIE_NAME } from '../../src/lib/oauth.js';
 import { putUser, getUserById } from '../../src/db/users.js';
 import { hashSecretToken } from '../../src/lib/auth.js';
 import { getUserIdByEmail } from '../../src/db/identities.js';
@@ -20,12 +21,16 @@ import { getUserIdByEmail } from '../../src/db/identities.js';
 const REDIRECT = 'https://token-derby.mauricode.co.uk/api/auth/google/callback';
 const SECRET = 'a'.repeat(64);
 
-function ev(code: string, signedState: string): APIGatewayProxyEventV2 {
+// `cookie` defaults to the state carried by signedState, i.e. the browser that
+// started the flow. Pass null for no cookie, or a string for a foreign one.
+function ev(code: string, signedState: string, cookie?: string | null): APIGatewayProxyEventV2 {
+  const value = cookie === undefined ? signedState.slice(0, signedState.lastIndexOf('.')) : cookie;
   return {
     version: '2.0', routeKey: 'GET /api/auth/google/callback',
     rawPath: '/api/auth/google/callback', rawQueryString: '',
     queryStringParameters: { code, state: signedState },
     headers: { host: 'token-derby.mauricode.co.uk' },
+    cookies: value === null ? [] : [`${STATE_COOKIE_NAME}=${value}`],
     requestContext: { domainName: 'token-derby.mauricode.co.uk' } as any,
     isBase64Encoded: false,
   } as APIGatewayProxyEventV2;
@@ -121,8 +126,78 @@ describe('auth-google-callback', () => {
   });
 
   it('rejects a forged state without touching the table', async () => {
-    const res: any = await handleCallback(ev('code', 'forged.deadbeef'), deps(claimsFor('x@y.com', 'n')));
+    const consumeSpy = vi.spyOn(authRequests, 'consumeAuthRequest');
+    const grantSpy = vi.spyOn(webSessions, 'putWebGrant');
+    const fetchSpy = vi.fn(tokenFetch('fake-id-token'));
+
+    const res: any = await handleCallback(ev('code', 'forged.deadbeef'),
+      { fetchImpl: fetchSpy, verifyIdToken: async () => claimsFor('x@y.com', 'n') } as any);
+
     expect(errOf(res.headers.location)).toBe('sso_failed');
+    expect(consumeSpy).not.toHaveBeenCalled();
+    expect(grantSpy).not.toHaveBeenCalled();
+    expect(fetchSpy).not.toHaveBeenCalled();
+    consumeSpy.mockRestore();
+    grantSpy.mockRestore();
+  });
+
+  it('rejects a callback with no state cookie, before consuming or exchanging anything', async () => {
+    const { nonce, signed } = await seedRequest();
+    const consumeSpy = vi.spyOn(authRequests, 'consumeAuthRequest');
+    const fetchSpy = vi.fn(tokenFetch('fake-id-token'));
+
+    const res: any = await handleCallback(ev('code', signed, null),
+      { fetchImpl: fetchSpy, verifyIdToken: async () => claimsFor('nocookie@example.com', nonce) } as any);
+
+    expect(errOf(res.headers.location)).toBe('sso_failed');
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(consumeSpy).not.toHaveBeenCalled();
+    consumeSpy.mockRestore();
+  });
+
+  it('rejects a state cookie belonging to a different flow', async () => {
+    const { nonce, signed } = await seedRequest();
+    const other = await seedRequest();
+    const fetchSpy = vi.fn(tokenFetch('fake-id-token'));
+
+    const res: any = await handleCallback(ev('code', signed, other.state),
+      { fetchImpl: fetchSpy, verifyIdToken: async () => claimsFor('wrongcookie@example.com', nonce) } as any);
+
+    expect(errOf(res.headers.location)).toBe('sso_failed');
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('leaves the pending request usable by the browser that started it after a cookieless attempt', async () => {
+    const { nonce, signed } = await seedRequest();
+    const email = `survives-${randomUUID()}@example.com`;
+    const fetchSpy = vi.fn(tokenFetch('fake-id-token'));
+    const callDeps = { fetchImpl: fetchSpy, verifyIdToken: async () => claimsFor(email, nonce) } as any;
+
+    const blocked: any = await handleCallback(ev('code', signed, null), callDeps);
+    expect(errOf(blocked.headers.location)).toBe('sso_failed');
+
+    const real: any = await handleCallback(ev('code', signed), callDeps);
+    expect(hashOf(real.headers.location)).toMatch(/^#code=/);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not attach a victim email to the attacker when the link flow is completed by another browser', async () => {
+    const attacker = randomUUID();
+    await putUser({ user_id: attacker, display_name: 'Attacker', created_at: new Date().toISOString() }, hashSecretToken('t'));
+    const { nonce, signed } = await seedRequest({ link_to_user_id: attacker });
+    const victimEmail = `victim-${randomUUID()}@example.com`;
+    const fetchSpy = vi.fn(tokenFetch('fake-id-token'));
+    const callDeps = { fetchImpl: fetchSpy, verifyIdToken: async () => claimsFor(victimEmail, nonce) } as any;
+
+    // The victim's browser has no cookie for the attacker's flow.
+    const res: any = await handleCallback(ev('code', signed, null), callDeps);
+
+    expect(errOf(res.headers.location)).toBe('sso_failed');
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(await getUserIdByEmail(victimEmail)).toBeNull();
+    const row = await getUserById(attacker);
+    expect(row!.display_name).toBe('Attacker');
+    expect((row as any).email).toBeUndefined();
   });
 
   it('rejects an unknown state', async () => {
@@ -144,12 +219,20 @@ describe('auth-google-callback', () => {
     const { nonce, signed } = await seedRequest();
     const email = `dbfail-${randomUUID()}@example.com`;
     const spy = vi.spyOn(authRequests, 'consumeAuthRequest').mockRejectedValueOnce(new Error('dynamo unavailable'));
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     const res: any = await handleCallback(ev('code', signed), deps(claimsFor(email, nonce)));
+    // mockRestore also clears the recorded calls, so copy them first.
+    const logged = errSpy.mock.calls.map((c) => [...c]);
     spy.mockRestore();
+    errSpy.mockRestore();
 
     expect(res.statusCode).toBe(302);
     expect(errOf(res.headers.location)).toBe('sso_failed');
+    // Without this log a C1-class failure is undiagnosable in CloudWatch.
+    expect(logged).toHaveLength(1);
+    expect(String(logged[0]![0])).toMatch(/sso callback failed/);
+    expect(logged[0]![1]).toBeInstanceOf(Error);
   });
 
   it('fails closed when ID-token verification rejects', async () => {

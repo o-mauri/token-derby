@@ -13,7 +13,7 @@ import { handler as googleStart } from '../../src/handlers/auth-google-start.js'
 import { handler as linkStart } from '../../src/handlers/auth-link-start.js';
 import { consumeAuthRequest } from '../../src/db/auth-requests.js';
 import { putWebSession } from '../../src/db/web-sessions.js';
-import { verifyState } from '../../src/lib/oauth.js';
+import { verifyState, STATE_COOKIE_NAME } from '../../src/lib/oauth.js';
 import { randomUUID } from 'node:crypto';
 
 function ev(over: Partial<APIGatewayProxyEventV2> = {}): APIGatewayProxyEventV2 {
@@ -42,11 +42,36 @@ describe('auth-google-start', () => {
 
     const state = verifyState('a'.repeat(64), stateFromUrl(loc));
     expect(state).not.toBeNull();
+    // The cookie is what binds the callback to this browser.
+    expect(res.cookies).toEqual([
+      `${STATE_COOKIE_NAME}=${state}; HttpOnly; Secure; SameSite=Lax; Path=/api/auth; Max-Age=600`,
+    ]);
     const pending = await consumeAuthRequest(state!);
     expect(pending).not.toBeNull();
     expect(pending!.code_verifier).toMatch(/^[A-Za-z0-9_-]{43}$/);
     expect(pending!.nonce).toBe(url.searchParams.get('nonce'));
     expect(pending!.link_to_user_id).toBeUndefined();
+  });
+
+  it('builds the redirect_uri from SITE_ORIGIN, not the Host CloudFront rewrites', async () => {
+    const before = process.env.SITE_ORIGIN;
+    process.env.SITE_ORIGIN = 'https://token-derby.mauricode.co.uk';
+    try {
+      const res: any = await googleStart(ev({
+        headers: { host: 'abc123.execute-api.eu-west-2.amazonaws.com' },
+        requestContext: { domainName: 'abc123.execute-api.eu-west-2.amazonaws.com' } as any,
+      }));
+      const loc = res.headers.location as string;
+      expect(new URL(loc).searchParams.get('redirect_uri'))
+        .toBe('https://token-derby.mauricode.co.uk/api/auth/google/callback');
+
+      const state = verifyState('a'.repeat(64), stateFromUrl(loc))!;
+      const pending = await consumeAuthRequest(state);
+      expect(pending!.redirect_uri).toBe('https://token-derby.mauricode.co.uk/api/auth/google/callback');
+    } finally {
+      if (before === undefined) delete process.env.SITE_ORIGIN;
+      else process.env.SITE_ORIGIN = before;
+    }
   });
 });
 
@@ -85,6 +110,9 @@ describe('auth-link-start', () => {
     expect(authorize_url).toContain('accounts.google.com');
 
     const state = verifyState('a'.repeat(64), stateFromUrl(authorize_url))!;
+    expect(res.cookies).toEqual([
+      `${STATE_COOKIE_NAME}=${state}; HttpOnly; Secure; SameSite=Lax; Path=/api/auth; Max-Age=600`,
+    ]);
     const pending = await consumeAuthRequest(state);
     expect(pending!.link_to_user_id).toBe(user_id);
   });

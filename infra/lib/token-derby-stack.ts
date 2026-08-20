@@ -132,7 +132,16 @@ export class TokenDerbyStack extends cdk.Stack {
 
     // ── Lambda factory ─────────────────────────────────────────────────
     const apiDir = path.resolve(__dirname, '..', '..', 'api', 'src', 'handlers');
-    const commonEnv = { TABLE_NAME, NODE_OPTIONS: '--enable-source-maps', ADMIN_SSM_PREFIX: config.ssmPrefix, AUTH_SSM_PREFIX: config.authSsmPrefix };
+    // CloudFront replaces the viewer Host with the API Gateway domain, so the
+    // OAuth redirect_uri cannot be derived from the request. Site domain, not
+    // admin: the org manager is served there.
+    const commonEnv = {
+      TABLE_NAME,
+      NODE_OPTIONS: '--enable-source-maps',
+      ADMIN_SSM_PREFIX: config.ssmPrefix,
+      AUTH_SSM_PREFIX: config.authSsmPrefix,
+      SITE_ORIGIN: `https://${DOMAIN_NAME}`,
+    };
 
     const makeFn = (name: string, fileBase: string, opts?: { timeout?: cdk.Duration }) => {
       const fn = new NodejsFunction(this, name, {

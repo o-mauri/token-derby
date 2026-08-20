@@ -2,7 +2,7 @@ import type { APIGatewayProxyEventV2, APIGatewayProxyStructuredResultV2 } from '
 import type { ApiHandler } from '../lib/http.js';
 import { loadAuthConfig } from '../lib/auth-config.js';
 import { consumeAuthRequest } from '../db/auth-requests.js';
-import { verifyState, originOf } from '../lib/oauth.js';
+import { verifyState, originOf, readStateCookie, stateCookieMatches } from '../lib/oauth.js';
 import { verifyGoogleIdToken } from '../lib/google-id-token.js';
 import { resolveGoogleIdentity, EmailAlreadyLinkedError } from '../lib/identity-link.js';
 import { putWebGrant } from '../db/web-sessions.js';
@@ -51,6 +51,10 @@ export async function handleCallback(
     const state = verifyState(cfg.stateSecret, signedState);
     if (!state) return fail(origin, 'sso_failed');
 
+    // Checked before the pending row is consumed, so a forged callback cannot
+    // burn the single-use request belonging to the browser that started it.
+    if (!stateCookieMatches(readStateCookie(event), state)) return fail(origin, 'sso_failed');
+
     if (q.error) return fail(origin, 'sso_failed');
 
     const pending = await consumeAuthRequest(state);
@@ -95,7 +99,10 @@ export async function handleCallback(
       if (e instanceof EmailAlreadyLinkedError) return fail(origin, 'email_already_linked');
       return fail(origin, 'sso_failed');
     }
-  } catch {
+  } catch (e) {
+    // The only auth telemetry on this flow — without it a config or SSM failure
+    // is invisible in CloudWatch.
+    console.error('sso callback failed', e);
     return fail(origin, 'sso_failed');
   }
 }

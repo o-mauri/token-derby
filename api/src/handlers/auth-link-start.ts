@@ -6,7 +6,7 @@ import { getWebSession } from '../db/web-sessions.js';
 import { loadAuthConfig } from '../lib/auth-config.js';
 import { putAuthRequest } from '../db/auth-requests.js';
 import {
-  generatePkce, signState, buildAuthorizeUrl, originOf, AUTH_REQUEST_TTL_SECONDS,
+  generatePkce, signState, buildAuthorizeUrl, originOf, stateCookie, AUTH_REQUEST_TTL_SECONDS,
 } from '../lib/oauth.js';
 
 export const handler: ApiHandler = async (event) => {
@@ -14,9 +14,6 @@ export const handler: ApiHandler = async (event) => {
   if (!token) return err('UNAUTHENTICATED', 'Sign in first to link a Google account');
   const session = await getWebSession(token);
   if (!session) return err('UNAUTHENTICATED', 'Invalid or expired web session');
-
-  const host = event.headers?.host ?? event.requestContext?.domainName;
-  if (!host) return err('BAD_REQUEST', 'Host header required');
 
   const cfg = await loadAuthConfig();
   const state = randomUUID();
@@ -30,9 +27,12 @@ export const handler: ApiHandler = async (event) => {
     link_to_user_id: session.user_id, ttlSeconds: AUTH_REQUEST_TTL_SECONDS,
   });
 
-  return ok({
-    authorize_url: buildAuthorizeUrl({
-      clientId: cfg.clientId, redirectUri, state: signState(cfg.stateSecret, state), nonce, challenge,
+  return {
+    ...ok({
+      authorize_url: buildAuthorizeUrl({
+        clientId: cfg.clientId, redirectUri, state: signState(cfg.stateSecret, state), nonce, challenge,
+      }),
     }),
-  });
+    cookies: [stateCookie(state)],
+  };
 };

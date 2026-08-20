@@ -30,12 +30,44 @@ export function verifyState(secret: string, signed: string): string | null {
   return state;
 }
 
-/** Origin the request arrived on, so prod and the local harness both work
- *  without configuration. */
+/** Public origin of the site. SITE_ORIGIN wins because CloudFront rewrites the
+ *  viewer Host to the API Gateway domain; the Host fallback is for the local
+ *  harness, which has no such proxy. */
 export function originOf(event: APIGatewayProxyEventV2): string {
+  const configured = process.env.SITE_ORIGIN?.trim().replace(/\/+$/, '');
+  if (configured) return configured;
   const host = String(event.headers?.host ?? event.requestContext?.domainName ?? '');
   const scheme = host.startsWith('localhost') || host.startsWith('127.0.0.1') ? 'http' : 'https';
   return `${scheme}://${host}`;
+}
+
+export const STATE_COOKIE_NAME = 'td_auth_state';
+
+/** Binds the flow to the browser that started it: the signature proves we
+ *  issued the state, this proves the callback is the same user agent. */
+export function stateCookie(state: string): string {
+  return `${STATE_COOKIE_NAME}=${state}; HttpOnly; Secure; SameSite=Lax; Path=/api/auth; Max-Age=${AUTH_REQUEST_TTL_SECONDS}`;
+}
+
+/** API Gateway v2 delivers cookies in `event.cookies`; the local harness passes
+ *  the raw header. Read both, and never assume ours is first. */
+export function readStateCookie(event: APIGatewayProxyEventV2): string | null {
+  const raw = Array.isArray(event.cookies) && event.cookies.length > 0
+    ? event.cookies
+    : String(event.headers?.cookie ?? '').split(';');
+  const prefix = `${STATE_COOKIE_NAME}=`;
+  for (const entry of raw) {
+    const pair = String(entry).trim();
+    if (pair.startsWith(prefix)) return pair.slice(prefix.length);
+  }
+  return null;
+}
+
+export function stateCookieMatches(cookie: string | null, state: string): boolean {
+  if (!cookie) return false;
+  const a = Buffer.from(cookie);
+  const b = Buffer.from(state);
+  return a.length === b.length && timingSafeEqual(a, b);
 }
 
 export function buildAuthorizeUrl(o: {

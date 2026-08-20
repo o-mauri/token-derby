@@ -78,6 +78,8 @@ createServer(async (req, res) => {
         version: '2.0', routeKey: `${route.method} ${route.pattern}`,
         rawPath: url.pathname, rawQueryString: url.search.slice(1),
         headers: { ...req.headers, host: `localhost:${PORT}` } as Record<string, string>,
+        // API Gateway v2 splits Cookie into its own array; mirror that here.
+        cookies: (req.headers.cookie ?? '').split(';').map((c) => c.trim()).filter(Boolean),
         queryStringParameters: Object.fromEntries(url.searchParams),
         pathParameters: params,
         body: body || undefined,
@@ -87,7 +89,9 @@ createServer(async (req, res) => {
 
       const { handler } = await route.load();
       const out: any = await handler(event);
-      res.writeHead(out.statusCode ?? 200, out.headers ?? {});
+      const outHeaders: Record<string, string | string[]> = { ...(out.headers ?? {}) };
+      if (Array.isArray(out.cookies) && out.cookies.length) outHeaders['set-cookie'] = out.cookies;
+      res.writeHead(out.statusCode ?? 200, outHeaders);
       res.end(out.body ?? '');
       console.log(`${req.method} ${url.pathname} -> ${out.statusCode}`);
       return;
