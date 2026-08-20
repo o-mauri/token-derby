@@ -5,7 +5,7 @@ import { getRaceByJoinCode } from '../db/races.js';
 import { listHorses } from '../db/horses.js';
 import { listRecentSeriesPoints } from '../db/series.js';
 import { getLeague } from '../db/leagues.js';
-import { listSeasonStandings } from '../db/league-standings.js';
+import { listSeasonStandingDivisions } from '../db/league-standings.js';
 import { computeStatus, timeLeftSeconds } from '../lib/status.js';
 import { finaliseRace } from '../lib/finalise-race.js';
 import { rankHorses } from '../lib/rank-horses.js';
@@ -43,10 +43,7 @@ export const handler: ApiHandler = async (event) => {
     if (league) {
       league_division_names = league.divisions.map((d) => d.name);
       const bottom = league.divisions.length;
-      const divByHorse = new Map<string, number>();
-      for (const s of await listSeasonStandings(race.league_id, race.league_season)) {
-        divByHorse.set(s.stable_horse_id, s.division);
-      }
+      const divByHorse = await listSeasonStandingDivisions(race.league_id, race.league_season);
       for (const h of ranked) {
         if (h.stable_horse_id) h.division = divByHorse.get(h.stable_horse_id) ?? bottom;
       }

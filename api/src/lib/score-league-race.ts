@@ -2,7 +2,7 @@ import type { Race, Horse } from '@token-derby/shared';
 import { leaguePoints } from '@token-derby/shared';
 import { getLeague } from '../db/leagues.js';
 import { listOrgMemberIds } from '../db/organisations.js';
-import { listSeasonStandings, ensureStanding, addStandingPointsForRound } from '../db/league-standings.js';
+import { listSeasonStandingDivisions, ensureStanding, addStandingPointsForRound } from '../db/league-standings.js';
 
 // A finisher as scoreLeagueRace requires it: both token figures already
 // stamped (finaliseRace's `stamped` array guarantees this for its sole caller).
@@ -49,8 +49,7 @@ export async function scoreLeagueRace(
   );
   if (participants.length === 0) return null;
 
-  const divByHorse = new Map<string, number>();
-  for (const s of await listSeasonStandings(org_id, season)) divByHorse.set(s.stable_horse_id, s.division);
+  const divByHorse = await listSeasonStandingDivisions(org_id, season);
 
   const now = new Date().toISOString();
   // Resolve each participant's division; create bottom-division rows for new entrants.
