@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { USER_NAME_MAX_LENGTH } from '@token-derby/shared';
 import type { GoogleClaims } from './google-id-token.js';
 import {
-  getUserIdByEmail, createUserWithEmail, attachEmailToUser, updateUserIdentity,
+  getUserIdByEmail, createUserWithEmail, attachEmailToUser, updateUserIdentity, UserAlreadyLinkedError,
 } from '../db/identities.js';
 
 export class EmailAlreadyLinkedError extends Error {
@@ -16,11 +16,11 @@ export function normaliseEmail(email: string): string {
   return email.trim().toLowerCase();
 }
 
-/** given_name, else the first token of name, else the email local part. */
+/** given_name, else the first token of name, else the email local part, else 'jockey'. */
 export function displayNameFromClaims(claims: GoogleClaims): string {
   const fromName = claims.name?.trim().split(/\s+/)[0];
-  const local = claims.email.split('@')[0] ?? 'jockey';
-  const raw = claims.given_name?.trim() || fromName || local;
+  const local = claims.email.split('@')[0];
+  const raw = claims.given_name?.trim() || fromName || local || 'jockey';
   return raw.slice(0, USER_NAME_MAX_LENGTH);
 }
 
@@ -47,7 +47,14 @@ export async function resolveGoogleIdentity(
   }
 
   if (link_to_user_id) {
-    await attachEmailToUser({ ...write, user_id: link_to_user_id });
+    try {
+      await attachEmailToUser({ ...write, user_id: link_to_user_id });
+    } catch (err) {
+      // Outward behaviour is unchanged — always EmailAlreadyLinkedError —
+      // but the db layer keeps this cause distinguishable in logs.
+      if (err instanceof UserAlreadyLinkedError) throw new EmailAlreadyLinkedError(email);
+      throw err;
+    }
     await updateUserIdentity({ ...write, user_id: link_to_user_id, display_name });
     return { user_id: link_to_user_id, display_name, created: false };
   }

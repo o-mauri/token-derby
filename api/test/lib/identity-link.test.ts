@@ -35,6 +35,11 @@ describe('displayNameFromClaims', () => {
     const long = 'x'.repeat(60);
     expect(displayNameFromClaims(claims({ given_name: long })).length).toBe(40);
   });
+  it('falls back to jockey when every source is empty', () => {
+    expect(displayNameFromClaims(
+      claims({ given_name: undefined, name: undefined, email: '@example.com' }),
+    )).toBe('jockey');
+  });
 });
 
 describe('resolveGoogleIdentity', () => {
@@ -66,6 +71,9 @@ describe('resolveGoogleIdentity', () => {
     // Overwriting the jockey name with the Google first name is the product decision.
     expect(res.display_name).toBe('NewName');
     expect((await getUserById(user_id))!.display_name).toBe('NewName');
+    // The email must actually be claimed, or the account becomes unreachable
+    // by email on the next sign-in — the two-accounts-for-one-email bug.
+    expect(await getUserIdByEmail(c.email)).toBe(user_id);
   });
 
   it('is idempotent when the link target already owns the email', async () => {
@@ -73,6 +81,7 @@ describe('resolveGoogleIdentity', () => {
     const first = await resolveGoogleIdentity(c);
     const again = await resolveGoogleIdentity(c, first.user_id);
     expect(again.user_id).toBe(first.user_id);
+    expect(again.created).toBe(false);
   });
 
   it('refuses when the email belongs to a different account — never merges', async () => {

@@ -16,11 +16,20 @@ export class EmailAlreadyClaimedError extends Error {
   }
 }
 
+/** Raised when the attach target already has a different email linked. */
+export class UserAlreadyLinkedError extends Error {
+  constructor(user_id: string) {
+    super(`User ${user_id} already has a different email linked`);
+    this.name = 'UserAlreadyLinkedError';
+  }
+}
+
 /** Strongly consistent: the claim row is the source of truth, not a GSI. */
 export async function getUserIdByEmail(email: string): Promise<string | null> {
   const { Item } = await ddb.send(new GetCommand({
     TableName: TABLE,
     Key: emailClaimKey(email),
+    ConsistentRead: true,
     ProjectionExpression: 'user_id',
   }));
   return Item?.user_id ? String(Item.user_id) : null;
@@ -102,7 +111,14 @@ export async function attachEmailToUser(input: IdentityWrite): Promise<void> {
       ],
     }));
   } catch (err: any) {
-    if (err?.name === 'TransactionCanceledException') throw new EmailAlreadyClaimedError(input.email);
+    if (err?.name === 'TransactionCanceledException') {
+      // TransactItems order above: [0] claim row Put, [1] user row Update.
+      // CancellationReasons is positional, so this tells the two failure
+      // modes apart — someone else's claim vs. this user already linked.
+      const reasons = err.CancellationReasons ?? [];
+      if (reasons[1]?.Code === 'ConditionalCheckFailed') throw new UserAlreadyLinkedError(input.user_id);
+      throw new EmailAlreadyClaimedError(input.email);
+    }
     throw err;
   }
 }

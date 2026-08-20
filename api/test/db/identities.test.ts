@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import {
   getUserIdByEmail, createUserWithEmail, attachEmailToUser, updateUserIdentity,
-  EmailAlreadyClaimedError,
+  EmailAlreadyClaimedError, UserAlreadyLinkedError,
 } from '../../src/db/identities.js';
 import { getUserById, putUser } from '../../src/db/users.js';
 import { hashSecretToken } from '../../src/lib/auth.js';
@@ -55,8 +55,9 @@ describe('identity writes', () => {
     const user_id = randomUUID();
     await putUser({ user_id, display_name: 'Linked', created_at: new Date().toISOString() }, hashSecretToken('t'));
     await attachEmailToUser({ user_id, email: email(), idp_sub: 's1' });
+    // The user-row guard is what fails here — a distinct cause from a claim-row race.
     await expect(attachEmailToUser({ user_id, email: email(), idp_sub: 's2' }))
-      .rejects.toBeInstanceOf(Error);
+      .rejects.toBeInstanceOf(UserAlreadyLinkedError);
   });
 
   it('refuses to attach an email that another user already claims', async () => {
@@ -64,8 +65,9 @@ describe('identity writes', () => {
     await createUserWithEmail({ user_id: randomUUID(), email: e, idp_sub: 's', display_name: 'Owner' });
     const other = randomUUID();
     await putUser({ user_id: other, display_name: 'Other', created_at: new Date().toISOString() }, hashSecretToken('t'));
+    // The claim-row guard is what fails here, not the user row's.
     await expect(attachEmailToUser({ user_id: other, email: e, idp_sub: 's2' }))
-      .rejects.toBeInstanceOf(Error);
+      .rejects.toBeInstanceOf(EmailAlreadyClaimedError);
   });
 
   it('refreshes the display name and identity fields on sign-in', async () => {
