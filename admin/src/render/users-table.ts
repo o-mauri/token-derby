@@ -95,7 +95,7 @@ export function renderUsersTable(container: HTMLElement, opts: UsersTableOptions
   function detailHtml(usr: AdminUser): string {
     const jockey = editMode ? `<div class="jockey-edit"><span class="lbl">Jockey name</span>${jockeyEditHtml(usr)}</div>` : '';
     const horses = usr.horses.length ? usr.horses.map((h) => horseCardHtml(h, usr.user_id)).join('') : `<span class="muted">No horses.</span>`;
-    return `<tr class="detail-row"><td class="horses-cell" colspan="8"><div class="detail">${jockey}<div class="horses">${horses}</div></div></td></tr>`;
+    return `<tr class="detail-row"><td class="horses-cell" colspan="9"><div class="detail">${jockey}<div class="horses">${horses}</div></div></td></tr>`;
   }
 
   function userRowHtml(usr: AdminUser): string {
@@ -104,12 +104,13 @@ export function renderUsersTable(container: HTMLElement, opts: UsersTableOptions
     const races = usr.horses.reduce((s, h) => s + (h.races_entered ?? 0), 0);
     const podiums = usr.horses.reduce((s, h) => s + (h.podiums ?? 0), 0);
     const xp = usr.horses.reduce((s, h) => s + (h.xp ?? 0), 0);
-    const main = `<tr class="user-row" data-action="toggle-user" data-uid="${esc(usr.user_id)}"><td><span class="caret">${open ? '▾' : '▸'}</span></td><td>${esc(usr.display_name)}</td><td>${usr.horses.length}</td><td>${races}</td><td class="win">${wins}</td><td>${podiums}</td><td>${xp.toLocaleString()}</td><td class="muted">${esc(usr.created_at.slice(0, 10))}</td></tr>`;
+    const emailCell = usr.email ? `<td class="muted">${esc(usr.email)}</td>` : `<td class="muted">—</td>`;
+    const main = `<tr class="user-row" data-action="toggle-user" data-uid="${esc(usr.user_id)}"><td><span class="caret">${open ? '▾' : '▸'}</span></td><td>${esc(usr.display_name)}</td>${emailCell}<td>${usr.horses.length}</td><td>${races}</td><td class="win">${wins}</td><td>${podiums}</td><td>${xp.toLocaleString()}</td><td class="muted">${esc(usr.created_at.slice(0, 10))}</td></tr>`;
     return open ? main + detailHtml(usr) : main;
   }
 
   function render(): void {
-    container.innerHTML = `<table><thead><tr><th style="width:34px"></th><th>Jockey</th><th>Horses</th><th>Races</th><th>Wins</th><th>Podiums</th><th>XP</th><th>Joined</th></tr></thead><tbody>${data.map(userRowHtml).join('')}</tbody></table>`;
+    container.innerHTML = `<table><thead><tr><th style="width:34px"></th><th>Jockey</th><th>Email</th><th>Horses</th><th>Races</th><th>Wins</th><th>Podiums</th><th>XP</th><th>Joined</th></tr></thead><tbody>${data.map(userRowHtml).join('')}</tbody></table>`;
   }
 
   function readInput(): string {

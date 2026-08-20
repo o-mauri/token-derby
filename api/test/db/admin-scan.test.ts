@@ -108,4 +108,32 @@ describe('admin-scan', () => {
     const org = (await scanOrganisations()).find(o => o.org_id === id)!;
     expect(org.creator_user_name).toBe('Ghost');
   });
+
+  it('surfaces a linked email, and leaves it undefined for unlinked users', async () => {
+    const linked = uid();
+    const unlinked = uid();
+    const { ddb, TABLE } = await import('../../src/db/client.js');
+    const { PutCommand } = await import('@aws-sdk/lib-dynamodb');
+    const { userMetaKey } = await import('../../src/db/keys.js');
+    await ddb.send(new PutCommand({
+      TableName: TABLE,
+      Item: {
+        ...userMetaKey(linked), user_id: linked, display_name: 'Linked',
+        created_at: '2026-08-01T00:00:00.000Z', email: 'linked@example.com',
+        email_verified: true, idp: 'google', idp_sub: 's1',
+      },
+    }));
+    await putUser({ user_id: unlinked, display_name: 'Unlinked', created_at: '2026-08-01T00:00:00.000Z' }, 'H');
+
+    const users = await scanUsersWithHorses();
+    expect(users.find(u => u.user_id === linked)!.email).toBe('linked@example.com');
+    expect(users.find(u => u.user_id === unlinked)!.email).toBeUndefined();
+  });
+
+  it('never serialises the secret hash alongside the email', async () => {
+    const id = uid();
+    await putUser({ user_id: id, display_name: 'HashCheck', created_at: '2026-08-01T00:00:00.000Z' }, 'SECRET_HASH_XYZ');
+    const users = await scanUsersWithHorses();
+    expect(JSON.stringify(users.find(u => u.user_id === id))).not.toContain('SECRET_HASH_XYZ');
+  });
 });

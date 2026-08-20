@@ -50,6 +50,7 @@ export async function scanUsersWithHorses(): Promise<AdminUser[]> {
       const u = ensure(user_id);
       u.display_name = String(it.display_name ?? '');
       u.created_at = String(it.created_at ?? '');
+      if (typeof it.email === 'string' && it.email !== '') u.email = it.email;
       // NB: secret_token_hash deliberately ignored — never serialised.
     } else if (parseStableHorseId(sk)) {
       // The StableHorse type is the full safe contract for a stable-horse row —
