@@ -137,3 +137,9 @@ export const RATELIMIT_PK_PREFIX = 'RATELIMIT#';
 export function rateLimitKey(bucket: string, subject: string, windowStart: number) {
   return { pk: `${RATELIMIT_PK_PREFIX}${bucket}#${subject}`, sk: `WINDOW#${windowStart}` };
 }
+
+export const AUTHREQ_PK_PREFIX = 'AUTHREQ#';
+
+export function authRequestKey(state: string) {
+  return { pk: `${AUTHREQ_PK_PREFIX}${state}`, sk: 'META' };
+}
