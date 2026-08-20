@@ -97,6 +97,25 @@ describe('resolveGoogleIdentity', () => {
     expect(again.created).toBe(false);
   });
 
+  it('does not refresh the jockey name when an already-linked account links again', async () => {
+    const user_id = randomUUID();
+    await putUser({ user_id, display_name: 'OldName', created_at: new Date().toISOString() }, hashSecretToken('t'));
+    const c = claims({ given_name: 'FirstLink' });
+
+    // First link is the one moment Google's first name wins.
+    expect((await resolveGoogleIdentity(c, user_id)).display_name).toBe('FirstLink');
+
+    // Clicking "Link Google account" again must not clobber the name, renamed or not.
+    const relinked = await resolveGoogleIdentity({ ...c, given_name: 'SecondLink' }, user_id);
+    expect(relinked.display_name).toBe('FirstLink');
+    expect((await getUserById(user_id))!.display_name).toBe('FirstLink');
+
+    await updateUserDisplayName(user_id, 'Renamed');
+    const afterRename = await resolveGoogleIdentity({ ...c, given_name: 'ThirdLink' }, user_id);
+    expect(afterRename.display_name).toBe('Renamed');
+    expect((await getUserById(user_id))!.display_name).toBe('Renamed');
+  });
+
   it('warns but still signs in when the Google sub changed for the same email', async () => {
     const c = claims();
     const first = await resolveGoogleIdentity(c);
