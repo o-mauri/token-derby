@@ -12,7 +12,7 @@ describe('renderPrivacy', () => {
 
   it('names the four sections Google looks for', () => {
     renderPrivacy(root);
-    const headings = [...root.querySelectorAll('h3')].map((h) => h.textContent?.trim());
+    const headings = Array.from(root.querySelectorAll('h3')).map((h) => h.textContent?.trim());
     expect(headings).toEqual(['What is stored', 'What is not stored', 'Sharing', 'Deletion']);
   });
 

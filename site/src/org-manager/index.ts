@@ -1,6 +1,6 @@
 import * as api from './api.js';
 import { ApiError } from './api.js';
-import { getSession, getUid, setUid, clearSession, readCodeFromHash } from './session.js';
+import { getSession, getUid, setUid, getLinkedEmail, setLinkedEmail, clearLinkedEmail, clearSession, readCodeFromHash } from './session.js';
 import { renderLogin, authErrorMessage } from './render/login.js';
 import { esc } from '../esc.js';
 import { renderSidebar } from './render/sidebar.js';
@@ -47,6 +47,7 @@ export function renderOrgManager(root: HTMLElement): () => void {
       try {
         const res = await api.exchangeCode(code);
         setUid(res.user.user_id);
+        if (res.user.email) setLinkedEmail(res.user.email); else clearLinkedEmail();
       } catch { showLogin(); return; }
     }
     if (!getSession()) { showLogin(); return; }
@@ -72,8 +73,9 @@ export function renderOrgManager(root: HTMLElement): () => void {
     const sideEl = root.querySelector<HTMLElement>('.org-side')!;
     const mainEl = root.querySelector<HTMLElement>('.org-main')!;
 
+    const linkedEmail = getLinkedEmail();
     const drawSidebar = () => renderSidebar(sideEl, {
-      orgs, selected, ownerOrgs,
+      orgs, selected, ownerOrgs, linkedEmail,
       onSelect: (name) => { selected = name; tab = 'overview'; void drawMain(); drawSidebar(); },
       onCreate: async () => {
         const name = prompt('New organisation name (1–12 alphanumeric):')?.trim();

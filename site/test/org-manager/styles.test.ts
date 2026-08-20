@@ -34,7 +34,7 @@ beforeEach(() => {
 });
 
 const sidebar = () => renderSidebar(root, {
-  orgs: [], selected: null, ownerOrgs: new Set(),
+  orgs: [], selected: null, ownerOrgs: new Set(), linkedEmail: null,
   onSelect: () => {}, onCreate: () => {}, onJoin: () => {}, onLinkGoogle: () => {}, onLogout: () => {},
 });
 

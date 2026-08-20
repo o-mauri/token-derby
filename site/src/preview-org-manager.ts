@@ -43,6 +43,24 @@ renderSidebar(shell.querySelector<HTMLElement>('.org-side')!, {
   ],
   selected: 'Acme',
   ownerOrgs: new Set(['Acme']),
+  linkedEmail: null,
+  onSelect: () => {}, onCreate: () => {}, onJoin: () => {}, onLinkGoogle: () => {}, onLogout: () => {},
+});
+
+// Section 2b: the same sidebar with a Google account already linked, shown
+// side by side with the unlinked one above so both renderings are visible.
+const linkedSidebarSection = document.createElement('section');
+linkedSidebarSection.className = 'org-preview-section';
+linkedSidebarSection.innerHTML = `<h2 class="org-preview-heading">Sidebar — Google account linked</h2><div class="org-manager"><div class="org-side"></div></div>`;
+app.appendChild(linkedSidebarSection);
+renderSidebar(linkedSidebarSection.querySelector<HTMLElement>('.org-side')!, {
+  orgs: [
+    { org_id: 'o1', org_name: 'Acme' },
+    { org_id: 'o2', org_name: 'RocketTeam' },
+  ],
+  selected: 'Acme',
+  ownerOrgs: new Set(['Acme']),
+  linkedEmail: 'omar@example.com',
   onSelect: () => {}, onCreate: () => {}, onJoin: () => {}, onLinkGoogle: () => {}, onLogout: () => {},
 });
 

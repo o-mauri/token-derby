@@ -1539,6 +1539,14 @@ body.tv .race-header .meta .btn {
 }
 .org-create:hover, .org-join:hover, .org-link-google:hover, .org-btn:hover { filter: brightness(1.1); }
 .org-sidebar .org-create, .org-sidebar .org-join, .org-sidebar .org-link-google { width: 100%; }
+.org-linked-email {
+  text-align: center;
+  font-size: 0.75rem;
+  letter-spacing: 0.03em;
+  padding: 9px 16px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
 
 .org-main {
   flex: 1 1 auto;

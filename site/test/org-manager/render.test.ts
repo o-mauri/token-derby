@@ -24,7 +24,7 @@ describe('renderSidebar', () => {
     const onSelect = vi.fn();
     renderSidebar(root, {
       orgs: [{ org_id: 'o1', org_name: 'Acme' }],
-      selected: 'Acme', ownerOrgs: new Set(['Acme']),
+      selected: 'Acme', ownerOrgs: new Set(['Acme']), linkedEmail: null,
       onSelect, onCreate: vi.fn(), onJoin: vi.fn(), onLinkGoogle: vi.fn(), onLogout: vi.fn(),
     });
     expect(root.textContent).toContain('Acme');
@@ -33,10 +33,10 @@ describe('renderSidebar', () => {
     expect(onSelect).toHaveBeenCalledWith('Acme');
   });
 
-  it('renders a Link Google account button', () => {
+  it('renders a Link Google account button when no account is linked', () => {
     renderSidebar(root, {
       orgs: [],
-      selected: null, ownerOrgs: new Set(),
+      selected: null, ownerOrgs: new Set(), linkedEmail: null,
       onSelect: vi.fn(), onCreate: vi.fn(), onJoin: vi.fn(), onLinkGoogle: vi.fn(), onLogout: vi.fn(),
     });
     expect(root.querySelector('.org-link-google')).not.toBeNull();
@@ -47,11 +47,25 @@ describe('renderSidebar', () => {
     const onLinkGoogle = vi.fn();
     renderSidebar(root, {
       orgs: [],
-      selected: null, ownerOrgs: new Set(),
+      selected: null, ownerOrgs: new Set(), linkedEmail: null,
       onSelect: vi.fn(), onCreate: vi.fn(), onJoin: vi.fn(), onLinkGoogle, onLogout: vi.fn(),
     });
     (root.querySelector('.org-link-google') as HTMLElement).click();
     expect(onLinkGoogle).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the linked email instead of an actionable link button when an account is linked', () => {
+    const onLinkGoogle = vi.fn();
+    renderSidebar(root, {
+      orgs: [],
+      selected: null, ownerOrgs: new Set(), linkedEmail: 'alice@example.com',
+      onSelect: vi.fn(), onCreate: vi.fn(), onJoin: vi.fn(), onLinkGoogle, onLogout: vi.fn(),
+    });
+    // The whole bug: a linked account must not offer a clickable link-account control.
+    expect(root.querySelector('.org-link-google')).toBeNull();
+    const buttonTexts = Array.from(root.querySelectorAll('button')).map((b) => b.textContent);
+    expect(buttonTexts.some((t) => /link google/i.test(t ?? ''))).toBe(false);
+    expect(root.textContent).toContain('alice@example.com');
   });
 });
 
