@@ -8,6 +8,12 @@ import type { StableHorse } from '@token-derby/shared';
 const uid = () => `u-${Math.random().toString(36).slice(2)}`;
 const oid = () => `o-${Math.random().toString(36).slice(2)}`;
 
+// Scan orders member rows by sk, i.e. by user_id. These force that pre-resolution
+// order to be the reverse of the expected post-sort name order, so a sort that
+// runs before names are filled in fails deterministically instead of by chance.
+const uidLate = () => `u-zz-${Math.random().toString(36).slice(2)}`;
+const uidEarly = () => `u-aa-${Math.random().toString(36).slice(2)}`;
+
 function horse(name: string): StableHorse {
   return {
     stable_horse_id: `sh-${Math.random().toString(36).slice(2)}`,
@@ -48,8 +54,8 @@ describe('admin-scan', () => {
 
   it('groups organisations with their members, naming them from the user rows', async () => {
     const id = oid();
-    const c1 = uid();
-    const c2 = uid();
+    const c1 = uidLate();
+    const c2 = uidEarly();
     await putUser({ user_id: c1, display_name: 'Creator', created_at: '2026-04-22T00:00:00.000Z' }, 'H');
     await putUser({ user_id: c2, display_name: 'Member2', created_at: '2026-04-23T00:00:00.000Z' }, 'H');
     await putOrganisation(
@@ -70,8 +76,8 @@ describe('admin-scan', () => {
 
   it('reflects renames of both the creator and a member', async () => {
     const id = oid();
-    const c1 = uid();
-    const c2 = uid();
+    const c1 = uidLate();
+    const c2 = uidEarly();
     await putUser({ user_id: c1, display_name: 'Zeta', created_at: '2026-04-22T00:00:00.000Z' }, 'H');
     await putUser({ user_id: c2, display_name: 'Alpha', created_at: '2026-04-23T00:00:00.000Z' }, 'H');
     await putOrganisation(
