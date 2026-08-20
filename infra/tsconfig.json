@@ -6,5 +6,5 @@
     "moduleResolution": "node",
     "rootDir": "."
   },
-  "include": ["bin/**/*", "lib/**/*"]
+  "include": ["bin/**/*", "lib/**/*", "test/**/*"]
 }

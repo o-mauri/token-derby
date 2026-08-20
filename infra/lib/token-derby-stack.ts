@@ -135,6 +135,9 @@ export class TokenDerbyStack extends cdk.Stack {
     // CloudFront replaces the viewer Host with the API Gateway domain, so the
     // OAuth redirect_uri cannot be derived from the request. Site domain, not
     // admin: the org manager is served there.
+    // The admin distribution also forwards /api/*, so a future sign-in entry
+    // point on admin. would set its state cookie there and be redirected here,
+    // where that cookie is absent — it would need its own SITE_ORIGIN.
     const commonEnv = {
       TABLE_NAME,
       NODE_OPTIONS: '--enable-source-maps',

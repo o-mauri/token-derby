@@ -7,6 +7,7 @@
   },
   "scripts": {
     "build": "tsc -p .",
+    "test": "tsc -p . && vitest run",
     "synth": "cdk synth",
     "deploy": "cdk deploy --require-approval never",
     "diff": "cdk diff",
@@ -22,6 +23,7 @@
     "aws-cdk": "^2.160.0",
     "esbuild": "^0.23.0",
     "ts-node": "^10.9.2",
-    "typescript": "^5.6.0"
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
   }
 }
