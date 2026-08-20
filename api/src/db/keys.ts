@@ -143,3 +143,9 @@ export const AUTHREQ_PK_PREFIX = 'AUTHREQ#';
 export function authRequestKey(state: string) {
   return { pk: `${AUTHREQ_PK_PREFIX}${state}`, sk: 'META' };
 }
+
+export const EMAIL_PK_PREFIX = 'EMAIL#';
+
+export function emailClaimKey(email: string) {
+  return { pk: `${EMAIL_PK_PREFIX}${email}`, sk: 'CLAIM' };
+}
