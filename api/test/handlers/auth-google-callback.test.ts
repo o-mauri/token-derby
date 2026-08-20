@@ -10,6 +10,7 @@ vi.mock('../../src/lib/auth-config.js', () => ({
 
 import { handleCallback } from '../../src/handlers/auth-google-callback.js';
 import { putAuthRequest } from '../../src/db/auth-requests.js';
+import * as authRequests from '../../src/db/auth-requests.js';
 import { consumeWebGrant } from '../../src/db/web-sessions.js';
 import { signState } from '../../src/lib/oauth.js';
 import { putUser, getUserById } from '../../src/db/users.js';
@@ -107,9 +108,16 @@ describe('auth-google-callback', () => {
   it('rejects a replayed callback — the pending request is single-use', async () => {
     const { nonce, signed } = await seedRequest();
     const email = `replay-${randomUUID()}@example.com`;
-    await handleCallback(ev('code', signed), deps(claimsFor(email, nonce)));
-    const res: any = await handleCallback(ev('code', signed), deps(claimsFor(email, nonce)));
+    const fetchSpy = vi.fn(tokenFetch('fake-id-token'));
+    const callDeps = { fetchImpl: fetchSpy, verifyIdToken: async () => claimsFor(email, nonce) } as any;
+
+    await handleCallback(ev('code', signed), callDeps);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+    const res: any = await handleCallback(ev('code', signed), callDeps);
     expect(errOf(res.headers.location)).toBe('expired');
+    // consumption must reject the replay before it can reach the token endpoint again
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
 
   it('rejects a forged state without touching the table', async () => {
@@ -124,9 +132,23 @@ describe('auth-google-callback', () => {
 
   it('surfaces a Google error parameter without exchanging anything', async () => {
     const { signed } = await seedRequest();
-    const e = ev('', signed);
-    (e as any).queryStringParameters = { error: 'access_denied', state: signed };
-    const res: any = await handleCallback(e, deps(claimsFor('x@y.com', 'n')));
+    const e = ev('some-code', signed);
+    (e as any).queryStringParameters = { code: 'some-code', error: 'access_denied', state: signed };
+    const fetchSpy = vi.fn(tokenFetch('fake-id-token'));
+    const res: any = await handleCallback(e, { fetchImpl: fetchSpy, verifyIdToken: async () => claimsFor('x@y.com', 'n') } as any);
+    expect(errOf(res.headers.location)).toBe('sso_failed');
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('fails closed with sso_failed when a dependency throws before the exchange', async () => {
+    const { nonce, signed } = await seedRequest();
+    const email = `dbfail-${randomUUID()}@example.com`;
+    const spy = vi.spyOn(authRequests, 'consumeAuthRequest').mockRejectedValueOnce(new Error('dynamo unavailable'));
+
+    const res: any = await handleCallback(ev('code', signed), deps(claimsFor(email, nonce)));
+    spy.mockRestore();
+
+    expect(res.statusCode).toBe(302);
     expect(errOf(res.headers.location)).toBe('sso_failed');
   });
 

@@ -39,56 +39,63 @@ export async function handleCallback(
 
   let origin = originOf(event);
 
-  const q = event.queryStringParameters ?? {};
-  const cfg = await loadAuthConfig();
-
-  const signedState = q.state;
-  if (!signedState) return fail(origin, 'sso_failed');
-  const state = verifyState(cfg.stateSecret, signedState);
-  if (!state) return fail(origin, 'sso_failed');
-
-  if (q.error) return fail(origin, 'sso_failed');
-
-  const pending = await consumeAuthRequest(state);
-  if (!pending) return fail(origin, 'expired');
-  origin = siteOriginFrom(pending.redirect_uri);
-
-  const code = q.code;
-  if (!code) return fail(origin, 'sso_failed');
-
+  // Outer backstop: the user is mid-redirect in a browser, so a thrown SSM
+  // or DynamoDB error here must still become an auth_error redirect, not a
+  // raw Lambda failure.
   try {
-    const res = await fetchImpl(TOKEN_URL, {
-      method: 'POST',
-      headers: { 'content-type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        code,
-        client_id: cfg.clientId,
-        client_secret: cfg.clientSecret,
-        redirect_uri: pending.redirect_uri,
-        grant_type: 'authorization_code',
-        code_verifier: pending.code_verifier,
-      }).toString(),
-    });
-    if (!res.ok) return fail(origin, 'sso_failed');
+    const q = event.queryStringParameters ?? {};
+    const cfg = await loadAuthConfig();
 
-    const payload = (await res.json()) as { id_token?: string };
-    if (!payload.id_token) return fail(origin, 'sso_failed');
+    const signedState = q.state;
+    if (!signedState) return fail(origin, 'sso_failed');
+    const state = verifyState(cfg.stateSecret, signedState);
+    if (!state) return fail(origin, 'sso_failed');
 
-    const claims = await verifyIdToken(payload.id_token, {
-      clientId: cfg.clientId,
-      nonce: pending.nonce,
-    });
+    if (q.error) return fail(origin, 'sso_failed');
 
-    const identity = await resolveGoogleIdentity(claims, pending.link_to_user_id);
+    const pending = await consumeAuthRequest(state);
+    if (!pending) return fail(origin, 'expired');
+    origin = siteOriginFrom(pending.redirect_uri);
 
-    // Reuse the CLI's grant-code seam, so the site's existing exchange path
-    // handles the session with no new session logic.
-    const grant = generateWebSessionCode();
-    await putWebGrant(grant, identity.user_id, identity.display_name, GRANT_TTL_SECONDS);
+    const code = q.code;
+    if (!code) return fail(origin, 'sso_failed');
 
-    return redirect(`${origin}/org-manager#code=${grant}`);
-  } catch (e) {
-    if (e instanceof EmailAlreadyLinkedError) return fail(origin, 'email_already_linked');
+    try {
+      const res = await fetchImpl(TOKEN_URL, {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          code,
+          client_id: cfg.clientId,
+          client_secret: cfg.clientSecret,
+          redirect_uri: pending.redirect_uri,
+          grant_type: 'authorization_code',
+          code_verifier: pending.code_verifier,
+        }).toString(),
+      });
+      if (!res.ok) return fail(origin, 'sso_failed');
+
+      const payload = (await res.json()) as { id_token?: string };
+      if (!payload.id_token) return fail(origin, 'sso_failed');
+
+      const claims = await verifyIdToken(payload.id_token, {
+        clientId: cfg.clientId,
+        nonce: pending.nonce,
+      });
+
+      const identity = await resolveGoogleIdentity(claims, pending.link_to_user_id);
+
+      // Reuse the CLI's grant-code seam, so the site's existing exchange path
+      // handles the session with no new session logic.
+      const grant = generateWebSessionCode();
+      await putWebGrant(grant, identity.user_id, identity.display_name, GRANT_TTL_SECONDS);
+
+      return redirect(`${origin}/org-manager#code=${grant}`);
+    } catch (e) {
+      if (e instanceof EmailAlreadyLinkedError) return fail(origin, 'email_already_linked');
+      return fail(origin, 'sso_failed');
+    }
+  } catch {
     return fail(origin, 'sso_failed');
   }
 }
