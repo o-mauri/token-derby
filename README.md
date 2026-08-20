@@ -94,6 +94,42 @@ parameters encrypted with the default `aws/ssm` managed key (as created above). 
 you instead encrypt them with a customer-managed KMS key, also grant the Lambdas
 `kms:Decrypt` on that key.
 
+## Google SSO
+
+Web sign-in uses a Google OAuth client. Three SSM SecureStrings hold its
+config, read at Lambda cold start and cached:
+
+    /token-derby/auth/google-client-id
+    /token-derby/auth/google-client-secret
+    /token-derby/auth/state-secret          # openssl rand -hex 32
+
+Provision them in the same account and region the stack deploys into
+(`eu-west-2` — the CLI default is `eu-west-1`, and params in the wrong region
+make sign-in 500 with no obvious cause):
+
+```bash
+aws ssm put-parameter --profile personal --region eu-west-2 --type SecureString \
+  --name /token-derby/auth/google-client-id     --value 'YOUR_CLIENT_ID'
+aws ssm put-parameter --profile personal --region eu-west-2 --type SecureString \
+  --name /token-derby/auth/google-client-secret --value 'YOUR_CLIENT_SECRET'
+aws ssm put-parameter --profile personal --region eu-west-2 --type SecureString \
+  --name /token-derby/auth/state-secret         --value "$(openssl rand -hex 32)"
+```
+
+The Google client is a **Web application** client with two authorised redirect
+URIs — the production callback and `http://localhost:3000/api/auth/google/callback`
+for the local harness. Authorised JavaScript origins stay empty: this is the
+server-side code flow, not the browser SDK.
+
+`mauricode.co.uk` must be a verified domain in Google Search Console (DNS TXT at
+the apex) before the consent screen will accept it. That record is **deliberately
+not managed by CDK** — it covers the whole domain, and a `cdk destroy` would take
+it with it, un-verifying the OAuth app.
+
+To rotate the client secret: reset it in the Google console, then re-run the
+`google-client-secret` command above. It takes effect on the next Lambda cold
+start; no redeploy is needed.
+
 ## Staging environment
 
 A full staging stack runs alongside production in the same AWS account at

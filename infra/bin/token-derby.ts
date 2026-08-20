@@ -11,6 +11,7 @@ const ENV_CONFIGS: Record<EnvName, EnvConfig> = {
     tableName: 'token-derby',
     apiName: 'token-derby-api',
     ssmPrefix: '/token-derby/admin',
+    authSsmPrefix: '/token-derby/auth',
     disposable: false,
   },
   staging: {
@@ -20,6 +21,7 @@ const ENV_CONFIGS: Record<EnvName, EnvConfig> = {
     tableName: 'token-derby-staging',
     apiName: 'token-derby-api-staging',
     ssmPrefix: '/token-derby-staging/admin',
+    authSsmPrefix: '/token-derby-staging/auth',
     disposable: true,
   },
 };

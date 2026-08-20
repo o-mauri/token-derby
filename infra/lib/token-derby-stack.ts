@@ -132,7 +132,7 @@ export class TokenDerbyStack extends cdk.Stack {
 
     // ── Lambda factory ─────────────────────────────────────────────────
     const apiDir = path.resolve(__dirname, '..', '..', 'api', 'src', 'handlers');
-    const commonEnv = { TABLE_NAME, NODE_OPTIONS: '--enable-source-maps', ADMIN_SSM_PREFIX: config.ssmPrefix };
+    const commonEnv = { TABLE_NAME, NODE_OPTIONS: '--enable-source-maps', ADMIN_SSM_PREFIX: config.ssmPrefix, AUTH_SSM_PREFIX: config.authSsmPrefix };
 
     const makeFn = (name: string, fileBase: string, opts?: { timeout?: cdk.Duration }) => {
       const fn = new NodejsFunction(this, name, {
@@ -189,6 +189,9 @@ export class TokenDerbyStack extends cdk.Stack {
     const createWebSessionFn = makeFn('CreateWebSessionFn', 'create-web-session');
     const exchangeWebSessionFn = makeFn('ExchangeWebSessionFn', 'exchange-web-session');
     const deleteWebSessionFn = makeFn('DeleteWebSessionFn', 'delete-web-session');
+    const authGoogleStartFn = makeFn('AuthGoogleStartFn', 'auth-google-start');
+    const authLinkStartFn = makeFn('AuthLinkStartFn', 'auth-link-start');
+    const authGoogleCallbackFn = makeFn('AuthGoogleCallbackFn', 'auth-google-callback');
     const listOrgMembersFn = makeFn('ListOrgMembersFn', 'list-org-members');
     const scheduleTickFn = makeFn('ScheduleTickFn', 'schedule-tick', { timeout: cdk.Duration.seconds(120) });
 
@@ -232,6 +235,14 @@ export class TokenDerbyStack extends cdk.Stack {
       fn.addToRolePolicy(new cdk.aws_iam.PolicyStatement({
         actions: ['ssm:GetParameter'],
         resources: [adminSsmArn],
+      }));
+    }
+
+    const authSsmArn = `arn:aws:ssm:${this.region}:${this.account}:parameter${config.authSsmPrefix}/*`;
+    for (const fn of [authGoogleStartFn, authLinkStartFn, authGoogleCallbackFn]) {
+      fn.addToRolePolicy(new cdk.aws_iam.PolicyStatement({
+        actions: ['ssm:GetParameter'],
+        resources: [authSsmArn],
       }));
     }
 
@@ -341,6 +352,9 @@ export class TokenDerbyStack extends cdk.Stack {
     httpApi.addRoutes({ path: '/api/web-sessions', methods: [HttpMethod.POST], integration: new HttpLambdaIntegration('CreateWebSessionInt', createWebSessionFn) });
     httpApi.addRoutes({ path: '/api/web-sessions/exchange', methods: [HttpMethod.POST], integration: new HttpLambdaIntegration('ExchangeWebSessionInt', exchangeWebSessionFn) });
     httpApi.addRoutes({ path: '/api/web-sessions', methods: [HttpMethod.DELETE], integration: new HttpLambdaIntegration('DeleteWebSessionInt', deleteWebSessionFn) });
+    httpApi.addRoutes({ path: '/api/auth/google/start', methods: [HttpMethod.GET], integration: new HttpLambdaIntegration('AuthGoogleStartInt', authGoogleStartFn) });
+    httpApi.addRoutes({ path: '/api/auth/link/start', methods: [HttpMethod.POST], integration: new HttpLambdaIntegration('AuthLinkStartInt', authLinkStartFn) });
+    httpApi.addRoutes({ path: '/api/auth/google/callback', methods: [HttpMethod.GET], integration: new HttpLambdaIntegration('AuthGoogleCallbackInt', authGoogleCallbackFn) });
     httpApi.addRoutes({ path: '/api/jockey/init', methods: [HttpMethod.POST], integration: new HttpLambdaIntegration('InitJockeyInt', initJockeyFn) });
     httpApi.addRoutes({ path: '/api/jockey/me', methods: [HttpMethod.GET], integration: new HttpLambdaIntegration('GetJockeyInt', getJockeyFn) });
     httpApi.addRoutes({ path: '/api/jockey/me', methods: [HttpMethod.PUT], integration: new HttpLambdaIntegration('UpdateJockeyInt', updateJockeyFn) });

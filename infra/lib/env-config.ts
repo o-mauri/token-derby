@@ -7,5 +7,6 @@ export interface EnvConfig {
   tableName: string;
   apiName: string;
   ssmPrefix: string;
+  authSsmPrefix: string;
   disposable: boolean;
 }
