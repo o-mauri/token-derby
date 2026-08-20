@@ -3,7 +3,7 @@ import { ddb, TABLE } from './client.js';
 import { userMetaKey } from './keys.js';
 import type { User } from '@token-derby/shared';
 
-export type UserRecord = User & { secret_token_hash: string };
+export type UserRecord = User & { secret_token_hash?: string };
 
 export async function putUser(user: User, secret_token_hash: string): Promise<void> {
   await ddb.send(new PutCommand({

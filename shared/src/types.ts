@@ -154,6 +154,12 @@ export type User = {
   user_id: string;
   display_name: string;
   created_at: string;
+  // Set once a Google account is linked. Absent on every pre-SSO row.
+  email?: string;
+  email_verified?: boolean;
+  idp?: 'google';
+  idp_sub?: string;
+  hd?: string;            // Google hosted-domain claim; Workspace accounts only
 };
 
 export type HatRarity = 'common' | 'rare' | 'epic' | 'legendary';
