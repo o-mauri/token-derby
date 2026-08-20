@@ -25,8 +25,12 @@ describe('renderLogin', () => {
   });
 
   it('shows a generic message for an unknown error code', () => {
-    renderLogin(root, { authError: 'sso_failed' });
-    expect(root.querySelector('.org-login-error')).not.toBeNull();
+    renderLogin(root, { authError: 'wat' });
+    const el = root.querySelector('.org-login-error');
+    expect(el).not.toBeNull();
+    // The generic fallback, not a blank banner and not the raw code.
+    expect(el!.textContent).toMatch(/did not complete/i);
+    expect(el!.textContent).not.toContain('wat');
   });
 
   it('shows no error block when there is no error', () => {
