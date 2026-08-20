@@ -56,6 +56,21 @@ describe('auth-link-start', () => {
     expect(res.statusCode).toBe(401);
   });
 
+  it('does no work at all before authenticating', async () => {
+    const cfg = await import('../../src/lib/auth-config.js');
+    const reqs = await import('../../src/db/auth-requests.js');
+    const cfgSpy = vi.spyOn(cfg, 'loadAuthConfig');
+    const putSpy = vi.spyOn(reqs, 'putAuthRequest');
+
+    const res: any = await linkStart(ev({ routeKey: 'POST /api/auth/link/start' }));
+
+    expect(res.statusCode).toBe(401);
+    expect(cfgSpy).not.toHaveBeenCalled();
+    expect(putSpy).not.toHaveBeenCalled();
+    cfgSpy.mockRestore();
+    putSpy.mockRestore();
+  });
+
   it('returns an authorize_url carrying the caller as the link target', async () => {
     const user_id = randomUUID();
     const token = randomUUID();
@@ -72,5 +87,26 @@ describe('auth-link-start', () => {
     const state = verifyState('a'.repeat(64), stateFromUrl(authorize_url))!;
     const pending = await consumeAuthRequest(state);
     expect(pending!.link_to_user_id).toBe(user_id);
+  });
+
+  it('ignores a link_to_user_id supplied by the caller', async () => {
+    const attacker = randomUUID();
+    const victim = randomUUID();
+    const token = randomUUID();
+    await putWebSession(token, attacker, 'Attacker', new Date(Date.now() + 3_600_000).toISOString(), 3600);
+
+    const res: any = await linkStart(ev({
+      routeKey: 'POST /api/auth/link/start',
+      headers: { host: 'token-derby.mauricode.co.uk', authorization: `Bearer ${token}` },
+      body: JSON.stringify({ link_to_user_id: victim }),
+      queryStringParameters: { link_to_user_id: victim },
+    }));
+    expect(res.statusCode).toBe(200);
+
+    const state = verifyState('a'.repeat(64), stateFromUrl(JSON.parse(res.body).authorize_url))!;
+    const pending = await consumeAuthRequest(state);
+    // The link target must come from the session, never from the request.
+    expect(pending!.link_to_user_id).toBe(attacker);
+    expect(pending!.link_to_user_id).not.toBe(victim);
   });
 });
