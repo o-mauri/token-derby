@@ -66,4 +66,12 @@ describe('parseRoute', () => {
     expect(parseRoute('/race/ABC/extra')).toEqual({ type: 'not-found' });
     expect(parseRoute('/org/')).toEqual({ type: 'not-found' });
   });
+
+  it('maps "/privacy" to privacy', () => {
+    expect(parseRoute('/privacy')).toEqual({ type: 'privacy' });
+  });
+
+  it('strips a trailing slash from /privacy', () => {
+    expect(parseRoute('/privacy/')).toEqual({ type: 'privacy' });
+  });
 });

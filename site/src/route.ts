@@ -5,6 +5,7 @@ export type Route =
   | { type: 'org-live'; orgName: string }
   | { type: 'catalog' }
   | { type: 'about' }
+  | { type: 'privacy' }
   | { type: 'org-manager' }
   | { type: 'not-found' };
 
@@ -26,6 +27,8 @@ export function parseRoute(pathname: string): Route {
   if (trimmed === '/catalog') return { type: 'catalog' };
 
   if (trimmed === '/about') return { type: 'about' };
+
+  if (trimmed === '/privacy') return { type: 'privacy' };
 
   return { type: 'not-found' };
 }

@@ -5,6 +5,7 @@ import { renderOrg } from './render/org.js';
 import { renderOrgLive } from './render/org-live.js';
 import { renderCatalog } from './render/catalog.js';
 import { renderAbout } from './render/about.js';
+import { renderPrivacy } from './render/privacy.js';
 import { renderOrgManager } from './org-manager/index.js';
 import { initTheme } from './theme.js';
 
@@ -36,6 +37,8 @@ function route() {
     activeCleanup = renderCatalog(root);
   } else if (r.type === 'about') {
     renderAbout(root);
+  } else if (r.type === 'privacy') {
+    renderPrivacy(root);
   } else if (r.type === 'org-manager') {
     activeCleanup = renderOrgManager(root);
   } else {
