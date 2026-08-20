@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { renderLogin } from '../../src/org-manager/render/login.js';
 
+const GOOGLE_BRAND_FILLS = ['#4285F4', '#34A853', '#FBBC05', '#EA4335'];
+
 describe('renderLogin', () => {
   let root: HTMLElement;
   beforeEach(() => { root = document.createElement('div'); });
@@ -12,11 +14,49 @@ describe('renderLogin', () => {
     expect(root.textContent).toMatch(/sign in with google/i);
   });
 
-  it('warns existing CLI users that signing in directly creates a new jockey', () => {
+  it('renders exactly two lanes, one per audience', () => {
     renderLogin(root);
-    const text = root.textContent ?? '';
-    expect(text).toMatch(/token-derby web/);
-    expect(text).toMatch(/new jockey/i);
+    const lanes = root.querySelectorAll('.org-login-lane');
+    expect(lanes).toHaveLength(2);
+  });
+
+  it('puts the Google action and the CLI command in different lanes', () => {
+    renderLogin(root);
+    const googleLane = root.querySelector('.google-signin')!.closest('.org-login-lane');
+    const cliLane = root.querySelector('.terminal-cmd')!.closest('.org-login-lane');
+    expect(googleLane).not.toBeNull();
+    expect(cliLane).not.toBeNull();
+    expect(googleLane).not.toBe(cliLane);
+  });
+
+  it('shows the token-derby web command for existing CLI racers', () => {
+    renderLogin(root);
+    expect(root.querySelector('.terminal-cmd')?.textContent).toBe('token-derby web');
+  });
+
+  it('names the exact CLI command that would create a second jockey', () => {
+    renderLogin(root);
+    // The specific string, not a loose /init/i match — this is the safety-critical
+    // prohibition that replaces the old post-button warning.
+    expect(root.textContent).toContain('token-derby init');
+    expect(root.textContent).toMatch(/second jockey/i);
+  });
+
+  it('renders the Google mark as inline SVG with the four brand fills, not an emoji or external image', () => {
+    renderLogin(root);
+    const mark = root.querySelector('a.google-signin svg.google-mark');
+    expect(mark).not.toBeNull();
+    expect(root.querySelector('a.google-signin img')).toBeNull();
+    for (const fill of GOOGLE_BRAND_FILLS) {
+      expect(mark!.innerHTML).toContain(fill);
+    }
+  });
+
+  it('renders the horse SVG in the heading, not the emoji', () => {
+    renderLogin(root);
+    const h1 = root.querySelector('h1')!;
+    expect(h1.querySelector('svg.horse-face')).not.toBeNull();
+    expect(h1.textContent).not.toContain('\u{1F3C7}');
   });
 
   it('shows a message when the callback reported email_already_linked', () => {

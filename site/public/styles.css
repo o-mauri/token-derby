@@ -1341,22 +1341,86 @@ body.tv .race-header .meta .btn {
   color: var(--accent);
   font-size: clamp(2rem, 6vw, 3rem);
   letter-spacing: 0.08em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4em;
+}
+.org-login-subtitle {
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  font-size: 0.9rem;
 }
 .org-login p { color: var(--muted); margin: 0; max-width: 42ch; }
-/* The sign-in CTA carries the same weight as .org-create/.org-btn, sized up to
-   .cmd's scale because it is the only action on the signed-out screen. */
-.org-login .google-signin {
-  display: inline-block;
-  background: var(--accent);
-  color: var(--bg);
-  padding: 12px 24px;
-  font-size: 1.15rem;
-  font-weight: bold;
-  letter-spacing: 0.05em;
-  border-radius: 4px;
+
+/* Two equal-weight paths (Option B): a new visitor and an existing CLI racer.
+   Stacks under the org-manager breakpoint used elsewhere in this file. */
+.org-login-lanes {
+  display: flex;
+  gap: 40px;
+  align-items: stretch;
+  justify-content: center;
+  flex-wrap: wrap;
+  width: 100%;
+  max-width: 640px;
+}
+.org-login-lane {
+  flex: 1 1 220px;
+  max-width: 280px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 22px;
+  background: var(--panel);
+  border: 2px solid var(--border);
+  border-radius: 6px;
+}
+/* Inline commands keep the surrounding pixel font and size — the browser's
+   default monospace is both a different face and a larger one, which breaks
+   the line mid-sentence. */
+.org-login code {
+  font-family: inherit;
+  font-size: inherit;
+  color: var(--accent);
+  background: var(--bg);
+  padding: 0 4px;
+  border-radius: 3px;
+}
+@media (max-width: 720px) {
+  .org-login-lanes { flex-direction: column; align-items: center; gap: 24px; }
+  .org-login-lane { max-width: 320px; width: 100%; }
+}
+
+/* Google's compliant "Sign in with Google" light button, built to Google's
+   published spec exactly (height/radius/padding/colours/type). It must look
+   identical in every theme, so it is deliberately literal-coloured and set in
+   Roboto rather than the site's tokens and pixel font — resetting both here
+   and on the label span so neither the global font nor a theme's glow can
+   reach it. */
+.org-login .google-signin,
+.org-login .google-signin-label {
+  font-family: Roboto, Arial, sans-serif;
+  font-weight: 500;
+  font-size: 14px;
+  letter-spacing: 0.25px;
+  text-shadow: none;
   text-decoration: none;
 }
-.org-login .google-signin:hover { filter: brightness(1.1); }
+.org-login .google-signin {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  height: 40px;
+  box-sizing: border-box;
+  padding: 0 12px;
+  background: #FFFFFF;
+  border: 1px solid #747775;
+  border-radius: 4px;
+  color: #1F1F1F;
+}
+.org-login .google-signin:hover { background: #F8F9FA; }
+.google-mark { flex-shrink: 0; }
 
 /* Reads as an error, not a hint: .org-login-error on the signed-out screen,
    .org-auth-error on the signed-in shell. Scoped under .org-login so it outranks
