@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import {
-  getUserIdByEmail, createUserWithEmail, attachEmailToUser, updateUserIdentity,
+  getUserIdByEmail, createUserWithEmail, attachEmailToUser, refreshUserIdentity,
   EmailAlreadyClaimedError, UserAlreadyLinkedError,
 } from '../../src/db/identities.js';
 import { getUserById, putUser } from '../../src/db/users.js';
@@ -70,14 +70,15 @@ describe('identity writes', () => {
       .rejects.toBeInstanceOf(EmailAlreadyClaimedError);
   });
 
-  it('refreshes the display name and identity fields on sign-in', async () => {
+  it('refreshes the identity fields on sign-in but never the display name', async () => {
     const e = email();
     const user_id = await createUserWithEmail({
       user_id: randomUUID(), email: e, idp_sub: 'old-sub', display_name: 'Before',
     });
-    await updateUserIdentity({ user_id, email: e, idp_sub: 'new-sub', hd: 'corp.com', display_name: 'After' });
+    const { display_name } = await refreshUserIdentity({ user_id, email: e, idp_sub: 'new-sub', hd: 'corp.com' });
     const row = await getUserById(user_id);
-    expect(row!.display_name).toBe('After');
+    expect(row!.display_name).toBe('Before');
+    expect(display_name).toBe('Before');
     expect(row!.idp_sub).toBe('new-sub');
     expect(row!.hd).toBe('corp.com');
   });

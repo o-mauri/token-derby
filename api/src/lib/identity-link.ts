@@ -2,8 +2,9 @@ import { randomUUID } from 'node:crypto';
 import { USER_NAME_MAX_LENGTH } from '@token-derby/shared';
 import type { GoogleClaims } from './google-id-token.js';
 import {
-  getUserIdByEmail, createUserWithEmail, attachEmailToUser, updateUserIdentity, UserAlreadyLinkedError,
+  getUserIdByEmail, createUserWithEmail, attachEmailToUser, refreshUserIdentity, UserAlreadyLinkedError,
 } from '../db/identities.js';
+import { updateUserDisplayName } from '../db/users.js';
 
 export class EmailAlreadyLinkedError extends Error {
   constructor(email: string) {
@@ -42,8 +43,10 @@ export async function resolveGoogleIdentity(
 
   if (claimed) {
     if (link_to_user_id && link_to_user_id !== claimed) throw new EmailAlreadyLinkedError(email);
-    await updateUserIdentity({ ...write, user_id: claimed, display_name });
-    return { user_id: claimed, display_name, created: false };
+    // Repeat sign-in: the jockey name is whatever it has been renamed to, not
+    // whatever Google currently says.
+    const { display_name: stored } = await refreshUserIdentity({ ...write, user_id: claimed });
+    return { user_id: claimed, display_name: stored ?? display_name, created: false };
   }
 
   if (link_to_user_id) {
@@ -55,7 +58,9 @@ export async function resolveGoogleIdentity(
       if (err instanceof UserAlreadyLinkedError) throw new EmailAlreadyLinkedError(email);
       throw err;
     }
-    await updateUserIdentity({ ...write, user_id: link_to_user_id, display_name });
+    // First link: attachEmailToUser already wrote the identity fields, and the
+    // Google first name becomes the jockey name at this moment only.
+    await updateUserDisplayName(link_to_user_id, display_name);
     return { user_id: link_to_user_id, display_name, created: false };
   }
 

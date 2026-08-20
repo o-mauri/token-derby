@@ -123,19 +123,31 @@ export async function attachEmailToUser(input: IdentityWrite): Promise<void> {
   }
 }
 
-/** Sign-in refresh for an account that already owns this email. */
-export async function updateUserIdentity(
-  input: IdentityWrite & { display_name: string },
-): Promise<void> {
-  await ddb.send(new UpdateCommand({
+/** Sign-in refresh for an account that already owns this email: identity fields
+ *  only. The display name is left alone so admin and CLI renames survive, and
+ *  the stored one is returned for the caller to carry into the session. */
+export async function refreshUserIdentity(
+  input: IdentityWrite,
+): Promise<{ display_name: string | null }> {
+  const { Attributes } = await ddb.send(new UpdateCommand({
     TableName: TABLE,
     Key: userMetaKey(input.user_id),
     UpdateExpression:
-      'SET display_name = :n, email_verified = :v, idp = :i, idp_sub = :s' + (input.hd ? ', hd = :h' : ''),
+      'SET email_verified = :v, idp = :i, idp_sub = :s' + (input.hd ? ', hd = :h' : ''),
     ConditionExpression: 'attribute_exists(pk)',
     ExpressionAttributeValues: {
-      ':n': input.display_name, ':v': true, ':i': 'google', ':s': input.idp_sub,
+      ':v': true, ':i': 'google', ':s': input.idp_sub,
       ...(input.hd ? { ':h': input.hd } : {}),
     },
+    ReturnValues: 'ALL_OLD',
   }));
+  // A changed idp_sub on the same email means the address was reassigned, so a
+  // new person is inheriting this account. Visible, but not refused.
+  const previous = Attributes?.idp_sub ? String(Attributes.idp_sub) : null;
+  if (previous && previous !== input.idp_sub) {
+    console.warn('idp_sub changed for existing email', {
+      user_id: input.user_id, email: input.email, stored_idp_sub: previous, new_idp_sub: input.idp_sub,
+    });
+  }
+  return { display_name: Attributes?.display_name ? String(Attributes.display_name) : null };
 }

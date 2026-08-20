@@ -1,9 +1,9 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import {
   resolveGoogleIdentity, displayNameFromClaims, normaliseEmail, EmailAlreadyLinkedError,
 } from '../../src/lib/identity-link.js';
-import { getUserById, putUser } from '../../src/db/users.js';
+import { getUserById, putUser, updateUserDisplayName } from '../../src/db/users.js';
 import { getUserIdByEmail } from '../../src/db/identities.js';
 import { hashSecretToken } from '../../src/lib/auth.js';
 import type { GoogleClaims } from '../../src/lib/google-id-token.js';
@@ -51,14 +51,27 @@ describe('resolveGoogleIdentity', () => {
     expect(await getUserIdByEmail(c.email)).toBe(res.user_id);
   });
 
-  it('signs in to the claimed account and refreshes the name', async () => {
+  it('signs in to the claimed account without touching the jockey name', async () => {
     const c = claims();
     const first = await resolveGoogleIdentity(c);
     const again = await resolveGoogleIdentity({ ...c, given_name: 'Adelaide' });
     expect(again.user_id).toBe(first.user_id);
     expect(again.created).toBe(false);
-    expect(again.display_name).toBe('Adelaide');
-    expect((await getUserById(first.user_id))!.display_name).toBe('Adelaide');
+    // Google's current given_name does not win on a repeat sign-in.
+    expect(again.display_name).toBe('Ada');
+    expect((await getUserById(first.user_id))!.display_name).toBe('Ada');
+  });
+
+  it('leaves an admin rename intact on the next sign-in, and carries it into the session', async () => {
+    const c = claims();
+    const first = await resolveGoogleIdentity(c);
+    await updateUserDisplayName(first.user_id, 'Renamed');
+
+    const again = await resolveGoogleIdentity(c);
+
+    expect((await getUserById(first.user_id))!.display_name).toBe('Renamed');
+    // The returned name becomes the web session's, so it must be the renamed one.
+    expect(again.display_name).toBe('Renamed');
   });
 
   it('attaches to an existing CLI account when a link target is given', async () => {
@@ -82,6 +95,46 @@ describe('resolveGoogleIdentity', () => {
     const again = await resolveGoogleIdentity(c, first.user_id);
     expect(again.user_id).toBe(first.user_id);
     expect(again.created).toBe(false);
+  });
+
+  it('warns but still signs in when the Google sub changed for the same email', async () => {
+    const c = claims();
+    const first = await resolveGoogleIdentity(c);
+
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    let again: Awaited<ReturnType<typeof resolveGoogleIdentity>>;
+    let calls: unknown[][];
+    try {
+      again = await resolveGoogleIdentity({ ...c, sub: 'sub-reassigned' });
+      calls = warn.mock.calls.map((c2) => [...c2]);
+    } finally {
+      warn.mockRestore(); // also clears the recorded calls, hence the copy above
+    }
+
+    // A reassigned Workspace address inherits the account; refusing would lock
+    // out a legitimate user, so this is visible rather than fatal.
+    expect(again.user_id).toBe(first.user_id);
+    expect(calls).toHaveLength(1);
+    expect(String(calls[0]![0])).toMatch(/idp_sub/);
+    expect(calls[0]![1]).toMatchObject({
+      user_id: first.user_id, email: c.email, stored_idp_sub: c.sub, new_idp_sub: 'sub-reassigned',
+    });
+  });
+
+  it('does not warn when the same Google sub signs in again', async () => {
+    const c = claims();
+    await resolveGoogleIdentity(c);
+
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    let calls: unknown[][];
+    try {
+      await resolveGoogleIdentity(c);
+      calls = warn.mock.calls.map((c2) => [...c2]);
+    } finally {
+      warn.mockRestore();
+    }
+
+    expect(calls).toEqual([]);
   });
 
   it('refuses when the email belongs to a different account — never merges', async () => {
