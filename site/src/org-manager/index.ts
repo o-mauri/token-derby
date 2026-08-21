@@ -10,9 +10,11 @@ import { renderRacing } from './render/tabs/racing.js';
 import { renderWebhook } from './render/tabs/webhook.js';
 import { renderSlackbot } from './render/tabs/slackbot.js';
 import { renderRaceSettings } from './render/tabs/race-settings.js';
+import { renderAccount } from './render/account.js';
 import type { OrganisationSummary } from '@token-derby/shared';
 
 type Tab = 'overview' | 'members' | 'racing' | 'webhook' | 'slackbot' | 'race-settings';
+type View = 'org' | 'account';
 
 /** Exported so the link chain can be tested — it is the only route an existing
  *  CLI user has to link, and a silent failure here is invisible. */
@@ -63,6 +65,7 @@ export function renderOrgManager(root: HTMLElement): () => void {
 
     let selected: string | null = orgs[0]?.org_name ?? null;
     let tab: Tab = 'overview';
+    let view: View = 'org';
     const ownerOrgs = new Set<string>();
 
     // The link flow always runs with a session, so its errors have to land here
@@ -75,8 +78,9 @@ export function renderOrgManager(root: HTMLElement): () => void {
 
     const linkedEmail = getLinkedEmail();
     const drawSidebar = () => renderSidebar(sideEl, {
-      orgs, selected, ownerOrgs, linkedEmail,
-      onSelect: (name) => { selected = name; tab = 'overview'; void drawMain(); drawSidebar(); },
+      orgs, selected, ownerOrgs, linkedEmail, view,
+      onSelect: (name) => { selected = name; tab = 'overview'; view = 'org'; void drawMain(); drawSidebar(); },
+      onAccount: () => { view = 'account'; void drawMain(); drawSidebar(); },
       onCreate: async () => {
         const name = prompt('New organisation name (1–12 alphanumeric):')?.trim();
         if (!name) return;
@@ -91,8 +95,42 @@ export function renderOrgManager(root: HTMLElement): () => void {
       onLogout: async () => { await api.logout(); showLogin(); },
     });
 
+    // Account is a sidebar-level view, not an org tab: it must render with no
+    // organisations selected, which the org tabs below cannot (they all
+    // return early without one). See render/account.ts.
+    const drawAccount = async () => {
+      try {
+        const { devices } = await api.listDevices();
+        renderAccount(mainEl, {
+          email: linkedEmail,
+          devices,
+          onRevoke: (deviceId) => {
+            void (async () => {
+              try { await api.deleteDevice(deviceId); await drawAccount(); }
+              catch (e) { alert(String((e as Error).message)); }
+            })();
+          },
+        });
+      } catch (e) {
+        if (e instanceof ApiError && e.status === 401) { clearSession(); showLogin(); return; }
+        mainEl.innerHTML = '<p class="muted">Failed to load. Try again.</p>';
+      }
+    };
+
     const drawMain = async () => {
-      if (!selected) { mainEl.innerHTML = '<p class="muted">Create or join an organisation to begin.</p>'; return; }
+      if (view === 'account') { await drawAccount(); return; }
+      if (!selected) {
+        // Names `login`, never `init` — init would mint a SECOND jockey for an
+        // account that already exists, which is the duplicate this whole design
+        // prevents. Racing needs a linked machine, so say so here.
+        mainEl.innerHTML = `
+          <div class="org-empty">
+            <p>Create or join an organisation to begin.</p>
+            <p class="muted">To race, link a machine by running
+              <code>token-derby login</code> in your terminal.</p>
+          </div>`;
+        return;
+      }
       const name = selected;
       mainEl.innerHTML = `
         <nav class="org-tabs">

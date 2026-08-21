@@ -7,6 +7,9 @@ import type {
   GetOrgSlackResponse, SetOrgSlackRequest,
   GetOrgRaceSettingsResponse, SetOrgRaceSettingsRequest, SetOrgRaceSettingsResponse,
   AuthLinkStartResponse,
+  CliAuthApproveResponse,
+  ListDevicesResponse,
+  DeleteDeviceResponse,
 } from '@token-derby/shared';
 import { getSession, setSession, clearSession } from './session.js';
 
@@ -107,3 +110,15 @@ export const joinOrganisation = (token: string, f: FetchFn = fetch) =>
   authed<JoinOrganisationResponse>('POST', '/api/organisations/join', { join_token: token }, f);
 export const linkStart = (f: FetchFn = fetch) =>
   authed<AuthLinkStartResponse>('POST', '/api/auth/link/start', undefined, f);
+
+/** Resolves a CLI device's user_code and returns its label WITHOUT approving
+ *  anything — the /cli page shows this before the real approve call. */
+export const previewCliApprove = (user_code: string, f: FetchFn = fetch) =>
+  authed<CliAuthApproveResponse>('POST', '/api/auth/cli/approve', { user_code, preview: true }, f);
+export const approveCliDevice = (user_code: string, f: FetchFn = fetch) =>
+  authed<CliAuthApproveResponse>('POST', '/api/auth/cli/approve', { user_code }, f);
+
+export const listDevices = (f: FetchFn = fetch) =>
+  authed<ListDevicesResponse>('GET', '/api/devices', undefined, f);
+export const deleteDevice = (deviceId: string, f: FetchFn = fetch) =>
+  authed<DeleteDeviceResponse>('DELETE', `/api/devices/${u(deviceId)}`, undefined, f);

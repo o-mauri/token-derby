@@ -9,6 +9,7 @@ import { renderRacing } from './org-manager/render/tabs/racing.js';
 import { renderWebhook } from './org-manager/render/tabs/webhook.js';
 import { renderSlackbot } from './org-manager/render/tabs/slackbot.js';
 import { renderRaceSettings } from './org-manager/render/tabs/race-settings.js';
+import { renderAccount } from './org-manager/render/account.js';
 
 const app = document.getElementById('app')!;
 
@@ -42,9 +43,10 @@ renderSidebar(shell.querySelector<HTMLElement>('.org-side')!, {
     { org_id: 'o2', org_name: 'RocketTeam' },
   ],
   selected: 'Acme',
+  view: 'org',
   ownerOrgs: new Set(['Acme']),
   linkedEmail: null,
-  onSelect: () => {}, onCreate: () => {}, onJoin: () => {}, onLinkGoogle: () => {}, onLogout: () => {},
+  onSelect: () => {}, onAccount: () => {}, onCreate: () => {}, onJoin: () => {}, onLinkGoogle: () => {}, onLogout: () => {},
 });
 
 // Section 2b: the same sidebar with a Google account already linked, shown
@@ -59,9 +61,25 @@ renderSidebar(linkedSidebarSection.querySelector<HTMLElement>('.org-side')!, {
     { org_id: 'o2', org_name: 'RocketTeam' },
   ],
   selected: 'Acme',
+  view: 'org',
   ownerOrgs: new Set(['Acme']),
   linkedEmail: 'omar@example.com',
-  onSelect: () => {}, onCreate: () => {}, onJoin: () => {}, onLinkGoogle: () => {}, onLogout: () => {},
+  onSelect: () => {}, onAccount: () => {}, onCreate: () => {}, onJoin: () => {}, onLinkGoogle: () => {}, onLogout: () => {},
+});
+
+// Section 2c: the Account sidebar entry selected — the state a user with zero
+// organisations lands in, since it is reachable independent of the org list.
+const accountSidebarSection = document.createElement('section');
+accountSidebarSection.className = 'org-preview-section';
+accountSidebarSection.innerHTML = `<h2 class="org-preview-heading">Sidebar — Account selected, zero organisations</h2><div class="org-manager"><div class="org-side"></div></div>`;
+app.appendChild(accountSidebarSection);
+renderSidebar(accountSidebarSection.querySelector<HTMLElement>('.org-side')!, {
+  orgs: [],
+  selected: null,
+  view: 'account',
+  ownerOrgs: new Set(),
+  linkedEmail: 'omar@example.com',
+  onSelect: () => {}, onAccount: () => {}, onCreate: () => {}, onJoin: () => {}, onLinkGoogle: () => {}, onLogout: () => {},
 });
 
 renderOverview(shell.querySelector<HTMLElement>('.org-tabbody')!, {
@@ -182,4 +200,34 @@ renderRaceSettings(tabSection('Race Settings tab (owner, no override — default
   staminaOn: false,
   isOwner: true,
   onSave: () => {}, onReset: () => {}, onToggleStamina: () => {},
+});
+
+// Section 4: the Account view — rendered directly into `.org-main` (no
+// `.org-tabs` nav), matching how index.ts draws it: a sidebar-level view, not
+// a tab. Two states side by side: zero organisations / no devices at all
+// (the state a brand-new SSO user lands in), and a linked account with
+// several devices, including two sharing a label to show the timestamps
+// disambiguating them.
+function accountSection(title: string): HTMLElement {
+  const section = document.createElement('section');
+  section.className = 'org-preview-section';
+  section.innerHTML = `<h2 class="org-preview-heading">${title}</h2><div class="org-manager"><div class="org-main"></div></div>`;
+  app.appendChild(section);
+  return section.querySelector<HTMLElement>('.org-main')!;
+}
+
+renderAccount(accountSection('Account view — zero organisations, no devices, no Google account linked'), {
+  email: null,
+  devices: [],
+  onRevoke: () => {},
+});
+
+renderAccount(accountSection('Account view — linked account, several devices'), {
+  email: 'omar@example.com',
+  devices: [
+    { device_id: 'd1', label: "Omar's MacBook", created_at: '2026-05-14T09:12:00Z', last_seen_at: '2026-08-20T07:45:00Z' },
+    { device_id: 'd2', label: "Omar's MacBook", created_at: '2026-07-02T18:00:00Z', last_seen_at: '2026-08-19T22:10:00Z' },
+    { device_id: 'd3', label: 'CI runner', created_at: '2026-06-01T00:00:00Z', last_seen_at: '2026-08-20T06:00:00Z' },
+  ],
+  onRevoke: () => {},
 });

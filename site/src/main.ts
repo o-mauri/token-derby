@@ -7,6 +7,7 @@ import { renderCatalog } from './render/catalog.js';
 import { renderAbout } from './render/about.js';
 import { renderPrivacy } from './render/privacy.js';
 import { renderOrgManager } from './org-manager/index.js';
+import { renderCliApprove } from './render/cli-approve.js';
 import { initTheme } from './theme.js';
 
 // Legendary hat keyframes are installed lazily on the first buildHatGroup
@@ -41,6 +42,8 @@ function route() {
     renderPrivacy(root);
   } else if (r.type === 'org-manager') {
     activeCleanup = renderOrgManager(root);
+  } else if (r.type === 'cli') {
+    activeCleanup = renderCliApprove(root);
   } else {
     root.innerHTML = `
       <section class="error">

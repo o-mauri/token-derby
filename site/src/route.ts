@@ -7,6 +7,7 @@ export type Route =
   | { type: 'about' }
   | { type: 'privacy' }
   | { type: 'org-manager' }
+  | { type: 'cli' }
   | { type: 'not-found' };
 
 export function parseRoute(pathname: string): Route {
@@ -17,6 +18,8 @@ export function parseRoute(pathname: string): Route {
   if (raceMatch) return { type: 'race', joinCode: raceMatch[1]!.toUpperCase() };
 
   if (trimmed === '/org-manager') return { type: 'org-manager' };
+
+  if (trimmed === '/cli') return { type: 'cli' };
 
   const orgLiveMatch = trimmed.match(/^\/org\/([A-Za-z0-9]{1,12})\/live$/);
   if (orgLiveMatch) return { type: 'org-live', orgName: orgLiveMatch[1]! };

@@ -24,6 +24,7 @@
   --label-mid: 23%;  /* vertical centre of the name-tag — aligned with the horse's middle */
   --ticker-h: 2.6rem;
   --error: #ff6b6b;
+  --error-wash: rgba(255, 107, 107, 0.1);
   --pixel-font: "VT323", "Courier New", ui-monospace, monospace;
 }
 
@@ -1450,6 +1451,98 @@ body.tv .race-header .meta .btn {
   border-radius: 4px;
 }
 
+/* ── CLI device approval ("/cli": render/cli-approve.ts) ─────────────────── */
+
+.cli-approve {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 32px;
+  text-align: center;
+}
+.cli-approve h1 {
+  margin: 0;
+  color: var(--accent);
+  font-size: clamp(1.6rem, 5vw, 2.4rem);
+  letter-spacing: 0.06em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4em;
+}
+/* The one load-bearing sentence on this page — kept visually louder than the
+   rest of the copy, the same way .org-login-error reads as urgent. */
+.cli-approve-warning {
+  max-width: 46ch;
+  margin: 0;
+  color: var(--error);
+  font-weight: bold;
+  font-size: 1rem;
+}
+.cli-approve-warning-detail {
+  max-width: 46ch;
+  margin: 0;
+  font-size: 0.85rem;
+}
+.cli-approve-form {
+  width: 100%;
+  max-width: 360px;
+  align-items: stretch;
+  text-align: left;
+}
+.cli-approve-form input {
+  font-family: inherit;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  font-size: 1.2rem;
+  text-align: center;
+  color: var(--text);
+  background: var(--bg);
+  border: 2px solid var(--border);
+  border-radius: 4px;
+  padding: 10px;
+  width: 100%;
+}
+.cli-approve-form input:focus { outline: none; border-color: var(--accent); }
+/* Structural attribution for the attacker-controlled device label: framed as
+   a quote FROM the requesting machine, never styled like the page's own
+   voice, so a label that reads like our copy still cannot pass as ours. */
+.cli-approve-label-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cli-approve-label {
+  margin: 0;
+  padding: 10px 14px;
+  background: var(--bg);
+  border: 2px dashed var(--border);
+  border-radius: 4px;
+  color: var(--muted);
+  font-style: italic;
+  word-break: break-word;
+  /* Defense in depth: the server now rejects bidi-override/format characters
+     at intake, but this keeps the label's own text direction from leaking
+     into the surrounding page if one ever reaches render by another route. */
+  unicode-bidi: isolate;
+}
+.cli-approve-success {
+  color: var(--accent);
+  font-weight: bold;
+  margin: 0;
+}
+.cli-approve-return-note {
+  max-width: 42ch;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 10px 16px;
+  font-size: 0.9rem;
+}
+
 /* Signed-in shell (org-manager/index.ts): sidebar + tabs + tab body. */
 .org-manager {
   flex: 1;
@@ -1700,6 +1793,38 @@ label.label input:disabled, label.label select:disabled { opacity: 0.5; }
   color: var(--accent);
 }
 .org-secret code { font-size: 1rem; letter-spacing: 0.03em; word-break: break-all; }
+
+/* Account sidebar entry (render/sidebar.ts): styled like an org row so it
+   reads as a peer entry, not a lesser one, even though it sits above the org
+   list rather than inside it. */
+.org-account-row {
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  letter-spacing: 0.02em;
+}
+
+/* Account view (render/account.ts) — a sidebar-level view rendered straight
+   into .org-main with no .org-tabs nav, since it is reachable with zero
+   organisations and must not depend on one being selected. */
+.org-account { display: flex; flex-direction: column; gap: 18px; }
+.org-account-email-value { color: var(--text); }
+.org-account-devices .org-table { max-width: 720px; }
+/* Attacker-influenced text, sanitised at intake — this keeps a label's own
+   text direction from leaking into the surrounding row as defense in depth,
+   the same treatment .cli-approve-label gives the device label at /cli. */
+.org-device-label { unicode-bidi: isolate; }
+.org-device-revoke {
+  background: none;
+  border: 1px solid var(--error);
+  color: var(--error);
+  font: inherit;
+  font-size: 0.8rem;
+  padding: 4px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.org-device-revoke:hover { background: var(--error-wash); }
 
 /* Preview-only scaffolding (site/src/preview-org-manager.ts) — not emitted by
    the render modules, just labels stacking the extra tab screenshots. */
