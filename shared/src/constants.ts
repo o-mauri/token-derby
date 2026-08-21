@@ -10,3 +10,4 @@ export const HORSE_NAME_MAX_LENGTH = 40;
 export const SECRET_TOKEN_BYTES = 32;
 export const ORG_NAME_MAX_LENGTH = 12;
 export const ORG_NAME_PATTERN = /^[A-Za-z0-9]{1,12}$/;
+export const DEVICE_LABEL_MAX_LENGTH = 40;
