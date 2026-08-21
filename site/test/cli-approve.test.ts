@@ -76,6 +76,16 @@ describe('renderCliApprove: signed out', () => {
     // in for the redirect Phase 1's callback does not provide.
     expect(root.textContent).toContain('After signing in, come back to this page to approve your device.');
   });
+
+  it('does not tell someone mid-login that CLI racing is unreleased', () => {
+    cleanup = renderCliApprove(root);
+    // Phase 1's default lane copy is false at exactly this moment: the visitor
+    // is here because `token-derby login` sent them.
+    expect(root.textContent).not.toContain('Racing from the CLI arrives in a later release');
+    expect(root.textContent).not.toMatch(/later release/i);
+    // The `init` prohibition is still true here, and must survive the variant.
+    expect(root.textContent).toContain('token-derby init');
+  });
 });
 
 describe('renderCliApprove: signed in', () => {

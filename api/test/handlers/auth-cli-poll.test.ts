@@ -10,10 +10,13 @@ import {
 } from '../../src/db/cli-auth-requests.js';
 import { recordAttempt, CLI_POLL_BUCKET, CLI_POLL_LIMIT } from '../../src/db/rate-limits.js';
 import { putOrganisation, addMember } from '../../src/db/organisations.js';
-import { CLI_AUTH_TTL_SECONDS, CLI_AUTH_POLL_INTERVAL_SECONDS } from '@token-derby/shared';
+import { CLI_AUTH_TTL_SECONDS, CLI_AUTH_POLL_INTERVAL_SECONDS, DEVICE_CODE_LENGTH } from '@token-derby/shared';
+import { generateSecretToken } from '../../src/lib/codes.js';
 import { makeUser, makeHorse } from '../helpers/auth-helper.js';
 
-const deviceCode = () => `dc-${randomUUID()}`;
+// The real generator, not a shorter stand-in: the handler checks device_code
+// against the exact length /start issues, so a stub would not exercise it.
+const deviceCode = () => generateSecretToken();
 const userCode = () => `UC${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
 
 function ev(body: string | undefined): APIGatewayProxyEventV2 {
@@ -71,6 +74,42 @@ describe('auth-cli-poll', () => {
         const res: any = await cliPoll(ev(body));
         expect(res.statusCode).toBe(400);
       }
+    });
+
+    it('rejects an over-long device_code with a 400 rather than throwing on the partition key', async () => {
+      // 2100 chars: over DynamoDB's 2048-byte hash key limit. device_code is
+      // the rate-limit subject and then a partition key, so without the length
+      // check this is an unhandled 500 from one unauthenticated request —
+      // there is no try/catch in lib/http.ts to catch it.
+      const res: any = await cliPoll(pollEvent('x'.repeat(2100)));
+      expect(res.statusCode).toBe(400);
+    });
+
+    it('rejects lengths either side of the issued one, and accepts the issued one', async () => {
+      const issued = generateSecretToken();
+      // Pins the check to what /start actually mints rather than to a literal.
+      expect(issued).toHaveLength(DEVICE_CODE_LENGTH);
+
+      for (const wrong of ['x'.repeat(DEVICE_CODE_LENGTH - 1), 'x'.repeat(DEVICE_CODE_LENGTH + 1)]) {
+        expect((await cliPoll(pollEvent(wrong)) as any).statusCode).toBe(400);
+      }
+      // A never-issued code of the right length is still the pending answer,
+      // so the length check has not become an existence oracle.
+      const res: any = await cliPoll(pollEvent(issued));
+      expect(res.statusCode).toBe(200);
+      expect(JSON.parse(res.body)).toEqual({ status: 'pending' });
+    });
+
+    it('never touches the table for a wrong-length device_code', async () => {
+      const rateLimits = await import('../../src/db/rate-limits.js');
+      const spy = vi.spyOn(rateLimits, 'recordAttempt');
+
+      await cliPoll(pollEvent('x'.repeat(2100)));
+
+      // The charge is the first write, and it is what blows up on the key —
+      // so the check has to fire before it, not after.
+      expect(spy).not.toHaveBeenCalled();
+      spy.mockRestore();
     });
   });
 
@@ -249,7 +288,7 @@ describe('auth-cli-poll', () => {
       // closes, and nothing else in this file would go red.
       const user = await makeUser('ExistenceAgnosticPoller');
       const { device_code: real } = await approvedRequest(user.user_id);
-      const fabricated = 'never-issued-device-code-0000000000000000000';
+      const fabricated = 'never-issued-device-code'.padEnd(DEVICE_CODE_LENGTH, '0');
 
       await charge(real, CLI_POLL_LIMIT);
       await charge(fabricated, CLI_POLL_LIMIT);
@@ -257,10 +296,13 @@ describe('auth-cli-poll', () => {
       const realRes: any = await cliPoll(pollEvent(real));
       const fakeRes: any = await cliPoll(pollEvent(fabricated));
 
-      // Compared to each other, not to literals, so the two cannot drift apart.
+      // Equal to each other so the two cannot drift apart, AND pinned to the
+      // literal refusal so they cannot collapse together onto a wrong shared
+      // answer — a 200 pending for both would satisfy the first pair alone.
       expect(fakeRes.statusCode).toBe(realRes.statusCode);
       expect(JSON.parse(fakeRes.body)).toEqual(JSON.parse(realRes.body));
       expect(realRes.statusCode).toBe(429);
+      expect(JSON.parse(realRes.body).code).toBe('RATE_LIMITED');
     });
 
     it('fires before the lookup: an over-limit poll never even reaches consumeCliAuthRequest', async () => {

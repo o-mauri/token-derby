@@ -109,8 +109,9 @@ describe('authenticate falling back to a device credential', () => {
 
     expect('error' in res).toBe(false);
     expect((res as { user_id: string }).user_id).toBe(user_id);
-    // This is the load-bearing assertion: a matching legacy hash must never
-    // pay for a device read on the 60s CLI heartbeat path.
+    // This is the load-bearing assertion: a matching legacy hash must never pay
+    // for a device read. Every interactive CLI command and org endpoint
+    // authenticates, and one org-manager page render fires several of them.
     expect(spy).not.toHaveBeenCalled();
     spy.mockRestore();
   });

@@ -5,6 +5,8 @@ import { handler as listDevicesHandler } from '../../src/handlers/list-devices.j
 import { handler as revokeDeviceHandler } from '../../src/handlers/revoke-device.js';
 import { handler as logoutDeviceHandler } from '../../src/handlers/logout-device.js';
 import { putDevice, listDevices } from '../../src/db/devices.js';
+import { createUserWithEmail } from '../../src/db/identities.js';
+import { authenticate } from '../../src/lib/auth.js';
 import { putWebSession } from '../../src/db/web-sessions.js';
 import { generateWebSessionToken } from '../../src/lib/codes.js';
 import { makeUser, authHeaders, type TestUser } from '../helpers/auth-helper.js';
@@ -108,6 +110,76 @@ describe('GET /api/devices', () => {
     const res: any = await listDevicesHandler(listEvent({}));
     expect(res.statusCode).toBe(401);
   });
+
+  describe('has_legacy_credential', () => {
+    it('stays true after revoking every listed device, because the account token survives it', async () => {
+      const user = await makeUser('LegacyFlagged');
+      await addDevice(user, 'this-machine');
+
+      const before: any = await listDevicesHandler(listEvent(authHeaders(user)));
+      expect(JSON.parse(before.body).has_legacy_credential).toBe(true);
+
+      for (const d of JSON.parse(before.body).devices) {
+        const revoked: any = await revokeDeviceHandler(revokeEvent(d.device_id, authHeaders(user)));
+        expect(revoked.statusCode).toBe(200);
+      }
+
+      // This request authenticates with the account-level token itself, so it
+      // proves the credential is still live with an empty device list — the
+      // exact moment the view would otherwise read as "no machine can act as me".
+      const after: any = await listDevicesHandler(listEvent(authHeaders(user)));
+      expect(after.statusCode).toBe(200);
+      expect(JSON.parse(after.body).devices).toEqual([]);
+      expect(JSON.parse(after.body).has_legacy_credential).toBe(true);
+    });
+
+    it('is false for an SSO-created account, which never had an account token', async () => {
+      const user_id = randomUUID();
+      await createUserWithEmail({
+        user_id,
+        email: `${user_id}@example.com`,
+        idp_sub: `sub-${user_id}`,
+        display_name: 'SsoOnly',
+      });
+      const token = generateWebSessionToken();
+      await putWebSession(token, user_id, 'SsoOnly', new Date(Date.now() + 3600_000).toISOString(), 3600);
+      await putDevice({ user_id, token: `dev-tok-${randomUUID()}`, label: 'only-device' });
+
+      const res: any = await listDevicesHandler(listEvent({ authorization: `Bearer ${token}` }));
+      expect(res.statusCode).toBe(200);
+      expect(JSON.parse(res.body).devices).toHaveLength(1);
+      // Nothing to warn about: for this account the device list IS the full set.
+      expect(JSON.parse(res.body).has_legacy_credential).toBe(false);
+    });
+
+    it('reports exactly what authenticate still accepts, for both kinds of account', async () => {
+      // Anti-drift: the flag and the auth path must never disagree, or the view
+      // reassures someone about a credential the server is still honouring.
+      const legacy = await makeUser('LegacyAgreement');
+      const legacyRes: any = await listDevicesHandler(listEvent(authHeaders(legacy)));
+      const legacyAuth = await authenticate(listEvent(authHeaders(legacy)));
+      expect(JSON.parse(legacyRes.body).has_legacy_credential).toBe(true);
+      expect('error' in legacyAuth).toBe(false);
+
+      const user_id = randomUUID();
+      await createUserWithEmail({
+        user_id,
+        email: `${user_id}@example.com`,
+        idp_sub: `sub-${user_id}`,
+        display_name: 'SsoAgreement',
+      });
+      await putDevice({ user_id, token: `dev-tok-${randomUUID()}`, label: 'sso-machine' });
+      const webToken = generateWebSessionToken();
+      await putWebSession(webToken, user_id, 'SsoAgreement', new Date(Date.now() + 3600_000).toISOString(), 3600);
+
+      const ssoRes: any = await listDevicesHandler(listEvent({ authorization: `Bearer ${webToken}` }));
+      const ssoAuth = await authenticate(listEvent({ 'x-user-id': user_id, 'x-user-token': 'not-an-account-token' }));
+      // Reported as absent, and genuinely absent: an invented account-level
+      // token is refused rather than falling through to some other credential.
+      expect(JSON.parse(ssoRes.body).has_legacy_credential).toBe(false);
+      expect('error' in ssoAuth).toBe(true);
+    });
+  });
 });
 
 describe('DELETE /api/devices/{device_id}', () => {
@@ -160,7 +232,7 @@ describe('DELETE /api/devices/{device_id}', () => {
     expect(aDevicesAfter).toHaveLength(1);
   });
 
-  it('returns identical bodies for an unknown device_id and another user device_id', async () => {
+  it('answers both an unknown device_id and another user device_id with 404 DEVICE_NOT_FOUND', async () => {
     const a = await makeUser('IndistinguishableA');
     const b = await makeUser('IndistinguishableB');
     const aDevice = await addDevice(a, 'a-real-device');
@@ -172,8 +244,16 @@ describe('DELETE /api/devices/{device_id}', () => {
       revokeEvent(aDevice.device_id, authHeaders(b)),
     );
 
+    // Both halves are needed. Equal-to-each-other stops the two answers
+    // drifting apart into an existence oracle; the literals stop them
+    // collapsing together onto a wrong shared answer — a success for a device
+    // that was never revoked, which is what a missing not-found branch does.
     expect(resOthers.statusCode).toBe(resUnknown.statusCode);
     expect(JSON.parse(resOthers.body)).toEqual(JSON.parse(resUnknown.body));
+    for (const res of [resUnknown, resOthers]) {
+      expect(res.statusCode).toBe(404);
+      expect(JSON.parse(res.body).code).toBe('DEVICE_NOT_FOUND');
+    }
   });
 
   it('rejects an unauthenticated request', async () => {

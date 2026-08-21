@@ -1,6 +1,10 @@
 import * as os from 'node:os';
 import type { CliAuthPollApprovedResponse } from '@token-derby/shared';
-import { saveIdentity as saveIdentityDefault, type Identity } from '../identity/identity.js';
+import {
+  saveIdentity as saveIdentityDefault,
+  loadIdentity as loadIdentityDefault,
+  type Identity,
+} from '../identity/identity.js';
 import { cliAuthStart, cliAuthPoll, revokeDevice } from '../api/endpoints.js';
 import { ApiError } from '../api/client.js';
 import { promptYesNo as promptYesNoDefault } from '../ui/prompt.js';
@@ -10,6 +14,7 @@ export type LoginDeps = {
   apiPoll?: typeof cliAuthPoll;
   apiRevokeDevice?: typeof revokeDevice;
   saveIdentity?: typeof saveIdentityDefault;
+  loadIdentity?: typeof loadIdentityDefault;
   promptText?: (question: string) => Promise<string>;
   promptYesNo?: (question: string) => Promise<boolean>;
   sleepImpl?: (ms: number) => Promise<void>;
@@ -64,11 +69,32 @@ export async function loginCommand(argv: string[] = [], deps: LoginDeps = {}): P
   const apiPoll = deps.apiPoll ?? cliAuthPoll;
   const apiRevokeDevice = deps.apiRevokeDevice ?? revokeDevice;
   const saveIdentity = deps.saveIdentity ?? saveIdentityDefault;
+  const loadIdentity = deps.loadIdentity ?? loadIdentityDefault;
   const promptText = deps.promptText ?? defaultPromptText;
   const promptYesNo = deps.promptYesNo ?? promptYesNoDefault;
   const sleepImpl = deps.sleepImpl ?? defaultSleep;
   const isTTY = deps.isTTY ?? Boolean(process.stdin.isTTY);
   const hostname = deps.hostname ?? (() => os.hostname());
+
+  // A second login on the same box mints a second device credential, usually
+  // with the same hostname label. identity.json only ever holds the newest, so
+  // `logout` retires that one and the earlier row stays valid until it is
+  // revoked by hand — say so before spending the code rather than after.
+  const existing = await loadIdentity();
+  if (existing) {
+    console.log('');
+    console.log(`  This machine is already signed in as ${existing.display_name}.`);
+    console.log('  Signing in again adds a second credential; the current one stays active');
+    console.log('  until you revoke it under Account in the org manager (`token-derby web`).');
+    if (isTTY) {
+      if (!await promptYesNo('  Sign in again anyway? [Y/n] ')) {
+        console.log('Login cancelled.');
+        return 0;
+      }
+    } else {
+      console.log('  No TTY to confirm — continuing (equivalent to answering Y).');
+    }
+  }
 
   let label = await resolveDeviceName(parseDeviceNameFlag(argv), isTTY, hostname(), promptText);
 

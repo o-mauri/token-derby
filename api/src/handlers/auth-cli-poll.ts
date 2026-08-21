@@ -1,5 +1,6 @@
 import type { ApiHandler } from '../lib/http.js';
 import type { CliAuthPollRequest, CliAuthPollResponse } from '@token-derby/shared';
+import { DEVICE_CODE_LENGTH } from '@token-derby/shared';
 import { ok, err, parseJson } from '../lib/http.js';
 import { consumeCliAuthRequest } from '../db/cli-auth-requests.js';
 import { recordAttempt, CLI_POLL_BUCKET, CLI_POLL_LIMIT } from '../db/rate-limits.js';
@@ -24,7 +25,11 @@ const PENDING: CliAuthPollResponse = { status: 'pending' };
  */
 export const handler: ApiHandler = async (event) => {
   const body = parseJson<CliAuthPollRequest>(event.body);
-  if (!body || typeof body.device_code !== 'string' || body.device_code.length === 0) {
+  // Exact length, not just non-empty: this value becomes a DynamoDB partition
+  // key on the very next line, and that key rejects anything over 2048 bytes —
+  // an unhandled throw on a public endpoint. Every issued device_code is
+  // exactly this long, so nothing legitimate is turned away.
+  if (!body || typeof body.device_code !== 'string' || body.device_code.length !== DEVICE_CODE_LENGTH) {
     return err('BAD_REQUEST', 'device_code is required');
   }
 

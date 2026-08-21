@@ -101,4 +101,29 @@ describe('bin.ts command registration order', () => {
     expect(errorText).toContain('token-derby init');
     expect(exitSpy).toHaveBeenCalledWith(1);
   });
+
+  it('aligns every help description in the same column', async () => {
+    vi.doMock('../src/identity/identity.js', () => ({
+      loadIdentity: vi.fn().mockResolvedValue(null),
+    }));
+
+    process.argv = ['node', 'bin.js', '--help'];
+
+    await import('../src/bin.js');
+    await settle();
+
+    const help = logSpy.mock.calls.map((c: unknown[]) => c.join(' ')).join('\n');
+    const columns = new Map<number, string[]>();
+    for (const line of help.split('\n')) {
+      const m = /^(\s+token-derby\s\S.*?)(\s\s+)\S/.exec(line);
+      if (!m) continue;
+      const col = m[1]!.length + m[2]!.length;
+      columns.set(col, [...(columns.get(col) ?? []), line.trimEnd()]);
+    }
+
+    // Proves the block was actually found, so this cannot pass by matching nothing.
+    const matched = [...columns.values()].reduce((n, ls) => n + ls.length, 0);
+    expect(matched).toBeGreaterThan(12);
+    expect([...columns.keys()]).toHaveLength(1);
+  });
 });

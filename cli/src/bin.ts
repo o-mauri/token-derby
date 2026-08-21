@@ -27,7 +27,7 @@ Identity:
   token-derby login [--device-name <name>]
                                           Sign in with your Google account and link this
                                           machine to your existing jockey.
-  token-derby logout                     Retire this machine's credential and clear
+  token-derby logout                      Retire this machine's credential and clear
                                           local identity.
 
 Maintenance:

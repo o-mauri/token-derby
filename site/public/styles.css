@@ -1810,6 +1810,20 @@ label.label input:disabled, label.label select:disabled { opacity: 0.5; }
 .org-account { display: flex; flex-direction: column; gap: 18px; }
 .org-account-email-value { color: var(--text); }
 .org-account-devices .org-table { max-width: 720px; }
+/* The account-level credential the device table cannot list. Warning-coloured
+   because it is the one thing on this view that revoking cannot remove. */
+.org-account-legacy {
+  max-width: 720px;
+  margin: 12px 0 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+  border-left: 2px solid var(--error);
+  padding-left: 10px;
+}
+.org-account-legacy strong { color: var(--error); }
+/* The site has no global link colour; these two are the only anchors in the
+   org manager's own copy, so they take the accent rather than browser blue. */
+.org-account-devices a, .org-empty a { color: var(--accent); }
 /* Attacker-influenced text, sanitised at intake — this keeps a label's own
    text direction from leaking into the surrounding row as defense in depth,
    the same treatment .cli-approve-label gives the device label at /cli. */

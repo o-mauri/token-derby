@@ -1,4 +1,4 @@
-import { JOIN_CODE_ALPHABET, JOIN_CODE_LENGTH } from './constants.js';
+import { JOIN_CODE_ALPHABET, JOIN_CODE_LENGTH, SECRET_TOKEN_BYTES } from './constants.js';
 
 // RFC 8628 device flow. device_code is the long secret the CLI polls with;
 // user_code is the short code a human types at verification_uri.
@@ -18,6 +18,15 @@ export function normaliseUserCode(raw: string): string | null {
   }
   return cleaned;
 }
+
+/**
+ * Length of a device_code: unpadded base64url of SECRET_TOKEN_BYTES random
+ * bytes. Derived rather than written out, so changing the token size moves the
+ * validation with it. The poll endpoint is unauthenticated and puts device_code
+ * straight into a DynamoDB partition key, which rejects anything over 2048
+ * bytes — an exact-length check costs nothing and keeps that a 400, not a 500.
+ */
+export const DEVICE_CODE_LENGTH = Math.ceil((SECRET_TOKEN_BYTES * 4) / 3);
 
 export type CliAuthStartRequest = {
   label: string;
@@ -87,6 +96,13 @@ export type DeviceRecord = {
 
 export type ListDevicesResponse = {
   devices: DeviceRecord[];
+  /**
+   * True when the account still carries the original account-level CLI token
+   * from before device credentials existed. It authenticates forever, nothing
+   * rotates or clears it, and it is not one of the devices above — so the list
+   * alone is not the full set of things that can act as this account.
+   */
+  has_legacy_credential: boolean;
 };
 
 export type DeleteDeviceResponse = {

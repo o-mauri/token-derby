@@ -17,6 +17,17 @@ export async function putUser(user: User, secret_token_hash: string): Promise<vo
   }));
 }
 
+/**
+ * True when the account-level `secret_token_hash` is still present and would
+ * still authenticate. Deliberately the same test lib/auth.ts applies when it
+ * accepts one, so the account view can never report a credential gone while
+ * `authenticate` still honours it.
+ */
+export function hasLegacyCredential(user: Pick<UserRecord, 'secret_token_hash'> | null): boolean {
+  const hash = user?.secret_token_hash;
+  return typeof hash === 'string' && hash.length > 0;
+}
+
 export async function getUserById(user_id: string): Promise<UserRecord | null> {
   const { Item } = await ddb.send(new GetCommand({
     TableName: TABLE,

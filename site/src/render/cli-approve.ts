@@ -96,7 +96,9 @@ export function renderCliApprove(root: HTMLElement): () => void {
   let disposed = false;
 
   if (!getSession()) {
-    renderLogin(root);
+    // The 'cli' variant, not the default: /org-manager's copy still says CLI
+    // racing is unreleased, which is false for someone who just ran `login`.
+    renderLogin(root, { variant: 'cli' });
     const note = document.createElement('p');
     note.className = 'cli-approve-return-note';
     note.textContent = RETURN_NOTE;

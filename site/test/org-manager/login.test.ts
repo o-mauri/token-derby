@@ -77,4 +77,36 @@ describe('renderLogin', () => {
     renderLogin(root);
     expect(root.querySelector('.org-login-error')).toBeNull();
   });
+
+  describe('the /cli variant', () => {
+    // Phase 1 wrote the default copy for /org-manager, where "racing from the
+    // CLI arrives in a later release" was true. It is false on /cli, where the
+    // visitor has just run `token-derby login`.
+    const STALE_SENTENCE = 'Racing from the CLI arrives in a later release';
+
+    it('keeps the stale-lane sentence on the default (org-manager) rendering', () => {
+      renderLogin(root);
+      expect(root.textContent).toContain(STALE_SENTENCE);
+      renderLogin(root, { variant: 'org-manager' });
+      expect(root.textContent).toContain(STALE_SENTENCE);
+    });
+
+    it('suppresses it on /cli', () => {
+      renderLogin(root, { variant: 'cli' });
+      expect(root.textContent).not.toContain(STALE_SENTENCE);
+      expect(root.textContent).not.toMatch(/later release/i);
+    });
+
+    it('still carries the init prohibition, which is true in both contexts', () => {
+      renderLogin(root, { variant: 'cli' });
+      expect(root.textContent).toContain('token-derby init');
+      expect(root.textContent).toMatch(/second jockey/i);
+    });
+
+    it('is otherwise the same screen: two lanes and the Google button', () => {
+      renderLogin(root, { variant: 'cli' });
+      expect(root.querySelectorAll('.org-login-lane')).toHaveLength(2);
+      expect(root.querySelector('a.google-signin[href="/api/auth/google/start"]')).not.toBeNull();
+    });
+  });
 });

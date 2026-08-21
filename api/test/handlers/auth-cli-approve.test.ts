@@ -13,7 +13,7 @@ import { listDevices, getDeviceByToken } from '../../src/db/devices.js';
 import { recordAttempt, CLI_APPROVE_BUCKET, CLI_APPROVE_LIMIT } from '../../src/db/rate-limits.js';
 import { putWebSession } from '../../src/db/web-sessions.js';
 import { createUserWithEmail } from '../../src/db/identities.js';
-import { generateWebSessionToken } from '../../src/lib/codes.js';
+import { generateWebSessionToken, generateSecretToken } from '../../src/lib/codes.js';
 import { ddb, TABLE } from '../../src/db/client.js';
 import { cliAuthCodeKey } from '../../src/db/keys.js';
 import { JOIN_CODE_ALPHABET, JOIN_CODE_LENGTH } from '@token-derby/shared';
@@ -75,7 +75,9 @@ async function pending(opts: {
   link_to_user_id?: string;
   ttlSeconds?: number;
 } = {}): Promise<{ device_code: string; user_code: string }> {
-  const device_code = `dc-${randomUUID()}`;
+  // The real generator: this device_code is polled with in the cross-check
+  // test below, and the poll handler enforces the exact issued length.
+  const device_code = generateSecretToken();
   const user_code = freshUserCode();
   await putCliAuthRequest({
     device_code,
@@ -264,6 +266,20 @@ describe('auth-cli-approve', () => {
 
       expect(res.statusCode).toBe(404);
       expect(await listDevices(user.user_id)).toEqual([]);
+    });
+
+    it('answers an over-long user_code with a 404 rather than throwing on the table', async () => {
+      const user = await makeUser('OverLongCodeUser');
+      const token = await webTokenFor(user.user_id, user.display_name);
+
+      // 2100 chars is past DynamoDB's 2048-byte key limit. normaliseUserCode
+      // rejects anything that is not exactly JOIN_CODE_LENGTH before any key is
+      // built from it, so this is already bounded — pinned here so a future
+      // reordering that looks the code up first cannot turn it into a 500.
+      const res: any = await cliApprove(ev({ token, body: JSON.stringify({ user_code: 'A'.repeat(2100) }) }));
+
+      expect(res.statusCode).toBe(404);
+      expect(JSON.parse(res.body).code).toBe('CLI_AUTH_NOT_FOUND');
     });
 
     it('answers a malformed code the same way as an unknown one, without a lookup', async () => {
@@ -685,10 +701,13 @@ describe('auth-cli-approve', () => {
       const approveRes: any = await cliApprove(approveEvent(live.user_code, token));
 
       // Same status and same code both ways: which one the caller asked for
-      // must not be readable off the refusal.
+      // must not be readable off the refusal. Bodies are compared to each other
+      // so they cannot drift apart, and to the literal refusal code so they
+      // cannot collapse together onto a shared 200 with a label in it.
       expect(previewRes.statusCode).toBe(429);
       expect(approveRes.statusCode).toBe(429);
       expect(JSON.parse(previewRes.body)).toEqual(JSON.parse(approveRes.body));
+      expect(JSON.parse(previewRes.body).code).toBe('RATE_LIMITED');
       expect((await getCliAuthRequest(live.device_code))!.status).toBe('pending');
     });
 

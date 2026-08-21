@@ -76,6 +76,7 @@ describe('loginCommand', () => {
     const saveIdentity = vi.fn().mockResolvedValue(undefined);
 
     const rc = await loginCommand(['--device-name', 'explicit-name'], {
+      loadIdentity: async () => null,
       apiStart, apiPoll, apiRevokeDevice: vi.fn(), saveIdentity, promptText, promptYesNo,
       sleepImpl: vi.fn().mockResolvedValue(undefined), isTTY: true, hostname: () => 'should-not-be-used',
     });
@@ -93,6 +94,7 @@ describe('loginCommand', () => {
     const saveIdentity = vi.fn().mockResolvedValue(undefined);
 
     const rc = await loginCommand([], {
+      loadIdentity: async () => null,
       apiStart, apiPoll, apiRevokeDevice: vi.fn(), saveIdentity, promptText, promptYesNo,
       sleepImpl: vi.fn().mockResolvedValue(undefined), isTTY: true, hostname: () => 'my-macbook',
     });
@@ -109,6 +111,7 @@ describe('loginCommand', () => {
     const promptYesNo = vi.fn().mockResolvedValue(true);
 
     await loginCommand([], {
+      loadIdentity: async () => null,
       apiStart, apiPoll, apiRevokeDevice: vi.fn(), saveIdentity: vi.fn(), promptText, promptYesNo,
       sleepImpl: vi.fn(), isTTY: true, hostname: () => 'my-macbook',
     });
@@ -127,6 +130,7 @@ describe('loginCommand', () => {
     let rc: number;
     try {
       rc = await loginCommand([], {
+        loadIdentity: async () => null,
         apiStart, apiPoll, apiRevokeDevice: vi.fn(), saveIdentity, promptText, promptYesNo,
         sleepImpl: vi.fn().mockResolvedValue(undefined), isTTY: false, hostname: () => 'headless-box',
       });
@@ -157,6 +161,7 @@ describe('loginCommand', () => {
     const sleepImpl = vi.fn().mockResolvedValue(undefined);
 
     const rc = await loginCommand(['--device-name', 'x'], {
+      loadIdentity: async () => null,
       apiStart, apiPoll, apiRevokeDevice: vi.fn(), saveIdentity, promptYesNo,
       sleepImpl, isTTY: true, hostname: () => 'x',
     });
@@ -178,6 +183,7 @@ describe('loginCommand', () => {
     const saveIdentity = vi.fn().mockResolvedValue(undefined);
 
     const rc = await loginCommand(['--device-name', 'x'], {
+      loadIdentity: async () => null,
       apiStart, apiPoll, apiRevokeDevice, saveIdentity, promptYesNo,
       sleepImpl: vi.fn(), isTTY: true, hostname: () => 'x',
     });
@@ -200,6 +206,7 @@ describe('loginCommand', () => {
     let rc: number;
     try {
       rc = await loginCommand(['--device-name', 'x'], {
+        loadIdentity: async () => null,
         apiStart, apiPoll, apiRevokeDevice, saveIdentity, promptYesNo,
         sleepImpl: vi.fn(), isTTY: true, hostname: () => 'x',
       });
@@ -221,6 +228,7 @@ describe('loginCommand', () => {
     const saveIdentity = vi.fn(async (identity: Identity) => { savedIdentity = identity; });
 
     const rc = await loginCommand(['--device-name', 'x'], {
+      loadIdentity: async () => null,
       apiStart, apiPoll, apiRevokeDevice: vi.fn(), saveIdentity, promptYesNo,
       sleepImpl: vi.fn(), isTTY: true, hostname: () => 'x',
     });
@@ -245,6 +253,7 @@ describe('loginCommand', () => {
     let rc: number;
     try {
       rc = await loginCommand(['--device-name', 'bad name'], {
+        loadIdentity: async () => null,
         apiStart, apiPoll, apiRevokeDevice: vi.fn(), saveIdentity, promptText, promptYesNo,
         sleepImpl: vi.fn(), isTTY: true, hostname: () => 'x',
       });
@@ -267,6 +276,7 @@ describe('loginCommand', () => {
     let rc: number;
     try {
       rc = await loginCommand(['--device-name', 'bad'], {
+        loadIdentity: async () => null,
         apiStart, apiPoll: vi.fn(), apiRevokeDevice: vi.fn(), saveIdentity: vi.fn(), promptText,
         sleepImpl: vi.fn(), isTTY: false, hostname: () => 'x',
       });
@@ -290,6 +300,7 @@ describe('loginCommand', () => {
     let rc: number;
     try {
       rc = await loginCommand(['--device-name', 'x'], {
+        loadIdentity: async () => null,
         apiStart, apiPoll, apiRevokeDevice: vi.fn(), saveIdentity: vi.fn(), promptYesNo,
         sleepImpl: vi.fn(), isTTY: true, hostname: () => 'x',
       });
@@ -314,6 +325,7 @@ describe('loginCommand', () => {
 
     try {
       await loginCommand(['--device-name', 'x'], {
+        loadIdentity: async () => null,
         apiStart, apiPoll, apiRevokeDevice: vi.fn(), saveIdentity: vi.fn(), promptYesNo,
         sleepImpl: vi.fn(), isTTY: true, hostname: () => 'x',
       });
@@ -337,6 +349,7 @@ describe('loginCommand', () => {
     let rc: number;
     try {
       rc = await loginCommand(['--device-name', 'x'], {
+        loadIdentity: async () => null,
         apiStart, apiPoll, apiRevokeDevice: vi.fn(), saveIdentity: vi.fn(),
         sleepImpl: vi.fn(), isTTY: true, hostname: () => 'x',
       });
@@ -357,6 +370,7 @@ describe('loginCommand', () => {
     let rc: number;
     try {
       rc = await loginCommand(['--device-name', 'x'], {
+        loadIdentity: async () => null,
         apiStart, apiPoll, apiRevokeDevice: vi.fn(), saveIdentity: vi.fn(),
         sleepImpl: vi.fn(), isTTY: true, hostname: () => 'x',
       });
@@ -366,5 +380,198 @@ describe('loginCommand', () => {
 
     expect(rc).toBe(1);
     expect(apiPoll).toHaveBeenCalledTimes(1);
+  });
+
+  describe('the approval deadline', () => {
+    // The server-side poll budget (CLI_POLL_LIMIT). Mirrored here so the mock
+    // behaves like the real endpoint: an unapproved login that keeps polling
+    // past its expiry eventually gets RATE_LIMITED, which is the wrong thing
+    // to tell someone whose real problem is that nobody approved them.
+    const SERVER_POLL_BUDGET = 240;
+
+    function pollingUntilRateLimited() {
+      let calls = 0;
+      return vi.fn(async () => {
+        calls++;
+        if (calls > SERVER_POLL_BUDGET) {
+          throw new ApiError('RATE_LIMITED', 'Too many poll attempts. Try again later.', 429);
+        }
+        return pending();
+      });
+    }
+
+    it('gives up at expires_in and says it timed out, instead of polling on to RATE_LIMITED', async () => {
+      vi.useFakeTimers();
+      const start = startResponse({ expires_in: 600, interval: 5 });
+      const apiPoll = pollingUntilRateLimited();
+      const saveIdentity = vi.fn();
+      // Time only moves when the command sleeps, so the fake clock advances
+      // exactly one poll interval per loop and nothing waits in real time.
+      const sleepImpl = vi.fn(async (ms: number) => { vi.advanceTimersByTime(ms); });
+      const con = captureConsole();
+
+      let rc: number;
+      try {
+        rc = await loginCommand(['--device-name', 'x'], {
+          loadIdentity: async () => null,
+          apiStart: vi.fn().mockResolvedValue(start), apiPoll, apiRevokeDevice: vi.fn(),
+          saveIdentity, sleepImpl, isTTY: true, hostname: () => 'x',
+        });
+      } finally {
+        con.restore();
+        vi.useRealTimers();
+      }
+
+      expect(rc).toBe(1);
+      expect(con.errors.join('\n')).toMatch(/timed out/i);
+      // The wrong diagnosis, spelled out: without the deadline the loop runs to
+      // the server's budget and blames rate limiting for nobody approving.
+      expect(con.errors.join('\n')).not.toContain('RATE_LIMITED');
+      expect(saveIdentity).not.toHaveBeenCalled();
+
+      // Derived from the response's own numbers rather than hardcoded: one poll
+      // at t=0 and one per interval up to and including the deadline.
+      expect(apiPoll).toHaveBeenCalledTimes(start.expires_in / start.interval + 1);
+    });
+
+    it('still accepts an approval that arrives on the last interval before the deadline', async () => {
+      vi.useFakeTimers();
+      const start = startResponse({ expires_in: 600, interval: 5 });
+      const lastPoll = start.expires_in / start.interval;
+      let calls = 0;
+      // Approves on the very last poll the deadline allows — an off-by-one in
+      // the check would fail an honest login that only just made it.
+      const apiPoll = vi.fn(async () => {
+        calls++;
+        return calls < lastPoll ? pending() : approvedResponse();
+      });
+      const saveIdentity = vi.fn().mockResolvedValue(undefined);
+      const sleepImpl = vi.fn(async (ms: number) => { vi.advanceTimersByTime(ms); });
+      const con = captureConsole();
+
+      let rc: number;
+      try {
+        rc = await loginCommand(['--device-name', 'x'], {
+          loadIdentity: async () => null,
+          apiStart: vi.fn().mockResolvedValue(start), apiPoll, apiRevokeDevice: vi.fn(),
+          saveIdentity, promptYesNo: vi.fn().mockResolvedValue(true), sleepImpl,
+          isTTY: true, hostname: () => 'x',
+        });
+      } finally {
+        con.restore();
+        vi.useRealTimers();
+      }
+
+      expect(rc).toBe(0);
+      expect(con.errors.join('\n')).not.toMatch(/timed out/i);
+      expect(saveIdentity).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('an identity.json that is already present', () => {
+    const existing = {
+      user_id: 'user-1',
+      display_name: 'Omar',
+      secret_token: 'old-account-token',
+      created_at: '2026-01-01T00:00:00.000Z',
+    };
+
+    it('warns and asks first on a TTY, and does nothing when the answer is no', async () => {
+      const apiStart = vi.fn();
+      const saveIdentity = vi.fn();
+      const promptYesNo = vi.fn().mockResolvedValue(false);
+      const con = captureConsole();
+
+      let rc: number;
+      try {
+        rc = await loginCommand(['--device-name', 'x'], {
+          loadIdentity: async () => existing,
+          apiStart, apiPoll: vi.fn(), apiRevokeDevice: vi.fn(), saveIdentity,
+          promptYesNo, sleepImpl: vi.fn(), isTTY: true, hostname: () => 'x',
+        });
+      } finally {
+        con.restore();
+      }
+
+      expect(rc).toBe(0);
+      // Declining must cost nothing: no /start call means no second code and no
+      // second credential, which is the accumulation being prevented.
+      expect(apiStart).not.toHaveBeenCalled();
+      expect(saveIdentity).not.toHaveBeenCalled();
+      expect(promptYesNo).toHaveBeenCalledTimes(1);
+      expect(con.logs.join('\n')).toContain('already signed in as Omar');
+    });
+
+    it('proceeds when the answer is yes', async () => {
+      const apiStart = vi.fn().mockResolvedValue(startResponse());
+      const saveIdentity = vi.fn().mockResolvedValue(undefined);
+      const promptYesNo = vi.fn().mockResolvedValue(true);
+      const con = captureConsole();
+
+      let rc: number;
+      try {
+        rc = await loginCommand(['--device-name', 'x'], {
+          loadIdentity: async () => existing,
+          apiStart, apiPoll: vi.fn().mockResolvedValue(approvedResponse()),
+          apiRevokeDevice: vi.fn(), saveIdentity, promptYesNo,
+          sleepImpl: vi.fn(), isTTY: true, hostname: () => 'x',
+        });
+      } finally {
+        con.restore();
+      }
+
+      expect(rc).toBe(0);
+      expect(apiStart).toHaveBeenCalledTimes(1);
+      expect(saveIdentity).toHaveBeenCalledTimes(1);
+    });
+
+    it('without a TTY, continues but says the previous credential is still active and where to revoke it', async () => {
+      const apiStart = vi.fn().mockResolvedValue(startResponse());
+      const promptYesNo = vi.fn();
+      const con = captureConsole();
+
+      let rc: number;
+      try {
+        rc = await loginCommand(['--device-name', 'x'], {
+          loadIdentity: async () => existing,
+          apiStart, apiPoll: vi.fn().mockResolvedValue(approvedResponse()),
+          apiRevokeDevice: vi.fn(), saveIdentity: vi.fn().mockResolvedValue(undefined),
+          promptYesNo, sleepImpl: vi.fn(), isTTY: false, hostname: () => 'x',
+        });
+      } finally {
+        con.restore();
+      }
+
+      expect(rc).toBe(0);
+      // No prompt without a terminal to answer it, but the log has to carry the
+      // fact and the remedy — CI is exactly where these rows pile up unnoticed.
+      expect(promptYesNo).not.toHaveBeenCalled();
+      const logged = con.logs.join('\n');
+      expect(logged).toContain('already signed in as Omar');
+      expect(logged).toMatch(/stays active/i);
+      expect(logged).toMatch(/revoke/i);
+      expect(logged).toContain('token-derby web');
+    });
+
+    it('says nothing and asks nothing when there is no identity.json', async () => {
+      const promptYesNo = vi.fn().mockResolvedValue(true);
+      const con = captureConsole();
+
+      try {
+        await loginCommand(['--device-name', 'x'], {
+          loadIdentity: async () => null,
+          apiStart: vi.fn().mockResolvedValue(startResponse()),
+          apiPoll: vi.fn().mockResolvedValue(approvedResponse()),
+          apiRevokeDevice: vi.fn(), saveIdentity: vi.fn().mockResolvedValue(undefined),
+          promptYesNo, sleepImpl: vi.fn(), isTTY: true, hostname: () => 'x',
+        });
+      } finally {
+        con.restore();
+      }
+
+      // The one confirm a first-time login already had, not two.
+      expect(promptYesNo).toHaveBeenCalledTimes(1);
+      expect(con.logs.join('\n')).not.toMatch(/already signed in/i);
+    });
   });
 });

@@ -4,6 +4,9 @@ import { esc } from '../../esc.js';
 export type AccountDeps = {
   email: string | null;
   devices: DeviceRecord[];
+  /** Whether the account still has the original account-level CLI credential,
+   *  which is not one of `devices` and is unaffected by revoking any of them. */
+  hasLegacyCredential: boolean;
   onRevoke: (deviceId: string) => void;
 };
 
@@ -22,6 +25,18 @@ function formatTimestamp(iso: string): string {
   return iso.slice(0, 19).replace('T', ' ');
 }
 
+// Said plainly rather than hinted at: the table is not the whole set, and
+// revoking every row in it does not lock out a machine still holding the old
+// identity.json. Nothing here clears that credential — retiring it is a
+// separate decision, so the view's job is to stop implying it is already gone.
+const LEGACY_NOTE = `
+  <p class="org-account-legacy">
+    This account also has an original CLI credential from before per-device sign-in.
+    It is <strong>not listed above</strong>, and revoking these devices does not affect it &mdash;
+    any machine still holding that <code>identity.json</code> keeps full access to your account.
+  </p>
+`;
+
 function deviceRow(d: DeviceRecord): string {
   return `
     <tr data-device="${esc(d.device_id)}">
@@ -35,7 +50,9 @@ function deviceRow(d: DeviceRecord): string {
 
 export function renderAccount(root: HTMLElement, deps: AccountDeps): void {
   const rows = deps.devices.map(deviceRow).join('');
-  const emptyRow = '<tr><td colspan="4" class="muted">No devices yet — run `token-derby login` on a machine to see it here.</td></tr>';
+  // Links /cli: the approval page is otherwise unreachable except by retyping
+  // a URL from the terminal, and nothing else in the site points at it.
+  const emptyRow = '<tr><td colspan="4" class="muted">No devices yet — run <code>token-derby login</code> on a machine and approve it at <a href="/cli">/cli</a> to see it here.</td></tr>';
 
   root.innerHTML = `
     <div class="org-account">
@@ -51,6 +68,7 @@ export function renderAccount(root: HTMLElement, deps: AccountDeps): void {
           <thead><tr><th>Label</th><th>Created</th><th>Last seen</th><th></th></tr></thead>
           <tbody>${rows || emptyRow}</tbody>
         </table>
+        ${deps.hasLegacyCredential ? LEGACY_NOTE : ''}
       </div>
     </div>
   `;

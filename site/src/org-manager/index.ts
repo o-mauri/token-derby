@@ -100,10 +100,11 @@ export function renderOrgManager(root: HTMLElement): () => void {
     // return early without one). See render/account.ts.
     const drawAccount = async () => {
       try {
-        const { devices } = await api.listDevices();
+        const { devices, has_legacy_credential } = await api.listDevices();
         renderAccount(mainEl, {
           email: linkedEmail,
           devices,
+          hasLegacyCredential: has_legacy_credential,
           onRevoke: (deviceId) => {
             void (async () => {
               try { await api.deleteDevice(deviceId); await drawAccount(); }
@@ -127,7 +128,8 @@ export function renderOrgManager(root: HTMLElement): () => void {
           <div class="org-empty">
             <p>Create or join an organisation to begin.</p>
             <p class="muted">To race, link a machine by running
-              <code>token-derby login</code> in your terminal.</p>
+              <code>token-derby login</code> in your terminal, then approve it at
+              <a href="/cli">/cli</a>.</p>
           </div>`;
         return;
       }

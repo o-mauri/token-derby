@@ -17,6 +17,19 @@ export const CLI_APPROVE_BUCKET = 'cli-approve';
  */
 export const CLI_APPROVE_LIMIT = 40;
 
+export const CLI_START_BUCKET = 'cli-start';
+
+/**
+ * Device-flow starts allowed per window, per signed-in user when credentials are
+ * attached and per source IP otherwise. Not a cost control: every start mints a
+ * live unlinked user_code, and the RFC 8628 residual phishing case was accepted
+ * on the premise that an attacker must get a specific victim to type a specific
+ * code. Unbounded starts break that premise — a large enough pool of live codes
+ * makes somebody else's mistype land on an attacker's flow. Sized in the test
+ * beside the honest worst case it has to clear.
+ */
+export const CLI_START_LIMIT = 200;
+
 export const CLI_POLL_BUCKET = 'cli-poll';
 
 /**

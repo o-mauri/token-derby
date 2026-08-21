@@ -13,10 +13,15 @@ import { renderAccount } from './org-manager/render/account.js';
 
 const app = document.getElementById('app')!;
 
-// Section 1: signed-out state.
+// Section 1: signed-out state, both variants — /org-manager's default and the
+// /cli one, which drops the "CLI racing arrives later" line.
 const loginSection = document.createElement('div');
 app.appendChild(loginSection);
 renderLogin(loginSection);
+
+const cliLoginSection = document.createElement('div');
+app.appendChild(cliLoginSection);
+renderLogin(cliLoginSection, { variant: 'cli' });
 
 // Section 2: signed-in shell — sidebar + a static tab strip + the Overview
 // tab body, matching the real DOM shape produced by org-manager/index.ts.
@@ -219,6 +224,14 @@ function accountSection(title: string): HTMLElement {
 renderAccount(accountSection('Account view — zero organisations, no devices, no Google account linked'), {
   email: null,
   devices: [],
+  hasLegacyCredential: false,
+  onRevoke: () => {},
+});
+
+renderAccount(accountSection('Account view — no devices, but a legacy account credential still live'), {
+  email: null,
+  devices: [],
+  hasLegacyCredential: true,
   onRevoke: () => {},
 });
 
@@ -229,5 +242,6 @@ renderAccount(accountSection('Account view — linked account, several devices')
     { device_id: 'd2', label: "Omar's MacBook", created_at: '2026-07-02T18:00:00Z', last_seen_at: '2026-08-19T22:10:00Z' },
     { device_id: 'd3', label: 'CI runner', created_at: '2026-06-01T00:00:00Z', last_seen_at: '2026-08-20T06:00:00Z' },
   ],
+  hasLegacyCredential: false,
   onRevoke: () => {},
 });

@@ -12,8 +12,9 @@ export type AuthError = { error: string };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-// Bounds device 'last seen' writes to at most one per interval per device,
-// no matter how often the CLI heartbeats — mirrors the read-order rule's cost concern.
+// Bounds device 'last seen' writes to one per interval per device. Generous
+// because the column is a disambiguator, not a liveness signal — see the touch
+// site in authenticate below.
 export const DEVICE_TOUCH_INTERVAL_MS = 5 * 60 * 1000;
 
 // Re-exported so existing call sites (init-jockey handler, tests) keep working unchanged.
@@ -51,8 +52,11 @@ export async function authenticate(
   const providedHash = hashSecretToken(rawToken);
   const storedHash = user.secret_token_hash;
   const hasLegacyHash = typeof storedHash === 'string' && storedHash.length > 0;
-  // Legacy users match here in one read — checked first so the 60s CLI
-  // heartbeat stays a single read for everyone who already has a hash.
+  // Legacy users match here in one read, checked first so the common path costs
+  // one read rather than two. That path is the interactive CLI commands — join,
+  // stable, roll — and the org endpoints, several of which fire on a single
+  // org-manager page render. It is NOT the race heartbeat: heartbeat.ts
+  // authenticates per-horse via getHorseForHeartbeat and never calls this.
   if (hasLegacyHash && providedHash.length === storedHash.length) {
     const a = Buffer.from(providedHash, 'hex');
     const b = Buffer.from(storedHash, 'hex');
@@ -68,10 +72,11 @@ export async function authenticate(
     return { error: 'Invalid token' };
   }
 
-  // Refresh last_seen_at, but only when it's actually stale — a device auth
-  // happens on every heartbeat, so an unconditional write here would be the
-  // same cost regression on the write side that the read-order check above
-  // prevents on the read side.
+  // Refresh last_seen_at, throttled so that authenticating is not also a write
+  // on every one of those calls. It means "last used to reach the API" — enough
+  // to tell two same-labelled devices apart in the account view, and not a
+  // liveness signal: a machine mid-race authenticates nothing, so its row can
+  // read hours stale while that machine is the busiest one there is.
   if (Date.now() - Date.parse(device.last_seen_at) > DEVICE_TOUCH_INTERVAL_MS) {
     await touchDevice(user.user_id, rawToken);
   }
