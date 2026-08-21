@@ -31,6 +31,17 @@ const ROUTES: Route[] = [
   { method: 'GET',  pattern: '/api/organisations',        load: () => import('../api/src/handlers/list-organisations.js') },
   { method: 'GET',  pattern: '/api/organisations/{org_name}', load: () => import('../api/src/handlers/get-organisation.js') },
   { method: 'GET',  pattern: '/api/organisations/{org_name}/members', load: () => import('../api/src/handlers/list-org-members.js') },
+  // Phase 2 device flow. `token-derby login` needs start/poll; the /cli page needs
+  // approve, which requires a web session from the Google sign-in above.
+  { method: 'POST', pattern: '/api/auth/cli/start',       load: () => import('../api/src/handlers/auth-cli-start.js') },
+  { method: 'POST', pattern: '/api/auth/cli/approve',     load: () => import('../api/src/handlers/auth-cli-approve.js') },
+  { method: 'POST', pattern: '/api/auth/cli/poll',        load: () => import('../api/src/handlers/auth-cli-poll.js') },
+  { method: 'GET',  pattern: '/api/devices',              load: () => import('../api/src/handlers/list-devices.js') },
+  // ORDER MATTERS HERE, unlike in production. match() returns the first hit, so
+  // `me` must precede `{device_id}` or logout would delete nothing locally.
+  // API Gateway prefers a static segment regardless of declaration order.
+  { method: 'DELETE', pattern: '/api/devices/me',         load: () => import('../api/src/handlers/logout-device.js') },
+  { method: 'DELETE', pattern: '/api/devices/{device_id}', load: () => import('../api/src/handlers/revoke-device.js') },
 ];
 
 function match(pattern: string, pathname: string): Record<string, string> | null {
