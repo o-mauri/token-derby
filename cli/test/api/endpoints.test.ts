@@ -1,4 +1,7 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import * as fs from 'node:fs/promises';
+import * as os from 'node:os';
+import * as path from 'node:path';
 
 describe('endpoints', () => {
   it('createRace POSTs to /races', async () => {
@@ -159,5 +162,68 @@ describe('endpoints', () => {
     const init = fetch.mock.calls[0]?.[1] as RequestInit;
     expect(init.method).toBe('DELETE');
     expect(fetch.mock.calls[0]?.[0]).toMatch(/\/jockey\/me\/horses\/sh$/);
+  });
+
+  it('logoutDevice DELETEs /devices/me', async () => {
+    const fetch = vi.fn().mockResolvedValue({
+      ok: true, status: 200,
+      headers: { get: () => 'application/json' },
+      text: async () => JSON.stringify({ revoked: true }),
+    });
+    (globalThis as any).fetch = fetch;
+    const { logoutDevice } = await import('../../src/api/endpoints.js');
+    const out = await logoutDevice();
+    expect(out.revoked).toBe(true);
+    expect(fetch.mock.calls[0]?.[0]).toMatch(/\/devices\/me$/);
+    const init = fetch.mock.calls[0]?.[1] as RequestInit;
+    expect(init.method).toBe('DELETE');
+  });
+
+  describe('revokeDevice', () => {
+    let tmp: string;
+
+    beforeEach(async () => {
+      tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'td-revoke-'));
+      process.env.TOKEN_DERBY_HOME = tmp;
+      const { _resetIdentityCacheForTests } = await import('../../src/api/client.js');
+      _resetIdentityCacheForTests();
+    });
+
+    afterEach(async () => {
+      delete process.env.TOKEN_DERBY_HOME;
+      await fs.rm(tmp, { recursive: true, force: true });
+      const { _resetIdentityCacheForTests } = await import('../../src/api/client.js');
+      _resetIdentityCacheForTests();
+    });
+
+    it('DELETEs /devices/<id> authenticated as the passed credential, not any cached identity.json', async () => {
+      // A decoy identity is on disk — proving the override wins, rather than
+      // merely proving headers appear at all (which an unrelated cached
+      // identity would also produce).
+      const { saveIdentity } = await import('../../src/identity/identity.js');
+      await saveIdentity({
+        user_id: 'decoy-user-id',
+        display_name: 'Decoy',
+        secret_token: 'decoy-token',
+        created_at: '2026-01-01T00:00:00Z',
+      });
+
+      const fetch = vi.fn().mockResolvedValue({
+        ok: true, status: 200,
+        headers: { get: () => 'application/json' },
+        text: async () => JSON.stringify({ ok: true }),
+      });
+      (globalThis as any).fetch = fetch;
+
+      const { revokeDevice } = await import('../../src/api/endpoints.js');
+      await revokeDevice('device-123', { user_id: 'real-user-id', secret_token: 'real-device-token' });
+
+      expect(fetch.mock.calls[0]?.[0]).toMatch(/\/devices\/device-123$/);
+      const init = fetch.mock.calls[0]?.[1] as RequestInit;
+      expect(init.method).toBe('DELETE');
+      const headers = init.headers as Record<string, string>;
+      expect(headers['x-user-id']).toBe('real-user-id');
+      expect(headers['x-user-token']).toBe('real-device-token');
+    });
   });
 });

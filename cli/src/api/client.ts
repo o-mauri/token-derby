@@ -23,6 +23,9 @@ export type ApiErrorCode =
   | 'CLAIM_NOT_FOUND'
   | 'CLAIM_ALREADY_REDEEMED'
   | 'CLAIM_EXPIRED'
+  | 'CLI_AUTH_NOT_FOUND'
+  | 'CLI_AUTH_WRONG_ACCOUNT'
+  | 'DEVICE_NOT_FOUND'
   | 'NETWORK_ERROR';
 
 export class ApiError extends Error {
@@ -55,12 +58,16 @@ export async function request<T>(
   body: unknown,
   horseAuthToken: string | undefined,
   fetchImpl: FetchFn = fetch,
+  // Used only by the login flow's device revoke: a device_code/token pair
+  // it holds before any identity.json exists to load, so the usual
+  // cached-identity lookup has nothing to attach.
+  identityOverride?: { user_id: string; secret_token: string },
 ): Promise<T> {
   const url = path.startsWith('http') ? path : `${apiBase()}${path}`;
   const headers: Record<string, string> = {};
   headers[CLI_VERSION_HEADER] = CLI_VERSION;
   headers['user-agent'] = `token-derby/${CLI_VERSION}`;
-  const identity = await getIdentity();
+  const identity = identityOverride ?? await getIdentity();
   if (identity) {
     headers[USER_ID_HEADER] = identity.user_id;
     headers[USER_TOKEN_HEADER] = identity.secret_token;

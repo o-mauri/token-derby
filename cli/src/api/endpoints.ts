@@ -11,6 +11,10 @@ import type {
   RollHatResponse, EquipHatRequest, EquipHatResponse,
   WebSessionCreateResponse,
   ClaimProbeResponse, RedeemClaimRequest, RedeemClaimResponse,
+  CliAuthStartRequest, CliAuthStartResponse,
+  CliAuthPollRequest, CliAuthPollResponse,
+  DeleteDeviceResponse,
+  LogoutDeviceResponse,
 } from '@token-derby/shared';
 import { request } from './client.js';
 
@@ -103,4 +107,33 @@ export function probeClaim(code: string) {
 
 export function redeemClaim(code: string, body: RedeemClaimRequest) {
   return request<RedeemClaimResponse>('POST', `/claims/${encodeURIComponent(code)}/redeem`, body, undefined);
+}
+
+export function cliAuthStart(body: CliAuthStartRequest) {
+  return request<CliAuthStartResponse>('POST', '/auth/cli/start', body, undefined);
+}
+
+export function cliAuthPoll(body: CliAuthPollRequest) {
+  return request<CliAuthPollResponse>('POST', '/auth/cli/poll', body, undefined);
+}
+
+// Called only on a declined confirm prompt, before identity.json exists — the
+// caller passes the just-issued device credential explicitly since there is
+// no on-disk identity yet for `request` to load.
+export function revokeDevice(deviceId: string, auth: { user_id: string; secret_token: string }) {
+  return request<DeleteDeviceResponse>(
+    'DELETE',
+    `/devices/${encodeURIComponent(deviceId)}`,
+    undefined,
+    undefined,
+    undefined,
+    auth,
+  );
+}
+
+// Used by `logout`, which runs with identity.json present — the server
+// resolves and deletes whichever device row authenticated this request, since
+// the CLI cannot compute its own device_id from the token it holds.
+export function logoutDevice() {
+  return request<LogoutDeviceResponse>('DELETE', '/devices/me', undefined, undefined);
 }

@@ -6,6 +6,8 @@ import { createRaceCommand } from './commands/create.js';
 import { joinCommand } from './commands/join.js';
 import { endCommand } from './commands/end.js';
 import { initCommand } from './commands/init.js';
+import { loginCommand } from './commands/login.js';
+import { logoutCommand } from './commands/logout.js';
 import { updateCommand } from './commands/update.js';
 import { rollCommand } from './commands/roll.js';
 import { claimCommand } from './commands/claim.js';
@@ -22,6 +24,11 @@ Identity:
                                           Re-running renames you on the server.
   token-derby init --reset                Wipe local identity and create a fresh account.
                                           Your previous stable is abandoned on the server.
+  token-derby login [--device-name <name>]
+                                          Sign in with your Google account and link this
+                                          machine to your existing jockey.
+  token-derby logout                     Retire this machine's credential and clear
+                                          local identity.
 
 Maintenance:
   token-derby update                      Check for and install the latest CLI version
@@ -71,6 +78,10 @@ async function main(): Promise<number> {
     const reset = argv.slice(1).includes('--reset');
     return initCommand(reset);
   }
+  // `login` runs before the identity gate: having no identity is the case it
+  // exists to solve, so gating it below would make it unreachable for its
+  // primary user.
+  if (cmd === 'login') return loginCommand(argv.slice(1));
   // `update` runs before the identity gate so a broken or stale install can fix itself.
   if (cmd === 'update') return updateCommand();
   // `env` runs before the identity gate: switching to a fresh env is exactly
@@ -107,6 +118,7 @@ async function main(): Promise<number> {
     const orgName = parseFlag(argv.slice(1), '--organisation');
     return createRaceCommand(orgName);
   }
+  if (cmd === 'logout') return logoutCommand();
   if (cmd === 'join')   return joinCommand(argv[1], argv.slice(2));
   if (cmd === 'end')    return endCommand(argv[1]);
   if (cmd === 'roll')      return rollCommand();
