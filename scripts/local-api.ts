@@ -31,6 +31,11 @@ const ROUTES: Route[] = [
   { method: 'GET',  pattern: '/api/organisations',        load: () => import('../api/src/handlers/list-organisations.js') },
   { method: 'GET',  pattern: '/api/organisations/{org_name}', load: () => import('../api/src/handlers/get-organisation.js') },
   { method: 'GET',  pattern: '/api/organisations/{org_name}/members', load: () => import('../api/src/handlers/list-org-members.js') },
+  // Needed to exercise the migration path: an existing CLI jockey created by
+  // `init`, then `web` to reach the org manager as that same jockey — which is
+  // how a legacy user obtains a web session before linking.
+  { method: 'POST', pattern: '/api/jockey/init',          load: () => import('../api/src/handlers/init-jockey.js') },
+  { method: 'POST', pattern: '/api/web-sessions',         load: () => import('../api/src/handlers/create-web-session.js') },
   // Phase 2 device flow. `token-derby login` needs start/poll; the /cli page needs
   // approve, which requires a web session from the Google sign-in above.
   { method: 'POST', pattern: '/api/auth/cli/start',       load: () => import('../api/src/handlers/auth-cli-start.js') },
