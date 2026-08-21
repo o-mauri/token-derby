@@ -82,3 +82,67 @@ describe('the synthesised staging stack', () => {
     }
   });
 });
+
+/** Resolves `METHOD /path` to the logical id of the Lambda its integration
+ *  targets, walking Route -> (Fn::Join ref) -> Integration -> (Fn::GetAtt)
+ *  -> Function. This checks the actual wiring, not just that a route with
+ *  the right RouteKey exists — a route pointed at the wrong handler is the
+ *  failure this guards against, and a RouteKey-only check would miss it. */
+function routeTargetFunctionLogicalId(template: Template, routeKey: string): string {
+  const routes = Object.values(template.findResources('AWS::ApiGatewayV2::Route')) as any[];
+  const matches = routes.filter((r) => r.Properties.RouteKey === routeKey);
+  expect(matches, `expected exactly one route for ${routeKey}`).toHaveLength(1);
+  const integrationRef = matches[0].Properties.Target['Fn::Join'][1][1].Ref as string;
+  const integrations = template.findResources('AWS::ApiGatewayV2::Integration');
+  const integration = (integrations as any)[integrationRef];
+  expect(integration, `integration ${integrationRef} referenced by ${routeKey} not found`).toBeDefined();
+  return integration.Properties.IntegrationUri['Fn::GetAtt'][0] as string;
+}
+
+describe('CLI login routes', () => {
+  let prod: Template;
+  beforeAll(() => { prod = synth('prod'); });
+
+  // Six new handlers wired via makeFn/addRoutes. Checked by function-logical-id
+  // prefix (not just "a route with this key exists") so a route wired to the
+  // wrong Lambda fails here rather than passing silently.
+  const NEW_ROUTES: Array<{ routeKey: string; fnPrefix: string }> = [
+    { routeKey: 'POST /api/auth/cli/start', fnPrefix: 'AuthCliStartFn' },
+    { routeKey: 'POST /api/auth/cli/approve', fnPrefix: 'AuthCliApproveFn' },
+    { routeKey: 'POST /api/auth/cli/poll', fnPrefix: 'AuthCliPollFn' },
+    { routeKey: 'GET /api/devices', fnPrefix: 'ListDevicesFn' },
+    { routeKey: 'DELETE /api/devices/me', fnPrefix: 'LogoutDeviceFn' },
+    { routeKey: 'DELETE /api/devices/{device_id}', fnPrefix: 'RevokeDeviceFn' },
+  ];
+
+  it('wires each of the six new routes to its own handler', () => {
+    for (const { routeKey, fnPrefix } of NEW_ROUTES) {
+      const fnLogicalId = routeTargetFunctionLogicalId(prod, routeKey);
+      expect(fnLogicalId.startsWith(fnPrefix), `${routeKey} -> ${fnLogicalId}, expected prefix ${fnPrefix}`).toBe(true);
+    }
+  });
+
+  // The omission guard: DELETE /api/devices/me and DELETE /api/devices/{device_id}
+  // overlap in path shape. If /me were ever forgotten, or its integration
+  // pointed at revoke-device, a logout would silently fall through to
+  // revoke-device with device_id="me" and leave a live credential behind.
+  it('keeps /api/devices/me and /api/devices/{device_id} distinct, each on its own handler', () => {
+    const meFn = routeTargetFunctionLogicalId(prod, 'DELETE /api/devices/me');
+    const idFn = routeTargetFunctionLogicalId(prod, 'DELETE /api/devices/{device_id}');
+    expect(meFn.startsWith('LogoutDeviceFn'), `/devices/me -> ${meFn}, expected LogoutDeviceFn`).toBe(true);
+    expect(idFn.startsWith('RevokeDeviceFn'), `/devices/{device_id} -> ${idFn}, expected RevokeDeviceFn`).toBe(true);
+    expect(meFn).not.toBe(idFn);
+  });
+
+  it('gives the six new CLI-login handlers SITE_ORIGIN', () => {
+    const fns = appFunctions(prod);
+    // Guards the prefix filters below the same way the top-level count guard
+    // does: an empty match per prefix would make its own SITE_ORIGIN check vacuous.
+    const prefixes = ['AuthCliStartFn', 'AuthCliApproveFn', 'AuthCliPollFn', 'ListDevicesFn', 'LogoutDeviceFn', 'RevokeDeviceFn'];
+    for (const prefix of prefixes) {
+      const matched = fns.filter((f) => f.id.startsWith(prefix));
+      expect(matched, `no ${prefix} in the template`).toHaveLength(1);
+      expect(matched[0]!.env.SITE_ORIGIN).toBe('https://token-derby.mauricode.co.uk');
+    }
+  });
+});

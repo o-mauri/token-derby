@@ -207,6 +207,13 @@ export class TokenDerbyStack extends cdk.Stack {
     const listOrgMembersFn = makeFn('ListOrgMembersFn', 'list-org-members');
     const scheduleTickFn = makeFn('ScheduleTickFn', 'schedule-tick', { timeout: cdk.Duration.seconds(120) });
 
+    const authCliStartFn = makeFn('AuthCliStartFn', 'auth-cli-start');
+    const authCliApproveFn = makeFn('AuthCliApproveFn', 'auth-cli-approve');
+    const authCliPollFn = makeFn('AuthCliPollFn', 'auth-cli-poll');
+    const listDevicesFn = makeFn('ListDevicesFn', 'list-devices');
+    const revokeDeviceFn = makeFn('RevokeDeviceFn', 'revoke-device');
+    const logoutDeviceFn = makeFn('LogoutDeviceFn', 'logout-device');
+
     new events.Rule(this, 'ScheduleTickRule', {
       schedule: events.Schedule.rate(cdk.Duration.minutes(1)),
       targets: [new eventsTargets.LambdaFunction(scheduleTickFn)],
@@ -367,6 +374,16 @@ export class TokenDerbyStack extends cdk.Stack {
     httpApi.addRoutes({ path: '/api/auth/google/start', methods: [HttpMethod.GET], integration: new HttpLambdaIntegration('AuthGoogleStartInt', authGoogleStartFn) });
     httpApi.addRoutes({ path: '/api/auth/link/start', methods: [HttpMethod.POST], integration: new HttpLambdaIntegration('AuthLinkStartInt', authLinkStartFn) });
     httpApi.addRoutes({ path: '/api/auth/google/callback', methods: [HttpMethod.GET], integration: new HttpLambdaIntegration('AuthGoogleCallbackInt', authGoogleCallbackFn) });
+    httpApi.addRoutes({ path: '/api/auth/cli/start', methods: [HttpMethod.POST], integration: new HttpLambdaIntegration('AuthCliStartInt', authCliStartFn) });
+    httpApi.addRoutes({ path: '/api/auth/cli/approve', methods: [HttpMethod.POST], integration: new HttpLambdaIntegration('AuthCliApproveInt', authCliApproveFn) });
+    httpApi.addRoutes({ path: '/api/auth/cli/poll', methods: [HttpMethod.POST], integration: new HttpLambdaIntegration('AuthCliPollInt', authCliPollFn) });
+    httpApi.addRoutes({ path: '/api/devices', methods: [HttpMethod.GET], integration: new HttpLambdaIntegration('ListDevicesInt', listDevicesFn) });
+    // Static beats variable in API Gateway route selection, so declaration
+    // order here is not what keeps these distinct — but both must exist:
+    // dropping /devices/me would silently fall through to {device_id} with
+    // device_id="me", leaving a live credential un-revoked on logout.
+    httpApi.addRoutes({ path: '/api/devices/me', methods: [HttpMethod.DELETE], integration: new HttpLambdaIntegration('LogoutDeviceInt', logoutDeviceFn) });
+    httpApi.addRoutes({ path: '/api/devices/{device_id}', methods: [HttpMethod.DELETE], integration: new HttpLambdaIntegration('RevokeDeviceInt', revokeDeviceFn) });
     httpApi.addRoutes({ path: '/api/jockey/init', methods: [HttpMethod.POST], integration: new HttpLambdaIntegration('InitJockeyInt', initJockeyFn) });
     httpApi.addRoutes({ path: '/api/jockey/me', methods: [HttpMethod.GET], integration: new HttpLambdaIntegration('GetJockeyInt', getJockeyFn) });
     httpApi.addRoutes({ path: '/api/jockey/me', methods: [HttpMethod.PUT], integration: new HttpLambdaIntegration('UpdateJockeyInt', updateJockeyFn) });
