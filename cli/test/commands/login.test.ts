@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { loginCommand, parseDeviceNameFlag } from '../../src/commands/login.js';
 import { ApiError } from '../../src/api/client.js';
 import type { Identity } from '../../src/identity/identity.js';
-import type { CliAuthPollApprovedResponse, CliAuthStartResponse } from '@token-derby/shared';
+import type { CliAuthPollApprovedResponse, CliAuthStartResponse, WebSessionCreateResponse } from '@token-derby/shared';
 
 let quietLog: typeof console.log;
 beforeEach(() => {
@@ -40,6 +40,10 @@ function approvedResponse(overrides: Partial<CliAuthPollApprovedResponse> = {}):
 
 function pending() {
   return { status: 'pending' as const };
+}
+
+function webSession(overrides: Partial<WebSessionCreateResponse> = {}): WebSessionCreateResponse {
+  return { code: 'GRANT123', ...overrides };
 }
 
 function captureConsole() {
@@ -341,6 +345,34 @@ describe('loginCommand', () => {
     expect(out).not.toMatch(/cli\/WXYZ-1234/);
   });
 
+  it('prints the bare URL and never mints a grant when there is no local identity', async () => {
+    const apiStart = vi.fn().mockResolvedValue(startResponse({ verification_uri: 'https://token-derby.mauricode.co.uk/cli' }));
+    const apiPoll = vi.fn().mockResolvedValue(approvedResponse());
+    const promptYesNo = vi.fn().mockResolvedValue(true);
+    const apiCreateWebSession = vi.fn();
+    const con = captureConsole();
+
+    let rc: number;
+    try {
+      rc = await loginCommand(['--device-name', 'x'], {
+        loadIdentity: async () => null,
+        apiStart, apiPoll, apiRevokeDevice: vi.fn(), apiCreateWebSession,
+        saveIdentity: vi.fn().mockResolvedValue(undefined), promptYesNo,
+        sleepImpl: vi.fn(), isTTY: true, hostname: () => 'x',
+      });
+    } finally {
+      con.restore();
+    }
+
+    expect(rc).toBe(0);
+    // Not just that the printed URL lacks a fragment — the mint call itself
+    // must never happen for an account with nothing to mint a credential from.
+    expect(apiCreateWebSession).not.toHaveBeenCalled();
+    const out = con.logs.join('\n');
+    expect(out).toContain('https://token-derby.mauricode.co.uk/cli');
+    expect(out).not.toContain('#code=');
+  });
+
   it('surfaces a non-BAD_REQUEST start error and does not poll', async () => {
     const apiStart = vi.fn().mockRejectedValue(new ApiError('RATE_LIMITED', 'slow down', 429));
     const apiPoll = vi.fn();
@@ -506,6 +538,7 @@ describe('loginCommand', () => {
       const apiStart = vi.fn().mockResolvedValue(startResponse());
       const saveIdentity = vi.fn().mockResolvedValue(undefined);
       const promptYesNo = vi.fn().mockResolvedValue(true);
+      const apiCreateWebSession = vi.fn().mockResolvedValue(webSession());
       const con = captureConsole();
 
       let rc: number;
@@ -513,7 +546,7 @@ describe('loginCommand', () => {
         rc = await loginCommand(['--device-name', 'x'], {
           loadIdentity: async () => existing,
           apiStart, apiPoll: vi.fn().mockResolvedValue(approvedResponse()),
-          apiRevokeDevice: vi.fn(), saveIdentity, promptYesNo,
+          apiRevokeDevice: vi.fn(), apiCreateWebSession, saveIdentity, promptYesNo,
           sleepImpl: vi.fn(), isTTY: true, hostname: () => 'x',
         });
       } finally {
@@ -528,6 +561,7 @@ describe('loginCommand', () => {
     it('without a TTY, continues but says the previous credential is still active and where to revoke it', async () => {
       const apiStart = vi.fn().mockResolvedValue(startResponse());
       const promptYesNo = vi.fn();
+      const apiCreateWebSession = vi.fn().mockResolvedValue(webSession());
       const con = captureConsole();
 
       let rc: number;
@@ -535,7 +569,7 @@ describe('loginCommand', () => {
         rc = await loginCommand(['--device-name', 'x'], {
           loadIdentity: async () => existing,
           apiStart, apiPoll: vi.fn().mockResolvedValue(approvedResponse()),
-          apiRevokeDevice: vi.fn(), saveIdentity: vi.fn().mockResolvedValue(undefined),
+          apiRevokeDevice: vi.fn(), apiCreateWebSession, saveIdentity: vi.fn().mockResolvedValue(undefined),
           promptYesNo, sleepImpl: vi.fn(), isTTY: false, hostname: () => 'x',
         });
       } finally {
@@ -551,6 +585,32 @@ describe('loginCommand', () => {
       expect(logged).toMatch(/stays active/i);
       expect(logged).toMatch(/revoke/i);
       expect(logged).toContain('token-derby web');
+    });
+
+    it('carries a minted grant in the printed URL, since a local identity exists to mint it from', async () => {
+      const apiStart = vi.fn().mockResolvedValue(startResponse({ verification_uri: 'https://token-derby.mauricode.co.uk/cli' }));
+      const apiPoll = vi.fn().mockResolvedValue(approvedResponse());
+      const promptYesNo = vi.fn().mockResolvedValue(true);
+      const apiCreateWebSession = vi.fn().mockResolvedValue(webSession({ code: 'GRANT-XYZ' }));
+      const con = captureConsole();
+
+      let rc: number;
+      try {
+        rc = await loginCommand(['--device-name', 'x'], {
+          loadIdentity: async () => existing,
+          apiStart, apiPoll, apiRevokeDevice: vi.fn(), apiCreateWebSession,
+          saveIdentity: vi.fn().mockResolvedValue(undefined), promptYesNo,
+          sleepImpl: vi.fn(), isTTY: true, hostname: () => 'x',
+        });
+      } finally {
+        con.restore();
+      }
+
+      expect(rc).toBe(0);
+      expect(apiCreateWebSession).toHaveBeenCalledTimes(1);
+      // The exact URL a browser would be sent to, fragment and all — not just
+      // that a code appears somewhere in the log.
+      expect(con.logs.join('\n')).toContain('https://token-derby.mauricode.co.uk/cli#code=GRANT-XYZ');
     });
 
     it('says nothing and asks nothing when there is no identity.json', async () => {

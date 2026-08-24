@@ -5,6 +5,17 @@ import * as api from '../src/org-manager/api.js';
 import { ApiError } from '../src/org-manager/api.js';
 import { setSession } from '../src/org-manager/session.js';
 
+function mockSuccessfulExchange() {
+  // The real exchangeCode also calls setSession as a side effect; the mock must too.
+  return vi.spyOn(api, 'exchangeCode').mockImplementation(async () => {
+    setSession('tok');
+    return {
+      token: 'tok', expires_at: '2026-01-01T00:00:00Z',
+      user: { user_id: 'u1', display_name: 'Alice' },
+    };
+  });
+}
+
 const XSS_LABEL = '<img src=x onerror=alert(1)>evil-device';
 
 function submitCode(root: HTMLElement, code: string): void {
@@ -226,5 +237,91 @@ describe('renderCliApprove: signed in', () => {
       vi.restoreAllMocks();
     }
     expect(new Set(messages).size).toBe(3);
+  });
+});
+
+describe('renderCliApprove: grant in the fragment', () => {
+  let root: HTMLElement;
+  let cleanup: (() => void) | null = null;
+
+  beforeEach(() => {
+    localStorage.clear();
+    window.location.hash = '';
+    root = document.createElement('div');
+  });
+
+  afterEach(() => {
+    cleanup?.();
+    cleanup = null;
+    vi.restoreAllMocks();
+    window.location.hash = '';
+  });
+
+  it('exchanges the grant from the fragment and proceeds straight to the approve form, without showing the login screen', async () => {
+    window.location.hash = '#code=ABC';
+    const exchangeSpy = mockSuccessfulExchange();
+
+    cleanup = renderCliApprove(root);
+
+    await vi.waitFor(() => expect(root.querySelector('.cli-approve-form')).not.toBeNull());
+    expect(exchangeSpy).toHaveBeenCalledWith('ABC');
+    expect(root.querySelector('.org-login')).toBeNull();
+  });
+
+  it('scrubs the one-time code from the fragment (via the existing readCodeFromHash)', async () => {
+    window.location.hash = '#code=ABC';
+    mockSuccessfulExchange();
+
+    cleanup = renderCliApprove(root);
+
+    await vi.waitFor(() => expect(window.location.hash).toBe(''));
+  });
+
+  it('falls back to the login screen when the grant exchange fails', async () => {
+    window.location.hash = '#code=BAD';
+    vi.spyOn(api, 'exchangeCode').mockRejectedValue(new ApiError('INVALID_GRANT', 'That link has expired.', 400));
+
+    cleanup = renderCliApprove(root);
+
+    await vi.waitFor(() => expect(root.querySelector('.org-login')).not.toBeNull());
+    expect(root.querySelector('.cli-approve-form')).toBeNull();
+  });
+});
+
+describe('renderCliApprove: no grant', () => {
+  let root: HTMLElement;
+  let cleanup: (() => void) | null = null;
+
+  beforeEach(() => {
+    localStorage.clear();
+    window.location.hash = '';
+    root = document.createElement('div');
+  });
+
+  afterEach(() => {
+    cleanup?.();
+    cleanup = null;
+    vi.restoreAllMocks();
+    window.location.hash = '';
+  });
+
+  it('with neither a grant nor a session, still shows the login screen', () => {
+    const exchangeSpy = vi.spyOn(api, 'exchangeCode');
+
+    cleanup = renderCliApprove(root);
+
+    expect(root.querySelector('.org-login')).not.toBeNull();
+    expect(exchangeSpy).not.toHaveBeenCalled();
+  });
+
+  it('with a session and no grant, skips the exchange and goes straight to the approve form (behaves as before)', () => {
+    setSession('tok');
+    const exchangeSpy = vi.spyOn(api, 'exchangeCode');
+
+    cleanup = renderCliApprove(root);
+
+    expect(exchangeSpy).not.toHaveBeenCalled();
+    expect(root.querySelector('.cli-approve-form')).not.toBeNull();
+    expect(root.querySelector('.org-login')).toBeNull();
   });
 });

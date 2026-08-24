@@ -1,8 +1,8 @@
 import { esc } from '../esc.js';
 import { horseFaceSvg } from '../horse-face.js';
 import { normaliseUserCode } from '@token-derby/shared';
-import { getSession } from '../org-manager/session.js';
-import { previewCliApprove, approveCliDevice, ApiError } from '../org-manager/api.js';
+import { getSession, readCodeFromHash } from '../org-manager/session.js';
+import { previewCliApprove, approveCliDevice, exchangeCode, ApiError } from '../org-manager/api.js';
 import { renderLogin } from '../org-manager/render/login.js';
 
 // The one sentence this whole page exists to carry: there is no server-side
@@ -95,7 +95,8 @@ function render(state: State): string {
 export function renderCliApprove(root: HTMLElement): () => void {
   let disposed = false;
 
-  if (!getSession()) {
+  const showSignInScreen = () => {
+    if (disposed) return;
     // The 'cli' variant, not the default: /org-manager's copy still says CLI
     // racing is unreleased, which is false for someone who just ran `login`.
     renderLogin(root, { variant: 'cli' });
@@ -103,8 +104,7 @@ export function renderCliApprove(root: HTMLElement): () => void {
     note.className = 'cli-approve-return-note';
     note.textContent = RETURN_NOTE;
     (root.querySelector('.org-login') ?? root).appendChild(note);
-    return () => { disposed = true; };
-  }
+  };
 
   let state: State = { step: 'entry' };
 
@@ -157,6 +157,26 @@ export function renderCliApprove(root: HTMLElement): () => void {
     draw();
   }
 
-  draw();
+  const boot = async () => {
+    // Arriving from `token-derby login` with a grant: exchange it for a
+    // session so the browser is signed in as the same jockey, exactly as
+    // org-manager/index.ts and render/link-google.ts do.
+    const code = readCodeFromHash();
+    if (code) {
+      try {
+        await exchangeCode(code);
+      } catch {
+        showSignInScreen();
+        return;
+      }
+    }
+    if (!getSession()) {
+      showSignInScreen();
+      return;
+    }
+    draw();
+  };
+
+  void boot();
   return () => { disposed = true; };
 }

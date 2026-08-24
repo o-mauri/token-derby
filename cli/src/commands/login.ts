@@ -5,7 +5,7 @@ import {
   loadIdentity as loadIdentityDefault,
   type Identity,
 } from '../identity/identity.js';
-import { cliAuthStart, cliAuthPoll, revokeDevice } from '../api/endpoints.js';
+import { cliAuthStart, cliAuthPoll, revokeDevice, createWebSession } from '../api/endpoints.js';
 import { ApiError } from '../api/client.js';
 import { promptYesNo as promptYesNoDefault } from '../ui/prompt.js';
 
@@ -13,6 +13,7 @@ export type LoginDeps = {
   apiStart?: typeof cliAuthStart;
   apiPoll?: typeof cliAuthPoll;
   apiRevokeDevice?: typeof revokeDevice;
+  apiCreateWebSession?: typeof createWebSession;
   saveIdentity?: typeof saveIdentityDefault;
   loadIdentity?: typeof loadIdentityDefault;
   promptText?: (question: string) => Promise<string>;
@@ -68,6 +69,7 @@ export async function loginCommand(argv: string[] = [], deps: LoginDeps = {}): P
   const apiStart = deps.apiStart ?? cliAuthStart;
   const apiPoll = deps.apiPoll ?? cliAuthPoll;
   const apiRevokeDevice = deps.apiRevokeDevice ?? revokeDevice;
+  const apiCreateWebSession = deps.apiCreateWebSession ?? createWebSession;
   const saveIdentity = deps.saveIdentity ?? saveIdentityDefault;
   const loadIdentity = deps.loadIdentity ?? loadIdentityDefault;
   const promptText = deps.promptText ?? defaultPromptText;
@@ -126,9 +128,27 @@ export async function loginCommand(argv: string[] = [], deps: LoginDeps = {}): P
     }
   }
 
+  // A local identity mints a grant so the browser arrives already signed in.
+  // With no local identity there is no credential to mint from, so the bare
+  // URL stays untouched.
+  let verificationUrl = start.verification_uri;
+  if (existing) {
+    let grant: Awaited<ReturnType<typeof apiCreateWebSession>>;
+    try {
+      grant = await apiCreateWebSession();
+    } catch (e) {
+      if (e instanceof ApiError) {
+        console.error(`Error: ${e.code} ${e.message}`);
+        return 1;
+      }
+      throw e;
+    }
+    verificationUrl = `${start.verification_uri}#code=${grant.code}`;
+  }
+
   console.log('');
   console.log('  To finish signing in, visit:');
-  console.log(`    ${start.verification_uri}`);
+  console.log(`    ${verificationUrl}`);
   console.log('');
   console.log('  And enter this code:');
   console.log(`    ${start.user_code}`);
