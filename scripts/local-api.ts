@@ -36,6 +36,9 @@ const ROUTES: Route[] = [
   // how a legacy user obtains a web session before linking.
   { method: 'POST', pattern: '/api/jockey/init',          load: () => import('../api/src/handlers/init-jockey.js') },
   { method: 'POST', pattern: '/api/web-sessions',         load: () => import('../api/src/handlers/create-web-session.js') },
+  // `token-derby link` reads this to check whether the account is already linked,
+  // and polls it to detect that the browser leg finished.
+  { method: 'GET',  pattern: '/api/jockey/me',            load: () => import('../api/src/handlers/get-jockey.js') },
   // Phase 2 device flow. `token-derby login` needs start/poll; the /cli page needs
   // approve, which requires a web session from the Google sign-in above.
   { method: 'POST', pattern: '/api/auth/cli/start',       load: () => import('../api/src/handlers/auth-cli-start.js') },
