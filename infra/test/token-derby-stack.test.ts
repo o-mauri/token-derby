@@ -103,19 +103,20 @@ describe('CLI login routes', () => {
   let prod: Template;
   beforeAll(() => { prod = synth('prod'); });
 
-  // Six new handlers wired via makeFn/addRoutes. Checked by function-logical-id
-  // prefix (not just "a route with this key exists") so a route wired to the
-  // wrong Lambda fails here rather than passing silently.
+  // Every CLI-login handler wired via makeFn/addRoutes. Checked by
+  // function-logical-id prefix (not just "a route with this key exists") so a
+  // route wired to the wrong Lambda fails here rather than passing silently.
   const NEW_ROUTES: Array<{ routeKey: string; fnPrefix: string }> = [
     { routeKey: 'POST /api/auth/cli/start', fnPrefix: 'AuthCliStartFn' },
     { routeKey: 'POST /api/auth/cli/approve', fnPrefix: 'AuthCliApproveFn' },
     { routeKey: 'POST /api/auth/cli/poll', fnPrefix: 'AuthCliPollFn' },
     { routeKey: 'GET /api/devices', fnPrefix: 'ListDevicesFn' },
+    { routeKey: 'POST /api/devices', fnPrefix: 'RegisterDeviceFn' },
     { routeKey: 'DELETE /api/devices/me', fnPrefix: 'LogoutDeviceFn' },
     { routeKey: 'DELETE /api/devices/{device_id}', fnPrefix: 'RevokeDeviceFn' },
   ];
 
-  it('wires each of the six new routes to its own handler', () => {
+  it('wires each CLI-login route to its own handler', () => {
     for (const { routeKey, fnPrefix } of NEW_ROUTES) {
       const fnLogicalId = routeTargetFunctionLogicalId(prod, routeKey);
       expect(fnLogicalId.startsWith(fnPrefix), `${routeKey} -> ${fnLogicalId}, expected prefix ${fnPrefix}`).toBe(true);
@@ -134,11 +135,24 @@ describe('CLI login routes', () => {
     expect(meFn).not.toBe(idFn);
   });
 
-  it('gives the six new CLI-login handlers SITE_ORIGIN', () => {
+  // POST /api/devices is the one genuinely new API surface on this branch, and
+  // it shares its path with the GET that already existed. A route key is
+  // method-plus-path, so the two coexist — but only if both are declared and
+  // each keeps its own integration. Collapsing them onto one Lambda would make
+  // `link` register nothing while still answering 200 to the account view.
+  it('keeps GET and POST /api/devices on separate handlers', () => {
+    const getFn = routeTargetFunctionLogicalId(prod, 'GET /api/devices');
+    const postFn = routeTargetFunctionLogicalId(prod, 'POST /api/devices');
+    expect(getFn.startsWith('ListDevicesFn'), `GET -> ${getFn}, expected ListDevicesFn`).toBe(true);
+    expect(postFn.startsWith('RegisterDeviceFn'), `POST -> ${postFn}, expected RegisterDeviceFn`).toBe(true);
+    expect(getFn).not.toBe(postFn);
+  });
+
+  it('gives every CLI-login handler SITE_ORIGIN', () => {
     const fns = appFunctions(prod);
     // Guards the prefix filters below the same way the top-level count guard
     // does: an empty match per prefix would make its own SITE_ORIGIN check vacuous.
-    const prefixes = ['AuthCliStartFn', 'AuthCliApproveFn', 'AuthCliPollFn', 'ListDevicesFn', 'LogoutDeviceFn', 'RevokeDeviceFn'];
+    const prefixes = ['AuthCliStartFn', 'AuthCliApproveFn', 'AuthCliPollFn', 'RegisterDeviceFn', 'ListDevicesFn', 'LogoutDeviceFn', 'RevokeDeviceFn'];
     for (const prefix of prefixes) {
       const matched = fns.filter((f) => f.id.startsWith(prefix));
       expect(matched, `no ${prefix} in the template`).toHaveLength(1);

@@ -164,6 +164,24 @@ describe('endpoints', () => {
     expect(fetch.mock.calls[0]?.[0]).toMatch(/\/jockey\/me\/horses\/sh$/);
   });
 
+  it('registerDevice POSTs the label to /devices and returns the credential', async () => {
+    const fetch = vi.fn().mockResolvedValue({
+      ok: true, status: 200,
+      headers: { get: () => 'application/json' },
+      text: async () => JSON.stringify({ device_id: 'd-1', secret_token: 'tok-new' }),
+    });
+    (globalThis as any).fetch = fetch;
+    const { registerDevice } = await import('../../src/api/endpoints.js');
+    const out = await registerDevice({ label: 'omars-laptop' });
+    expect(out.secret_token).toBe('tok-new');
+    // POST, not the GET that lists devices: same path, and the two would
+    // otherwise be indistinguishable from here.
+    expect(fetch.mock.calls[0]?.[0]).toMatch(/\/devices$/);
+    const init = fetch.mock.calls[0]?.[1] as RequestInit;
+    expect(init.method).toBe('POST');
+    expect(init.body).toBe(JSON.stringify({ label: 'omars-laptop' }));
+  });
+
   it('logoutDevice DELETEs /devices/me', async () => {
     const fetch = vi.fn().mockResolvedValue({
       ok: true, status: 200,

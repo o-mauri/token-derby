@@ -30,6 +30,18 @@ export const CLI_START_BUCKET = 'cli-start';
  */
 export const CLI_START_LIMIT = 200;
 
+export const DEVICE_REGISTER_BUCKET = 'device-register';
+
+/**
+ * Direct device registrations allowed per signed-in user per window. Not a
+ * defence against an attacker — the caller already holds a working credential,
+ * so it grants them nothing they could not already do. It stops a loop (a
+ * scripted `link`, a retry wrapper) from filling the table with device rows the
+ * person then has to revoke one at a time in the Account view. Sized in the
+ * test beside the honest count it has to clear.
+ */
+export const DEVICE_REGISTER_LIMIT = 20;
+
 export const CLI_POLL_BUCKET = 'cli-poll';
 
 /**

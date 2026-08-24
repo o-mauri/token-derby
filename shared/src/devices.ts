@@ -118,3 +118,17 @@ export type DeleteDeviceResponse = {
 export type LogoutDeviceResponse = {
   revoked: boolean;
 };
+
+export type RegisterDeviceRequest = {
+  label: string;
+};
+
+/**
+ * POST /devices — a credential for the machine that asked. Returned in full
+ * because this is the only time the token is ever readable: only its hash is
+ * stored, so a caller that loses this response has to register again.
+ */
+export type RegisterDeviceResponse = {
+  device_id: string;
+  secret_token: string;
+};

@@ -55,8 +55,12 @@ function defaultSleep(ms: number): Promise<void> {
  * prompted with the hostname pre-filled as the default (empty answer keeps
  * it); a non-TTY (SSH without a terminal, CI) falls straight back to the
  * hostname rather than blocking on a prompt nothing will ever answer.
+ *
+ * Exported because `link` registers a device too and must name it identically —
+ * two copies of this would drift, and the no-TTY case is the one that would
+ * hang if the second copy got it wrong.
  */
-async function resolveDeviceName(
+export async function resolveDeviceName(
   flagName: string | null,
   isTTY: boolean,
   hostname: string,

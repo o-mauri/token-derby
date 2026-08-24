@@ -28,15 +28,19 @@ Identity:
                                           account (previous stable abandoned); \`login\` recovers
                                           your existing account instead of abandoning it.
   token-derby login [--device-name <name>]
-                                          Sign in with your Google account to give this
-                                          machine a credential for your jockey. Does not
-                                          add an email to your account — see \`link\`.
+                                          About THIS MACHINE: sign in with Google to give
+                                          it a credential of its own. The way in for a
+                                          machine that has none yet. Adds no email to
+                                          your account — see \`link\`.
   token-derby logout                      Retire this machine's credential and clear
                                           local identity.
-  token-derby link                        Connect your jockey to a Google account (adds
-                                          your email on file, and renames your jockey to
-                                          the first name on that account). Does not
-                                          authorize a new machine — see \`login\`.
+  token-derby link [--device-name <name>]
+                                          About YOUR JOCKEY: connect it to a Google
+                                          account — adds your email on file, and
+                                          renames your jockey to the first name on
+                                          that account. Then registers this machine
+                                          as a device too, so it stops using the
+                                          shared account credential.
   token-derby whoami                      Show your jockey name, linked email (if any),
                                           and this machine's device name (if any).
 
@@ -129,7 +133,7 @@ async function main(): Promise<number> {
     return createRaceCommand(orgName);
   }
   if (cmd === 'logout') return logoutCommand();
-  if (cmd === 'link')   return linkCommand();
+  if (cmd === 'link')   return linkCommand(argv.slice(1));
   if (cmd === 'whoami') return whoamiCommand();
   if (cmd === 'join')   return joinCommand(argv[1], argv.slice(2));
   if (cmd === 'end')    return endCommand(argv[1]);

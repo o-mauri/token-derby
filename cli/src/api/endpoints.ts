@@ -15,6 +15,7 @@ import type {
   CliAuthPollRequest, CliAuthPollResponse,
   DeleteDeviceResponse,
   LogoutDeviceResponse,
+  RegisterDeviceRequest, RegisterDeviceResponse,
 } from '@token-derby/shared';
 import { request } from './client.js';
 
@@ -129,6 +130,13 @@ export function revokeDevice(deviceId: string, auth: { user_id: string; secret_t
     undefined,
     auth,
   );
+}
+
+// Registers this machine directly, with no browser leg — `link` uses it to
+// trade the shared account-level credential for a revocable device one. The
+// credential already on disk is what authorises it, so `request` picks it up.
+export function registerDevice(body: RegisterDeviceRequest) {
+  return request<RegisterDeviceResponse>('POST', '/devices', body, undefined);
 }
 
 // Used by `logout`, which runs with identity.json present — the server

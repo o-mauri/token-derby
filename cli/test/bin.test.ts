@@ -111,12 +111,14 @@ describe('bin.ts command registration order', () => {
     const linkCommand = vi.fn().mockResolvedValue(0);
     vi.doMock('../src/commands/link.js', () => ({ linkCommand }));
 
-    process.argv = ['node', 'bin.js', 'link'];
+    process.argv = ['node', 'bin.js', 'link', '--device-name', 'x'];
 
     await import('../src/bin.js');
     await settle();
 
-    expect(linkCommand).toHaveBeenCalledTimes(1);
+    // The argv has to reach the command, not just the command reach the
+    // dispatcher: `link` names the device it registers from --device-name.
+    expect(linkCommand).toHaveBeenCalledWith(['--device-name', 'x']);
     expect(exitSpy).toHaveBeenCalledWith(0);
   });
 
@@ -206,6 +208,32 @@ describe('bin.ts command registration order', () => {
     expect(linkBlock).toMatch(/renames your jockey/i);
   });
 
+  it('keeps `login` and `link` distinguished now that both register a device', async () => {
+    vi.doMock('../src/identity/identity.js', () => ({
+      loadIdentity: vi.fn().mockResolvedValue(null),
+    }));
+    process.argv = ['node', 'bin.js', '--help'];
+    await import('../src/bin.js');
+    await settle();
+
+    const help = logSpy.mock.calls.map((c: unknown[]) => c.join(' ')).join('\n');
+    const loginBlock = help.slice(help.indexOf('token-derby login'), help.indexOf('token-derby logout'));
+    const linkBlock = help.slice(help.indexOf('token-derby link'), help.indexOf('token-derby whoami'));
+
+    // `link` now does the machine half too, so the old "does not authorize a new
+    // machine" line would be a lie. What still separates them is what each one
+    // is ABOUT — and each has to point at the other, or a reader picks by
+    // guessing which of two overlapping commands they want.
+    expect(linkBlock).toMatch(/registers this machine/i);
+    expect(linkBlock).not.toMatch(/does not authorize/i);
+    expect(loginBlock).toMatch(/this machine/i);
+    expect(loginBlock).toMatch(/\bsee `link`/);
+    expect(linkBlock).toMatch(/your jockey/i);
+    // And `link` takes the same naming flag, or the two disagree on how a
+    // machine gets named.
+    expect(linkBlock).toContain('--device-name');
+  });
+
   it('aligns every help description in the same column', async () => {
     vi.doMock('../src/identity/identity.js', () => ({
       loadIdentity: vi.fn().mockResolvedValue(null),
@@ -227,9 +255,10 @@ describe('bin.ts command registration order', () => {
 
     // Proves the block was actually found, so this cannot pass by matching nothing.
     // Known limit: the regex needs a 2+-space gap to locate the description, so a
-    // single-space typo is skipped rather than flagged, and two command lines
-    // legitimately carry no inline description at all. Tightening this to "every
-    // command line matched" gives a false failure on those two.
+    // single-space typo is skipped rather than flagged, and three command lines
+    // (`login`, `link`, `create`) legitimately carry no inline description at
+    // all — their flags fill the column, so the text starts on the next line.
+    // Tightening this to "every command line matched" gives a false failure on those.
     const matched = [...columns.values()].reduce((n, ls) => n + ls.length, 0);
     expect(matched).toBeGreaterThan(12);
     expect([...columns.keys()]).toHaveLength(1);

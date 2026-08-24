@@ -211,6 +211,7 @@ export class TokenDerbyStack extends cdk.Stack {
     const authCliApproveFn = makeFn('AuthCliApproveFn', 'auth-cli-approve');
     const authCliPollFn = makeFn('AuthCliPollFn', 'auth-cli-poll');
     const listDevicesFn = makeFn('ListDevicesFn', 'list-devices');
+    const registerDeviceFn = makeFn('RegisterDeviceFn', 'register-device');
     const revokeDeviceFn = makeFn('RevokeDeviceFn', 'revoke-device');
     const logoutDeviceFn = makeFn('LogoutDeviceFn', 'logout-device');
 
@@ -378,6 +379,10 @@ export class TokenDerbyStack extends cdk.Stack {
     httpApi.addRoutes({ path: '/api/auth/cli/approve', methods: [HttpMethod.POST], integration: new HttpLambdaIntegration('AuthCliApproveInt', authCliApproveFn) });
     httpApi.addRoutes({ path: '/api/auth/cli/poll', methods: [HttpMethod.POST], integration: new HttpLambdaIntegration('AuthCliPollInt', authCliPollFn) });
     httpApi.addRoutes({ path: '/api/devices', methods: [HttpMethod.GET], integration: new HttpLambdaIntegration('ListDevicesInt', listDevicesFn) });
+    // Distinct from the GET above: a route key is method-plus-path, so the two
+    // coexist on the same path. This is the CLI's direct registration, used by
+    // `link` to trade a legacy account-level credential for a device one.
+    httpApi.addRoutes({ path: '/api/devices', methods: [HttpMethod.POST], integration: new HttpLambdaIntegration('RegisterDeviceInt', registerDeviceFn) });
     // Static beats variable in API Gateway route selection, so declaration
     // order here is not what keeps these distinct — but both must exist:
     // dropping /devices/me would silently fall through to {device_id} with

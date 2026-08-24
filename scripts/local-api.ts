@@ -45,6 +45,9 @@ const ROUTES: Route[] = [
   { method: 'POST', pattern: '/api/auth/cli/approve',     load: () => import('../api/src/handlers/auth-cli-approve.js') },
   { method: 'POST', pattern: '/api/auth/cli/poll',        load: () => import('../api/src/handlers/auth-cli-poll.js') },
   { method: 'GET',  pattern: '/api/devices',              load: () => import('../api/src/handlers/list-devices.js') },
+  // Same path, different method — API Gateway keys routes on method+path, and
+  // match() below only considers entries whose method already agrees.
+  { method: 'POST', pattern: '/api/devices',              load: () => import('../api/src/handlers/register-device.js') },
   // ORDER MATTERS HERE, unlike in production. match() returns the first hit, so
   // `me` must precede `{device_id}` or logout would delete nothing locally.
   // API Gateway prefers a static segment regardless of declaration order.

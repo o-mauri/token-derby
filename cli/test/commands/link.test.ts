@@ -2,13 +2,13 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { linkCommand } from '../../src/commands/link.js';
 import { ApiError } from '../../src/api/client.js';
 import type { Identity } from '../../src/identity/identity.js';
-import type { GetJockeyResponse, WebSessionCreateResponse } from '@token-derby/shared';
+import type { GetJockeyResponse, WebSessionCreateResponse, RegisterDeviceResponse } from '@token-derby/shared';
 
 function identity(overrides: Partial<Identity> = {}): Identity {
   return {
     user_id: 'user-1',
     display_name: 'Omar',
-    secret_token: 'secret-token',
+    secret_token: 'legacy-account-token',
     created_at: '2026-01-01T00:00:00.000Z',
     ...overrides,
   };
@@ -27,6 +27,15 @@ function session(overrides: Partial<WebSessionCreateResponse> = {}): WebSessionC
   return { code: 'GRANT123', ...overrides };
 }
 
+function registration(overrides: Partial<RegisterDeviceResponse> = {}): RegisterDeviceResponse {
+  return { device_id: 'device-1', secret_token: 'fresh-device-token', ...overrides };
+}
+
+/** A registration stub that succeeds and remembers the label it was given. */
+function okRegister(overrides: Partial<RegisterDeviceResponse> = {}) {
+  return vi.fn().mockResolvedValue(registration(overrides));
+}
+
 function captureConsole() {
   const logs: string[] = [];
   const errors: string[] = [];
@@ -40,20 +49,35 @@ function captureConsole() {
   };
 }
 
+/** The deps every happy-path run needs: no browser, no real prompt, no clock. */
+function baseDeps() {
+  return {
+    spawnImpl: vi.fn(() => ({ on: () => {}, unref: () => {} })) as any,
+    sleepImpl: vi.fn(),
+    isTTY: false,
+    hostname: () => 'omars-macbook',
+    promptText: vi.fn(),
+  };
+}
+
 afterEach(() => {
   vi.useRealTimers();
   delete process.env.TOKEN_DERBY_API_BASE;
 });
 
 describe('linkCommand', () => {
-  it('already linked: prints the email, exits 0, and never mints a grant', async () => {
+  it('already linked: prints the email, exits 0, and never mints a grant or a device', async () => {
     const apiGetJockey = vi.fn().mockResolvedValue(jockey({ email: 'omar@stackone.com' }));
     const apiCreateWebSession = vi.fn();
+    const apiRegisterDevice = okRegister();
     const con = captureConsole();
 
     let rc: number;
     try {
-      rc = await linkCommand({ apiGetJockey, apiCreateWebSession, sleepImpl: vi.fn(), loadIdentity: vi.fn().mockResolvedValue(null), saveIdentity: vi.fn() });
+      rc = await linkCommand([], {
+        ...baseDeps(), apiGetJockey, apiCreateWebSession, apiRegisterDevice,
+        loadIdentity: vi.fn().mockResolvedValue(null), saveIdentity: vi.fn(),
+      });
     } finally {
       con.restore();
     }
@@ -61,6 +85,9 @@ describe('linkCommand', () => {
     expect(rc).toBe(0);
     expect(con.logs.join('\n')).toContain('Already linked to omar@stackone.com.');
     expect(apiCreateWebSession).not.toHaveBeenCalled();
+    // Re-running `link` is how somebody checks their state. It must not quietly
+    // mint a credential every time — each one is a row to revoke by hand.
+    expect(apiRegisterDevice).not.toHaveBeenCalled();
     expect(apiGetJockey).toHaveBeenCalledTimes(1);
   });
 
@@ -70,12 +97,15 @@ describe('linkCommand', () => {
       .mockResolvedValueOnce(jockey())
       .mockResolvedValueOnce(jockey({ email: 'omar@stackone.com' }));
     const apiCreateWebSession = vi.fn().mockResolvedValue(session({ code: 'GRANT123' }));
-    const spawnImpl = vi.fn(() => ({ on: () => {}, unref: () => {} })) as any;
+    const deps = baseDeps();
     const con = captureConsole();
 
     let rc: number;
     try {
-      rc = await linkCommand({ apiGetJockey, apiCreateWebSession, spawnImpl, sleepImpl: vi.fn(), loadIdentity: vi.fn().mockResolvedValue(null), saveIdentity: vi.fn() });
+      rc = await linkCommand([], {
+        ...deps, apiGetJockey, apiCreateWebSession, apiRegisterDevice: okRegister(),
+        loadIdentity: vi.fn().mockResolvedValue(identity()), saveIdentity: vi.fn(),
+      });
     } finally {
       con.restore();
     }
@@ -83,9 +113,8 @@ describe('linkCommand', () => {
     expect(rc).toBe(0);
     const out = con.logs.join('\n');
     expect(out).toContain('https://example.test/link#code=GRANT123');
-    expect(spawnImpl).toHaveBeenCalled();
-    const args = spawnImpl.mock.calls[0];
-    expect(JSON.stringify(args)).toContain('https://example.test/link#code=GRANT123');
+    expect(deps.spawnImpl).toHaveBeenCalled();
+    expect(JSON.stringify(deps.spawnImpl.mock.calls[0])).toContain('https://example.test/link#code=GRANT123');
   });
 
   it('polls repeatedly while unlinked and stops as soon as the email appears', async () => {
@@ -94,13 +123,17 @@ describe('linkCommand', () => {
       .mockResolvedValueOnce(jockey())                                     // poll: still no email
       .mockResolvedValueOnce(jockey())                                     // poll: still no email
       .mockResolvedValueOnce(jockey({ email: 'omar@stackone.com' }));      // poll: linked
-    const apiCreateWebSession = vi.fn().mockResolvedValue(session());
-    const sleepImpl = vi.fn().mockResolvedValue(undefined);
+    const deps = baseDeps();
     const con = captureConsole();
 
     let rc: number;
     try {
-      rc = await linkCommand({ apiGetJockey, apiCreateWebSession, spawnImpl: vi.fn(() => ({ on: () => {}, unref: () => {} })) as any, sleepImpl, loadIdentity: vi.fn().mockResolvedValue(null), saveIdentity: vi.fn() });
+      rc = await linkCommand([], {
+        ...deps, apiGetJockey,
+        apiCreateWebSession: vi.fn().mockResolvedValue(session()),
+        apiRegisterDevice: okRegister(),
+        loadIdentity: vi.fn().mockResolvedValue(identity()), saveIdentity: vi.fn(),
+      });
     } finally {
       con.restore();
     }
@@ -108,14 +141,14 @@ describe('linkCommand', () => {
     expect(rc).toBe(0);
     expect(apiGetJockey).toHaveBeenCalledTimes(4);
     // One sleep between each unlinked poll, none after the linked one.
-    expect(sleepImpl).toHaveBeenCalledTimes(2);
+    expect(deps.sleepImpl).toHaveBeenCalledTimes(2);
     expect(con.logs.join('\n')).toContain('✓ Linked to omar@stackone.com.');
   });
 
   it('fails with an honest message and a non-zero exit once the bounded wait elapses', async () => {
     vi.useFakeTimers();
     const apiGetJockey = vi.fn().mockResolvedValue(jockey()); // never gains an email
-    const apiCreateWebSession = vi.fn().mockResolvedValue(session());
+    const apiRegisterDevice = okRegister();
     // Time only moves when the command sleeps, so the fake clock advances in
     // lockstep with the poll loop and nothing waits in real time.
     const sleepImpl = vi.fn(async (ms: number) => { vi.advanceTimersByTime(ms); });
@@ -123,10 +156,10 @@ describe('linkCommand', () => {
 
     let rc: number;
     try {
-      rc = await linkCommand({
-        apiGetJockey, apiCreateWebSession,
-        spawnImpl: vi.fn(() => ({ on: () => {}, unref: () => {} })) as any,
-        sleepImpl, loadIdentity: vi.fn().mockResolvedValue(null), saveIdentity: vi.fn(),
+      rc = await linkCommand([], {
+        ...baseDeps(), apiGetJockey, apiRegisterDevice, sleepImpl,
+        apiCreateWebSession: vi.fn().mockResolvedValue(session()),
+        loadIdentity: vi.fn().mockResolvedValue(identity()), saveIdentity: vi.fn(),
       });
     } finally {
       con.restore();
@@ -135,44 +168,17 @@ describe('linkCommand', () => {
 
     expect(rc).toBe(1);
     expect(con.errors.join('\n')).toMatch(/timed out/i);
+    // A link that never happened registers nothing.
+    expect(apiRegisterDevice).not.toHaveBeenCalled();
   });
 
-  // Setting process.stdin.isTTY asserted nothing: linkCommand never reads it.
-  // What is worth holding is the property underneath — the command runs
-  // unattended, so it must never attach to stdin. readline.createInterface
-  // does (`error`, `data`, `end`), so adding any prompt turns this red.
-  it('never attaches to stdin, so it runs unattended over SSH or in CI', async () => {
-    vi.useFakeTimers();
-    const stdinOn = vi.spyOn(process.stdin, 'on');
-    const apiGetJockey = vi.fn()
-      .mockResolvedValueOnce(jockey())
-      .mockResolvedValueOnce(jockey({ email: 'omar@stackone.com' }));
-    const apiCreateWebSession = vi.fn().mockResolvedValue(session());
-    const sleepImpl = vi.fn(async (ms: number) => { vi.advanceTimersByTime(ms); });
-    const con = captureConsole();
-
-    let rc: number;
-    try {
-      rc = await linkCommand({
-        apiGetJockey, apiCreateWebSession,
-        spawnImpl: vi.fn(() => ({ on: () => {}, unref: () => {} })) as any,
-        sleepImpl, loadIdentity: vi.fn().mockResolvedValue(null), saveIdentity: vi.fn(),
-      });
-    } finally {
-      con.restore();
-      vi.useRealTimers();
-    }
-
-    expect(rc).toBe(0);
-    expect(stdinOn).not.toHaveBeenCalled();
-  });
-
-  describe('the rename a first link performs', () => {
-    // The server sets the jockey name to the Google first name on a first
-    // link. It is intended, but nothing used to say so, and identity.json kept
-    // the old name — so `login`, `init` and the leaderboards disagreed.
-    function linkRun(overrides: { linkedName?: string; local?: Identity | null } = {}) {
-      const linkedName = overrides.linkedName ?? 'Om';
+  describe('registering this machine as a device', () => {
+    function linkRun(overrides: {
+      linkedName?: string;
+      local?: Identity | null;
+      register?: ReturnType<typeof vi.fn>;
+    } = {}) {
+      const linkedName = overrides.linkedName ?? 'Omar';
       const apiGetJockey = vi.fn()
         .mockResolvedValueOnce(jockey({ display_name: 'Omar' }))
         .mockResolvedValueOnce(jockey({ display_name: linkedName, email: 'omar@stackone.com' }));
@@ -180,69 +186,214 @@ describe('linkCommand', () => {
         overrides.local === undefined ? identity({ display_name: 'Omar' }) : overrides.local,
       );
       const saveIdentity = vi.fn().mockResolvedValue(undefined);
-      return { apiGetJockey, loadIdentity, saveIdentity };
+      const apiRegisterDevice = overrides.register ?? okRegister();
+      return { apiGetJockey, loadIdentity, saveIdentity, apiRegisterDevice };
     }
 
-    async function run(deps: ReturnType<typeof linkRun>) {
+    async function run(deps: ReturnType<typeof linkRun>, argv: string[] = [], extra: Record<string, unknown> = {}) {
       const con = captureConsole();
       try {
-        const rc = await linkCommand({
-          ...deps,
+        const rc = await linkCommand(argv, {
+          ...baseDeps(), ...deps,
           apiCreateWebSession: vi.fn().mockResolvedValue(session()),
-          spawnImpl: vi.fn(() => ({ on: () => {}, unref: () => {} })) as any,
-          sleepImpl: vi.fn(),
+          ...extra,
         });
-        return { rc, logs: con.logs.join('\n') };
+        return { rc, logs: con.logs.join('\n'), errors: con.errors.join('\n') };
       } finally {
         con.restore();
       }
     }
 
-    it('names the new jockey name in the output when the link changed it', async () => {
+    it('overwrites identity.json with the freshly minted device credential', async () => {
+      const deps = linkRun();
+      const { rc } = await run(deps);
+
+      expect(rc).toBe(0);
+      expect(deps.apiRegisterDevice).toHaveBeenCalledTimes(1);
+      expect(deps.saveIdentity).toHaveBeenCalledWith(expect.objectContaining({
+        user_id: 'user-1',
+        secret_token: 'fresh-device-token',
+      }));
+    });
+
+    it('leaves the legacy token nowhere in the file it wrote, so nothing reads it again', async () => {
+      const deps = linkRun();
+      await run(deps);
+
+      // The point of the whole exercise: after this command, the credential on
+      // disk is the revocable per-machine one. Anything still loading the shared
+      // account token from identity.json would keep the machine un-migrated.
+      expect(deps.saveIdentity).toHaveBeenCalled();
+      for (const [written] of deps.saveIdentity.mock.calls) {
+        expect((written as Identity).secret_token).not.toBe('legacy-account-token');
+      }
+      const last = deps.saveIdentity.mock.calls.at(-1)![0] as Identity;
+      expect(last.secret_token).toBe('fresh-device-token');
+    });
+
+    it('says the machine is registered, and under what name', async () => {
+      const deps = linkRun();
+      const { logs } = await run(deps, ['--device-name', 'work-laptop']);
+
+      expect(logs).toMatch(/registered as "work-laptop"/);
+    });
+
+    it('folds the link rename and the new credential into one write', async () => {
       const deps = linkRun({ linkedName: 'Om' });
       const { rc, logs } = await run(deps);
 
       expect(rc).toBe(0);
       expect(logs).toContain('now named Om');
-      expect(logs).toMatch(/first name on the Google account/i);
-    });
-
-    it('says nothing about a rename when the name is unchanged', async () => {
-      const deps = linkRun({ linkedName: 'Omar' });
-      const { rc, logs } = await run(deps);
-
-      expect(rc).toBe(0);
-      expect(logs).toContain('✓ Linked to omar@stackone.com.');
-      expect(logs).not.toMatch(/now named/i);
-    });
-
-    it('rewrites identity.json with the name the server now reports', async () => {
-      const deps = linkRun({ linkedName: 'Om' });
-      await run(deps);
-
+      // One write, carrying both changes: the server's new name and the new
+      // credential. Two writes would leave a window with one but not the other.
       expect(deps.saveIdentity).toHaveBeenCalledTimes(1);
       expect(deps.saveIdentity).toHaveBeenCalledWith(expect.objectContaining({
         display_name: 'Om',
-        // The credential must survive the rewrite untouched — it is the only
-        // copy and this is not the command that rotates it.
-        secret_token: 'secret-token',
+        secret_token: 'fresh-device-token',
         user_id: 'user-1',
       }));
     });
 
-    it('leaves identity.json alone when the name already matches', async () => {
+    it('keeps the local name when the link did not change it', async () => {
       const deps = linkRun({ linkedName: 'Omar' });
-      await run(deps);
+      const { logs } = await run(deps);
 
-      expect(deps.saveIdentity).not.toHaveBeenCalled();
+      expect(logs).not.toMatch(/now named/i);
+      expect(deps.saveIdentity).toHaveBeenCalledWith(expect.objectContaining({
+        display_name: 'Omar',
+        secret_token: 'fresh-device-token',
+      }));
     });
 
-    it('does not write an identity.json that is not there', async () => {
+    it('registers nothing when there is no identity.json to hold the credential', async () => {
       const deps = linkRun({ linkedName: 'Om', local: null });
-      const { rc } = await run(deps);
+      const { rc, logs } = await run(deps);
 
       expect(rc).toBe(0);
+      // A credential with nowhere to live is a device row the person can see and
+      // no machine can use, so it is never minted.
+      expect(deps.apiRegisterDevice).not.toHaveBeenCalled();
       expect(deps.saveIdentity).not.toHaveBeenCalled();
+      expect(logs).toContain('token-derby login');
+    });
+
+    describe('when registration fails', () => {
+      const failing = () => vi.fn().mockRejectedValue(new ApiError('RATE_LIMITED', 'Too many device registrations.', 429));
+
+      it('still succeeds, because the link itself already landed', async () => {
+        const deps = linkRun({ register: failing() });
+        const { rc, logs } = await run(deps);
+
+        // State, not just wording: the link is reported done and the command
+        // does not present a completed link as a total failure.
+        expect(rc).toBe(0);
+        expect(logs).toContain('✓ Linked to omar@stackone.com.');
+        expect(logs).toMatch(/linked — that part is done/i);
+      });
+
+      it('names `token-derby login` as the way to finish', async () => {
+        const deps = linkRun({ register: failing() });
+        const { logs } = await run(deps);
+
+        expect(logs).toContain('token-derby login');
+      });
+
+      it('never writes a credential it did not receive', async () => {
+        const deps = linkRun({ linkedName: 'Omar', register: failing() });
+        await run(deps);
+
+        // Nothing to write: the name was unchanged and no token came back, so
+        // identity.json keeps the working legacy credential rather than being
+        // clobbered with a placeholder.
+        expect(deps.saveIdentity).not.toHaveBeenCalled();
+      });
+
+      it('still lands the rename, which is the write this command always owed', async () => {
+        const deps = linkRun({ linkedName: 'Om', register: failing() });
+        await run(deps);
+
+        expect(deps.saveIdentity).toHaveBeenCalledTimes(1);
+        const written = deps.saveIdentity.mock.calls[0]![0] as Identity;
+        expect(written.display_name).toBe('Om');
+        // The credential survives untouched — the machine is still on the
+        // legacy token and has to keep working with it until `login` runs.
+        expect(written.secret_token).toBe('legacy-account-token');
+      });
+
+      it('does not roll the link back or re-run it', async () => {
+        const deps = linkRun({ register: failing() });
+        const { logs } = await run(deps);
+
+        // Two calls: the initial already-linked check and the one poll that saw
+        // the email. A retry loop here would re-open a window that is closed.
+        expect(deps.apiGetJockey).toHaveBeenCalledTimes(2);
+        expect(logs).not.toMatch(/run `token-derby link` again/i);
+      });
+    });
+
+    describe('naming this machine', () => {
+      it('takes --device-name over anything else, without prompting', async () => {
+        const deps = linkRun();
+        const promptText = vi.fn().mockResolvedValue('typed-name');
+        await run(deps, ['--device-name', 'flag-name'], { isTTY: true, promptText });
+
+        expect(deps.apiRegisterDevice).toHaveBeenCalledWith({ label: 'flag-name' });
+        expect(promptText).not.toHaveBeenCalled();
+      });
+
+      it('accepts --device-name=<name> too', async () => {
+        const deps = linkRun();
+        await run(deps, ['--device-name=equals-name'], { isTTY: true, promptText: vi.fn() });
+
+        expect(deps.apiRegisterDevice).toHaveBeenCalledWith({ label: 'equals-name' });
+      });
+
+      it('prompts with the hostname pre-filled when there is a TTY and no flag', async () => {
+        const deps = linkRun();
+        const promptText = vi.fn().mockResolvedValue('typed-name');
+        await run(deps, [], { isTTY: true, promptText });
+
+        expect(promptText).toHaveBeenCalledWith(expect.stringContaining('omars-macbook'));
+        expect(deps.apiRegisterDevice).toHaveBeenCalledWith({ label: 'typed-name' });
+      });
+
+      it('keeps the hostname when the prompt is answered with nothing', async () => {
+        const deps = linkRun();
+        await run(deps, [], { isTTY: true, promptText: vi.fn().mockResolvedValue('   ') });
+
+        expect(deps.apiRegisterDevice).toHaveBeenCalledWith({ label: 'omars-macbook' });
+      });
+
+      it('falls back to the hostname with no TTY, without waiting on a prompt', async () => {
+        const deps = linkRun();
+        // A prompt that never settles: if the no-TTY path ever asked, this test
+        // would hang rather than fail, which is exactly the production symptom
+        // (a `link` in CI or over SSH stuck forever on a question nothing answers).
+        const promptText = vi.fn(() => new Promise<string>(() => {}));
+        const { rc } = await run(deps, [], { isTTY: false, promptText });
+
+        expect(rc).toBe(0);
+        expect(promptText).not.toHaveBeenCalled();
+        expect(deps.apiRegisterDevice).toHaveBeenCalledWith({ label: 'omars-macbook' });
+      });
+
+      it('never attaches to stdin with no TTY, so it runs unattended over SSH or in CI', async () => {
+        const stdinOn = vi.spyOn(process.stdin, 'on');
+        const deps = linkRun();
+        try {
+          const { rc } = await run(deps, [], { isTTY: false, promptText: undefined });
+          expect(rc).toBe(0);
+        } finally {
+          stdinOn.mockRestore();
+        }
+
+        // The real prompt builds a readline interface, which attaches to stdin.
+        // With promptText left at its default, this is the guard that the no-TTY
+        // path genuinely never reaches it — and the label proves the naming path
+        // actually ran, so this cannot pass by registering nothing.
+        expect(stdinOn).not.toHaveBeenCalled();
+        expect(deps.apiRegisterDevice).toHaveBeenCalledWith({ label: 'omars-macbook' });
+      });
     });
 
     it('brings a stale local name back in line on an already-linked account', async () => {
@@ -251,34 +402,49 @@ describe('linkCommand', () => {
       );
       const loadIdentity = vi.fn().mockResolvedValue(identity({ display_name: 'Omar' }));
       const saveIdentity = vi.fn().mockResolvedValue(undefined);
+      const apiRegisterDevice = okRegister();
       const con = captureConsole();
 
       let rc: number;
       try {
-        rc = await linkCommand({ apiGetJockey, apiCreateWebSession: vi.fn(), loadIdentity, saveIdentity, sleepImpl: vi.fn() });
+        rc = await linkCommand([], {
+          ...baseDeps(), apiGetJockey, apiCreateWebSession: vi.fn(), apiRegisterDevice,
+          loadIdentity, saveIdentity,
+        });
       } finally {
         con.restore();
       }
 
       expect(rc).toBe(0);
-      expect(saveIdentity).toHaveBeenCalledWith(expect.objectContaining({ display_name: 'Om' }));
+      // The name is synced, and the credential is left exactly as it was: this
+      // branch did no linking, so it has nothing to migrate.
+      expect(saveIdentity).toHaveBeenCalledWith(expect.objectContaining({
+        display_name: 'Om',
+        secret_token: 'legacy-account-token',
+      }));
+      expect(apiRegisterDevice).not.toHaveBeenCalled();
     });
   });
 
   it('surfaces an ApiError from the initial check without minting a grant', async () => {
     const apiGetJockey = vi.fn().mockRejectedValue(new ApiError('UNAUTHENTICATED', 'no credential', 401));
     const apiCreateWebSession = vi.fn();
+    const apiRegisterDevice = okRegister();
     const con = captureConsole();
 
     let rc: number;
     try {
-      rc = await linkCommand({ apiGetJockey, apiCreateWebSession, loadIdentity: vi.fn().mockResolvedValue(null), saveIdentity: vi.fn() });
+      rc = await linkCommand([], {
+        ...baseDeps(), apiGetJockey, apiCreateWebSession, apiRegisterDevice,
+        loadIdentity: vi.fn().mockResolvedValue(null), saveIdentity: vi.fn(),
+      });
     } finally {
       con.restore();
     }
 
     expect(rc).toBe(1);
     expect(apiCreateWebSession).not.toHaveBeenCalled();
+    expect(apiRegisterDevice).not.toHaveBeenCalled();
     // Not a bare `Error: UNAUTHENTICATED Invalid token`: this is the revoked
     // -machine state, and `logout` already names the cause and the next step.
     const errors = con.errors.join('\n');

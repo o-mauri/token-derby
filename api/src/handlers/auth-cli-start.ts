@@ -1,29 +1,18 @@
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import type { ApiHandler } from '../lib/http.js';
 import type { CliAuthStartRequest, CliAuthStartResponse } from '@token-derby/shared';
-import { DEVICE_LABEL_MAX_LENGTH, CLI_AUTH_TTL_SECONDS, CLI_AUTH_POLL_INTERVAL_SECONDS } from '@token-derby/shared';
+import { CLI_AUTH_TTL_SECONDS, CLI_AUTH_POLL_INTERVAL_SECONDS } from '@token-derby/shared';
 import { ok, err, parseJson } from '../lib/http.js';
 import { originOf } from '../lib/oauth.js';
 import { generateJoinCode, generateSecretToken } from '../lib/codes.js';
 import { putCliAuthRequest, UserCodeCollisionError } from '../db/cli-auth-requests.js';
 import { recordAttempt, CLI_START_BUCKET, CLI_START_LIMIT } from '../db/rate-limits.js';
 import { authenticate } from '../lib/auth.js';
+import { validateDeviceLabel } from '../lib/device-label.js';
 
 // user_code is 6 chars over a 32-char alphabet (~1e9 space); this many
 // collisions in a row is not a real-world case, only a stuck loop guard.
 const MAX_USER_CODE_ATTEMPTS = 10;
-
-// C0/C1 controls (\p{Cc}) and Unicode format characters (\p{Cf} — zero-width
-// characters, bidi overrides like U+202E). The label is shown verbatim on the
-// /cli approval page as the human's "second thing to compare against their
-// terminal"; either category lets a device rewrite how its own name reads
-// without visibly matching what the person typed, or make two different
-// labels render identically. Rejected at intake, not stripped or escaped at
-// render, so a device sees its name was refused rather than silently
-// getting a different one back. Deliberately narrow: accented letters, CJK,
-// Cyrillic and a curly apostrophe are all outside these two categories and
-// stay allowed.
-const UNSAFE_LABEL_CHARS = /[\p{Cc}\p{Cf}]/u;
 
 /**
  * Rate-limit subject. A signed-in relink is charged to the identity; an
@@ -41,16 +30,9 @@ function rateLimitSubject(event: APIGatewayProxyEventV2, user_id: string | undef
 
 export const handler: ApiHandler = async (event) => {
   const body = parseJson<CliAuthStartRequest>(event.body);
-  if (!body || typeof body.label !== 'string') {
-    return err('BAD_REQUEST', 'label is required');
-  }
-  const label = body.label.trim();
-  if (label.length < 1 || label.length > DEVICE_LABEL_MAX_LENGTH) {
-    return err('BAD_REQUEST', `label must be 1–${DEVICE_LABEL_MAX_LENGTH} characters`);
-  }
-  if (UNSAFE_LABEL_CHARS.test(label)) {
-    return err('BAD_REQUEST', 'label may not contain control or invisible characters');
-  }
+  const validated = validateDeviceLabel(body?.label);
+  if (!validated.ok) return err('BAD_REQUEST', validated.message);
+  const label = validated.label;
 
   // Unauthenticated endpoint: a machine with no identity.json is the primary
   // case. But if valid CLI credentials ARE attached, this is a relink rather
