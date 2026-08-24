@@ -1543,6 +1543,35 @@ body.tv .race-header .meta .btn {
   font-size: 0.9rem;
 }
 
+/* ── Google account linking ("/link": render/link-google.ts) ─────────────── */
+
+.link-google {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 32px;
+  text-align: center;
+}
+.link-google h1 {
+  margin: 0;
+  color: var(--accent);
+  font-size: clamp(1.6rem, 5vw, 2.4rem);
+  letter-spacing: 0.06em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4em;
+}
+.link-google-explain,
+.link-google-status {
+  max-width: 46ch;
+  margin: 0;
+  color: var(--muted);
+}
+
 /* Signed-in shell (org-manager/index.ts): sidebar + tabs + tab body. */
 .org-manager {
   flex: 1;
