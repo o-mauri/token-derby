@@ -84,6 +84,42 @@ describe('bin.ts command registration order', () => {
     expect(exitSpy).toHaveBeenCalledWith(0);
   });
 
+  it('does not reach `link` when there is no identity — it requires the local account it connects', async () => {
+    vi.doMock('../src/identity/identity.js', () => ({
+      loadIdentity: vi.fn().mockResolvedValue(null),
+    }));
+    const linkCommand = vi.fn().mockResolvedValue(0);
+    vi.doMock('../src/commands/link.js', () => ({ linkCommand }));
+
+    process.argv = ['node', 'bin.js', 'link'];
+
+    await import('../src/bin.js');
+    await settle();
+
+    expect(linkCommand).not.toHaveBeenCalled();
+    const errorText = errorSpy.mock.calls.map((c: unknown[]) => c.join(' ')).join('\n');
+    expect(errorText).toContain('token-derby init');
+    expect(exitSpy).toHaveBeenCalledWith(1);
+  });
+
+  it('reaches `link` once an identity is on disk', async () => {
+    vi.doMock('../src/identity/identity.js', () => ({
+      loadIdentity: vi.fn().mockResolvedValue({
+        user_id: 'u', display_name: 'D', secret_token: 't', created_at: '2026-01-01T00:00:00Z',
+      }),
+    }));
+    const linkCommand = vi.fn().mockResolvedValue(0);
+    vi.doMock('../src/commands/link.js', () => ({ linkCommand }));
+
+    process.argv = ['node', 'bin.js', 'link'];
+
+    await import('../src/bin.js');
+    await settle();
+
+    expect(linkCommand).toHaveBeenCalledTimes(1);
+    expect(exitSpy).toHaveBeenCalledWith(0);
+  });
+
   it('control: a command that is NOT one of the escape hatches still hits the identity gate with no identity', async () => {
     vi.doMock('../src/identity/identity.js', () => ({
       loadIdentity: vi.fn().mockResolvedValue(null),
@@ -122,6 +158,10 @@ describe('bin.ts command registration order', () => {
     }
 
     // Proves the block was actually found, so this cannot pass by matching nothing.
+    // Known limit: the regex needs a 2+-space gap to locate the description, so a
+    // single-space typo is skipped rather than flagged, and two command lines
+    // legitimately carry no inline description at all. Tightening this to "every
+    // command line matched" gives a false failure on those two.
     const matched = [...columns.values()].reduce((n, ls) => n + ls.length, 0);
     expect(matched).toBeGreaterThan(12);
     expect([...columns.keys()]).toHaveLength(1);

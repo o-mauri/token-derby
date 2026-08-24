@@ -5,11 +5,11 @@ import { ApiError } from '../api/client.js';
 
 type Deps = { spawnImpl?: typeof spawn };
 
-function webOrigin(): string {
+export function webOrigin(): string {
   return apiBase().replace(/\/api\/?$/, '');
 }
 
-function opener(): string | null {
+export function opener(): string | null {
   if (process.platform === 'darwin') return 'open';
   if (process.platform === 'win32') return 'start';
   if (process.platform === 'linux') return 'xdg-open';

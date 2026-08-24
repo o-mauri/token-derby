@@ -8,6 +8,7 @@ import { endCommand } from './commands/end.js';
 import { initCommand } from './commands/init.js';
 import { loginCommand } from './commands/login.js';
 import { logoutCommand } from './commands/logout.js';
+import { linkCommand } from './commands/link.js';
 import { updateCommand } from './commands/update.js';
 import { rollCommand } from './commands/roll.js';
 import { claimCommand } from './commands/claim.js';
@@ -25,10 +26,14 @@ Identity:
   token-derby init --reset                Wipe local identity and create a fresh account.
                                           Your previous stable is abandoned on the server.
   token-derby login [--device-name <name>]
-                                          Sign in with your Google account and link this
-                                          machine to your existing jockey.
+                                          Sign in with your Google account to give this
+                                          machine a credential for your jockey. Does not
+                                          add an email to your account — see \`link\`.
   token-derby logout                      Retire this machine's credential and clear
                                           local identity.
+  token-derby link                        Connect your jockey to a Google account (adds
+                                          your email on file). Does not authorize a new
+                                          machine — see \`login\`.
 
 Maintenance:
   token-derby update                      Check for and install the latest CLI version
@@ -119,6 +124,7 @@ async function main(): Promise<number> {
     return createRaceCommand(orgName);
   }
   if (cmd === 'logout') return logoutCommand();
+  if (cmd === 'link')   return linkCommand();
   if (cmd === 'join')   return joinCommand(argv[1], argv.slice(2));
   if (cmd === 'end')    return endCommand(argv[1]);
   if (cmd === 'roll')      return rollCommand();
