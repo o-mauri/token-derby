@@ -42,7 +42,7 @@ export async function joinCommand(joinCode: string | undefined, argv: string[] =
   const identity = await loadIdentity();
   if (!identity) {
     // Defensive — bin.ts already checks. Kept so this command is self-contained.
-    console.error('Run `token-derby init` to set up your identity.');
+    console.error('Run `token-derby login` to set up your identity.');
     return 1;
   }
 

@@ -22,10 +22,11 @@ import { loadIdentity } from './identity/identity.js';
 const HELP = `token-derby v${CLI_VERSION}
 
 Identity:
-  token-derby init                        Set up your jockey identity (run this first)
-                                          Re-running renames you on the server.
-  token-derby init --reset                Wipe local identity and create a fresh account.
-                                          Your previous stable is abandoned on the server.
+  token-derby init                        Deprecated — creates or renames your jockey identity;
+                                          prefer \`login\`, which also links your account.
+  token-derby init --reset                Deprecated — wipes local identity and starts a fresh
+                                          account (previous stable abandoned); \`login\` recovers
+                                          your existing account instead of abandoning it.
   token-derby login [--device-name <name>]
                                           Sign in with your Google account to give this
                                           machine a credential for your jockey. Does not
@@ -99,7 +100,7 @@ async function main(): Promise<number> {
   // Every other command requires an identity. `init`, `update`, and `env` are the only escape hatches.
   const identity = await loadIdentity();
   if (!identity) {
-    console.error('Run `token-derby init` to set up your identity before using any other command.');
+    console.error('Run `token-derby login` to set up your identity before using any other command.');
     return 1;
   }
 

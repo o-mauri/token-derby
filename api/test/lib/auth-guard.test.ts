@@ -197,3 +197,13 @@ describe('authenticate throttles device last_seen_at writes', () => {
     spy.mockRestore();
   });
 });
+
+describe('the unknown-user message names a command that exists', () => {
+  it('directs a caller with an unrecognised user_id at login, not at init', async () => {
+    const res = await authenticate(ev(randomUUID(), 'whatever'));
+    // Not a substring check: `init` also appears in other guidance, and this
+    // string is the server's, so it reaches every client version including old
+    // ones. Naming a command that is going away would age badly.
+    expect('error' in res && res.error).toBe('Unknown user — run `token-derby login` to create one');
+  });
+});

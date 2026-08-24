@@ -46,7 +46,7 @@ export async function authenticate(
 
   const user = await getUserById(rawId);
   if (!user) {
-    return { error: 'Unknown user — run `token-derby init` to create one' };
+    return { error: 'Unknown user — run `token-derby login` to create one' };
   }
 
   const providedHash = hashSecretToken(rawToken);

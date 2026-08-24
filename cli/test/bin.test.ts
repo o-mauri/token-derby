@@ -62,7 +62,7 @@ describe('bin.ts command registration order', () => {
 
     expect(logoutCommand).not.toHaveBeenCalled();
     const errorText = errorSpy.mock.calls.map((c: unknown[]) => c.join(' ')).join('\n');
-    expect(errorText).toContain('token-derby init');
+    expect(errorText).toContain('token-derby login');
     expect(exitSpy).toHaveBeenCalledWith(1);
   });
 
@@ -98,7 +98,7 @@ describe('bin.ts command registration order', () => {
 
     expect(linkCommand).not.toHaveBeenCalled();
     const errorText = errorSpy.mock.calls.map((c: unknown[]) => c.join(' ')).join('\n');
-    expect(errorText).toContain('token-derby init');
+    expect(errorText).toContain('token-derby login');
     expect(exitSpy).toHaveBeenCalledWith(1);
   });
 
@@ -134,7 +134,7 @@ describe('bin.ts command registration order', () => {
 
     expect(whoamiCommand).not.toHaveBeenCalled();
     const errorText = errorSpy.mock.calls.map((c: unknown[]) => c.join(' ')).join('\n');
-    expect(errorText).toContain('token-derby init');
+    expect(errorText).toContain('token-derby login');
     expect(exitSpy).toHaveBeenCalledWith(1);
   });
 
@@ -170,8 +170,25 @@ describe('bin.ts command registration order', () => {
 
     expect(joinCommand).not.toHaveBeenCalled();
     const errorText = errorSpy.mock.calls.map((c: unknown[]) => c.join(' ')).join('\n');
-    expect(errorText).toContain('token-derby init');
+    expect(errorText).toContain('token-derby login');
     expect(exitSpy).toHaveBeenCalledWith(1);
+  });
+
+
+  it('marks both init entries as deprecated and points at login', async () => {
+    vi.doMock('../src/identity/identity.js', () => ({
+      loadIdentity: vi.fn().mockResolvedValue(null),
+    }));
+    process.argv = ['node', 'bin.js', '--help'];
+    await import('../src/bin.js');
+    await settle();
+
+    const help = logSpy.mock.calls.map((c: unknown[]) => c.join(' ')).join('\n');
+    // Both entries, not just one: --reset is the destructive path and the one
+    // most likely to be reached for by someone who should be running login.
+    const initLines = help.split('\n').filter((l) => /^\s+token-derby init/.test(l));
+    expect(initLines).toHaveLength(2);
+    for (const line of initLines) expect(line).toMatch(/Deprecated/);
   });
 
   it('aligns every help description in the same column', async () => {
