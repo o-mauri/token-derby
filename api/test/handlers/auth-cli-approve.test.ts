@@ -352,7 +352,7 @@ describe('auth-cli-approve', () => {
         headers: { 'x-user-id': user.user_id, 'x-user-token': row!.issued_token! },
         requestContext: {} as any, isBase64Encoded: false,
       } as APIGatewayProxyEventV2);
-      expect(auth).toEqual({ user_id: user.user_id, display_name: 'FreshCliUser' });
+      expect(auth).toEqual({ user_id: user.user_id, display_name: 'FreshCliUser', device_label: 'kitchen-laptop' });
     });
 
     it('works for a brand-new SSO account that has no CLI credential at all', async () => {
@@ -370,7 +370,7 @@ describe('auth-cli-approve', () => {
         headers: { 'x-user-id': user_id, 'x-user-token': row!.issued_token! },
         requestContext: {} as any, isBase64Encoded: false,
       } as APIGatewayProxyEventV2);
-      expect(auth).toEqual({ user_id, display_name: 'SsoNewcomer' });
+      expect(auth).toEqual({ user_id, display_name: 'SsoNewcomer', device_label: 'first-machine' });
     });
 
     it('links a request whose link_to_user_id matches the caller, onto that same account', async () => {
@@ -493,8 +493,11 @@ describe('auth-cli-approve', () => {
 
   describe('the rate limit', () => {
     /** Burns budget the cheap way, so a boundary test does not need 20 HTTP calls. */
+    // One write, not `times` of them: the counter is what matters, not how
+    // many calls got it there. Serialising hundreds of round-trips per case
+    // was slow enough to time out under full-suite load.
     async function charge(user_id: string, times: number): Promise<void> {
-      for (let i = 0; i < times; i++) await recordAttempt(CLI_APPROVE_BUCKET, user_id);
+      await recordAttempt(CLI_APPROVE_BUCKET, user_id, Date.now(), times);
     }
 
     it('allows the attempt that lands exactly on the limit', async () => {

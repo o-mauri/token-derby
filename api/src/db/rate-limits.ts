@@ -48,11 +48,16 @@ export const CLI_POLL_LIMIT = 240;
 /**
  * Fixed-window counter. One atomic ADD that returns the new value, so there is
  * no read-then-write race and no lock. Returns the count including this attempt.
+ *
+ * `count` exists so a test can put the counter at a limit in one write instead of
+ * a few hundred. Production always charges one; the limits here run to 400, and
+ * serialising that many round-trips per case was slow enough to time out.
  */
 export async function recordAttempt(
   bucket: string,
   subject: string,
   nowMs: number = Date.now(),
+  count = 1,
 ): Promise<number> {
   const windowStart = Math.floor(nowMs / 1000 / WINDOW_SECONDS) * WINDOW_SECONDS;
   const { Attributes } = await ddb.send(new UpdateCommand({
@@ -61,7 +66,7 @@ export async function recordAttempt(
     UpdateExpression: 'ADD attempts :one SET #ttl = :ttl',
     ExpressionAttributeNames: { '#ttl': 'ttl' },
     ExpressionAttributeValues: {
-      ':one': 1,
+      ':one': count,
       ':ttl': windowStart + WINDOW_SECONDS * 2,
     },
     ReturnValues: 'UPDATED_NEW',

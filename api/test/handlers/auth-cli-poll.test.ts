@@ -246,8 +246,11 @@ describe('auth-cli-poll', () => {
   });
 
   describe('the rate limit', () => {
+    // One write, not `times` of them: the counter is what matters, not how
+    // many calls got it there. Serialising hundreds of round-trips per case
+    // was slow enough to time out under full-suite load.
     async function charge(device_code: string, times: number): Promise<void> {
-      for (let i = 0; i < times; i++) await recordAttempt(CLI_POLL_BUCKET, device_code);
+      await recordAttempt(CLI_POLL_BUCKET, device_code, Date.now(), times);
     }
 
     it('allows the poll that lands exactly on the limit', async () => {

@@ -290,8 +290,11 @@ describe('auth-cli-start', () => {
       });
     }
 
+    // One write, not `times` of them: the counter is what matters, not how
+    // many calls got it there. Serialising hundreds of round-trips per case
+    // was slow enough to time out under full-suite load.
     async function charge(subject: string, times: number): Promise<void> {
-      for (let i = 0; i < times; i++) await recordAttempt(CLI_START_BUCKET, subject);
+      await recordAttempt(CLI_START_BUCKET, subject, Date.now(), times);
     }
 
     it('allows the start that lands exactly on the limit', async () => {
