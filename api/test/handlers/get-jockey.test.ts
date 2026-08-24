@@ -64,4 +64,31 @@ describe('get-jockey handler', () => {
     expect(body.user_id).toBe(user_id);
     expect(body.email).toBe(email);
   });
+
+  it('omits device_label entirely for a legacy (account-level) credential', async () => {
+    const user_id = randomUUID();
+    await putUser(
+      { user_id, display_name: 'Legacy', created_at: new Date().toISOString() },
+      hashSecretToken('legacy-secret-2'),
+    );
+
+    const res: any = await getJockey(meEvent(user_id, 'legacy-secret-2'));
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect('device_label' in body).toBe(false);
+  });
+
+  it('includes the label of the specific device that authenticated, not another device on the account', async () => {
+    const user_id = randomUUID();
+    await createUserWithEmail({
+      user_id, email: `${user_id}@example.com`, idp_sub: `sub-${user_id}`, display_name: 'TwoDevices',
+    });
+    await putDevice({ user_id, token: 'device-one-tok', label: 'omars-laptop' });
+    await putDevice({ user_id, token: 'device-two-tok', label: 'omars-desktop' });
+
+    const res: any = await getJockey(meEvent(user_id, 'device-two-tok'));
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.device_label).toBe('omars-desktop');
+  });
 });

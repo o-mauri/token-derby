@@ -9,6 +9,7 @@ import { initCommand } from './commands/init.js';
 import { loginCommand } from './commands/login.js';
 import { logoutCommand } from './commands/logout.js';
 import { linkCommand } from './commands/link.js';
+import { whoamiCommand } from './commands/whoami.js';
 import { updateCommand } from './commands/update.js';
 import { rollCommand } from './commands/roll.js';
 import { claimCommand } from './commands/claim.js';
@@ -34,6 +35,8 @@ Identity:
   token-derby link                        Connect your jockey to a Google account (adds
                                           your email on file). Does not authorize a new
                                           machine — see \`login\`.
+  token-derby whoami                      Show your jockey name, linked email (if any),
+                                          and this machine's device name (if any).
 
 Maintenance:
   token-derby update                      Check for and install the latest CLI version
@@ -125,6 +128,7 @@ async function main(): Promise<number> {
   }
   if (cmd === 'logout') return logoutCommand();
   if (cmd === 'link')   return linkCommand();
+  if (cmd === 'whoami') return whoamiCommand();
   if (cmd === 'join')   return joinCommand(argv[1], argv.slice(2));
   if (cmd === 'end')    return endCommand(argv[1]);
   if (cmd === 'roll')      return rollCommand();

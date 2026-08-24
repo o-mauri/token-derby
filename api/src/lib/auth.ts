@@ -7,7 +7,7 @@ import { bearerToken } from './admin-auth.js';
 import { getWebSession } from '../db/web-sessions.js';
 import { hashSecretToken } from './token-hash.js';
 
-export type AuthenticatedCaller = { user_id: string; display_name: string };
+export type AuthenticatedCaller = { user_id: string; display_name: string; device_label?: string };
 export type AuthError = { error: string };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -81,7 +81,7 @@ export async function authenticate(
     await touchDevice(user.user_id, rawToken);
   }
 
-  return { user_id: user.user_id, display_name: user.display_name };
+  return { user_id: user.user_id, display_name: user.display_name, device_label: device.label };
 }
 
 export type ResolvedCaller = AuthenticatedCaller & { source: 'cli' | 'web' };

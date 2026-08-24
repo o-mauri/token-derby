@@ -135,6 +135,7 @@ export type GetJockeyResponse = {
   display_name: string;
   created_at: string;
   email?: string;
+  device_label?: string;
 };
 
 export type UpdateJockeyRequest = {

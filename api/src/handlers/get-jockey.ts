@@ -16,6 +16,7 @@ export const handler: ApiHandler = async (event) => {
     display_name: user.display_name,
     created_at: user.created_at,
     ...(user.email ? { email: user.email } : {}),
+    ...(auth.device_label ? { device_label: auth.device_label } : {}),
   };
   return ok(response);
 };
