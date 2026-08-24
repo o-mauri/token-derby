@@ -406,3 +406,76 @@ describe('plain init and an unreadable identity file', () => {
     expect(con.errors.join('\n')).toContain('will not overwrite it');
   });
 });
+
+describe('plain init and an identity file that holds no credential', () => {
+  const noCredentialFile = { kind: 'no-credential' as const, reason: 'holds no credential this version can use' };
+
+  it('creates the account rather than refusing, because there is nothing to lose', async () => {
+    const initJockey = vi.fn().mockResolvedValue({ user_id: 'u9', display_name: 'Fresh', secret_token: 't9' });
+    const saveIdentity = vi.fn().mockResolvedValue(undefined);
+    const deleteIdentity = vi.fn();
+    const con = captureConsole();
+
+    let rc: number;
+    try {
+      rc = await initCommand(false, {
+        readIdentityFile: async () => noCredentialFile,
+        loadIdentity: async () => null,
+        initJockey, saveIdentity, deleteIdentity,
+        promptText: vi.fn().mockResolvedValue('Fresh'),
+        isTTY: true,
+      } as any);
+    } finally { con.restore(); }
+
+    expect(rc).toBe(0);
+    // State: an account was created and written, which is what this file did
+    // before the unreadable guard started catching it too.
+    expect(initJockey).toHaveBeenCalledWith({ display_name: 'Fresh' });
+    expect(saveIdentity).toHaveBeenCalledWith(expect.objectContaining({ secret_token: 't9' }));
+    expect(con.errors.join('\n')).not.toMatch(/will not overwrite it/);
+  });
+
+  it('says the file is being replaced instead of claiming a credential is at risk', async () => {
+    const con = captureConsole();
+    try {
+      await initCommand(false, {
+        readIdentityFile: async () => noCredentialFile,
+        loadIdentity: async () => null,
+        initJockey: vi.fn().mockResolvedValue({ user_id: 'u9', display_name: 'Fresh', secret_token: 't9' }),
+        saveIdentity: vi.fn(), deleteIdentity: vi.fn(),
+        promptText: vi.fn().mockResolvedValue('Fresh'),
+        isTTY: true,
+      } as any);
+    } finally { con.restore(); }
+
+    const out = con.logs.join('\n');
+    expect(out).toContain('holds no credential this version can use');
+    expect(out).toMatch(/replace it/);
+    // The claim that made this a regression: it was never true of this file.
+    expect(out).not.toMatch(/cannot be recovered/);
+  });
+
+  it('--reset still asks before deleting it, and says what it says about it', async () => {
+    const deleteIdentity = vi.fn().mockResolvedValue(undefined);
+    const promptText = vi.fn().mockResolvedValue('no');
+    const con = captureConsole();
+
+    let rc: number;
+    try {
+      rc = await initCommand(true, {
+        readIdentityFile: async () => noCredentialFile,
+        loadIdentity: async () => null,
+        deleteIdentity, initJockey: vi.fn(), saveIdentity: vi.fn(),
+        promptText, isTTY: true,
+      } as any);
+    } finally { con.restore(); }
+
+    // Unchanged from before: --reset deletes only on an explicit yes.
+    expect(rc).toBe(0);
+    expect(deleteIdentity).not.toHaveBeenCalled();
+    const out = con.logs.join('\n');
+    expect(out).toContain('About to delete identity.json, which holds no credential');
+    // Not the unreadable wording — nothing here is unreadable.
+    expect(out).not.toMatch(/credential inside cannot be read/);
+  });
+});

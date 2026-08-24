@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process';
 import * as os from 'node:os';
+import { validateDeviceLabel } from '@token-derby/shared';
 import { getJockey, createWebSession, registerDevice } from '../api/endpoints.js';
 import { webOrigin, opener } from './web.js';
 import { ApiError } from '../api/client.js';
@@ -57,6 +58,18 @@ export async function linkCommand(argv: string[] = [], deps: LinkDeps = {}): Pro
   const isTTY = deps.isTTY ?? Boolean(process.stdin.isTTY);
   const hostname = deps.hostname ?? (() => os.hostname());
 
+  // Checked before anything starts, not after the browser leg: the label is
+  // only sent at the very end, so a typo used to cost the whole round trip and
+  // land in the "run `token-derby login` to finish" branch.
+  const flagName = parseDeviceNameFlag(argv);
+  if (flagName !== null) {
+    const checked = validateDeviceLabel(flagName);
+    if (!checked.ok) {
+      console.error(`Error: invalid --device-name: ${checked.message}`);
+      return 1;
+    }
+  }
+
   // The server renames the jockey to the Google first name on a first link, so
   // identity.json goes stale unless it is rewritten from what the server
   // reports afterwards. Everything local reads its name from that file.
@@ -67,16 +80,35 @@ export async function linkCommand(argv: string[] = [], deps: LinkDeps = {}): Pro
   };
 
   /**
-   * The second half of the migration. A machine that got here was authenticating
-   * with the account-level credential: shared by every machine on the account,
-   * not revocable one machine at a time, and rotating it would kill the others.
+   * The second half of the migration, for a machine still authenticating with
+   * the account-level credential: shared by every machine on the account, not
+   * revocable one machine at a time, and rotating it would kill the others.
    * Register this machine and put its own credential in identity.json instead.
+   *
+   * Checked, not assumed. `login` before `link` — exactly what the two help
+   * entries invite — leaves this machine on a device credential, and minting a
+   * second one would overwrite identity.json and strand the first: valid
+   * forever, held by nothing, and indistinguishable in the Account view.
    *
    * The link has already succeeded by the time this runs, so nothing in here is
    * allowed to fail the command or undo it — the worst case is being told to run
    * `token-derby login`, which reaches the same end state.
    */
-  const registerThisMachine = async (serverName: string): Promise<void> => {
+  const registerThisMachine = async (
+    linked: Awaited<ReturnType<typeof apiGetJockey>>,
+  ): Promise<void> => {
+    const serverName = linked.display_name;
+    if (linked.device_label) {
+      // Present only when the request authenticated with a device credential,
+      // so this machine already has the revocable per-machine credential the
+      // migration exists to give it. The rename still has to land.
+      await syncLocalName(serverName);
+      console.log(`  This machine already has its own credential, "${linked.device_label}", so it`);
+      console.log('  was not registered again — a second one would leave the first live with');
+      console.log('  nothing on this machine holding it.');
+      return;
+    }
+
     const local = await loadIdentity();
     if (!local) {
       // Nothing on disk for a credential to live in, so minting one would
@@ -89,9 +121,23 @@ export async function linkCommand(argv: string[] = [], deps: LinkDeps = {}): Pro
 
     let label: string;
     try {
-      label = await resolveDeviceName(parseDeviceNameFlag(argv), isTTY, hostname(), promptText);
-      const registered = await apiRegisterDevice({ label });
-      await saveIdentity({ ...named, secret_token: registered.secret_token });
+      label = await resolveDeviceName(flagName, isTTY, hostname(), promptText);
+      for (;;) {
+        try {
+          const registered = await apiRegisterDevice({ label });
+          await saveIdentity({ ...named, secret_token: registered.secret_token });
+          break;
+        } catch (e) {
+          // The re-prompt `login` gives: the server refuses a label rather than
+          // silently changing it, and this one is asked for after the browser
+          // leg — a rejection with no retry would cost the whole round trip.
+          if (!(e instanceof ApiError && e.code === 'BAD_REQUEST' && isTTY)) throw e;
+          console.error(`  Error: ${e.message}`);
+          const retry = (await promptText('  Enter a different device name: ')).trim();
+          if (!retry) throw e;
+          label = retry;
+        }
+      }
     } catch (e) {
       // The name sync still has to land: it is the only reason this command
       // touched identity.json before device credentials existed.
@@ -194,7 +240,7 @@ export async function linkCommand(argv: string[] = [], deps: LinkDeps = {}): Pro
         console.log('  the first name on the Google account. `token-derby init` renames it again');
         console.log('  if you would rather it said something else.');
       }
-      await registerThisMachine(poll.display_name);
+      await registerThisMachine(poll);
       return 0;
     }
     if (Date.now() >= deadline) {

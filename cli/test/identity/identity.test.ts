@@ -98,6 +98,51 @@ describe('identity', () => {
       expect(state.kind === 'unreadable' && state.reason).toMatch(/fields/);
     });
 
+    it('reports an object with no secret_token key as holding no credential', async () => {
+      // A genuinely old file: it has a created_at, so it is not garbage, and no
+      // token anywhere in it, so there is nothing for `init` to destroy.
+      await fs.writeFile(path.join(tmp, 'identity.json'), JSON.stringify({
+        user_id: 'x', display_name: 'Alice', created_at: 'now',
+      }), 'utf8');
+      const state = await readIdentityFile();
+      expect(state.kind).toBe('no-credential');
+      expect(state.kind === 'no-credential' && state.reason).toMatch(/no credential/);
+    });
+
+    it('reports an empty object as holding no credential', async () => {
+      await fs.writeFile(path.join(tmp, 'identity.json'), '{}', 'utf8');
+      expect((await readIdentityFile()).kind).toBe('no-credential');
+    });
+
+    it('keeps a present-but-wrong-typed secret_token unreadable', async () => {
+      // The key is there, so something may have written a credential in a shape
+      // this version cannot read — the case that must never be overwritten.
+      await fs.writeFile(path.join(tmp, 'identity.json'), JSON.stringify({
+        user_id: 'x', display_name: 'Alice', created_at: 'now', secret_token: 12345,
+      }), 'utf8');
+      expect((await readIdentityFile()).kind).toBe('unreadable');
+    });
+
+    it('keeps a non-object JSON file unreadable rather than credential-free', async () => {
+      // `42` has no secret_token either, but nothing about it says it was ever
+      // an identity file, so it gets the cautious answer.
+      await fs.writeFile(path.join(tmp, 'identity.json'), '42', 'utf8');
+      expect((await readIdentityFile()).kind).toBe('unreadable');
+      await fs.writeFile(path.join(tmp, 'identity.json'), 'null', 'utf8');
+      expect((await readIdentityFile()).kind).toBe('unreadable');
+      await fs.writeFile(path.join(tmp, 'identity.json'), '[]', 'utf8');
+      expect((await readIdentityFile()).kind).toBe('unreadable');
+    });
+
+    it('loadIdentity still reads a credential-free file as no identity', async () => {
+      await fs.writeFile(path.join(tmp, 'identity.json'), JSON.stringify({
+        user_id: 'x', display_name: 'Alice', created_at: 'now',
+      }), 'utf8');
+      // Nothing can authenticate with it, so every caller that just wants a
+      // credential must still see nothing.
+      expect(await loadIdentity()).toBeNull();
+    });
+
     it('reports an unreadable-on-disk file as unreadable, naming the errno', async () => {
       const file = path.join(tmp, 'identity.json');
       await fs.writeFile(file, JSON.stringify({

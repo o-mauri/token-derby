@@ -1,8 +1,8 @@
 import type { ApiHandler } from '../lib/http.js';
 import type { RegisterDeviceRequest, RegisterDeviceResponse } from '@token-derby/shared';
+import { validateDeviceLabel } from '@token-derby/shared';
 import { ok, err, parseJson } from '../lib/http.js';
 import { authenticate } from '../lib/auth.js';
-import { validateDeviceLabel } from '../lib/device-label.js';
 import { generateSecretToken } from '../lib/codes.js';
 import { putDevice } from '../db/devices.js';
 import { recordAttempt, DEVICE_REGISTER_BUCKET, DEVICE_REGISTER_LIMIT } from '../db/rate-limits.js';
@@ -14,14 +14,15 @@ import { recordAttempt, DEVICE_REGISTER_BUCKET, DEVICE_REGISTER_LIMIT } from '..
  * shared across every machine and cannot be revoked per-machine, and rotating
  * it would kill the others.
  *
- * It grants no new authority, which is worth stating because the missing
- * browser approval invites a second look. The caller must already present a
- * working CLI credential, and what they get back is STRICTLY LESS powerful: a
- * device credential is revocable on its own row, where the legacy account-level
- * one is not. Anyone who can reach this already holds something better than
- * what it hands out. Browser approval exists in the device-code flow to prove a
- * human is present and that the machine is theirs — a caller presenting a valid
- * credential has already established both.
+ * Skipping browser approval is only defensible for that one caller. A legacy
+ * caller hands over the account-level token and gets back something strictly
+ * weaker — revocable on its own row, where the token it presented is not — so
+ * there is no new authority to approve. A caller presenting a DEVICE credential
+ * is the opposite case: what it presents is revocable and what it would receive
+ * is a second row the first one's revocation does not touch, so a leaked
+ * credential could outlive its own eviction and re-mint indefinitely. Hence the
+ * device_label guard below: it holds the endpoint to the scope this docstring
+ * can actually justify, which is also all `link` ever needs.
  *
  * `authenticate`, not `resolveCaller`: this registers the machine that made the
  * request, and a web session has no machine behind it to register.
@@ -29,6 +30,17 @@ import { recordAttempt, DEVICE_REGISTER_BUCKET, DEVICE_REGISTER_LIMIT } from '..
 export const handler: ApiHandler = async (event) => {
   const caller = await authenticate(event);
   if ('error' in caller) return err('UNAUTHENTICATED', caller.error);
+
+  // Set only on the device-credential path in `authenticate`, so its presence
+  // is the whole test. Refused before the rate-limit charge: a caller this
+  // endpoint is not for must not spend the budget `link` needs.
+  if (caller.device_label) {
+    return err(
+      'BAD_REQUEST',
+      'This machine already has its own device credential, so there is nothing to migrate. ' +
+      'Revoking it is how it stops working; use `token-derby login` to add another machine.',
+    );
+  }
 
   const body = parseJson<RegisterDeviceRequest>(event.body);
   const validated = validateDeviceLabel(body?.label);

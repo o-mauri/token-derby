@@ -331,6 +331,68 @@ describe('linkCommand', () => {
       });
     });
 
+    describe('a machine that already has its own credential', () => {
+      /** `login` then `link`: the machine polls on a device credential. */
+      function alreadyDeviceRun(overrides: { linkedName?: string } = {}) {
+        const linkedName = overrides.linkedName ?? 'Omar';
+        const apiGetJockey = vi.fn()
+          .mockResolvedValueOnce(jockey({ display_name: 'Omar', device_label: 'omars-macbook' }))
+          .mockResolvedValueOnce(jockey({
+            display_name: linkedName, email: 'omar@stackone.com', device_label: 'omars-macbook',
+          }));
+        const loadIdentity = vi.fn().mockResolvedValue(
+          identity({ display_name: 'Omar', secret_token: 'device-token-1' }),
+        );
+        return {
+          apiGetJockey, loadIdentity,
+          saveIdentity: vi.fn().mockResolvedValue(undefined),
+          apiRegisterDevice: okRegister(),
+        };
+      }
+
+      it('links the email and registers nothing', async () => {
+        const deps = alreadyDeviceRun();
+        const { rc, logs } = await run(deps);
+
+        expect(rc).toBe(0);
+        expect(logs).toContain('✓ Linked to omar@stackone.com.');
+        // The credential this machine holds is the one a revoke is supposed to
+        // kill. A second one would survive that revoke with nothing on disk
+        // holding it — invisible in the Account view next to the live row.
+        expect(deps.apiRegisterDevice).not.toHaveBeenCalled();
+      });
+
+      it('leaves the credential on disk exactly as it found it', async () => {
+        const deps = alreadyDeviceRun();
+        await run(deps);
+
+        // Nothing was minted, so nothing may overwrite the working credential.
+        expect(deps.saveIdentity).not.toHaveBeenCalled();
+      });
+
+      it('says why, naming the credential it already has', async () => {
+        const deps = alreadyDeviceRun();
+        const { logs } = await run(deps);
+
+        // Silence here reads as "registration failed" on a command whose own
+        // help text promises to register the machine.
+        expect(logs).toMatch(/already has its own credential, "omars-macbook"/);
+        expect(logs).not.toMatch(/is now registered as/);
+      });
+
+      it('still lands the rename the link caused', async () => {
+        const deps = alreadyDeviceRun({ linkedName: 'Om' });
+        await run(deps);
+
+        // The write this command has always owed, independent of devices.
+        expect(deps.apiRegisterDevice).not.toHaveBeenCalled();
+        expect(deps.saveIdentity).toHaveBeenCalledWith(expect.objectContaining({
+          display_name: 'Om',
+          secret_token: 'device-token-1',
+        }));
+      });
+    });
+
     describe('naming this machine', () => {
       it('takes --device-name over anything else, without prompting', async () => {
         const deps = linkRun();
@@ -375,6 +437,75 @@ describe('linkCommand', () => {
         expect(rc).toBe(0);
         expect(promptText).not.toHaveBeenCalled();
         expect(deps.apiRegisterDevice).toHaveBeenCalledWith({ label: 'omars-macbook' });
+      });
+
+      it('rejects a bad --device-name before spending the browser leg', async () => {
+        const deps = linkRun();
+        const { rc, errors } = await run(deps, ['--device-name', 'laptop\nadmin']);
+
+        expect(rc).toBe(1);
+        // Nothing started: the label is only sent at the very end, so catching
+        // it here is the difference between a typo costing a message and a typo
+        // costing five minutes of waiting on a browser.
+        expect(deps.apiGetJockey).not.toHaveBeenCalled();
+        expect(deps.apiRegisterDevice).not.toHaveBeenCalled();
+        expect(errors).toMatch(/--device-name/);
+        expect(errors).toMatch(/control or invisible/);
+      });
+
+      it('rejects an over-long --device-name up front too', async () => {
+        const deps = linkRun();
+        const { rc, errors } = await run(deps, [`--device-name=${'x'.repeat(41)}`]);
+
+        expect(rc).toBe(1);
+        expect(deps.apiGetJockey).not.toHaveBeenCalled();
+        expect(errors).toMatch(/1–40 characters/);
+      });
+
+      it('lets a label the server would accept through untouched', async () => {
+        const deps = linkRun();
+        const { rc } = await run(deps, ['--device-name', "Amélie's PC"]);
+
+        // The pre-flight check must not be stricter than the server's, or it
+        // rejects names `login` accepts.
+        expect(rc).toBe(0);
+        expect(deps.apiRegisterDevice).toHaveBeenCalledWith({ label: "Amélie's PC" });
+      });
+
+      it('re-prompts when the server rejects the label, the way `login` does', async () => {
+        const register = vi.fn()
+          .mockRejectedValueOnce(new ApiError('BAD_REQUEST', 'label may not contain control or invisible characters', 400))
+          .mockResolvedValueOnce(registration());
+        const deps = linkRun({ register });
+        const promptText = vi.fn()
+          .mockResolvedValueOnce('badname')   // the device-name prompt
+          .mockResolvedValueOnce('good-name');      // the retry
+        const { rc, logs } = await run(deps, [], { isTTY: true, promptText });
+
+        expect(rc).toBe(0);
+        expect(register.mock.calls.map((c) => c[0])).toEqual([
+          { label: 'badname' }, { label: 'good-name' },
+        ]);
+        // State: the retry is what got written, and it is reported as the name.
+        expect(deps.saveIdentity).toHaveBeenCalledWith(expect.objectContaining({
+          secret_token: 'fresh-device-token',
+        }));
+        expect(logs).toMatch(/registered as "good-name"/);
+      });
+
+      it('gives up on a rejected label with no TTY rather than looping', async () => {
+        const register = vi.fn().mockRejectedValue(
+          new ApiError('BAD_REQUEST', 'label may not contain control or invisible characters', 400),
+        );
+        const deps = linkRun({ register });
+        // Would hang instead of failing if the no-TTY path ever asked.
+        const promptText = vi.fn(() => new Promise<string>(() => {}));
+        const { rc, logs } = await run(deps, [], { isTTY: false, promptText });
+
+        expect(rc).toBe(0); // the link itself still landed
+        expect(register).toHaveBeenCalledTimes(1);
+        expect(promptText).not.toHaveBeenCalled();
+        expect(logs).toContain('token-derby login');
       });
 
       it('never attaches to stdin with no TTY, so it runs unattended over SSH or in CI', async () => {

@@ -62,10 +62,12 @@ export async function initCommand(reset = false, deps: InitDeps = {}): Promise<n
     if (current.kind !== 'missing') {
       if (current.kind === 'ok') {
         console.log(`About to abandon jockey: ${current.identity.display_name}`);
-      } else {
+      } else if (current.kind === 'unreadable') {
         console.log(`About to delete identity.json, which ${current.reason}.`);
         console.log('The credential inside cannot be read, so there is no way to tell which jockey');
         console.log('this is, or whether anything else can still recover it.');
+      } else {
+        console.log(`About to delete identity.json, which ${current.reason}.`);
       }
       console.log('This deletes the local identity only — the account itself stays on the server.');
 
@@ -111,6 +113,10 @@ export async function initCommand(reset = false, deps: InitDeps = {}): Promise<n
   // so without this check plain `init` would create a new account and overwrite
   // it — destroying a legacy secret_token that cannot be recovered. --reset is
   // the path for discarding it deliberately, and it asks first.
+  //
+  // Only when it MIGHT hold a credential, though: a file with no secret_token in
+  // it has nothing to destroy, and refusing there would strand an old shape on a
+  // command that used to handle it.
   if (!reset) {
     const state = await readIdentityFile();
     if (state.kind === 'unreadable') {
@@ -118,6 +124,9 @@ export async function initCommand(reset = false, deps: InitDeps = {}): Promise<n
       console.error('It may hold a credential that cannot be recovered, so this will not overwrite it.');
       console.error('Run `token-derby login` to sign in fresh, or `token-derby init --reset` to discard it.');
       return 1;
+    }
+    if (state.kind === 'no-credential') {
+      console.log(`Your local identity file ${state.reason}, so this will replace it.`);
     }
   }
 

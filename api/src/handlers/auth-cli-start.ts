@@ -1,14 +1,17 @@
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import type { ApiHandler } from '../lib/http.js';
 import type { CliAuthStartRequest, CliAuthStartResponse } from '@token-derby/shared';
-import { CLI_AUTH_TTL_SECONDS, CLI_AUTH_POLL_INTERVAL_SECONDS } from '@token-derby/shared';
+import {
+  CLI_AUTH_TTL_SECONDS,
+  CLI_AUTH_POLL_INTERVAL_SECONDS,
+  validateDeviceLabel,
+} from '@token-derby/shared';
 import { ok, err, parseJson } from '../lib/http.js';
 import { originOf } from '../lib/oauth.js';
 import { generateJoinCode, generateSecretToken } from '../lib/codes.js';
 import { putCliAuthRequest, UserCodeCollisionError } from '../db/cli-auth-requests.js';
 import { recordAttempt, CLI_START_BUCKET, CLI_START_LIMIT } from '../db/rate-limits.js';
 import { authenticate } from '../lib/auth.js';
-import { validateDeviceLabel } from '../lib/device-label.js';
 
 // user_code is 6 chars over a 32-char alphabet (~1e9 space); this many
 // collisions in a row is not a real-world case, only a stuck loop guard.

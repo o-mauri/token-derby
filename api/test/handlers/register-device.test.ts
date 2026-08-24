@@ -150,19 +150,47 @@ describe('register-device', () => {
       expect(res.statusCode).toBe(401);
     });
 
-    it('accepts a device credential, so a registered machine can register another name', async () => {
+    it('refuses a device credential, and writes no second row', async () => {
       const user = await makeUser('DeviceChained');
       const first = JSON.parse((await registerDevice(asUser(user, { label: 'first' })) as any).body);
+      const db = await import('../../src/db/devices.js');
+      const spy = vi.spyOn(db, 'putDevice');
 
       const res: any = await registerDevice(ev({
         'x-user-id': user.user_id,
         'x-user-token': first.secret_token,
       }, { label: 'second' }));
 
-      // A device credential is a CLI credential; this endpoint hands out
-      // nothing stronger than what was presented, so there is nothing to gate.
-      expect(res.statusCode).toBe(200);
-      expect(JSON.parse(res.body).device_id).not.toBe(first.device_id);
+      // 400, not the 401 an unusable credential gets: this one authenticates
+      // fine, it is simply not what the endpoint is for.
+      expect(res.statusCode).toBe(400);
+      expect(JSON.parse(res.body).code).toBe('BAD_REQUEST');
+      expect(JSON.parse(res.body).secret_token).toBeUndefined();
+      expect(spy).not.toHaveBeenCalled();
+      // State: the account still has exactly the one machine it registered.
+      expect((await devicesOf(user)).devices.map((d: any) => d.label)).toEqual(['first']);
+      spy.mockRestore();
+    });
+
+    it('leaves a revoked device credential with no successor to fall back on', async () => {
+      const user = await makeUser('RevocationEvicts');
+      const stolen = JSON.parse((await registerDevice(asUser(user, { label: 'laptop' })) as any).body);
+
+      // The holder of a leaked credential tries to extend it — no browser, no
+      // human, no approval.
+      const extended: any = await registerDevice(ev({
+        'x-user-id': user.user_id,
+        'x-user-token': stolen.secret_token,
+      }, { label: 'laptop' }));
+      expect(extended.statusCode).toBe(400);
+
+      const db = await import('../../src/db/devices.js');
+      expect(await db.deleteDevice(user.user_id, stolen.device_id)).toBe(true);
+
+      // Revoking evicts the machine, which is the property the endpoint's
+      // docstring sells: nothing minted off the stolen credential survives it.
+      expect(await authenticates(user.user_id, stolen.secret_token)).toBe(false);
+      expect((await devicesOf(user)).devices).toHaveLength(0);
     });
 
     it('never lets a body-supplied user_id pick the account', async () => {
@@ -180,7 +208,7 @@ describe('register-device', () => {
 
   describe('label validation', () => {
     // The same rule as auth-cli-start, because both go through
-    // lib/device-label.ts — the label is rendered on the site either way.
+    // shared's validateDeviceLabel — the label is rendered on the site either way.
     async function rejects(label: unknown) {
       const user = await makeUser('LabelChecker');
       const db = await import('../../src/db/devices.js');
@@ -296,6 +324,24 @@ describe('register-device', () => {
       expect(((await registerDevice(asUser(user))) as any).statusCode).toBe(200);
     });
 
+    it('does not charge a device-credential caller the budget `link` needs', async () => {
+      const user = await makeUser('DeviceBudget');
+      const device = JSON.parse((await registerDevice(asUser(user, { label: 'laptop' })) as any).body);
+      await charge(user.user_id, DEVICE_REGISTER_LIMIT - 2); // one already spent above
+
+      // Otherwise a leaked device credential could burn the account's budget in
+      // a loop and lock the legacy machine out of `link` — the one caller this
+      // endpoint exists for.
+      for (let i = 0; i < DEVICE_REGISTER_LIMIT + 5; i++) {
+        const res: any = await registerDevice(ev({
+          'x-user-id': user.user_id, 'x-user-token': device.secret_token,
+        }, { label: 'probe' }));
+        expect(res.statusCode).toBe(400);
+      }
+
+      expect(((await registerDevice(asUser(user, { label: 'legacy-machine' }))) as any).statusCode).toBe(200);
+    });
+
     it('clears the honest count and is still a real bound', () => {
       // Derived from what the flow actually costs rather than written out, so
       // changing the limit re-checks this instead of leaving it stale.
@@ -307,10 +353,11 @@ describe('register-device', () => {
       const abandonedBrowserRetriesPerHour = 5;
       expect(DEVICE_REGISTER_LIMIT).toBeGreaterThan(registrationsPerLink * abandonedBrowserRetriesPerHour);
 
-      // Still a bound, and be honest about which one: this defends nobody's
-      // account (the caller already holds a working credential and gets back a
-      // weaker one). What it buys is that a runaway loop cannot bury the
-      // Account device list in rows the person has to revoke one at a time.
+      // Still a bound, and be honest about which one: the caller is a legacy
+      // machine handing over the account-level token and getting back a weaker
+      // credential, so this defends nobody's account. What it buys is that a
+      // runaway loop cannot bury the Account device list in rows the person has
+      // to revoke one at a time.
       const REVOCATIONS_A_PERSON_WILL_TOLERATE = 25;
       expect(DEVICE_REGISTER_LIMIT).toBeLessThan(REVOCATIONS_A_PERSON_WILL_TOLERATE);
     });

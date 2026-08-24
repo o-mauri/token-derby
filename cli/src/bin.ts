@@ -39,7 +39,7 @@ Identity:
                                           account — adds your email on file, and
                                           renames your jockey to the first name on
                                           that account. Then registers this machine
-                                          as a device too, so it stops using the
+                                          as a device too, if it is still using the
                                           shared account credential.
   token-derby whoami                      Show your jockey name, linked email (if any),
                                           and this machine's device name (if any).

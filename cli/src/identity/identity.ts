@@ -17,6 +17,7 @@ export type Identity = {
  */
 export type IdentityFileState =
   | { kind: 'missing' }
+  | { kind: 'no-credential'; reason: string }
   | { kind: 'unreadable'; reason: string }
   | { kind: 'ok'; identity: Identity };
 
@@ -28,11 +29,16 @@ export async function readIdentityFile(): Promise<IdentityFileState> {
     if (e?.code === 'ENOENT') return { kind: 'missing' };
     return { kind: 'unreadable', reason: `could not be read (${e?.code ?? 'read error'})` };
   }
-  let parsed: Partial<Identity>;
+  let parsed: unknown;
   try {
-    parsed = JSON.parse(raw) as Partial<Identity>;
+    parsed = JSON.parse(raw) as unknown;
   } catch {
     return { kind: 'unreadable', reason: 'is not valid JSON' };
+  }
+  // Valid JSON that is not an object at all — `null`, a number, an array. Read
+  // before the field checks because indexing into null throws.
+  if (!isPlainObject(parsed)) {
+    return { kind: 'unreadable', reason: 'does not contain an identity object' };
   }
   if (
     typeof parsed.user_id === 'string' &&
@@ -40,9 +46,19 @@ export async function readIdentityFile(): Promise<IdentityFileState> {
     typeof parsed.secret_token === 'string' &&
     typeof parsed.created_at === 'string'
   ) {
-    return { kind: 'ok', identity: parsed as Identity };
+    return { kind: 'ok', identity: parsed as unknown as Identity };
+  }
+  // No secret_token key at all: the file provably holds no credential, so
+  // refusing to replace it protects nothing. Narrow on purpose — a key that is
+  // present but the wrong type could be a credential this version cannot read.
+  if (!('secret_token' in parsed)) {
+    return { kind: 'no-credential', reason: 'holds no credential this version can use' };
   }
   return { kind: 'unreadable', reason: 'is missing fields this version expects' };
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 export async function loadIdentity(): Promise<Identity | null> {
