@@ -15,6 +15,7 @@ export const handler: ApiHandler = async (event) => {
     user_id: user.user_id,
     display_name: user.display_name,
     created_at: user.created_at,
+    ...(user.email ? { email: user.email } : {}),
   };
   return ok(response);
 };

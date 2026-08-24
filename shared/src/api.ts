@@ -134,6 +134,7 @@ export type GetJockeyResponse = {
   user_id: string;
   display_name: string;
   created_at: string;
+  email?: string;
 };
 
 export type UpdateJockeyRequest = {
