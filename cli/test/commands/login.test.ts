@@ -635,3 +635,26 @@ describe('loginCommand', () => {
     });
   });
 });
+
+describe('opening the browser', () => {
+  it('opens the verification URL and still prints it as the fallback', async () => {
+    const apiStart = vi.fn(async () => startResponse());
+    const apiPoll = vi.fn(async () => approvedResponse());
+    const spawnImpl = vi.fn(() => ({ on: vi.fn(), unref: vi.fn() })) as any;
+    const con = captureConsole();
+    try {
+      await loginCommand([], {
+        loadIdentity: async () => null,
+        apiStart, apiPoll, apiRevokeDevice: vi.fn(), saveIdentity: vi.fn(),
+        promptText: vi.fn(), promptYesNo: vi.fn(),
+        sleepImpl: vi.fn(), isTTY: false, hostname: () => 'my-macbook',
+        spawnImpl,
+      });
+    } finally { con.restore(); }
+
+    // Opened with the same URL it printed — not a second, differently-built one.
+    const opened = spawnImpl.mock.calls[0]?.[1]?.[0] as string | undefined;
+    expect(opened).toBeTruthy();
+    expect(con.logs.join('\n')).toContain(opened!);
+  });
+});

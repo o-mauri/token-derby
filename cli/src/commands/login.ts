@@ -1,3 +1,4 @@
+import { spawn } from 'node:child_process';
 import * as os from 'node:os';
 import type { CliAuthPollApprovedResponse } from '@token-derby/shared';
 import {
@@ -5,6 +6,7 @@ import {
   loadIdentity as loadIdentityDefault,
   type Identity,
 } from '../identity/identity.js';
+import { opener } from './web.js';
 import { cliAuthStart, cliAuthPoll, revokeDevice, createWebSession } from '../api/endpoints.js';
 import { ApiError } from '../api/client.js';
 import { promptYesNo as promptYesNoDefault } from '../ui/prompt.js';
@@ -20,6 +22,7 @@ export type LoginDeps = {
   promptYesNo?: (question: string) => Promise<boolean>;
   sleepImpl?: (ms: number) => Promise<void>;
   isTTY?: boolean;
+  spawnImpl?: typeof spawn;
   hostname?: () => string;
 };
 
@@ -76,6 +79,7 @@ export async function loginCommand(argv: string[] = [], deps: LoginDeps = {}): P
   const promptYesNo = deps.promptYesNo ?? promptYesNoDefault;
   const sleepImpl = deps.sleepImpl ?? defaultSleep;
   const isTTY = deps.isTTY ?? Boolean(process.stdin.isTTY);
+  const spawnImpl = deps.spawnImpl ?? spawn;
   const hostname = deps.hostname ?? (() => os.hostname());
 
   // A second login on the same box mints a second device credential, usually
@@ -154,6 +158,20 @@ export async function loginCommand(argv: string[] = [], deps: LoginDeps = {}): P
   console.log(`    ${start.user_code}`);
   console.log('');
   console.log('  Waiting for approval...');
+
+  // Open it rather than making the reader copy it. When a local identity exists
+  // the URL carries a 60-second grant, and copying by hand is the likeliest way
+  // to miss that window. The printed URL remains the fallback.
+  const cmd = opener();
+  if (cmd) {
+    try {
+      const child = spawnImpl(cmd, [verificationUrl], { stdio: 'ignore', detached: true });
+      child.on('error', () => { /* headless / no opener — the printed URL is the fallback */ });
+      child.unref();
+    } catch {
+      // ignore — URL already printed
+    }
+  }
 
   const deadline = Date.now() + start.expires_in * 1000;
   let approved: CliAuthPollApprovedResponse | null = null;
