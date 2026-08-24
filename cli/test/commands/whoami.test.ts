@@ -110,8 +110,8 @@ describe('whoamiCommand', () => {
     expect(out).not.toMatch(/@/);
   });
 
-  it('surfaces an ApiError without throwing', async () => {
-    const apiGetJockey = vi.fn().mockRejectedValue(new ApiError('UNAUTHENTICATED', 'no credential', 401));
+  it('names the cause and the next step for a revoked credential, not a bare error code', async () => {
+    const apiGetJockey = vi.fn().mockRejectedValue(new ApiError('UNAUTHENTICATED', 'Invalid token', 401));
     const con = captureConsole();
 
     let rc: number;
@@ -122,6 +122,25 @@ describe('whoamiCommand', () => {
     }
 
     expect(rc).toBe(1);
-    expect(con.errors.join('\n')).toContain('UNAUTHENTICATED');
+    // `logout` already says this; a bare `Error: UNAUTHENTICATED Invalid token`
+    // leaves the reader with no idea that `login` is the way out.
+    const errors = con.errors.join('\n');
+    expect(errors).toMatch(/no longer valid/i);
+    expect(errors).toContain('token-derby login');
+  });
+
+  it('still surfaces any other ApiError with its code, rather than swallowing it', async () => {
+    const apiGetJockey = vi.fn().mockRejectedValue(new ApiError('RATE_LIMITED', 'slow down', 429));
+    const con = captureConsole();
+
+    let rc: number;
+    try {
+      rc = await whoamiCommand({ apiGetJockey });
+    } finally {
+      con.restore();
+    }
+
+    expect(rc).toBe(1);
+    expect(con.errors.join('\n')).toContain('RATE_LIMITED');
   });
 });

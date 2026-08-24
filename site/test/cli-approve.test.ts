@@ -3,7 +3,7 @@ import { parseRoute } from '../src/route.js';
 import { renderCliApprove } from '../src/render/cli-approve.js';
 import * as api from '../src/org-manager/api.js';
 import { ApiError } from '../src/org-manager/api.js';
-import { setSession } from '../src/org-manager/session.js';
+import { setSession, setUid, setLinkedEmail, getUid, getLinkedEmail } from '../src/org-manager/session.js';
 
 function mockSuccessfulExchange() {
   // The real exchangeCode also calls setSession as a side effect; the mock must too.
@@ -277,7 +277,10 @@ describe('renderCliApprove: grant in the fragment', () => {
     await vi.waitFor(() => expect(window.location.hash).toBe(''));
   });
 
-  it('falls back to the login screen when the grant exchange fails', async () => {
+  // Two cases the old single test could not tell apart, because it cleared
+  // localStorage first: with no session both paths end on the sign-in screen,
+  // so the catch could be replaced with a no-op and stay green.
+  it('with no session, a failed grant exchange lands on the sign-in screen', async () => {
     window.location.hash = '#code=BAD';
     vi.spyOn(api, 'exchangeCode').mockRejectedValue(new ApiError('INVALID_GRANT', 'That link has expired.', 400));
 
@@ -285,6 +288,55 @@ describe('renderCliApprove: grant in the fragment', () => {
 
     await vi.waitFor(() => expect(root.querySelector('.org-login')).not.toBeNull());
     expect(root.querySelector('.cli-approve-form')).toBeNull();
+  });
+
+  it('keeps a session that already works when the grant exchange fails', async () => {
+    // Grants are single-use and last 60s, and `login` prints the URL as well as
+    // opening it — a second load of the same link is ordinary. Signing the user
+    // out here would, for an unlinked account, create a second jockey and make
+    // approving impossible.
+    window.location.hash = '#code=ALREADY-REDEEMED';
+    setSession('tok');
+    vi.spyOn(api, 'exchangeCode').mockRejectedValue(new ApiError('INVALID_GRANT', 'That link has expired.', 400));
+
+    cleanup = renderCliApprove(root);
+
+    await vi.waitFor(() => expect(root.querySelector('.cli-approve-form')).not.toBeNull());
+    expect(root.querySelector('.org-login')).toBeNull();
+  });
+
+  it('leaves no identity marker from the previous user attached to the new session', async () => {
+    // A shared machine: A signed into /org-manager, then B ran `token-derby
+    // login`. B's session with A's uid/email makes /org-manager show A's
+    // linked account and a false owner badge.
+    setUid('user-A');
+    setLinkedEmail('a@example.com');
+    window.location.hash = '#code=ABC';
+    mockSuccessfulExchange();
+
+    cleanup = renderCliApprove(root);
+
+    await vi.waitFor(() => expect(root.querySelector('.cli-approve-form')).not.toBeNull());
+    expect(getUid()).toBe('u1');
+    expect(getLinkedEmail()).toBeNull();
+  });
+
+  it('records the exchanged user\'s own email when they have one', async () => {
+    setLinkedEmail('a@example.com');
+    window.location.hash = '#code=ABC';
+    vi.spyOn(api, 'exchangeCode').mockImplementation(async () => {
+      setSession('tok');
+      return {
+        token: 'tok', expires_at: '2026-01-01T00:00:00Z',
+        user: { user_id: 'u2', display_name: 'Bob', email: 'b@example.com' },
+      };
+    });
+
+    cleanup = renderCliApprove(root);
+
+    await vi.waitFor(() => expect(root.querySelector('.cli-approve-form')).not.toBeNull());
+    expect(getUid()).toBe('u2');
+    expect(getLinkedEmail()).toBe('b@example.com');
   });
 });
 

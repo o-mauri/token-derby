@@ -1,7 +1,7 @@
 import { esc } from '../esc.js';
 import { horseFaceSvg } from '../horse-face.js';
 import { normaliseUserCode } from '@token-derby/shared';
-import { getSession, readCodeFromHash } from '../org-manager/session.js';
+import { getSession, readCodeFromHash, adoptExchangedUser } from '../org-manager/session.js';
 import { previewCliApprove, approveCliDevice, exchangeCode, ApiError } from '../org-manager/api.js';
 import { renderLogin } from '../org-manager/render/login.js';
 
@@ -164,10 +164,12 @@ export function renderCliApprove(root: HTMLElement): () => void {
     const code = readCodeFromHash();
     if (code) {
       try {
-        await exchangeCode(code);
+        const res = await exchangeCode(code);
+        adoptExchangedUser(res.user);
       } catch {
-        showSignInScreen();
-        return;
+        // Grants are single-use and last 60 seconds, and `login` both opens the
+        // URL and prints it — a second load is routine. Fall through to the
+        // session check rather than discarding a session that already works.
       }
     }
     if (!getSession()) {

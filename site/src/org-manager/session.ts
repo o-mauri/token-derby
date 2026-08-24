@@ -45,6 +45,15 @@ export function clearLinkedEmail(): void {
   localStorage.removeItem(LINKED_EMAIL_KEY);
 }
 
+/** Points the identity markers at whoever the just-exchanged grant belongs to.
+ *  Every code-exchange path must call this: the session token and these two
+ *  keys are read independently, so a page that sets one and not the others
+ *  leaves the previous user's id and email attached to the new session. */
+export function adoptExchangedUser(user: { user_id: string; email?: string }): void {
+  setUid(user.user_id);
+  if (user.email) setLinkedEmail(user.email); else clearLinkedEmail();
+}
+
 /** Reads `#code=<code>` from the URL fragment and wipes the fragment. */
 export function readCodeFromHash(): string | null {
   const hash = window.location.hash.replace(/^#/, '');

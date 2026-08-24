@@ -14,6 +14,16 @@ function identity(overrides: Partial<Identity> = {}): Identity {
   };
 }
 
+function okFile(overrides: Partial<Identity> = {}) {
+  return { kind: 'ok' as const, identity: identity(overrides) };
+}
+
+const missingFile = { kind: 'missing' as const };
+
+function unreadableFile(reason = 'is not valid JSON') {
+  return { kind: 'unreadable' as const, reason };
+}
+
 function jockey(overrides: Partial<GetJockeyResponse> = {}): GetJockeyResponse {
   return {
     user_id: 'user-1',
@@ -122,7 +132,8 @@ describe('initCommand', () => {
       let rc: number;
       try {
         rc = await initCommand(true, {
-          loadIdentity, deleteIdentity, initJockey, apiGetJockey, promptText, isTTY: true,
+          loadIdentity, readIdentityFile: vi.fn().mockResolvedValue(okFile({ display_name: 'Omar' })),
+          deleteIdentity, initJockey, apiGetJockey, promptText, isTTY: true,
         });
       } finally {
         con.restore();
@@ -151,7 +162,8 @@ describe('initCommand', () => {
       let rc: number;
       try {
         rc = await initCommand(true, {
-          loadIdentity, deleteIdentity, initJockey, saveIdentity, apiGetJockey, promptText, isTTY: true,
+          loadIdentity, readIdentityFile: vi.fn().mockResolvedValue(okFile({ display_name: 'Omar' })),
+          deleteIdentity, initJockey, saveIdentity, apiGetJockey, promptText, isTTY: true,
         });
       } finally {
         con.restore();
@@ -173,7 +185,8 @@ describe('initCommand', () => {
       let rc: number;
       try {
         rc = await initCommand(true, {
-          loadIdentity, deleteIdentity, initJockey, apiGetJockey, promptText, isTTY: false,
+          loadIdentity, readIdentityFile: vi.fn().mockResolvedValue(okFile({ display_name: 'Omar' })),
+          deleteIdentity, initJockey, apiGetJockey, promptText, isTTY: false,
         });
       } finally {
         con.restore();
@@ -196,7 +209,8 @@ describe('initCommand', () => {
       let rc: number;
       try {
         rc = await initCommand(true, {
-          loadIdentity, deleteIdentity, apiGetJockey, promptText, isTTY: true,
+          loadIdentity, readIdentityFile: vi.fn().mockResolvedValue(okFile({ display_name: 'Omar' })),
+          deleteIdentity, apiGetJockey, promptText, isTTY: true,
         });
       } finally {
         con.restore();
@@ -219,7 +233,8 @@ describe('initCommand', () => {
       let rc: number;
       try {
         rc = await initCommand(true, {
-          loadIdentity, deleteIdentity, apiGetJockey, promptText, isTTY: true,
+          loadIdentity, readIdentityFile: vi.fn().mockResolvedValue(okFile({ display_name: 'Omar' })),
+          deleteIdentity, apiGetJockey, promptText, isTTY: true,
         });
       } finally {
         con.restore();
@@ -247,7 +262,8 @@ describe('initCommand', () => {
       let rc: number;
       try {
         rc = await initCommand(true, {
-          loadIdentity, deleteIdentity, initJockey, saveIdentity, apiGetJockey, promptText, isTTY: true,
+          loadIdentity, readIdentityFile: vi.fn().mockResolvedValue(okFile({ display_name: 'Omar' })),
+          deleteIdentity, initJockey, saveIdentity, apiGetJockey, promptText, isTTY: true,
         });
       } finally {
         con.restore();
@@ -271,7 +287,8 @@ describe('initCommand', () => {
       let rc: number;
       try {
         rc = await initCommand(true, {
-          loadIdentity, deleteIdentity, initJockey, saveIdentity, apiGetJockey, promptText, isTTY: false,
+          loadIdentity, readIdentityFile: vi.fn().mockResolvedValue(missingFile),
+          deleteIdentity, initJockey, saveIdentity, apiGetJockey, promptText, isTTY: false,
         });
       } finally {
         con.restore();
@@ -282,5 +299,110 @@ describe('initCommand', () => {
       expect(apiGetJockey).not.toHaveBeenCalled();
       expect(initJockey).toHaveBeenCalledWith({ display_name: 'Fresh' });
     });
+
+    // The file existing and the file parsing are different questions, and the
+    // guard has to key on the first: loadIdentity returns null for a
+    // hand-edited file, an older shape, and an EACCES read alike.
+    describe('an identity.json that cannot be parsed', () => {
+      it('still warns, and says the credential itself cannot be read', async () => {
+        const loadIdentity = vi.fn().mockResolvedValue(null);
+        const deleteIdentity = vi.fn().mockResolvedValue(undefined);
+        const initJockey = vi.fn();
+        const promptText = vi.fn().mockResolvedValue('no');
+        const con = captureConsole();
+
+        let rc: number;
+        try {
+          rc = await initCommand(true, {
+            loadIdentity, readIdentityFile: vi.fn().mockResolvedValue(unreadableFile('is not valid JSON')),
+            deleteIdentity, initJockey, promptText, isTTY: true,
+          });
+        } finally {
+          con.restore();
+        }
+
+        expect(rc).toBe(0);
+        expect(deleteIdentity).not.toHaveBeenCalled();
+        const out = con.logs.join('\n');
+        expect(out).toContain('is not valid JSON');
+        expect(out).toMatch(/cannot be read/i);
+        expect(out).toContain('Reset cancelled. Nothing was deleted.');
+      });
+
+      it('refuses without a TTY, exactly as it does for a readable one', async () => {
+        const loadIdentity = vi.fn().mockResolvedValue(null);
+        const deleteIdentity = vi.fn().mockResolvedValue(undefined);
+        const initJockey = vi.fn();
+        const promptText = vi.fn();
+        const con = captureConsole();
+
+        let rc: number;
+        try {
+          rc = await initCommand(true, {
+            loadIdentity, readIdentityFile: vi.fn().mockResolvedValue(unreadableFile('could not be read (EACCES)')),
+            deleteIdentity, initJockey, promptText, isTTY: false,
+          });
+        } finally {
+          con.restore();
+        }
+
+        expect(rc).not.toBe(0);
+        expect(deleteIdentity).not.toHaveBeenCalled();
+        expect(promptText).not.toHaveBeenCalled();
+        expect(con.errors.join('\n')).toMatch(/refus/i);
+      });
+
+      it('deletes only after an explicit yes', async () => {
+        const loadIdentity = vi.fn().mockResolvedValue(null);
+        const deleteIdentity = vi.fn().mockResolvedValue(undefined);
+        const initJockey = vi.fn().mockResolvedValue({ user_id: 'u2', display_name: 'Fresh', secret_token: 't2' });
+        const saveIdentity = vi.fn().mockResolvedValue(undefined);
+        const apiGetJockey = vi.fn();
+        const promptText = vi.fn()
+          .mockResolvedValueOnce('yes')
+          .mockResolvedValueOnce('Fresh');
+        const con = captureConsole();
+
+        let rc: number;
+        try {
+          rc = await initCommand(true, {
+            loadIdentity, readIdentityFile: vi.fn().mockResolvedValue(unreadableFile()),
+            deleteIdentity, initJockey, saveIdentity, apiGetJockey, promptText, isTTY: true,
+          });
+        } finally {
+          con.restore();
+        }
+
+        expect(rc).toBe(0);
+        expect(deleteIdentity).toHaveBeenCalledTimes(1);
+        // No credential to authenticate with, so the server-side warning is
+        // skipped rather than attempted and swallowed.
+        expect(apiGetJockey).not.toHaveBeenCalled();
+        expect(initJockey).toHaveBeenCalledWith({ display_name: 'Fresh' });
+      });
+    });
+  });
+});
+
+describe('plain init and an unreadable identity file', () => {
+  it('refuses rather than overwriting a credential it cannot read', async () => {
+    const saveIdentity = vi.fn();
+    const deleteIdentity = vi.fn();
+    const con = captureConsole();
+    let rc: number;
+    try {
+      rc = await initCommand(false, {
+        readIdentityFile: async () => ({ kind: 'unreadable', reason: 'is not valid JSON' }),
+        loadIdentity: async () => null,
+        saveIdentity, deleteIdentity,
+        promptText: vi.fn(),
+      } as any);
+    } finally { con.restore(); }
+
+    expect(rc).toBe(1);
+    // State, not just the message: the whole point is that nothing was written.
+    expect(saveIdentity).not.toHaveBeenCalled();
+    expect(deleteIdentity).not.toHaveBeenCalled();
+    expect(con.errors.join('\n')).toContain('will not overwrite it');
   });
 });

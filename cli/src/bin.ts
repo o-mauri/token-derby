@@ -34,8 +34,9 @@ Identity:
   token-derby logout                      Retire this machine's credential and clear
                                           local identity.
   token-derby link                        Connect your jockey to a Google account (adds
-                                          your email on file). Does not authorize a new
-                                          machine — see \`login\`.
+                                          your email on file, and renames your jockey to
+                                          the first name on that account). Does not
+                                          authorize a new machine — see \`login\`.
   token-derby whoami                      Show your jockey name, linked email (if any),
                                           and this machine's device name (if any).
 

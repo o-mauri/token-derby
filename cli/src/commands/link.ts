@@ -2,10 +2,17 @@ import { spawn } from 'node:child_process';
 import { getJockey, createWebSession } from '../api/endpoints.js';
 import { webOrigin, opener } from './web.js';
 import { ApiError } from '../api/client.js';
+import {
+  loadIdentity as loadIdentityDefault,
+  saveIdentity as saveIdentityDefault,
+} from '../identity/identity.js';
+import { CREDENTIAL_DEAD_MESSAGE } from '../ui/messages.js';
 
 export type LinkDeps = {
   apiGetJockey?: typeof getJockey;
   apiCreateWebSession?: typeof createWebSession;
+  loadIdentity?: typeof loadIdentityDefault;
+  saveIdentity?: typeof saveIdentityDefault;
   spawnImpl?: typeof spawn;
   sleepImpl?: (ms: number) => Promise<void>;
 };
@@ -25,14 +32,29 @@ const WAIT_TIMEOUT_MS = 5 * 60 * 1_000;
 export async function linkCommand(deps: LinkDeps = {}): Promise<number> {
   const apiGetJockey = deps.apiGetJockey ?? getJockey;
   const apiCreateWebSession = deps.apiCreateWebSession ?? createWebSession;
+  const loadIdentity = deps.loadIdentity ?? loadIdentityDefault;
+  const saveIdentity = deps.saveIdentity ?? saveIdentityDefault;
   const spawnImpl = deps.spawnImpl ?? spawn;
   const sleepImpl = deps.sleepImpl ?? defaultSleep;
+
+  // The server renames the jockey to the Google first name on a first link, so
+  // identity.json goes stale unless it is rewritten from what the server
+  // reports afterwards. Everything local reads its name from that file.
+  const syncLocalName = async (serverName: string): Promise<void> => {
+    const local = await loadIdentity();
+    if (!local || local.display_name === serverName) return;
+    await saveIdentity({ ...local, display_name: serverName });
+  };
 
   let me: Awaited<ReturnType<typeof apiGetJockey>>;
   try {
     me = await apiGetJockey();
   } catch (e) {
     if (e instanceof ApiError) {
+      if (e.code === 'UNAUTHENTICATED') {
+        console.error(CREDENTIAL_DEAD_MESSAGE);
+        return 1;
+      }
       console.error(`Error: ${e.code} ${e.message}`);
       return 1;
     }
@@ -41,6 +63,7 @@ export async function linkCommand(deps: LinkDeps = {}): Promise<number> {
 
   if (me.email) {
     console.log(`Already linked to ${me.email}.`);
+    await syncLocalName(me.display_name);
     return 0;
   }
 
@@ -83,6 +106,10 @@ export async function linkCommand(deps: LinkDeps = {}): Promise<number> {
       poll = await apiGetJockey();
     } catch (e) {
       if (e instanceof ApiError) {
+        if (e.code === 'UNAUTHENTICATED') {
+          console.error(CREDENTIAL_DEAD_MESSAGE);
+          return 1;
+        }
         console.error(`Error: ${e.code} ${e.message}`);
         return 1;
       }
@@ -90,6 +117,12 @@ export async function linkCommand(deps: LinkDeps = {}): Promise<number> {
     }
     if (poll.email) {
       console.log(`✓ Linked to ${poll.email}.`);
+      if (poll.display_name !== me.display_name) {
+        console.log(`  Your jockey is now named ${poll.display_name} — a first link renames it to`);
+        console.log('  the first name on the Google account. `token-derby init` renames it again');
+        console.log('  if you would rather it said something else.');
+      }
+      await syncLocalName(poll.display_name);
       return 0;
     }
     if (Date.now() >= deadline) {

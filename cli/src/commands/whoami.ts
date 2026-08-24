@@ -1,5 +1,6 @@
 import { getJockey } from '../api/endpoints.js';
 import { ApiError } from '../api/client.js';
+import { CREDENTIAL_DEAD_MESSAGE } from '../ui/messages.js';
 
 export type WhoamiDeps = {
   apiGetJockey?: typeof getJockey;
@@ -13,6 +14,10 @@ export async function whoamiCommand(deps: WhoamiDeps = {}): Promise<number> {
     me = await apiGetJockey();
   } catch (e) {
     if (e instanceof ApiError) {
+      if (e.code === 'UNAUTHENTICATED') {
+        console.error(CREDENTIAL_DEAD_MESSAGE);
+        return 1;
+      }
       console.error(`Error: ${e.code} ${e.message}`);
       return 1;
     }

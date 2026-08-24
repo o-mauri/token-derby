@@ -10,23 +10,44 @@ export type Identity = {
   created_at: string;
 };
 
-export async function loadIdentity(): Promise<Identity | null> {
+/**
+ * Whether identity.json exists, separately from whether it can be understood.
+ * `loadIdentity` collapses both into null, which is fine for "can I make an
+ * authenticated call" but not for anything that deletes the file.
+ */
+export type IdentityFileState =
+  | { kind: 'missing' }
+  | { kind: 'unreadable'; reason: string }
+  | { kind: 'ok'; identity: Identity };
+
+export async function readIdentityFile(): Promise<IdentityFileState> {
+  let raw: string;
   try {
-    const raw = await fs.readFile(identityFile(), 'utf8');
-    const parsed = JSON.parse(raw) as Partial<Identity>;
-    if (
-      typeof parsed.user_id === 'string' &&
-      typeof parsed.display_name === 'string' &&
-      typeof parsed.secret_token === 'string' &&
-      typeof parsed.created_at === 'string'
-    ) {
-      return parsed as Identity;
-    }
-    return null;
+    raw = await fs.readFile(identityFile(), 'utf8');
   } catch (e: any) {
-    if (e?.code === 'ENOENT') return null;
-    return null;
+    if (e?.code === 'ENOENT') return { kind: 'missing' };
+    return { kind: 'unreadable', reason: `could not be read (${e?.code ?? 'read error'})` };
   }
+  let parsed: Partial<Identity>;
+  try {
+    parsed = JSON.parse(raw) as Partial<Identity>;
+  } catch {
+    return { kind: 'unreadable', reason: 'is not valid JSON' };
+  }
+  if (
+    typeof parsed.user_id === 'string' &&
+    typeof parsed.display_name === 'string' &&
+    typeof parsed.secret_token === 'string' &&
+    typeof parsed.created_at === 'string'
+  ) {
+    return { kind: 'ok', identity: parsed as Identity };
+  }
+  return { kind: 'unreadable', reason: 'is missing fields this version expects' };
+}
+
+export async function loadIdentity(): Promise<Identity | null> {
+  const state = await readIdentityFile();
+  return state.kind === 'ok' ? state.identity : null;
 }
 
 export async function saveIdentity(identity: Identity): Promise<void> {

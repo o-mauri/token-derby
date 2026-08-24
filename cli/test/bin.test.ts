@@ -186,9 +186,24 @@ describe('bin.ts command registration order', () => {
     const help = logSpy.mock.calls.map((c: unknown[]) => c.join(' ')).join('\n');
     // Both entries, not just one: --reset is the destructive path and the one
     // most likely to be reached for by someone who should be running login.
-    const initLines = help.split('\n').filter((l) => /^\s+token-derby init/.test(l));
+    const initLines = help.split('\n').filter((l: string) => /^\s+token-derby init/.test(l));
     expect(initLines).toHaveLength(2);
     for (const line of initLines) expect(line).toMatch(/Deprecated/);
+  });
+
+  it('discloses that `link` renames the jockey, since the rename is silent otherwise', async () => {
+    vi.doMock('../src/identity/identity.js', () => ({
+      loadIdentity: vi.fn().mockResolvedValue(null),
+    }));
+    process.argv = ['node', 'bin.js', '--help'];
+    await import('../src/bin.js');
+    await settle();
+
+    const help = logSpy.mock.calls.map((c: unknown[]) => c.join(' ')).join('\n');
+    // The rename is intended, but it overwrites a name the user chose, so the
+    // help for the command that does it has to say so.
+    const linkBlock = help.slice(help.indexOf('token-derby link'), help.indexOf('token-derby whoami'));
+    expect(linkBlock).toMatch(/renames your jockey/i);
   });
 
   it('aligns every help description in the same column', async () => {

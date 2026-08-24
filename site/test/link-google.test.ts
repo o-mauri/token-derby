@@ -3,7 +3,7 @@ import { parseRoute } from '../src/route.js';
 import { renderLinkGoogle } from '../src/render/link-google.js';
 import * as api from '../src/org-manager/api.js';
 import { ApiError } from '../src/org-manager/api.js';
-import { setSession } from '../src/org-manager/session.js';
+import { setSession, setUid, setLinkedEmail, getUid, getLinkedEmail } from '../src/org-manager/session.js';
 
 describe('parseRoute /link', () => {
   it('maps "/link" to the link route', () => {
@@ -93,6 +93,27 @@ describe('renderLinkGoogle: grant in the fragment', () => {
     cleanup = renderLinkGoogle(root);
 
     await vi.waitFor(() => expect(window.location.hash).toBe(''));
+  });
+
+  it('leaves no identity marker from the previous user attached to the new session', async () => {
+    // The exchange only sets the session token. On a shared machine the uid and
+    // linked-email keys would otherwise still describe whoever was here before,
+    // and /org-manager reads all three independently.
+    setUid('user-A');
+    setLinkedEmail('a@example.com');
+    window.location.hash = '#code=ABC';
+    vi.spyOn(api, 'exchangeCode').mockResolvedValue({
+      token: 'tok', expires_at: '2026-01-01T00:00:00Z',
+      user: { user_id: 'u1', display_name: 'Alice' },
+    });
+    vi.spyOn(api, 'linkStart').mockResolvedValue({ authorize_url: 'https://accounts.google.com/x' });
+    const assignSpy = vi.spyOn(window.location, 'assign').mockImplementation(() => {});
+
+    cleanup = renderLinkGoogle(root);
+
+    await vi.waitFor(() => expect(assignSpy).toHaveBeenCalled());
+    expect(getUid()).toBe('u1');
+    expect(getLinkedEmail()).toBeNull();
   });
 
   it('shows a real error, not a blank page, when the exchange fails', async () => {

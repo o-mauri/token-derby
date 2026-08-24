@@ -136,32 +136,45 @@ export async function loginCommand(argv: string[] = [], deps: LoginDeps = {}): P
   // With no local identity there is no credential to mint from, so the bare
   // URL stays untouched.
   let verificationUrl = start.verification_uri;
+  let hasGrant = false;
   if (existing) {
-    let grant: Awaited<ReturnType<typeof apiCreateWebSession>>;
     try {
-      grant = await apiCreateWebSession();
+      const grant = await apiCreateWebSession();
+      verificationUrl = `${start.verification_uri}#code=${grant.code}`;
+      hasGrant = true;
     } catch (e) {
-      if (e instanceof ApiError) {
+      // A credential the server rejects has no jockey to link to — `/start`
+      // ignored it too, so the pending request carries no link target and the
+      // bare URL is the right path. Only other failures are worth aborting on.
+      if (e instanceof ApiError && e.code === 'UNAUTHENTICATED') {
+        console.log('');
+        console.log('  The credential stored on this machine is no longer valid (it may have been');
+        console.log('  revoked), so this will sign you in fresh in the browser.');
+      } else if (e instanceof ApiError) {
         console.error(`Error: ${e.code} ${e.message}`);
         return 1;
+      } else {
+        throw e;
       }
-      throw e;
     }
-    verificationUrl = `${start.verification_uri}#code=${grant.code}`;
   }
 
   console.log('');
   console.log('  To finish signing in, visit:');
   console.log(`    ${verificationUrl}`);
+  if (hasGrant) {
+    console.log('    That link signs the browser in for you and expires in 60 seconds — if it');
+    console.log('    does, run `token-derby login` again for a fresh one.');
+  }
   console.log('');
   console.log('  And enter this code:');
   console.log(`    ${start.user_code}`);
   console.log('');
   console.log('  Waiting for approval...');
 
-  // Open it rather than making the reader copy it. When a local identity exists
-  // the URL carries a 60-second grant, and copying by hand is the likeliest way
-  // to miss that window. The printed URL remains the fallback.
+  // Open it rather than making the reader copy it. When a grant was minted the
+  // URL carries a 60-second window, and copying by hand is the likeliest way to
+  // miss it. The printed URL remains the fallback.
   const cmd = opener();
   if (cmd) {
     try {

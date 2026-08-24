@@ -613,6 +613,137 @@ describe('loginCommand', () => {
       expect(con.logs.join('\n')).toContain('https://token-derby.mauricode.co.uk/cli#code=GRANT-XYZ');
     });
 
+    it('says the grant link is short-lived, matching what `web` and `link` already say', async () => {
+      const con = captureConsole();
+      try {
+        await loginCommand(['--device-name', 'x'], {
+          loadIdentity: async () => existing,
+          apiStart: vi.fn().mockResolvedValue(startResponse()),
+          apiPoll: vi.fn().mockResolvedValue(approvedResponse()),
+          apiRevokeDevice: vi.fn(), apiCreateWebSession: vi.fn().mockResolvedValue(webSession()),
+          saveIdentity: vi.fn().mockResolvedValue(undefined),
+          promptYesNo: vi.fn().mockResolvedValue(true),
+          sleepImpl: vi.fn(), isTTY: true, hostname: () => 'x',
+          spawnImpl: vi.fn(() => ({ on: vi.fn(), unref: vi.fn() })) as any,
+        });
+      } finally {
+        con.restore();
+      }
+
+      // The 60s grant window, not the 600s code window the rest of the output
+      // is about — a reader who only sees the latter waits out the wrong clock.
+      expect(con.logs.join('\n')).toMatch(/expires in 60 seconds/);
+    });
+
+    it('does not claim a 60-second window on the bare URL, which has none', async () => {
+      const con = captureConsole();
+      try {
+        await loginCommand(['--device-name', 'x'], {
+          loadIdentity: async () => null,
+          apiStart: vi.fn().mockResolvedValue(startResponse()),
+          apiPoll: vi.fn().mockResolvedValue(approvedResponse()),
+          apiRevokeDevice: vi.fn(), apiCreateWebSession: vi.fn(),
+          saveIdentity: vi.fn().mockResolvedValue(undefined),
+          promptYesNo: vi.fn().mockResolvedValue(true),
+          sleepImpl: vi.fn(), isTTY: true, hostname: () => 'x',
+          spawnImpl: vi.fn(() => ({ on: vi.fn(), unref: vi.fn() })) as any,
+        });
+      } finally {
+        con.restore();
+      }
+
+      expect(con.logs.join('\n')).not.toMatch(/60 seconds/);
+    });
+
+    describe('a credential the server no longer accepts', () => {
+      it('falls back to the bare URL and completes the login instead of dead-ending', async () => {
+        const apiStart = vi.fn().mockResolvedValue(startResponse({ verification_uri: 'https://token-derby.mauricode.co.uk/cli' }));
+        const apiPoll = vi.fn().mockResolvedValue(approvedResponse());
+        // Exactly what `create-web-session` returns once this machine has been
+        // revoked from the Account view, or the account has been wiped.
+        const apiCreateWebSession = vi.fn().mockRejectedValue(
+          new ApiError('UNAUTHENTICATED', 'Invalid token', 401),
+        );
+        const saveIdentity = vi.fn().mockResolvedValue(undefined);
+        const con = captureConsole();
+
+        let rc: number;
+        try {
+          rc = await loginCommand(['--device-name', 'x'], {
+            loadIdentity: async () => existing,
+            apiStart, apiPoll, apiRevokeDevice: vi.fn(), apiCreateWebSession, saveIdentity,
+            promptYesNo: vi.fn().mockResolvedValue(true),
+            sleepImpl: vi.fn(), isTTY: true, hostname: () => 'x',
+          spawnImpl: vi.fn(() => ({ on: vi.fn(), unref: vi.fn() })) as any,
+          });
+        } finally {
+          con.restore();
+        }
+
+        const logged = con.logs.join('\n');
+        expect(rc).toBe(0);
+        // The URL is the whole point: this is the only machine `login` can be
+        // run from to recover a credential that was revoked on this machine.
+        expect(logged).toContain('https://token-derby.mauricode.co.uk/cli');
+        expect(logged).not.toContain('#code=');
+        expect(apiPoll).toHaveBeenCalled();
+        expect(saveIdentity).toHaveBeenCalledTimes(1);
+      });
+
+      it('says why the browser will ask for a fresh sign-in', async () => {
+        const con = captureConsole();
+        try {
+          await loginCommand(['--device-name', 'x'], {
+            loadIdentity: async () => existing,
+            apiStart: vi.fn().mockResolvedValue(startResponse()),
+            apiPoll: vi.fn().mockResolvedValue(approvedResponse()),
+            apiRevokeDevice: vi.fn(),
+            apiCreateWebSession: vi.fn().mockRejectedValue(new ApiError('UNAUTHENTICATED', 'Invalid token', 401)),
+            saveIdentity: vi.fn().mockResolvedValue(undefined),
+            promptYesNo: vi.fn().mockResolvedValue(true),
+            sleepImpl: vi.fn(), isTTY: true, hostname: () => 'x',
+          spawnImpl: vi.fn(() => ({ on: vi.fn(), unref: vi.fn() })) as any,
+          });
+        } finally {
+          con.restore();
+        }
+
+        const logged = con.logs.join('\n');
+        expect(logged).toMatch(/no longer valid/i);
+        expect(logged).toMatch(/sign you in fresh/i);
+      });
+
+      it('still aborts on a transient mint failure, before printing any URL', async () => {
+        const apiStart = vi.fn().mockResolvedValue(startResponse({ verification_uri: 'https://token-derby.mauricode.co.uk/cli' }));
+        const apiPoll = vi.fn();
+        const saveIdentity = vi.fn();
+        // Not UNAUTHENTICATED: nothing has been said about this credential, so
+        // retrying is the right move and a bare-URL fallback would silently
+        // start a second account.
+        const apiCreateWebSession = vi.fn().mockRejectedValue(new ApiError('NETWORK_ERROR', 'fetch failed', 0));
+        const con = captureConsole();
+
+        let rc: number;
+        try {
+          rc = await loginCommand(['--device-name', 'x'], {
+            loadIdentity: async () => existing,
+            apiStart, apiPoll, apiRevokeDevice: vi.fn(), apiCreateWebSession, saveIdentity,
+            promptYesNo: vi.fn().mockResolvedValue(true),
+            sleepImpl: vi.fn(), isTTY: true, hostname: () => 'x',
+          spawnImpl: vi.fn(() => ({ on: vi.fn(), unref: vi.fn() })) as any,
+          });
+        } finally {
+          con.restore();
+        }
+
+        expect(rc).toBe(1);
+        expect(apiPoll).not.toHaveBeenCalled();
+        expect(saveIdentity).not.toHaveBeenCalled();
+        expect(con.logs.join('\n')).not.toContain('https://token-derby.mauricode.co.uk/cli');
+        expect(con.errors.join('\n')).toContain('NETWORK_ERROR');
+      });
+    });
+
     it('says nothing and asks nothing when there is no identity.json', async () => {
       const promptYesNo = vi.fn().mockResolvedValue(true);
       const con = captureConsole();

@@ -1,11 +1,12 @@
 import { writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import * as path from 'node:path';
+// The one definition of the pixel art, imported rather than copied so the logo
+// cannot drift from the site header. Needs Node >= 22.18 (or >= 23.6) for the
+// built-in .ts type stripping; no build step and no dependency.
+import { FACE_ROWS, COLOR } from '../site/src/horse-face.ts';
 
-// Same pixel data as site/src/horse-face.ts, kept in sync deliberately.
-const FACE_ROWS = [
-  '..MMM...', '..MMM...', '.MBBEBB.', '.MBBEBB.', 'MBBBBBBB',
-  'MBBBBBBB', 'MBBB....', 'MBBB....', 'BB......', 'BB......',
-];
-const COLOR = { B: '#8B4513', M: '#f5e9d3', E: '#000000' };
 const BG = '#000000'; // site --bg; the cream mane is designed to pop against it
 
 const W = 8, H = FACE_ROWS.length;   // 8 x 10 source art
@@ -32,5 +33,22 @@ const svg =
   rects.join('') +
   `</svg>`;
 
-writeFileSync(process.argv[2], svg);
-console.log(`svg written: ${SIZE}x${SIZE}, art ${W * SCALE}x${H * SCALE} at (${offX},${offY}), ${rects.length} pixels`);
+const here = path.dirname(fileURLToPath(import.meta.url));
+const svgPath = process.argv[2] ?? path.join(here, 'token-derby-logo.svg');
+writeFileSync(svgPath, svg);
+console.log(`svg written: ${svgPath} — ${SIZE}x${SIZE}, art ${W * SCALE}x${H * SCALE} at (${offX},${offY}), ${rects.length} pixels`);
+
+// The PNGs Google actually consumes are rasterised from that SVG. rsvg-convert
+// is external and optional: without it the SVG is still regenerated, and the
+// stale PNGs are reported rather than silently left behind.
+if (process.argv[2]) process.exit(0);
+for (const px of [120, 240]) {
+  const out = path.join(here, `token-derby-logo-${px}.png`);
+  const r = spawnSync('rsvg-convert', ['-w', String(px), '-h', String(px), svgPath, '-o', out], { stdio: 'inherit' });
+  if (r.error || r.status !== 0) {
+    console.error(`png NOT written: ${out} — needs rsvg-convert on PATH (brew install librsvg).`);
+    process.exitCode = 1;
+    continue;
+  }
+  console.log(`png written: ${out} — ${px}x${px}`);
+}

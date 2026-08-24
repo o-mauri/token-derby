@@ -1,6 +1,6 @@
 import { esc } from '../esc.js';
 import { horseFaceSvg } from '../horse-face.js';
-import { getSession, readCodeFromHash } from '../org-manager/session.js';
+import { getSession, readCodeFromHash, adoptExchangedUser } from '../org-manager/session.js';
 import { exchangeCode, linkStart, ApiError } from '../org-manager/api.js';
 
 /** Shown when there is neither a grant in the fragment nor an existing
@@ -66,7 +66,8 @@ export function renderLinkGoogle(root: HTMLElement): () => void {
     if (code) {
       draw({ step: 'connecting' });
       try {
-        await exchangeCode(code);
+        const res = await exchangeCode(code);
+        adoptExchangedUser(res.user);
       } catch (e) {
         draw({ step: 'error', message: errorMessage(e) });
         return;

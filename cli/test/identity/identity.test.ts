@@ -4,6 +4,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import {
   loadIdentity,
+  readIdentityFile,
   saveIdentity,
   deleteIdentity,
   validateDisplayName,
@@ -72,6 +73,56 @@ describe('identity', () => {
 
   it('deleteIdentity is a no-op when no file exists', async () => {
     await expect(deleteIdentity()).resolves.toBeUndefined();
+  });
+
+  // Anything that deletes the file needs to tell "no file" apart from "a file
+  // I could not understand" — loadIdentity collapses both to null.
+  describe('readIdentityFile', () => {
+    it('reports a missing file as missing', async () => {
+      expect(await readIdentityFile()).toEqual({ kind: 'missing' });
+    });
+
+    it('reports corrupt JSON as unreadable, not missing', async () => {
+      await fs.writeFile(path.join(tmp, 'identity.json'), '{not-json', 'utf8');
+      const state = await readIdentityFile();
+      expect(state.kind).toBe('unreadable');
+      expect(state.kind === 'unreadable' && state.reason).toMatch(/JSON/);
+    });
+
+    it('reports an older shape as unreadable, not missing', async () => {
+      await fs.writeFile(path.join(tmp, 'identity.json'), JSON.stringify({
+        user_id: 'x', display_name: 'Alice', secret_token: 's',
+      }), 'utf8');
+      const state = await readIdentityFile();
+      expect(state.kind).toBe('unreadable');
+      expect(state.kind === 'unreadable' && state.reason).toMatch(/fields/);
+    });
+
+    it('reports an unreadable-on-disk file as unreadable, naming the errno', async () => {
+      const file = path.join(tmp, 'identity.json');
+      await fs.writeFile(file, JSON.stringify({
+        user_id: 'x', display_name: 'Alice', secret_token: 's', created_at: 'now',
+      }), 'utf8');
+      await fs.chmod(file, 0o000);
+      try {
+        const state = await readIdentityFile();
+        expect(state.kind).toBe('unreadable');
+        expect(state.kind === 'unreadable' && state.reason).toContain('EACCES');
+      } finally {
+        await fs.chmod(file, 0o600);
+      }
+    });
+
+    it('returns the identity when the file is intact', async () => {
+      const id: Identity = {
+        user_id: '550e8400-e29b-41d4-a716-446655440000',
+        display_name: 'Alice',
+        secret_token: 'secret',
+        created_at: '2026-05-14T10:00:00Z',
+      };
+      await saveIdentity(id);
+      expect(await readIdentityFile()).toEqual({ kind: 'ok', identity: id });
+    });
   });
 });
 

@@ -1,6 +1,6 @@
 import * as api from './api.js';
 import { ApiError } from './api.js';
-import { getSession, getUid, setUid, getLinkedEmail, setLinkedEmail, clearLinkedEmail, clearSession, readCodeFromHash } from './session.js';
+import { getSession, getUid, getLinkedEmail, adoptExchangedUser, clearSession, readCodeFromHash } from './session.js';
 import { renderLogin, authErrorMessage } from './render/login.js';
 import { esc } from '../esc.js';
 import { renderSidebar } from './render/sidebar.js';
@@ -48,8 +48,7 @@ export function renderOrgManager(root: HTMLElement): () => void {
     if (code) {
       try {
         const res = await api.exchangeCode(code);
-        setUid(res.user.user_id);
-        if (res.user.email) setLinkedEmail(res.user.email); else clearLinkedEmail();
+        adoptExchangedUser(res.user);
       } catch { showLogin(); return; }
     }
     if (!getSession()) { showLogin(); return; }
