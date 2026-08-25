@@ -67,3 +67,20 @@ describe('message builders', () => {
     expect(m.blocks.some((b: any) => b.text?.text?.includes('Most XP'))).toBe(true);
   });
 });
+
+describe('the live race link on a starting race', () => {
+  it('is a clickable Slack link carrying the scheme and the join code', () => {
+    const msg = buildRaceCreatedMessage(CREATED);
+    const flat = JSON.stringify(msg.blocks);
+    // Slack only renders <url|label>; a bare hostname posts as plain text, which
+    // is what the changelog line elsewhere in this file still does.
+    expect(flat).toContain('<https://token-derby.mauricode.co.uk/race/AB7XQ2|');
+  });
+
+  it('points at the join code of this race, not a fixed URL', () => {
+    const other = { ...CREATED, race: { ...(CREATED as any).race, join_code: 'ZZ9WQ1' } } as any;
+    const flat = JSON.stringify(buildRaceCreatedMessage(other).blocks);
+    expect(flat).toContain('/race/ZZ9WQ1|');
+    expect(flat).not.toContain('AB7XQ2');
+  });
+});
