@@ -4,7 +4,15 @@ import {
 } from '../../src/db/organisations.js';
 import { ddb, TABLE } from '../../src/db/client.js';
 import { orgMetaKey } from '../../src/db/keys.js';
-import { UpdateCommand } from '@aws-sdk/lib-dynamodb';
+import { GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
+
+/** The raw attribute, not the defaulted read: pickOrgRecord reports an absent
+ *  join_token_enabled as `true`, so a rotation that deleted the attribute would
+ *  be indistinguishable from one that left it alone. */
+async function storedJoinTokenEnabled(org_id: string): Promise<boolean | undefined> {
+  const { Item } = await ddb.send(new GetCommand({ TableName: TABLE, Key: orgMetaKey(org_id) }));
+  return Item?.join_token_enabled as boolean | undefined;
+}
 
 async function seedOrg(join_token_enabled?: boolean) {
   const org_id = `org-rot-${Math.random().toString(36).slice(2)}`;
@@ -69,6 +77,7 @@ describe('rotateJoinToken', () => {
 
     await rotateJoinToken(org_id);
 
+    expect(await storedJoinTokenEnabled(org_id)).toBe(true);
     expect((await getOrganisationById(org_id))!.join_token_enabled).toBe(true);
   });
 

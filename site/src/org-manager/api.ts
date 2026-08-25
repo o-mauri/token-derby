@@ -109,8 +109,11 @@ export const setRaceSettings = (name: string, body: SetOrgRaceSettingsRequest, f
   authed<SetOrgRaceSettingsResponse>('PUT', `/api/organisations/${u(name)}/race-settings`, body, f);
 export const createOrganisation = (name: string, f: FetchFn = fetch) =>
   authed<CreateOrganisationResponse>('POST', '/api/organisations', { name }, f);
-export const joinOrganisation = (token: string, f: FetchFn = fetch) =>
-  authed<JoinOrganisationResponse>('POST', '/api/organisations/join', { join_token: token }, f);
+// The field is omitted, never sent blank: the server rejects a
+// supplied-but-empty token, and an absent one is what asks to join by the
+// signed-in user's verified email domain.
+export const joinOrganisation = (token: string | undefined, f: FetchFn = fetch) =>
+  authed<JoinOrganisationResponse>('POST', '/api/organisations/join', token ? { join_token: token } : {}, f);
 export const linkStart = (f: FetchFn = fetch) =>
   authed<AuthLinkStartResponse>('POST', '/api/auth/link/start', undefined, f);
 

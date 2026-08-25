@@ -54,7 +54,9 @@ Stable management:
   token-derby stable delete <name>        Remove a horse from your stable
 
 Organisations:
-  token-derby organisation join <token>   Join an organisation with a join token
+  token-derby organisation join [token]   Join an organisation with a join token,
+                                          or leave the token out to join by your
+                                          verified email domain
   token-derby web                         Open the web org manager (create orgs,
                                           manage schedules, webhooks, members)
 
@@ -124,7 +126,7 @@ async function main(): Promise<number> {
     const sub = argv[1];
     if (sub === 'join') return orgJoinCommand(argv[2]);
     console.error(`Organisation management has moved to the web: token-derby web`);
-    console.error(`The only CLI organisation command is: organisation join <token>`);
+    console.error(`The only CLI organisation command is: organisation join [token]`);
     return 2;
   }
 

@@ -31,6 +31,7 @@ import { handler } from '../../src/handlers/set-org-access.js';
 import { handler as createOrgHandler } from '../../src/handlers/create-organisation.js';
 import { getOrganisationByName } from '../../src/db/organisations.js';
 import { resolveOrgDomain } from '../../src/db/org-domains.js';
+import { attachEmailToUser } from '../../src/db/identities.js';
 import { makeUser, type TestUser } from '../helpers/auth-helper.js';
 import { CURRENT_CLI_VERSION } from '../helpers/cli-version.js';
 
@@ -55,8 +56,19 @@ function accessEvent(org_name: string, body: unknown, user: TestUser): APIGatewa
   };
 }
 
-async function ownedOrg(prefix: string) {
+// Domain claims need the creator to prove the domain, so every owner here is
+// linked: `own` comes from the verified address and `hd` from the Workspace
+// claim. `emailDomain` pins the address when two orgs must both prove one.
+async function ownedOrg(prefix: string, opts: { emailDomain?: string } = {}) {
   const owner = await makeUser(`O${rand()}`);
+  const own = opts.emailDomain ?? domain();
+  const hd = domain();
+  await attachEmailToUser({
+    user_id: owner.user_id,
+    email: `owner-${rand()}@${own}`,
+    idp_sub: `sub-${rand()}${rand()}`,
+    hd,
+  });
   const org_name = `${prefix}${rand()}`.slice(0, 12);
   const res: any = await createOrgHandler({
     version: '2.0',
@@ -74,7 +86,7 @@ async function ownedOrg(prefix: string) {
     isBase64Encoded: false,
   });
   if (res.statusCode !== 200) throw new Error(`create-org failed: ${res.body}`);
-  return { owner, org_name, org_id: JSON.parse(res.body).org_id as string };
+  return { owner, org_name, own, hd, org_id: JSON.parse(res.body).org_id as string };
 }
 
 async function readAccess(org_name: string): Promise<OrgAccessSettings> {
@@ -94,12 +106,12 @@ describe('setOrgAccess handler — losing the claim race after the pre-flight re
     const rival = await ownedOrg('RcRival');
     const before = await readAccess(rival.org_name);
 
-    const first = domain(), contested = domain(), last = domain();
+    const first = rival.own, contested = rival.hd;
     race.contested = contested;
     race.holder_org_id = holder.org_id;
 
     const res: any = await handler(accessEvent(rival.org_name, {
-      allowed_domains: [first, contested, last],
+      allowed_domains: [first, contested],
       join_token_enabled: false,
       domain_join_enabled: true,
       restrict_to_allowed_domains: false,
@@ -113,7 +125,6 @@ describe('setOrgAccess handler — losing the claim race after the pre-flight re
     // `first` was genuinely claimed before the race was lost — this is the only
     // test that can prove the rollback puts it back.
     expect(await resolveOrgDomain(first)).toBeNull();
-    expect(await resolveOrgDomain(last)).toBeNull();
     expect(await readAccess(rival.org_name)).toEqual(before);
   });
 
@@ -124,9 +135,10 @@ describe('setOrgAccess handler — losing the claim race after the pre-flight re
   // The difference is not cosmetic: a rollback that never runs, because the
   // process died, leaves those claims live for an org whose request was refused.
   it('attempts no claim at all when a domain is already held by another org', async () => {
-    const holder = await ownedOrg('RcPreH');
-    const rival = await ownedOrg('RcPreR');
-    const taken = domain(), free = domain();
+    const taken = domain();
+    const holder = await ownedOrg('RcPreH', { emailDomain: taken });
+    const rival = await ownedOrg('RcPreR', { emailDomain: taken });
+    const free = rival.hd;
 
     race.contested = '';
     await handler(accessEvent(holder.org_name, {
@@ -151,7 +163,7 @@ describe('setOrgAccess handler — losing the claim race after the pre-flight re
   it('does not release a claim the org already held before the request', async () => {
     const holder = await ownedOrg('RcKeepH');
     const rival = await ownedOrg('RcKeepR');
-    const held = domain(), contested = domain();
+    const held = rival.own, contested = rival.hd;
 
     race.contested = '';
     const first: any = await handler(accessEvent(rival.org_name, {

@@ -5,6 +5,7 @@ import { handler } from '../../src/handlers/set-org-access.js';
 import { handler as rotateHandler } from '../../src/handlers/rotate-org-join-token.js';
 import { getOrganisationByName, getOrganisationByJoinToken, addMember } from '../../src/db/organisations.js';
 import { resolveOrgDomain, claimOrgDomain, releaseOrgDomain } from '../../src/db/org-domains.js';
+import { attachEmailToUser } from '../../src/db/identities.js';
 import { makeUser, type TestUser } from '../helpers/auth-helper.js';
 import { CURRENT_CLI_VERSION } from '../helpers/cli-version.js';
 import type { OrgAccessSettings } from '@token-derby/shared';
@@ -89,8 +90,29 @@ async function readAccess(org_name: string): Promise<OrgAccessSettings> {
   };
 }
 
-/** An owner with an org whose access settings are still at their defaults. */
-async function ownedOrg(prefix: string) {
+/** An owner with an org whose access settings are still at their defaults.
+ *  The owner's Google link is what proves domain ownership, so every test that
+ *  claims a domain has to say which domains this owner can prove: `own` comes
+ *  from their verified email address and `hd` from the Workspace claim.
+ *  `emailDomain` pins the email domain when a test needs two orgs able to prove
+ *  the same one. */
+async function ownedOrg(prefix: string, opts: { emailDomain?: string; hd?: string } = {}) {
+  const owner = await makeUser(`O${rand()}`);
+  const own = opts.emailDomain ?? domain();
+  const hd = opts.hd ?? domain();
+  await attachEmailToUser({
+    user_id: owner.user_id,
+    email: `owner-${rand()}@${own}`,
+    idp_sub: `sub-${rand()}${rand()}`,
+    hd,
+  });
+  const org_name = orgName(prefix);
+  const org_id = await createOrg(owner, org_name);
+  return { owner, org_name, org_id, own, hd };
+}
+
+/** An owner with no Google link at all — proves no domain. */
+async function unlinkedOrg(prefix: string) {
   const owner = await makeUser(`O${rand()}`);
   const org_name = orgName(prefix);
   const org_id = await createOrg(owner, org_name);
@@ -224,19 +246,17 @@ describe('setOrgAccess handler — the lockout combination', () => {
 });
 
 describe('setOrgAccess handler — domain claims', () => {
-  it('claims one DOMAIN# row per allowed domain when domain join is switched on', async () => {
-    const { owner, org_name, org_id } = await ownedOrg('AcClaim');
-    const a = domain(), b = domain(), c = domain();
+  it('claims one DOMAIN# row per owned allowed domain when domain join is switched on', async () => {
+    const { owner, org_name, org_id, own, hd } = await ownedOrg('AcClaim');
 
     const res: any = await handler(accessEvent(org_name, settings({
-      allowed_domains: [a, b, c],
+      allowed_domains: [own, hd],
       domain_join_enabled: true,
     }), owner));
 
     expect(res.statusCode).toBe(200);
-    expect(await resolveOrgDomain(a)).toBe(org_id);
-    expect(await resolveOrgDomain(b)).toBe(org_id);
-    expect(await resolveOrgDomain(c)).toBe(org_id);
+    expect(await resolveOrgDomain(own)).toBe(org_id);
+    expect(await resolveOrgDomain(hd)).toBe(org_id);
   });
 
   it('claims nothing while domain join is off, even with domains listed', async () => {
@@ -256,43 +276,51 @@ describe('setOrgAccess handler — domain claims', () => {
   });
 
   it('releases every claim when domain join is switched off', async () => {
-    const { owner, org_name, org_id } = await ownedOrg('AcDisab');
-    const a = domain(), b = domain();
-    await handler(accessEvent(org_name, settings({ allowed_domains: [a, b], domain_join_enabled: true }), owner));
-    expect(await resolveOrgDomain(a)).toBe(org_id);
+    const { owner, org_name, org_id, own, hd } = await ownedOrg('AcDisab');
+    await handler(accessEvent(org_name, settings({ allowed_domains: [own, hd], domain_join_enabled: true }), owner));
+    expect(await resolveOrgDomain(own)).toBe(org_id);
 
     const res: any = await handler(accessEvent(org_name, settings({
-      allowed_domains: [a, b],
+      allowed_domains: [own, hd],
       domain_join_enabled: false,
     }), owner));
 
     expect(res.statusCode).toBe(200);
-    expect(await resolveOrgDomain(a)).toBeNull();
-    expect(await resolveOrgDomain(b)).toBeNull();
+    expect(await resolveOrgDomain(own)).toBeNull();
+    expect(await resolveOrgDomain(hd)).toBeNull();
     // The list itself survives — turning auto-join off is not the same as
     // forgetting which domains the owner configured.
-    expect((await readAccess(org_name)).allowed_domains).toEqual([a, b]);
+    expect((await readAccess(org_name)).allowed_domains).toEqual([own, hd]);
   });
 
+  // An owner can only ever prove two domains (verified email plus the Workspace
+  // hd claim), so add and drop are walked in sequence rather than in one save.
   it('reconciles both directions when the list is edited while enabled', async () => {
-    const { owner, org_name, org_id } = await ownedOrg('AcRecon');
-    const kept = domain(), dropped = domain(), added = domain();
+    const { owner, org_name, org_id, own, hd } = await ownedOrg('AcRecon');
     await handler(accessEvent(org_name, settings({
-      allowed_domains: [kept, dropped],
+      allowed_domains: [own],
       domain_join_enabled: true,
     }), owner));
-    expect(await resolveOrgDomain(dropped)).toBe(org_id);
+    expect(await resolveOrgDomain(own)).toBe(org_id);
 
-    const res: any = await handler(accessEvent(org_name, settings({
-      allowed_domains: [kept, added],
+    // Added: hd joins the list, own stays claimed.
+    const added: any = await handler(accessEvent(org_name, settings({
+      allowed_domains: [own, hd],
       domain_join_enabled: true,
     }), owner));
+    expect(added.statusCode).toBe(200);
+    expect(await resolveOrgDomain(own)).toBe(org_id);
+    expect(await resolveOrgDomain(hd)).toBe(org_id);
 
-    expect(res.statusCode).toBe(200);
-    expect(await resolveOrgDomain(added)).toBe(org_id);
-    expect(await resolveOrgDomain(dropped)).toBeNull();
-    expect(await resolveOrgDomain(kept)).toBe(org_id);
-    expect((await readAccess(org_name)).allowed_domains).toEqual([kept, added]);
+    // Dropped: own leaves the list and must lose its row, hd keeps its own.
+    const dropped: any = await handler(accessEvent(org_name, settings({
+      allowed_domains: [hd],
+      domain_join_enabled: true,
+    }), owner));
+    expect(dropped.statusCode).toBe(200);
+    expect(await resolveOrgDomain(own)).toBeNull();
+    expect(await resolveOrgDomain(hd)).toBe(org_id);
+    expect((await readAccess(org_name)).allowed_domains).toEqual([hd]);
   });
 
   // A claim row left behind by a request that died mid-flight still routes
@@ -316,8 +344,7 @@ describe('setOrgAccess handler — domain claims', () => {
   });
 
   it('is idempotent — re-saving the same settings keeps the claims', async () => {
-    const { owner, org_name, org_id } = await ownedOrg('AcIdem');
-    const d = domain();
+    const { owner, org_name, org_id, own: d } = await ownedOrg('AcIdem');
     const body = settings({ allowed_domains: [d], domain_join_enabled: true });
     await handler(accessEvent(org_name, body, owner));
 
@@ -328,8 +355,7 @@ describe('setOrgAccess handler — domain claims', () => {
   });
 
   it('re-claims a domain whose claim row was lost, without reporting a conflict', async () => {
-    const { owner, org_name, org_id } = await ownedOrg('AcHeal');
-    const d = domain();
+    const { owner, org_name, org_id, own: d } = await ownedOrg('AcHeal');
     const body = settings({ allowed_domains: [d], domain_join_enabled: true });
     await handler(accessEvent(org_name, body, owner));
     // Simulates a request that died between claiming and storing: the row is
@@ -344,16 +370,207 @@ describe('setOrgAccess handler — domain claims', () => {
   });
 });
 
+describe('setOrgAccess handler — ownership proof for auto-join', () => {
+  // The squatting attack: nothing about org ownership or domain format says
+  // anything about who owns bigcorp.com, so without this the first org to ask
+  // becomes the destination for every verified bigcorp.com address.
+  it('refuses a domain the creator cannot prove, and claims nothing', async () => {
+    const { owner, org_name } = await ownedOrg('AcSquat');
+    const someone_elses = domain();
+    const before = await readAccess(org_name);
+
+    const res: any = await handler(accessEvent(org_name, settings({
+      allowed_domains: [someone_elses],
+      domain_join_enabled: true,
+    }), owner));
+
+    expect(res.statusCode).toBe(403);
+    expect(JSON.parse(res.body).code).toBe('DOMAIN_NOT_VERIFIED');
+    expect(await resolveOrgDomain(someone_elses)).toBeNull();
+    expect(await readAccess(org_name)).toEqual(before);
+  });
+
+  // The other half of the same bug: once a squatter holds the row, the real
+  // owner can never enable auto-join for its own domain and there is no admin
+  // remedy. Refusing the squatter is what keeps this reachable.
+  it('lets the domain\'s real owner claim it after a squatter has been refused', async () => {
+    const contested = domain();
+    const squatter = await ownedOrg('AcSqB');
+    await handler(accessEvent(squatter.org_name, settings({
+      allowed_domains: [contested],
+      domain_join_enabled: true,
+    }), squatter.owner));
+
+    const real = await ownedOrg('AcSqReal', { emailDomain: contested });
+    const res: any = await handler(accessEvent(real.org_name, settings({
+      allowed_domains: [contested],
+      domain_join_enabled: true,
+    }), real.owner));
+
+    expect(res.statusCode).toBe(200);
+    expect(await resolveOrgDomain(contested)).toBe(real.org_id);
+  });
+
+  // The over-claim. The allow-list is a restriction list: two orgs may
+  // legitimately restrict to the same partner domain. Claiming the whole list
+  // meant whichever of them turned auto-join on locked the other out of a
+  // domain it actually owns.
+  it('claims only the owned domains, leaving a restriction-only entry free for its owner', async () => {
+    const partner = domain();
+    const a = await ownedOrg('AcPartA');
+
+    const res: any = await handler(accessEvent(a.org_name, settings({
+      allowed_domains: [a.own, partner],
+      domain_join_enabled: true,
+      restrict_to_allowed_domains: true,
+    }), a.owner));
+
+    expect(res.statusCode).toBe(200);
+    expect(await resolveOrgDomain(a.own)).toBe(a.org_id);
+    // Stored for the restriction, never claimed — it is not org A's domain.
+    expect(await resolveOrgDomain(partner)).toBeNull();
+    expect((await readAccess(a.org_name)).allowed_domains).toEqual([a.own, partner]);
+
+    const b = await ownedOrg('AcPartB', { emailDomain: partner });
+    const claim: any = await handler(accessEvent(b.org_name, settings({
+      allowed_domains: [partner],
+      domain_join_enabled: true,
+    }), b.owner));
+
+    expect(claim.statusCode).toBe(200);
+    expect(await resolveOrgDomain(partner)).toBe(b.org_id);
+  });
+
+  it('accepts the Workspace hd claim as proof, not only the email domain', async () => {
+    const { owner, org_name, org_id, hd } = await ownedOrg('AcHd');
+
+    const res: any = await handler(accessEvent(org_name, settings({
+      allowed_domains: [hd],
+      domain_join_enabled: true,
+    }), owner));
+
+    expect(res.statusCode).toBe(200);
+    expect(await resolveOrgDomain(hd)).toBe(org_id);
+  });
+
+  it('tells an unlinked creator to link an account rather than naming a domain', async () => {
+    const { owner, org_name } = await unlinkedOrg('AcNoLink');
+    const d = domain();
+
+    const res: any = await handler(accessEvent(org_name, settings({
+      allowed_domains: [d],
+      domain_join_enabled: true,
+    }), owner));
+
+    expect(res.statusCode).toBe(403);
+    expect(JSON.parse(res.body).code).toBe('DOMAIN_NOT_VERIFIED');
+    expect(JSON.parse(res.body).message.toLowerCase()).toContain('link a google account');
+  });
+
+  it('refuses auto-join with an empty allow-list rather than storing a toggle that claims nothing', async () => {
+    const { owner, org_name } = await ownedOrg('AcEmptyAJ');
+    const before = await readAccess(org_name);
+
+    const res: any = await handler(accessEvent(org_name, settings({
+      allowed_domains: [],
+      domain_join_enabled: true,
+    }), owner));
+
+    expect(res.statusCode).toBe(403);
+    expect(JSON.parse(res.body).code).toBe('DOMAIN_NOT_VERIFIED');
+    expect(await readAccess(org_name)).toEqual(before);
+  });
+
+  // An unprovable entry does not block the save — an org must be able to
+  // restrict to a partner domain while auto-joining its own.
+  it('does not refuse when at least one listed domain is owned', async () => {
+    const { owner, org_name, org_id, own } = await ownedOrg('AcMixed');
+    const partner = domain();
+
+    const res: any = await handler(accessEvent(org_name, settings({
+      allowed_domains: [partner, own],
+      domain_join_enabled: true,
+    }), owner));
+
+    expect(res.statusCode).toBe(200);
+    expect(await resolveOrgDomain(own)).toBe(org_id);
+    expect(await resolveOrgDomain(partner)).toBeNull();
+  });
+});
+
+describe('setOrgAccess handler — healing an orphan claim row', () => {
+  // The gap that made an orphan permanent: `stale` was derived from the stored
+  // allow-list, so a claim row for a domain absent from that list was in no
+  // release set and no later save could ever drop it — while
+  // join-organisation kept routing that domain here, authorised by nothing.
+  it('releases a claim row for a domain the stored settings never mention', async () => {
+    const { owner, org_name, org_id, own } = await ownedOrg('AcOrphan');
+    // A request that died between claiming and storing leaves exactly this:
+    // the row exists, the settings know nothing about it.
+    await handler(accessEvent(org_name, settings({ allowed_domains: [] }), owner));
+    await claimOrgDomain(own, org_id);
+    expect(await resolveOrgDomain(own)).toBe(org_id);
+
+    const res: any = await handler(accessEvent(org_name, settings({ allowed_domains: [] }), owner));
+
+    expect(res.statusCode).toBe(200);
+    expect(await resolveOrgDomain(own)).toBeNull();
+  });
+
+  it('releases an orphan row while a different domain stays claimed', async () => {
+    const { owner, org_name, org_id, own, hd } = await ownedOrg('AcOrphan2');
+    await handler(accessEvent(org_name, settings({
+      allowed_domains: [hd],
+      domain_join_enabled: true,
+    }), owner));
+    await claimOrgDomain(own, org_id);
+
+    const res: any = await handler(accessEvent(org_name, settings({
+      allowed_domains: [hd],
+      domain_join_enabled: true,
+    }), owner));
+
+    expect(res.statusCode).toBe(200);
+    expect(await resolveOrgDomain(own)).toBeNull();
+    expect(await resolveOrgDomain(hd)).toBe(org_id);
+  });
+
+  // Reconciliation walks a wider candidate set than the stored list, so it has
+  // to stay incapable of touching a row another org holds.
+  it('never releases another org\'s claim while healing its own', async () => {
+    const shared = domain();
+    const other = await ownedOrg('AcOthr', { emailDomain: shared });
+    await handler(accessEvent(other.org_name, settings({
+      allowed_domains: [shared],
+      domain_join_enabled: true,
+    }), other.owner));
+    expect(await resolveOrgDomain(shared)).toBe(other.org_id);
+
+    // Same domain in this org's allow-list for restriction only — it is in the
+    // release candidate set, and must still be untouchable.
+    const mine = await ownedOrg('AcMine', { emailDomain: shared });
+    const res: any = await handler(accessEvent(mine.org_name, settings({
+      allowed_domains: [shared],
+      restrict_to_allowed_domains: true,
+    }), mine.owner));
+
+    expect(res.statusCode).toBe(200);
+    expect(await resolveOrgDomain(shared)).toBe(other.org_id);
+  });
+});
+
 describe('setOrgAccess handler — a domain another org already holds', () => {
   it('refuses with DOMAIN_ALREADY_CLAIMED naming the holding organisation', async () => {
-    const holder = await ownedOrg('AcHold');
     const taken = domain();
+    // Both creators hold a verified address at `taken`, so ownership proof is
+    // satisfied for both and the refusal can only come from the claim row.
+    const holder = await ownedOrg('AcHold', { emailDomain: taken });
     await handler(accessEvent(holder.org_name, settings({
       allowed_domains: [taken],
       domain_join_enabled: true,
     }), holder.owner));
 
-    const rival = await ownedOrg('AcRival');
+    const rival = await ownedOrg('AcRival', { emailDomain: taken });
     const res: any = await handler(accessEvent(rival.org_name, settings({
       allowed_domains: [taken],
       domain_join_enabled: true,
@@ -368,14 +585,14 @@ describe('setOrgAccess handler — a domain another org already holds', () => {
   });
 
   it('leaves the claim with the original org', async () => {
-    const holder = await ownedOrg('AcKeep');
     const taken = domain();
+    const holder = await ownedOrg('AcKeep', { emailDomain: taken });
     await handler(accessEvent(holder.org_name, settings({
       allowed_domains: [taken],
       domain_join_enabled: true,
     }), holder.owner));
 
-    const rival = await ownedOrg('AcSteal');
+    const rival = await ownedOrg('AcSteal', { emailDomain: taken });
     await handler(accessEvent(rival.org_name, settings({
       allowed_domains: [taken],
       domain_join_enabled: true,
@@ -389,29 +606,27 @@ describe('setOrgAccess handler — a domain another org already holds', () => {
   // first — an org whose UI says domain join is on while only some of its
   // domains route to it. Asserting the error code alone would not see either.
   it('writes nothing at all — not the settings, not a partial set of claims', async () => {
-    const holder = await ownedOrg('AcConfH');
     const taken = domain();
+    const holder = await ownedOrg('AcConfH', { emailDomain: taken });
     await handler(accessEvent(holder.org_name, settings({
       allowed_domains: [taken],
       domain_join_enabled: true,
     }), holder.owner));
 
-    const rival = await ownedOrg('AcConfR');
+    const rival = await ownedOrg('AcConfR', { emailDomain: taken });
     const before = await readAccess(rival.org_name);
-    const freeBefore = domain(), freeAfter = domain();
 
     const res: any = await handler(accessEvent(rival.org_name, settings({
-      // The conflicting domain sits in the middle, so a claim-as-you-go handler
-      // gets one claim in before it fails and has one left to skip.
-      allowed_domains: [freeBefore, taken, freeAfter],
+      // The free domain the rival owns comes first, so a claim-as-you-go
+      // handler gets one claim in before the conflict refuses it.
+      allowed_domains: [rival.hd, taken],
       domain_join_enabled: true,
       join_token_enabled: false,
     }), rival.owner));
 
     expect(JSON.parse(res.body).code).toBe('DOMAIN_ALREADY_CLAIMED');
     expect(await readAccess(rival.org_name)).toEqual(before);
-    expect(await resolveOrgDomain(freeBefore)).toBeNull();
-    expect(await resolveOrgDomain(freeAfter)).toBeNull();
+    expect(await resolveOrgDomain(rival.hd)).toBeNull();
   });
 
   // A claim made outside this handler is refused just the same — the DOMAIN#
@@ -419,9 +634,10 @@ describe('setOrgAccess handler — a domain another org already holds', () => {
   // for a claim that lands *after* the pre-flight read cannot be reached from
   // here; it is pinned in set-org-access-race.test.ts.)
   it('refuses a domain claimed outside the handler, and claims nothing alongside it', async () => {
-    const rival = await ownedOrg('AcRace');
+    const contested = domain();
+    const rival = await ownedOrg('AcRace', { emailDomain: contested });
     const other = await ownedOrg('AcRaceO');
-    const free = domain(), contested = domain();
+    const free = rival.hd;
     // Claimed directly, bypassing the handler, so the pre-flight in the call
     // below still sees it — this is the same state a lost race produces.
     await claimOrgDomain(contested, other.org_id);
@@ -437,12 +653,11 @@ describe('setOrgAccess handler — a domain another org already holds', () => {
   });
 
   it('lets an org re-list a domain it already holds itself', async () => {
-    const { owner, org_name, org_id } = await ownedOrg('AcSelf');
-    const d = domain();
+    const { owner, org_name, org_id, own: d, hd } = await ownedOrg('AcSelf');
     await handler(accessEvent(org_name, settings({ allowed_domains: [d], domain_join_enabled: true }), owner));
 
     const res: any = await handler(accessEvent(org_name, settings({
-      allowed_domains: [d, domain()],
+      allowed_domains: [d, hd],
       domain_join_enabled: true,
     }), owner));
 
@@ -482,8 +697,7 @@ describe('rotateOrgJoinToken handler', () => {
   });
 
   it('does not disturb the access settings', async () => {
-    const { owner, org_name } = await ownedOrg('AcRotSet');
-    const d = domain();
+    const { owner, org_name, own: d } = await ownedOrg('AcRotSet');
     await handler(accessEvent(org_name, settings({
       allowed_domains: [d],
       domain_join_enabled: true,

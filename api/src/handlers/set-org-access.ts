@@ -1,11 +1,15 @@
 import type { ApiHandler } from '../lib/http.js';
 import type { SetOrgAccessRequest, SetOrgAccessResponse, OrgAccessSettings } from '@token-derby/shared';
 import { ORG_NAME_PATTERN } from '@token-derby/shared';
-import { getOrganisationByName, getOrganisationById, setOrgAccess } from '../db/organisations.js';
+import {
+  getOrganisationByName, getOrganisationById, setOrgAccess, OrgAccessConflictError,
+} from '../db/organisations.js';
 import {
   claimOrgDomain, releaseOrgDomain, resolveOrgDomain, normaliseDomain, DomainAlreadyClaimedError,
 } from '../db/org-domains.js';
+import { getUserById } from '../db/users.js';
 import { ok, err, parseJson } from '../lib/http.js';
+import { provenDomains } from '../lib/user-domains.js';
 import { resolveCaller } from '../lib/auth.js';
 
 // Labels of alphanumerics and hyphens, at least one dot. Applied after
@@ -121,21 +125,52 @@ export const handler: ApiHandler = async (event) => {
   if ('error' in validated) return validated.error;
   const next = validated.settings;
 
-  const org = await getOrganisationByName(org_name);
+  // The name lookup goes through a GSI, which is eventually consistent. Every
+  // decision below is a read-modify-write input — ownership, the stored domain
+  // list, access_rev — so the row itself is re-read strongly consistently.
+  const named = await getOrganisationByName(org_name);
+  if (!named) return err('ORG_NOT_FOUND', `No organisation named "${org_name}"`);
+  const org = await getOrganisationById(named.org_id, { consistent: true });
   if (!org) return err('ORG_NOT_FOUND', `No organisation named "${org_name}"`);
   if (org.creator_user_id !== auth.user_id) {
     return err('NOT_ORG_OWNER', 'Only the organisation creator can change access settings');
   }
 
+  // A DOMAIN# row routes *everyone* at that domain into this org, so claiming
+  // one needs proof the creator belongs to it — format and org ownership say
+  // nothing about who owns bigcorp.com. The allow-list cannot double as the
+  // claim list: it is a restriction list, and two orgs may legitimately
+  // restrict to the same partner domain without either owning it.
+  const creator = await getUserById(org.creator_user_id);
+  const provable = provenDomains(creator);
+  const desired = next.domain_join_enabled
+    ? next.allowed_domains.filter(d => provable.has(d))
+    : [];
+
+  // Refused rather than stored as a no-op: the toggle would otherwise report
+  // success while claiming nothing, and the owner would believe auto-join is on.
+  if (next.domain_join_enabled && desired.length === 0) {
+    const own = [...provable];
+    return err('DOMAIN_NOT_VERIFIED', own.length > 0
+      ? `Automatic domain join only covers a domain you own — list ${own.join(' or ')} above, or turn it off`
+      : 'Automatic domain join needs a domain you own — link a Google account on your work email first, then list that domain above');
+  }
+
   // Reconciled against the desired state rather than against a diff of the
   // request: claiming is idempotent for a domain we already hold, so re-deriving
   // the full set costs a handful of conditional puts and repairs claim rows lost
-  // to an earlier half-completed request. `stale` ignores the previous
-  // domain_join_enabled for the same reason — a leftover claim row from a
-  // request that died mid-flight still routes joiners here, and this is the only
-  // code that ever looks at it.
-  const desired = next.domain_join_enabled ? next.allowed_domains : [];
-  const stale = org.allowed_domains.filter(d => !desired.includes(d));
+  // to an earlier half-completed request.
+  //
+  // The release candidates are every domain this org could be holding a row
+  // for — the stored list, the requested list, and the creator's own domains,
+  // which is the only set this handler ever claims from. Derived from the stored
+  // list alone (as it once was) a row for a domain absent from that list was in
+  // no `stale` set and no later save could ever release it, leaving a live
+  // auto-join route no stored setting authorises. releaseOrgDomain is
+  // conditional on the org id, so a candidate we do not hold is a no-op and
+  // another org's claim is untouchable.
+  const candidates = new Set([...org.allowed_domains, ...next.allowed_domains, ...provable]);
+  const stale = [...candidates].filter(d => !desired.includes(d));
 
   // Pre-flight every claim before writing anything. The conditional put in
   // claimOrgDomain is the real guarantee — this read only makes the ordinary
@@ -178,9 +213,17 @@ export const handler: ApiHandler = async (event) => {
 
   try {
     for (const domain of stale) await releaseOrgDomain(domain, org.org_id);
-    await setOrgAccess(org.org_id, next);
+    await setOrgAccess(org.org_id, next, org.access_rev);
   } catch (e) {
     await undoClaims(claimed, org.org_id);
+    // An overlapping save landed between our read and our write, so the claim
+    // rows we just made were reconciled against a snapshot that is no longer
+    // the stored state. Refusing (and undoing) leaves over-revocation, which
+    // the reconciliation above heals on the next save, rather than a live
+    // route the winner's settings never authorised.
+    if (e instanceof OrgAccessConflictError) {
+      return err('ACCESS_CONFLICT', 'These settings changed in another window — reload and try again');
+    }
     throw e;
   }
 

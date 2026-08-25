@@ -37,6 +37,7 @@ export function renderAccess(root: HTMLElement, deps: AccessDeps): void {
         <input type="checkbox" data-field="domain_join_enabled" ${a.domain_join_enabled ? 'checked' : ''}>
         Automatically let people with a matching email domain join — no token needed
       </label>
+      <p class="muted">Auto-join only covers a domain you own: your verified email domain, or your Google Workspace domain. Other domains in the list still gate joins, they just do not admit anyone on their own.</p>
 
       <label class="label">Domains
         <textarea data-field="allowed_domains" rows="4" placeholder="acme.com">${esc(a.allowed_domains.join('\n'))}</textarea>
@@ -53,7 +54,9 @@ export function renderAccess(root: HTMLElement, deps: AccessDeps): void {
 
       <div class="org-access-rotate">
         <span class="label">JOIN TOKEN ROTATION</span>
-        <p class="muted">The join token is visible to every member, not just you — rotating is how you shut out someone you've removed who still has it.</p>
+        <p class="muted">${a.domain_join_enabled
+          ? 'The join token is visible to every member, not just you. Rotating it does not shut out someone you have removed while automatic domain join is on — they can rejoin with no token at all.'
+          : 'The join token is visible to every member, not just you — rotating is how you shut out someone you\'ve removed who still has it.'}</p>
         <div class="org-actions"><button type="button" class="org-btn" data-action="rotate">Rotate join token</button></div>
         ${rotatedBlock}
       </div>

@@ -89,16 +89,42 @@ describe('renderAccess', () => {
     });
   });
 
-  it('escapes a domain containing markup when rendering the textarea', () => {
-    const XSS = '<img src=x onerror=alert(1)>';
+  // The payload has to close the textarea. A bare `<img>` inside one is inert
+  // even unescaped — `<textarea>` is escapable raw text — so a test using that
+  // would pass with esc() deleted and prove nothing about this sink.
+  it('escapes a domain that would otherwise close the textarea and inject markup', () => {
+    const XSS = '</textarea><img src=x onerror=alert(1)>';
     renderAccess(root, { access: access({ allowed_domains: [XSS] }), onSave: vi.fn(), onRotate: vi.fn() });
-    // Not present as live markup...
-    expect(root.innerHTML).not.toContain(XSS);
-    expect(root.innerHTML).toContain('&lt;img src=x onerror=alert(1)&gt;');
-    // ...but the textarea's own value round-trips back to the original text,
-    // proving it was inert markup and not, say, double-escaped.
+    // No element escaped the textarea...
+    expect(root.querySelector('img')).toBeNull();
+    // ...and the textarea's own value round-trips back to the original text,
+    // proving it was inert text and not, say, double-escaped.
     const textarea = root.querySelector<HTMLTextAreaElement>('[data-field="allowed_domains"]')!;
     expect(textarea.value).toBe(XSS);
+  });
+
+  // I5's other half. The rotation blurb promises rotation shuts out a removed
+  // member — false the moment auto-join is on, and the owner reading it is the
+  // one about to rely on it.
+  it('offers rotation as the lockout lever only while domain auto-join is off', () => {
+    renderAccess(root, { access: access({ domain_join_enabled: false }), onSave: vi.fn(), onRotate: vi.fn() });
+    expect(root.textContent!.toLowerCase()).toContain('rotating is how you shut out');
+  });
+
+  it('says rotation does not shut anyone out while domain auto-join is on', () => {
+    renderAccess(root, { access: access({ domain_join_enabled: true }), onSave: vi.fn(), onRotate: vi.fn() });
+    const text = root.textContent!.toLowerCase();
+    expect(text).toContain('does not shut out');
+    expect(text).not.toContain('rotating is how you shut out');
+  });
+
+  // The server refuses auto-join for a domain the creator cannot prove, so the
+  // tab has to say what the toggle actually covers before they hit that refusal.
+  it('explains that auto-join only covers a domain the owner can prove', () => {
+    renderAccess(root, { access: access(), onSave: vi.fn(), onRotate: vi.fn() });
+    const text = root.textContent!.toLowerCase();
+    expect(text).toContain('only covers a domain you own');
+    expect(text).toContain('verified email domain');
   });
 
   describe('rotation', () => {
@@ -181,10 +207,45 @@ describe('renderMembers — Remove', () => {
     expect(confirmFn).toHaveBeenCalledTimes(1);
     const message = confirmFn.mock.calls[0]![0] as string;
     expect(message).toContain('jess');
-    expect(message.toLowerCase()).toContain('races and standings');
+    expect(message.toLowerCase()).toContain('joining');
     expect(message.toLowerCase()).toContain('next season');
+    // Each consequence is asserted separately: the previous version named only
+    // two of them, so dropping the past-results sentence kept the suite green.
+    expect(message.toLowerCase()).toContain('past results stay');
     // The honest part: removal is not a block, and this must not read as permanent.
     expect(message.toLowerCase()).toContain('rejoin');
+  });
+
+  // get-org-leaderboard, get-org-league-standings and list-org-races have no
+  // auth at all, so promising that standings go away on removal is false.
+  it('does not claim removal takes standings away', () => {
+    renderMembers(root, { members, isOwner: true, ownerUserId: 'owner-1', onRemove: vi.fn() });
+    (root.querySelector('.org-member-remove') as HTMLElement).click();
+    const message = String(confirmFn.mock.calls[0]![0]).toLowerCase();
+    expect(message).not.toContain('lose access to races and standings');
+    expect(message).toContain('standings and past results stay visible');
+  });
+
+  // I5: rotating the token is the remedy only while auto-join is off. With it
+  // on, the removed member walks back in with no token at all.
+  it('offers token rotation as the remedy only when domain auto-join is off', () => {
+    renderMembers(root, { members, isOwner: true, ownerUserId: 'owner-1', onRemove: vi.fn() });
+    (root.querySelector('.org-member-remove') as HTMLElement).click();
+    const message = String(confirmFn.mock.calls[0]![0]).toLowerCase();
+    expect(message).toContain('join token');
+    expect(message).toContain('rotate');
+  });
+
+  it('says the token is not the lever when domain auto-join is on', () => {
+    renderMembers(root, {
+      members, isOwner: true, ownerUserId: 'owner-1', domainJoinEnabled: true, onRemove: vi.fn(),
+    });
+    (root.querySelector('.org-member-remove') as HTMLElement).click();
+    const message = String(confirmFn.mock.calls[0]![0]).toLowerCase();
+    expect(message).toContain('no token at all');
+    expect(message).toContain('access tab');
+    // The false promise must be gone, not merely joined by a caveat.
+    expect(message).not.toContain('rotate it');
   });
 
   it('calls onRemove with the user_id once confirmed', () => {
@@ -203,15 +264,25 @@ describe('renderMembers — Remove', () => {
     expect(onRemove).not.toHaveBeenCalled();
   });
 
-  it('escapes a member name containing live markup instead of rendering it', () => {
-    const XSS = '<img src=x onerror=alert(1)>evil';
+  // The name reaches two sinks: the data-name attribute on the Remove button
+  // and the cell text. Only a payload carrying a double quote can break out of
+  // the attribute, so without one the attribute's esc() is never exercised.
+  // update-jockey only length-checks display_name, so this sink is reachable.
+  it('escapes a member name containing a quote and markup at both sinks', () => {
+    const XSS = '" autofocus onfocus=alert(1) x="><img src=x onerror=alert(1)>';
     renderMembers(root, {
       members: [{ user_id: 'u3', user_name: XSS, joined_at: '2026-06-01T00:00:00Z' }],
       isOwner: true, ownerUserId: 'owner-1', onRemove: vi.fn(),
     });
     // No live element was created from the name...
     expect(root.querySelector('img')).toBeNull();
-    // ...but the text is still shown, as literal text.
+    // ...the attribute took the whole payload as one value rather than being
+    // closed early and reopened as new attributes...
+    const btn = root.querySelector<HTMLButtonElement>('.org-member-remove')!;
+    expect(btn.dataset.name).toBe(XSS);
+    expect(btn.hasAttribute('onfocus')).toBe(false);
+    expect(btn.hasAttribute('autofocus')).toBe(false);
+    // ...and the text is still shown, as literal text.
     expect(root.textContent).toContain(XSS);
   });
 });
@@ -353,6 +424,72 @@ describe('Access tab & member removal — full flow', () => {
     const message = String(alertFn.mock.calls[0]![0]).toLowerCase();
     expect(message).toContain('lock');
     expect(message).not.toBe('allow_list_required');
+  });
+
+  // I3: currentSettings() reads live DOM, so a refused save that only alerts
+  // leaves the checkbox ticked — the owner believes the setting is on, and the
+  // next unrelated toggle re-sends the value the server already rejected.
+  it('reverts the checkbox to server state when the save is refused', async () => {
+    setUid('owner-1');
+    vi.spyOn(api, 'listOrganisations').mockResolvedValue({ organisations: [{ org_id: 'o1', org_name: 'Acme' }] });
+    vi.spyOn(api, 'getOrganisation').mockResolvedValue(org({ creator_user_id: 'owner-1' }));
+    const setAccessSpy = vi.spyOn(api, 'setOrgAccess')
+      .mockRejectedValue(new Error('acme.com is already the auto-join domain for "RocketTeam"'));
+    vi.stubGlobal('alert', vi.fn());
+
+    dispose = renderOrgManager(root);
+    await vi.waitFor(() => expect(root.querySelector('.org-tabs')).not.toBeNull());
+    (root.querySelector('[data-tab="access"]') as HTMLElement).click();
+    await vi.waitFor(() => expect(root.querySelector('[data-field="domain_join_enabled"]')).not.toBeNull());
+
+    (root.querySelector('[data-field="domain_join_enabled"]') as HTMLElement).click();
+    await vi.waitFor(() => expect(setAccessSpy).toHaveBeenCalledTimes(1));
+
+    // Back to the stored value, not the value the server refused.
+    await vi.waitFor(() => expect(
+      root.querySelector<HTMLInputElement>('[data-field="domain_join_enabled"]')!.checked,
+    ).toBe(false));
+
+    // ...and the poisoned value is not re-sent with the next, unrelated toggle.
+    (root.querySelector('[data-field="join_token_enabled"]') as HTMLElement).click();
+    await vi.waitFor(() => expect(setAccessSpy).toHaveBeenCalledTimes(2));
+    expect(setAccessSpy.mock.calls[1]![1]).toEqual({
+      join_token_enabled: false,
+      domain_join_enabled: false,
+      restrict_to_allowed_domains: false,
+      allowed_domains: [],
+    });
+  });
+
+  // I5, wired end to end: the confirmation can only tell the truth about
+  // rotation if index.ts passes the org's own domain_join_enabled through.
+  it('passes domain auto-join through to the removal confirmation', async () => {
+    setUid('owner-1');
+    vi.spyOn(api, 'listOrganisations').mockResolvedValue({ organisations: [{ org_id: 'o1', org_name: 'Acme' }] });
+    vi.spyOn(api, 'getOrganisation').mockResolvedValue(org({
+      creator_user_id: 'owner-1',
+      access: access({ domain_join_enabled: true, allowed_domains: ['acme.com'] }),
+    }));
+    vi.spyOn(api, 'getMembers').mockResolvedValue({
+      members: [
+        { user_id: 'owner-1', user_name: 'omar', joined_at: '2026-05-14T00:00:00Z' },
+        { user_id: 'member-2', user_name: 'jess', joined_at: '2026-06-01T00:00:00Z' },
+      ],
+    });
+    vi.spyOn(api, 'removeMember').mockResolvedValue({ ok: true });
+    const confirmFn = vi.fn(() => false);
+    vi.stubGlobal('confirm', confirmFn);
+
+    dispose = renderOrgManager(root);
+    await vi.waitFor(() => expect(root.querySelector('.org-tabs')).not.toBeNull());
+    (root.querySelector('[data-tab="members"]') as HTMLElement).click();
+    await vi.waitFor(() => expect(root.querySelector('.org-member-remove')).not.toBeNull());
+
+    (root.querySelector('.org-member-remove') as HTMLElement).click();
+
+    const message = String(confirmFn.mock.calls[0]![0]).toLowerCase();
+    expect(message).toContain('no token at all');
+    expect(message).not.toContain('rotate it');
   });
 
   it('rotating the join token shows the new token once confirmed', async () => {

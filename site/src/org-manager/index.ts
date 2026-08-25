@@ -89,9 +89,14 @@ export function renderOrgManager(root: HTMLElement): () => void {
         try { await api.createOrganisation(name); location.reload(); } catch (e) { alert(String((e as Error).message)); }
       },
       onJoin: async () => {
-        const token = prompt('Join token:')?.trim();
-        if (!token) return;
-        try { await api.joinOrganisation(token); location.reload(); } catch (e) { alert(String((e as Error).message)); }
+        // Blank is a real answer here, not a cancel — it asks the server to
+        // match the signed-in email domain. Only a dismissed prompt (null)
+        // aborts.
+        const entered = prompt('Join token — leave blank to join by your email domain:');
+        if (entered === null) return;
+        const token = entered.trim();
+        try { await api.joinOrganisation(token || undefined); location.reload(); }
+        catch (e) { alert(String((e as Error).message)); }
       },
       onLinkGoogle: startGoogleLink,
       onLogout: async () => { await api.logout(); showLogin(); },
@@ -182,6 +187,7 @@ export function renderOrgManager(root: HTMLElement): () => void {
             members: (await api.getMembers(name)).members,
             isOwner,
             ownerUserId: org.creator_user_id,
+            domainJoinEnabled: org.access.domain_join_enabled,
             onRemove: (userId) => {
               void (async () => {
                 try { await api.removeMember(name, userId); void drawMain(); }
@@ -199,7 +205,12 @@ export function renderOrgManager(root: HTMLElement): () => void {
               onSave: (settings: OrgAccessSettings) => {
                 void (async () => {
                   try { const res = await api.setOrgAccess(name, settings); access = res.access; drawAccess(null); }
-                  catch (e) { alert(String((e as Error).message)); }
+                  catch (e) {
+                    alert(String((e as Error).message));
+                    // The controls read live DOM, so a refused toggle would
+                    // otherwise stay ticked and be re-sent with the next save.
+                    drawAccess(null);
+                  }
                 })();
               },
               onRotate: () => {

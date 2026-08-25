@@ -10,20 +10,29 @@ export type MembersDeps = {
   /** The creator's user_id — never offered a Remove button; the server refuses
    *  it too (CANNOT_REMOVE_OWNER), but the control should not dangle here. */
   ownerUserId?: string;
+  /** Changes what the confirmation can promise about shutting someone out:
+   *  with domain auto-join on, rotating the token does not. */
+  domainJoinEnabled?: boolean;
   onRemove?: (userId: string) => void;
 };
 
 // Removal is not blocking: it says so, plainly, so nobody reads this as
 // permanent. What actually happens, in the order it happens:
-//   - immediate loss of access to races and standings
-//   - past results are untouched — those races already happened
+//   - immediate loss of creating and joining races, and of the member list
+//   - standings and past results stay readable: those pages need no membership
 //   - the horse does not carry into next season
-//   - rejoining is still open, unless the token is also rotated or turned off
-function removeConfirm(name: string): string {
+//   - rejoining is still open, and with domain auto-join on the token is not
+//     the lever that stops it
+function removeConfirm(name: string, domainJoinEnabled: boolean): string {
+  const rejoin = domainJoinEnabled
+    ? `They can rejoin at once with no token at all — this organisation admits anyone with a matching email domain. `
+      + `Turn that off on the Access tab first if you mean to keep them out.`
+    : `They can rejoin with the join token unless you also rotate it or turn joining off.`;
   return `Remove ${name} from this organisation?\n\n`
-    + `They lose access to races and standings immediately. Their past results stay — those races happened — `
+    + `They lose access to creating and joining this organisation's races immediately. `
+    + `Standings and past results stay visible to them — those races happened — `
     + `but their horse will not be carried into next season.\n\n`
-    + `They can rejoin with the join token unless you also rotate it or turn joining off.`;
+    + rejoin;
 }
 
 export function renderMembers(root: HTMLElement, deps: MembersDeps): void {
@@ -48,7 +57,7 @@ export function renderMembers(root: HTMLElement, deps: MembersDeps): void {
     btn.addEventListener('click', () => {
       const userId = btn.dataset.user!;
       const name = btn.dataset.name!;
-      if (!confirm(removeConfirm(name))) return;
+      if (!confirm(removeConfirm(name, deps.domainJoinEnabled === true))) return;
       deps.onRemove?.(userId);
     });
   });

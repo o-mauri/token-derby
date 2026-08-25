@@ -34,6 +34,9 @@ type OrgRecord = Omit<Organisation, keyof OrgAccessSettings> &
     webhook_url?: string;
     webhook_secret?: string;
     slack?: OrgSlackConfig;
+    // Bumped by every setOrgAccess write and used as its compare-and-swap
+    // token. Absent until the first access save, including on legacy rows.
+    access_rev?: number;
   };
 
 export async function putOrganisation(org: Organisation, org_join_token: string): Promise<void> {
@@ -48,10 +51,16 @@ export async function putOrganisation(org: Organisation, org_join_token: string)
   }));
 }
 
-export async function getOrganisationById(org_id: string): Promise<OrgRecord | null> {
+// `consistent` is for read-modify-write callers: setOrgAccess compares
+// access_rev, and a stale copy of it would refuse a legitimate save.
+export async function getOrganisationById(
+  org_id: string,
+  options: { consistent?: boolean } = {},
+): Promise<OrgRecord | null> {
   const { Item } = await ddb.send(new GetCommand({
     TableName: TABLE,
     Key: orgMetaKey(org_id),
+    ...(options.consistent ? { ConsistentRead: true } : {}),
   }));
   return Item ? pickOrgRecord(Item) : null;
 }
@@ -125,31 +134,59 @@ export async function removeMember(org_id: string, user_id: string): Promise<boo
   }
 }
 
+/** Raised when the org's access settings changed between the caller's read and
+ *  its write, so the write was refused rather than clobbering the other save. */
+export class OrgAccessConflictError extends Error {
+  constructor(org_id: string) {
+    super(`Access settings for ${org_id} changed since they were read`);
+    this.name = 'OrgAccessConflictError';
+  }
+}
+
 // Writes all four access fields together, never one at a time: the settings
 // are validated as a set (restrict_to_allowed_domains with an empty
 // allowed_domains locks everyone out), so a writer that could land half of a
 // validated pair would be able to reach a combination nothing validated.
+//
+// `expected_rev` is the `access_rev` the caller read, or undefined for a row
+// that has never been saved. The condition makes this a compare-and-swap: two
+// overlapping saves cannot both land, so the loser cannot strand the winner's
+// stored domains with claim rows it reconciled against a stale snapshot.
 // Attribute names go through ExpressionAttributeNames because several of these
 // words are DynamoDB reserved words.
-export async function setOrgAccess(org_id: string, access: OrgAccessSettings): Promise<void> {
-  await ddb.send(new UpdateCommand({
-    TableName: TABLE,
-    Key: orgMetaKey(org_id),
-    UpdateExpression: 'SET #ad = :ad, #jte = :jte, #dje = :dje, #rad = :rad',
-    ConditionExpression: 'attribute_exists(pk)',
-    ExpressionAttributeNames: {
-      '#ad': 'allowed_domains',
-      '#jte': 'join_token_enabled',
-      '#dje': 'domain_join_enabled',
-      '#rad': 'restrict_to_allowed_domains',
-    },
-    ExpressionAttributeValues: {
-      ':ad': access.allowed_domains,
-      ':jte': access.join_token_enabled,
-      ':dje': access.domain_join_enabled,
-      ':rad': access.restrict_to_allowed_domains,
-    },
-  }));
+export async function setOrgAccess(
+  org_id: string,
+  access: OrgAccessSettings,
+  expected_rev: number | undefined,
+): Promise<void> {
+  try {
+    await ddb.send(new UpdateCommand({
+      TableName: TABLE,
+      Key: orgMetaKey(org_id),
+      UpdateExpression: 'SET #ad = :ad, #jte = :jte, #dje = :dje, #rad = :rad, #rev = :next_rev',
+      ConditionExpression: expected_rev === undefined
+        ? 'attribute_exists(pk) AND attribute_not_exists(#rev)'
+        : 'attribute_exists(pk) AND #rev = :rev',
+      ExpressionAttributeNames: {
+        '#ad': 'allowed_domains',
+        '#jte': 'join_token_enabled',
+        '#dje': 'domain_join_enabled',
+        '#rad': 'restrict_to_allowed_domains',
+        '#rev': 'access_rev',
+      },
+      ExpressionAttributeValues: {
+        ':ad': access.allowed_domains,
+        ':jte': access.join_token_enabled,
+        ':dje': access.domain_join_enabled,
+        ':rad': access.restrict_to_allowed_domains,
+        ':next_rev': (expected_rev ?? 0) + 1,
+        ...(expected_rev === undefined ? {} : { ':rev': expected_rev }),
+      },
+    }));
+  } catch (err: any) {
+    if (err?.name === 'ConditionalCheckFailedException') throw new OrgAccessConflictError(org_id);
+    throw err;
+  }
 }
 
 // `org_join_token` is queried through OrgJoinTokenIndex (see

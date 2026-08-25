@@ -147,6 +147,19 @@ renderAccess(tabSection('Access tab (owner — token+domain joins both open)'), 
   onRotate: () => {},
 });
 
+// The rotation blurb and the removal confirmation both change wording with
+// domain auto-join off, so both states need a fixture.
+renderAccess(tabSection('Access tab (owner — domain auto-join off)'), {
+  access: {
+    allowed_domains: ['acme.com'],
+    join_token_enabled: true,
+    domain_join_enabled: false,
+    restrict_to_allowed_domains: false,
+  },
+  onSave: () => {},
+  onRotate: () => {},
+});
+
 renderAccess(tabSection('Access tab (owner — just rotated the join token)'), {
   access: {
     allowed_domains: ['acme.com', 'acme.io'],

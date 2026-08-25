@@ -368,18 +368,28 @@ describe('joinOrganisation: existing members', () => {
     expect(await isMember(org.org_id, joiner.user_id)).toBe(true);
   });
 
-  it('refuses even an existing member the disabled token, since the token itself is the thing withdrawn', async () => {
+  // The token gate governs who may *become* a member, exactly like the
+  // restriction above: a member re-running `join` with a saved token after the
+  // owner turns tokens off is told which org they are in, not refused. The
+  // second half is what keeps this from being "delete the gate" — the same
+  // disabled token still refuses someone who is not a member yet.
+  it('still returns the org to an existing member after the token is turned off, while refusing a non-member', async () => {
     const creator = await makeUser('JO_MemberTokenOffCreator');
     const joiner = await makeUser('JO_MemberTokenOffJoiner');
+    const outsider = await makeUser('JO_MemberTokenOffOutsider');
     const org = await makeOrg(creator, orgName('MemberTokenOffOrg'));
     await joinOrg(joinEvent(joiner, { join_token: org.org_join_token }));
     await setOrgAccess(org.org_id, { join_token_enabled: false });
 
-    const res: any = await joinOrg(joinEvent(joiner, { join_token: org.org_join_token }));
-    expect(res.statusCode).toBe(403);
-    expect(JSON.parse(res.body).code).toBe('JOIN_TOKEN_DISABLED');
-    // Membership is untouched — the refusal is about the credential, not them.
+    const member: any = await joinOrg(joinEvent(joiner, { join_token: org.org_join_token }));
+    expect(member.statusCode).toBe(200);
+    expect(JSON.parse(member.body).org_id).toBe(org.org_id);
     expect(await isMember(org.org_id, joiner.user_id)).toBe(true);
+
+    const stranger: any = await joinOrg(joinEvent(outsider, { join_token: org.org_join_token }));
+    expect(stranger.statusCode).toBe(403);
+    expect(JSON.parse(stranger.body).code).toBe('JOIN_TOKEN_DISABLED');
+    await expectNotAMember(org.org_id, outsider);
   });
 });
 

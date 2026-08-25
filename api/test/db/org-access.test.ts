@@ -7,7 +7,10 @@ import {
   getOrganisationById,
   getOrganisationByName,
   getOrganisationByJoinToken,
+  setOrgAccess,
+  OrgAccessConflictError,
 } from '../../src/db/organisations.js';
+import type { OrgAccessSettings } from '@token-derby/shared';
 
 // Writes a META row exactly as it would have looked before Phase 3 (org
 // access control) — no allowed_domains, join_token_enabled,
@@ -82,5 +85,59 @@ describe('legacy org rows get safe Phase 3 access-control defaults', () => {
     }));
     const org = await getOrganisationById(org_id);
     expect(org!.allowed_domains).toEqual(['acme.com', 'sub.example.org']);
+  });
+});
+
+describe('setOrgAccess compare-and-swap', () => {
+  const access = (over: Partial<OrgAccessSettings> = {}): OrgAccessSettings => ({
+    allowed_domains: [],
+    join_token_enabled: true,
+    domain_join_enabled: false,
+    restrict_to_allowed_domains: false,
+    ...over,
+  });
+
+  it('accepts the first save of a row that has never been saved', async () => {
+    const { org_id } = await putLegacyOrg();
+
+    await setOrgAccess(org_id, access({ allowed_domains: ['a.com'] }), undefined);
+
+    const org = await getOrganisationById(org_id);
+    expect(org!.allowed_domains).toEqual(['a.com']);
+    expect(org!.access_rev).toBe(1);
+  });
+
+  // The overlapping-saves case: both reads saw an unversioned row, so the
+  // second write is refused instead of clobbering the first. Without the guard
+  // the loser would silently overwrite settings it reconciled its claim rows
+  // against a stale snapshot of.
+  it('refuses a second save that also read the row as unversioned', async () => {
+    const { org_id } = await putLegacyOrg();
+    await setOrgAccess(org_id, access({ allowed_domains: ['first.com'] }), undefined);
+
+    await expect(setOrgAccess(org_id, access({ allowed_domains: ['second.com'] }), undefined))
+      .rejects.toBeInstanceOf(OrgAccessConflictError);
+    expect((await getOrganisationById(org_id))!.allowed_domains).toEqual(['first.com']);
+  });
+
+  it('accepts a save that presents the current revision, and bumps it', async () => {
+    const { org_id } = await putLegacyOrg();
+    await setOrgAccess(org_id, access(), undefined);
+
+    await setOrgAccess(org_id, access({ allowed_domains: ['next.com'] }), 1);
+
+    const org = await getOrganisationById(org_id);
+    expect(org!.allowed_domains).toEqual(['next.com']);
+    expect(org!.access_rev).toBe(2);
+  });
+
+  it('refuses a save that presents a stale revision, leaving the stored settings alone', async () => {
+    const { org_id } = await putLegacyOrg();
+    await setOrgAccess(org_id, access(), undefined);
+    await setOrgAccess(org_id, access({ allowed_domains: ['winner.com'] }), 1);
+
+    await expect(setOrgAccess(org_id, access({ allowed_domains: ['loser.com'] }), 1))
+      .rejects.toBeInstanceOf(OrgAccessConflictError);
+    expect((await getOrganisationById(org_id))!.allowed_domains).toEqual(['winner.com']);
   });
 });
