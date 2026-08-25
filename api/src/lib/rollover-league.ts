@@ -1,11 +1,11 @@
 import type { League, LeagueStanding, LeagueSeasonResult, LeagueSeasonEndedEvent, PendingStructural } from '@token-derby/shared';
 import { computeNextDivisions, seasonPrizeXp, leagueXpMultiplier, byStanding, buildSeasonStandings } from '@token-derby/shared';
 import { getLeagueSeason, ensureLeagueSeason, markSeasonComplete } from '../db/league-seasons.js';
-import { listSeasonStandings, ensureStanding, tryMarkPrizeAwarded } from '../db/league-standings.js';
+import { listSeasonStandings, listSeasonParticipants, ensureStanding, tryMarkPrizeAwarded } from '../db/league-standings.js';
 import { putSeasonResultIfAbsent } from '../db/league-results.js';
 import { commitRollover } from '../db/leagues.js';
 import { listRacesByOrgId } from '../db/races.js';
-import { getOrganisationById } from '../db/organisations.js';
+import { getOrganisationById, listOrgMemberIds } from '../db/organisations.js';
 import { finaliseRace } from './finalise-race.js';
 import { sendOrgWebhook } from './webhook.js';
 import { sendOrgSlack } from './slack/send.js';
@@ -68,9 +68,30 @@ export async function rolloverDueLeague(league: League, now: Date): Promise<bool
   }
 
   // 3. Seed the next season (put-if-absent per row + season row).
+  //
+  // Two culls, deliberately scoped to this loop and nowhere else. `standings`
+  // describes a season that has already been raced, so filtering it at source
+  // would retroactively rewrite it: the anti-farm gate above, the per-division
+  // field size used for prize XP, the promoted/relegated summary and the
+  // league.season.ended payload all read the full list on purpose.
+  const members = new Set(await listOrgMemberIds(org_id));
+  const raced = await listSeasonParticipants(org_id, season);
+  // The division the horse SAT IN this season, not its computed next division —
+  // an idle horse higher up is relegated on points as normal and only becomes
+  // cullable at the following rollover, once it has reached the bottom.
+  const bottom = league.divisions.length;
   const nextSeason = season + 1;
   await ensureLeagueSeason(org_id, nextSeason);
   for (const s of standings) {
+    // A removed member's horse cannot score (scoreLeagueRace filters on the same
+    // membership list) and cannot enter (join-race blocks it), so seeding it
+    // would carry a permanent 0-point ghost into every future season.
+    if (!members.has(s.user_id)) continue;
+    // Idle in the bottom division → not carried forward. Nothing is lost:
+    // scoreLeagueRace's new-entrant path re-adds it at the bottom division the
+    // moment it races again. "Idle" is an empty scored_rounds set, never
+    // `points > 0` — last place can legitimately score nothing having raced.
+    if (s.division >= bottom && !raced.has(s.stable_horse_id)) continue;
     const nd = nextDivision.get(s.stable_horse_id) ?? s.division;
     await ensureStanding({
       org_id, season: nextSeason, division: nd,

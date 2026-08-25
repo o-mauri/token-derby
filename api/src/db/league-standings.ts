@@ -50,6 +50,39 @@ export async function listSeasonStandingDivisions(
   return out;
 }
 
+/**
+ * stable_horse_ids that raced at least once this season — those whose
+ * `scored_rounds` set is non-empty. Deliberately a separate query rather than
+ * a field on LeagueStanding: listSeasonStandings strips scored_rounds (it's
+ * an internal idempotency mechanism), and threading a derived `raced` field
+ * through LeagueStanding would leak into buildSeasonStandings and, by
+ * structural typing, into the league.season.ended webhook payload.
+ *
+ * Do not substitute `points > 0` (last place can legitimately score 0 while
+ * having raced) or `season_tokens > 0` (a horse can race and produce no
+ * tokens) — the only correct signal is a non-empty scored_rounds set.
+ */
+export async function listSeasonParticipants(org_id: string, season: number): Promise<Set<string>> {
+  const { pk, skPrefix } = orgLeagueStandingsPrefix(org_id, season);
+  const out = new Set<string>();
+  let ExclusiveStartKey: Record<string, any> | undefined;
+  do {
+    const res = await ddb.send(new QueryCommand({
+      TableName: TABLE,
+      KeyConditionExpression: 'pk = :pk AND begins_with(sk, :p)',
+      ExpressionAttributeValues: { ':pk': pk, ':p': skPrefix },
+      ProjectionExpression: 'stable_horse_id, scored_rounds',
+      ExclusiveStartKey,
+    }));
+    for (const it of res.Items ?? []) {
+      const rounds: Set<number> | undefined = it.scored_rounds;
+      if (it.stable_horse_id && rounds && rounds.size > 0) out.add(String(it.stable_horse_id));
+    }
+    ExclusiveStartKey = res.LastEvaluatedKey;
+  } while (ExclusiveStartKey);
+  return out;
+}
+
 // Create a standing row if absent (a new entrant). No-op when it already exists.
 export async function ensureStanding(s: LeagueStanding): Promise<void> {
   try {
