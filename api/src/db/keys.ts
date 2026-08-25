@@ -150,6 +150,12 @@ export function emailClaimKey(email: string) {
   return { pk: `${EMAIL_PK_PREFIX}${email}`, sk: 'CLAIM' };
 }
 
+export const DOMAIN_PK_PREFIX = 'DOMAIN#';
+
+export function orgDomainKey(domain: string) {
+  return { pk: `${DOMAIN_PK_PREFIX}${domain}`, sk: 'CLAIM' };
+}
+
 export const DEVICE_SK_PREFIX = 'DEVICE#';
 
 export function deviceKey(user_id: string, tokenHash: string) {
