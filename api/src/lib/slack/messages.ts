@@ -42,6 +42,9 @@ export function buildRaceCreatedMessage(event: RaceCreatedEvent): SlackMessage {
       { type: 'divider' },
       { type: 'section', text: { type: 'mrkdwn', text: 'Join code:' } },
       { type: 'header', text: { type: 'plain_text', text: `🔑  ${race.join_code}`, emoji: true } },
+      // A fenced block, because Slack puts a copy button on those — an app cannot
+      // touch the clipboard itself, so this is the only one-click copy available.
+      { type: 'section', text: { type: 'mrkdwn', text: `\`\`\`\ntoken-derby join ${race.join_code}\n\`\`\`` } },
       { type: 'section', text: { type: 'mrkdwn', text: liveRaceLink(race.join_code) } },
     ],
   };

@@ -84,3 +84,21 @@ describe('the live race link on a starting race', () => {
     expect(flat).not.toContain('AB7XQ2');
   });
 });
+
+describe('the copyable join command', () => {
+  it('is a fenced block, which is the only thing Slack puts a copy button on', () => {
+    const flat = JSON.stringify(buildRaceCreatedMessage(CREATED).blocks);
+    // Slack apps cannot touch the clipboard; a fenced block is what gives the
+    // reader one-click copy. Inline code and plain text do not.
+    expect(flat).toContain('```\\ntoken-derby join AB7XQ2\\n```');
+  });
+
+  it('copies the real command, so the exact CLI syntax has to hold', () => {
+    const flat = JSON.stringify(buildRaceCreatedMessage(CREATED).blocks);
+    // bin.ts declares `token-derby join <join-code>`. A wrong command pasted
+    // from a copy button is worse than no command at all.
+    expect(flat).toContain('token-derby join ');
+    expect(flat).not.toContain('token-derby race join');
+    expect(flat).not.toContain('token-derby organisation join');
+  });
+});
