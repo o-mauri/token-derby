@@ -1,5 +1,14 @@
 [
   {
+    "version": "0.14.0",
+    "date": "2026-08-25",
+    "component": "site",
+    "changes": [
+      "device linking screen",
+      "org management controls"
+    ]
+  },
+  {
     "version": "3.0.0",
     "date": "2026-08-25",
     "component": "cli",
