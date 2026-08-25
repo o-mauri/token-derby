@@ -31,6 +31,15 @@ const ROUTES: Route[] = [
   { method: 'GET',  pattern: '/api/organisations',        load: () => import('../api/src/handlers/list-organisations.js') },
   { method: 'GET',  pattern: '/api/organisations/{org_name}', load: () => import('../api/src/handlers/get-organisation.js') },
   { method: 'GET',  pattern: '/api/organisations/{org_name}/members', load: () => import('../api/src/handlers/list-org-members.js') },
+  { method: 'PUT',  pattern: '/api/organisations/{org_name}/access', load: () => import('../api/src/handlers/set-org-access.js') },
+  // ORDER MATTERS HERE, unlike in production (see the /api/devices note above).
+  // match() returns the first hit, so this static join-token/rotate path must
+  // precede any broader /organisations/{org_name}/... pattern with the same
+  // segment count and method, or a retried rotation would silently resolve to
+  // the wrong handler. No such broader POST pattern exists today, but this
+  // stays first regardless so a future one can never swallow it by accident.
+  { method: 'POST', pattern: '/api/organisations/{org_name}/join-token/rotate', load: () => import('../api/src/handlers/rotate-org-join-token.js') },
+  { method: 'DELETE', pattern: '/api/organisations/{org_name}/members/{user_id}', load: () => import('../api/src/handlers/remove-org-member.js') },
   // Needed to exercise the migration path: an existing CLI jockey created by
   // `init`, then `web` to reach the org manager as that same jockey — which is
   // how a legacy user obtains a web session before linking.

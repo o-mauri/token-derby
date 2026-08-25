@@ -160,3 +160,60 @@ describe('CLI login routes', () => {
     }
   });
 });
+
+describe('org access control routes', () => {
+  let prod: Template;
+  beforeAll(() => { prod = synth('prod'); });
+
+  // Every Phase 3 handler wired via makeFn/addRoutes. Checked by
+  // function-logical-id prefix (not just "a route with this key exists") so a
+  // route wired to the wrong Lambda fails here rather than passing silently —
+  // these three were unreachable in every deployed stack until this route.
+  const NEW_ROUTES: Array<{ routeKey: string; fnPrefix: string }> = [
+    { routeKey: 'PUT /api/organisations/{org_name}/access', fnPrefix: 'SetOrgAccessFn' },
+    { routeKey: 'POST /api/organisations/{org_name}/join-token/rotate', fnPrefix: 'RotateOrgJoinTokenFn' },
+    { routeKey: 'DELETE /api/organisations/{org_name}/members/{user_id}', fnPrefix: 'RemoveOrgMemberFn' },
+  ];
+
+  it('wires each org access control route to its own handler', () => {
+    for (const { routeKey, fnPrefix } of NEW_ROUTES) {
+      const fnLogicalId = routeTargetFunctionLogicalId(prod, routeKey);
+      expect(fnLogicalId.startsWith(fnPrefix), `${routeKey} -> ${fnLogicalId}, expected prefix ${fnPrefix}`).toBe(true);
+    }
+  });
+
+  // The omission guard: rotation is its own POST endpoint precisely because a
+  // retried PUT must never mint a second token. If rotation were folded back
+  // onto the access route, or its integration pointed at set-org-access, a
+  // retried rotate would silently resolve to the settings handler instead.
+  it('keeps join-token/rotate on its own handler, distinct from PUT .../access', () => {
+    const rotateFn = routeTargetFunctionLogicalId(prod, 'POST /api/organisations/{org_name}/join-token/rotate');
+    const accessFn = routeTargetFunctionLogicalId(prod, 'PUT /api/organisations/{org_name}/access');
+    expect(rotateFn.startsWith('RotateOrgJoinTokenFn'), `rotate -> ${rotateFn}`).toBe(true);
+    expect(accessFn.startsWith('SetOrgAccessFn'), `access -> ${accessFn}`).toBe(true);
+    expect(rotateFn).not.toBe(accessFn);
+  });
+
+  // DELETE .../members/{user_id} overlaps in path shape with GET .../members.
+  // If remove-org-member were ever forgotten, or wired to list-org-members,
+  // this would need to fail rather than pass on a RouteKey-only check.
+  it('keeps GET .../members and DELETE .../members/{user_id} on separate handlers', () => {
+    const listFn = routeTargetFunctionLogicalId(prod, 'GET /api/organisations/{org_name}/members');
+    const removeFn = routeTargetFunctionLogicalId(prod, 'DELETE /api/organisations/{org_name}/members/{user_id}');
+    expect(listFn.startsWith('ListOrgMembersFn'), `GET .../members -> ${listFn}, expected ListOrgMembersFn`).toBe(true);
+    expect(removeFn.startsWith('RemoveOrgMemberFn'), `DELETE .../members/{user_id} -> ${removeFn}, expected RemoveOrgMemberFn`).toBe(true);
+    expect(listFn).not.toBe(removeFn);
+  });
+
+  it('gives every org access control handler SITE_ORIGIN', () => {
+    const fns = appFunctions(prod);
+    // Guards the prefix filters above the same way the top-level count guard
+    // does: an empty match per prefix would make its own SITE_ORIGIN check vacuous.
+    const prefixes = ['SetOrgAccessFn', 'RotateOrgJoinTokenFn', 'RemoveOrgMemberFn'];
+    for (const prefix of prefixes) {
+      const matched = fns.filter((f) => f.id.startsWith(prefix));
+      expect(matched, `no ${prefix} in the template`).toHaveLength(1);
+      expect(matched[0]!.env.SITE_ORIGIN).toBe('https://token-derby.mauricode.co.uk');
+    }
+  });
+});

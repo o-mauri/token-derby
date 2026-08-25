@@ -205,6 +205,9 @@ export class TokenDerbyStack extends cdk.Stack {
     const authLinkStartFn = makeFn('AuthLinkStartFn', 'auth-link-start');
     const authGoogleCallbackFn = makeFn('AuthGoogleCallbackFn', 'auth-google-callback');
     const listOrgMembersFn = makeFn('ListOrgMembersFn', 'list-org-members');
+    const setOrgAccessFn = makeFn('SetOrgAccessFn', 'set-org-access');
+    const rotateOrgJoinTokenFn = makeFn('RotateOrgJoinTokenFn', 'rotate-org-join-token');
+    const removeOrgMemberFn = makeFn('RemoveOrgMemberFn', 'remove-org-member');
     const scheduleTickFn = makeFn('ScheduleTickFn', 'schedule-tick', { timeout: cdk.Duration.seconds(120) });
 
     const authCliStartFn = makeFn('AuthCliStartFn', 'auth-cli-start');
@@ -369,6 +372,14 @@ export class TokenDerbyStack extends cdk.Stack {
       integration: new HttpLambdaIntegration('GetOrgLeagueStandingsInt', getOrgLeagueStandingsFn),
     });
     httpApi.addRoutes({ path: '/api/organisations/{org_name}/members', methods: [HttpMethod.GET], integration: new HttpLambdaIntegration('ListOrgMembersInt', listOrgMembersFn) });
+    httpApi.addRoutes({ path: '/api/organisations/{org_name}/access', methods: [HttpMethod.PUT], integration: new HttpLambdaIntegration('SetOrgAccessInt', setOrgAccessFn) });
+    // Own endpoint, not a flag on the PUT above: a PUT is retryable, and a
+    // retried rotation must not mint a second token. API Gateway prefers a
+    // static segment over a path variable regardless of declaration order, so
+    // this is never at risk of being swallowed by a broader {org_name}/...
+    // pattern here (unlike scripts/local-api.ts, where order matters).
+    httpApi.addRoutes({ path: '/api/organisations/{org_name}/join-token/rotate', methods: [HttpMethod.POST], integration: new HttpLambdaIntegration('RotateOrgJoinTokenInt', rotateOrgJoinTokenFn) });
+    httpApi.addRoutes({ path: '/api/organisations/{org_name}/members/{user_id}', methods: [HttpMethod.DELETE], integration: new HttpLambdaIntegration('RemoveOrgMemberInt', removeOrgMemberFn) });
     httpApi.addRoutes({ path: '/api/web-sessions', methods: [HttpMethod.POST], integration: new HttpLambdaIntegration('CreateWebSessionInt', createWebSessionFn) });
     httpApi.addRoutes({ path: '/api/web-sessions/exchange', methods: [HttpMethod.POST], integration: new HttpLambdaIntegration('ExchangeWebSessionInt', exchangeWebSessionFn) });
     httpApi.addRoutes({ path: '/api/web-sessions', methods: [HttpMethod.DELETE], integration: new HttpLambdaIntegration('DeleteWebSessionInt', deleteWebSessionFn) });

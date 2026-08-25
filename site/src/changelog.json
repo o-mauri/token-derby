@@ -1,5 +1,15 @@
 [
   {
+    "version": "3.0.0",
+    "date": "2026-08-25",
+    "component": "cli",
+    "changes": [
+      "SSO Account Linking",
+      "Added login, link, whoami commands",
+      "Google Account integration"
+    ]
+  },
+  {
     "version": "2.13.1",
     "date": "2026-08-19",
     "component": "cli",

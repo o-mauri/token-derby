@@ -1730,7 +1730,7 @@ label.label {
   max-width: 260px;
 }
 label.label:has(input[type="checkbox"]) { flex-direction: row; align-items: center; max-width: none; }
-label.label input, label.label select {
+label.label input, label.label select, label.label textarea {
   font-family: inherit;
   text-transform: none;
   letter-spacing: normal;
@@ -1743,8 +1743,9 @@ label.label input, label.label select {
   width: 100%;
 }
 label.label input[type="checkbox"] { width: auto; }
-label.label input:focus, label.label select:focus { outline: none; border-color: var(--accent); }
-label.label input:disabled, label.label select:disabled { opacity: 0.5; }
+label.label textarea { resize: vertical; }
+label.label input:focus, label.label select:focus, label.label textarea:focus { outline: none; border-color: var(--accent); }
+label.label input:disabled, label.label select:disabled, label.label textarea:disabled { opacity: 0.5; }
 
 .org-token {
   display: inline-block;
@@ -1826,6 +1827,32 @@ label.label input:disabled, label.label select:disabled { opacity: 0.5; }
   color: var(--accent);
 }
 .org-secret code { font-size: 1rem; letter-spacing: 0.03em; word-break: break-all; }
+
+/* Access tab (render/tabs/access.ts). Toggle rows match .org-stamina-toggle's
+   row layout; given its own name because "stamina" would be a misleading
+   class on an access-control checkbox. */
+.org-access-toggle { flex-direction: row !important; align-items: center; gap: 8px; max-width: none !important; }
+/* A sub-section within the tab's own .org-panel, not a nested panel — a box
+   inside a box would just double the border. A top rule is enough to set the
+   rotation controls apart from the toggles above. */
+.org-access-rotate {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.org-member-remove {
+  background: none;
+  border: 1px solid var(--error);
+  color: var(--error);
+  font: inherit;
+  font-size: 0.8rem;
+  padding: 4px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.org-member-remove:hover { background: var(--error-wash); }
 
 /* Account sidebar entry (render/sidebar.ts): styled like an org row so it
    reads as a peer entry, not a lesser one, even though it sits above the org

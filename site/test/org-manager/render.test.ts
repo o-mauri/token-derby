@@ -73,7 +73,9 @@ describe('renderOverview', () => {
   it('renders the join token and creator', () => {
     renderOverview(root, {
       org: { org_id: 'o1', org_name: 'Acme', org_join_token: 'JOIN-XYZ',
-        created_at: '2026-05-14T00:00:00Z', creator_user_id: 'u1', creator_user_name: 'omar' },
+        created_at: '2026-05-14T00:00:00Z', creator_user_id: 'u1', creator_user_name: 'omar',
+        access: { allowed_domains: [], join_token_enabled: true,
+          domain_join_enabled: false, restrict_to_allowed_domains: false } },
     });
     expect(root.textContent).toContain('JOIN-XYZ');
     expect(root.textContent).toContain('omar');

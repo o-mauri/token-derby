@@ -9,6 +9,7 @@ import { renderRacing } from './org-manager/render/tabs/racing.js';
 import { renderWebhook } from './org-manager/render/tabs/webhook.js';
 import { renderSlackbot } from './org-manager/render/tabs/slackbot.js';
 import { renderRaceSettings } from './org-manager/render/tabs/race-settings.js';
+import { renderAccess } from './org-manager/render/tabs/access.js';
 import { renderAccount } from './org-manager/render/account.js';
 
 const app = document.getElementById('app')!;
@@ -36,6 +37,7 @@ shell.innerHTML = `
       <button type="button" class="org-tab">racing</button>
       <button type="button" class="org-tab">webhook</button>
       <button type="button" class="org-tab">slackbot</button>
+      <button type="button" class="org-tab">access</button>
     </nav>
     <div class="org-tabbody"></div>
   </div>
@@ -95,6 +97,12 @@ renderOverview(shell.querySelector<HTMLElement>('.org-tabbody')!, {
     created_at: '2026-05-14T00:00:00Z',
     creator_user_id: 'u1',
     creator_user_name: 'omar',
+    access: {
+      allowed_domains: [],
+      join_token_enabled: true,
+      domain_join_enabled: false,
+      restrict_to_allowed_domains: false,
+    },
   },
 });
 
@@ -109,12 +117,46 @@ function tabSection(title: string): HTMLElement {
   return section.querySelector<HTMLElement>('.org-tabbody')!;
 }
 
-renderMembers(tabSection('Members tab'), {
+renderMembers(tabSection('Members tab (non-owner — no Remove column)'), {
   members: [
     { user_id: 'u1', user_name: 'omar', joined_at: '2026-05-14T00:00:00Z' },
     { user_id: 'u2', user_name: 'jess', joined_at: '2026-06-01T00:00:00Z' },
     { user_id: 'u3', user_name: 'sam', joined_at: '2026-06-20T00:00:00Z' },
   ],
+});
+
+renderMembers(tabSection('Members tab (owner — Remove available, never on their own row)'), {
+  members: [
+    { user_id: 'u1', user_name: 'omar', joined_at: '2026-05-14T00:00:00Z' },
+    { user_id: 'u2', user_name: 'jess', joined_at: '2026-06-01T00:00:00Z' },
+    { user_id: 'u3', user_name: 'sam', joined_at: '2026-06-20T00:00:00Z' },
+  ],
+  isOwner: true,
+  ownerUserId: 'u1',
+  onRemove: () => {},
+});
+
+renderAccess(tabSection('Access tab (owner — token+domain joins both open)'), {
+  access: {
+    allowed_domains: ['acme.com'],
+    join_token_enabled: true,
+    domain_join_enabled: true,
+    restrict_to_allowed_domains: false,
+  },
+  onSave: () => {},
+  onRotate: () => {},
+});
+
+renderAccess(tabSection('Access tab (owner — just rotated the join token)'), {
+  access: {
+    allowed_domains: ['acme.com', 'acme.io'],
+    join_token_enabled: true,
+    domain_join_enabled: true,
+    restrict_to_allowed_domains: true,
+  },
+  rotatedToken: 'td_join_k3mP9qXz',
+  onSave: () => {},
+  onRotate: () => {},
 });
 
 renderRacing(tabSection('Racing tab (owner) — League mode'), {

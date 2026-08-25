@@ -10,10 +10,11 @@ import { renderRacing } from './render/tabs/racing.js';
 import { renderWebhook } from './render/tabs/webhook.js';
 import { renderSlackbot } from './render/tabs/slackbot.js';
 import { renderRaceSettings } from './render/tabs/race-settings.js';
+import { renderAccess } from './render/tabs/access.js';
 import { renderAccount } from './render/account.js';
-import type { OrganisationSummary } from '@token-derby/shared';
+import type { OrganisationSummary, OrgAccessSettings } from '@token-derby/shared';
 
-type Tab = 'overview' | 'members' | 'racing' | 'webhook' | 'slackbot' | 'race-settings';
+type Tab = 'overview' | 'members' | 'racing' | 'webhook' | 'slackbot' | 'race-settings' | 'access';
 type View = 'org' | 'account';
 
 /** Exported so the link chain can be tested — it is the only route an existing
@@ -135,25 +136,81 @@ export function renderOrgManager(root: HTMLElement): () => void {
         return;
       }
       const name = selected;
-      mainEl.innerHTML = `
-        <nav class="org-tabs">
-          ${(['overview', 'members', 'racing', 'race-settings', 'webhook', 'slackbot'] as Tab[]).map((t) =>
-            `<button type="button" class="org-tab${t === tab ? ' on' : ''}" data-tab="${t}">${t}</button>`).join('')}
-        </nav>
-        <div class="org-tabbody"></div>`;
-      mainEl.querySelectorAll<HTMLElement>('.org-tab').forEach((el) =>
-        el.addEventListener('click', () => { tab = el.dataset.tab as Tab; void drawMain(); }));
-      const bodyEl = mainEl.querySelector<HTMLElement>('.org-tabbody')!;
+      // Declared here, not inside the try, so the catch below can still reach
+      // it if a failure lands after the tab strip renders but before a tab
+      // body finishes loading (e.g. getMembers/getSchedule rejecting).
+      let bodyEl: HTMLElement | null = null;
 
       try {
-        // The org record tells us ownership; every tab needs it.
+        // The org record tells us ownership; every tab needs it, and the tab
+        // strip itself needs it before it can be drawn — Access must never
+        // appear as a clickable button for a non-owner, not merely refuse
+        // once clicked.
         const org = await api.getOrganisation(name);
         const isOwner = org.creator_user_id === (await currentUserId());
         ownerOrgs[isOwner ? 'add' : 'delete'](name);
         drawSidebar();
 
-        if (tab === 'overview') renderOverview(bodyEl, { org });
-        else if (tab === 'members') renderMembers(bodyEl, { members: (await api.getMembers(name)).members });
+        const tabs: Tab[] = [
+          'overview', 'members', 'racing', 'race-settings', 'webhook', 'slackbot',
+          ...(isOwner ? (['access'] as Tab[]) : []),
+        ];
+        // Guards against landing here with 'access' selected from a
+        // still-owned org, then switching to one this user does not own.
+        if (!tabs.includes(tab)) tab = 'overview';
+
+        mainEl.innerHTML = `
+          <nav class="org-tabs">
+            ${tabs.map((t) =>
+              `<button type="button" class="org-tab${t === tab ? ' on' : ''}" data-tab="${t}">${t}</button>`).join('')}
+          </nav>
+          <div class="org-tabbody"></div>`;
+        mainEl.querySelectorAll<HTMLElement>('.org-tab').forEach((el) =>
+          el.addEventListener('click', () => { tab = el.dataset.tab as Tab; void drawMain(); }));
+        bodyEl = mainEl.querySelector<HTMLElement>('.org-tabbody')!;
+        // A separate non-null binding for the tab-rendering calls below: several
+        // of them create closures (onRemove, onSave, tab clicks) that capture
+        // `bodyEl`, and TypeScript widens a captured `let` back to its declared
+        // type at every later use — this keeps those calls narrowed instead.
+        // Named distinctly from the slackbot save handler's own `body`
+        // (a request payload) below, which would otherwise shadow it.
+        const contentEl = bodyEl;
+
+        if (tab === 'overview') renderOverview(contentEl, { org });
+        else if (tab === 'members') {
+          renderMembers(contentEl, {
+            members: (await api.getMembers(name)).members,
+            isOwner,
+            ownerUserId: org.creator_user_id,
+            onRemove: (userId) => {
+              void (async () => {
+                try { await api.removeMember(name, userId); void drawMain(); }
+                catch (e) { alert(String((e as Error).message)); }
+              })();
+            },
+          });
+        }
+        else if (tab === 'access') {
+          let access = org.access;
+          const drawAccess = (rotatedToken: string | null) =>
+            renderAccess(contentEl, {
+              access,
+              rotatedToken,
+              onSave: (settings: OrgAccessSettings) => {
+                void (async () => {
+                  try { const res = await api.setOrgAccess(name, settings); access = res.access; drawAccess(null); }
+                  catch (e) { alert(String((e as Error).message)); }
+                })();
+              },
+              onRotate: () => {
+                void (async () => {
+                  try { const res = await api.rotateJoinToken(name); drawAccess(res.org_join_token); }
+                  catch (e) { alert(String((e as Error).message)); }
+                })();
+              },
+            });
+          drawAccess(null);
+        }
         else if (tab === 'racing') {
           // Schedule + league GETs are owner-only server-side; non-owners see a read-only mode view.
           const schedule = isOwner ? ((await api.getSchedule(name)).schedule ?? null) : null;
@@ -161,7 +218,7 @@ export function renderOrgManager(root: HTMLElement): () => void {
           const guard = async (fn: () => Promise<unknown>) => {
             try { await fn(); void drawMain(); } catch (e) { alert(String((e as Error).message)); }
           };
-          renderRacing(bodyEl, {
+          renderRacing(contentEl, {
             schedule, league, isOwner,
             // Mutual exclusivity: clear the other mode (after a confirm) before saving the chosen one.
             onSaveSchedule: (b) => {
@@ -184,7 +241,7 @@ export function renderOrgManager(root: HTMLElement): () => void {
           const guard = async (fn: () => Promise<unknown>) => {
             try { await fn(); void drawMain(); } catch (e) { alert(String((e as Error).message)); }
           };
-          renderRaceSettings(bodyEl, {
+          renderRaceSettings(contentEl, {
             settings, staminaOn, isOwner,
             onSave: (b) => void guard(() => api.setRaceSettings(name, b)),
             onReset: () => void guard(() => api.setRaceSettings(name, {})),
@@ -205,7 +262,7 @@ export function renderOrgManager(root: HTMLElement): () => void {
             catch (e) { alert(String((e as Error).message)); }
           };
           const onClear = async () => { try { await api.clearWebhook(name); void drawMain(); } catch (e) { alert(String((e as Error).message)); } };
-          const drawWebhook = (lastSecret?: string) => renderWebhook(bodyEl, { webhook, isOwner, lastSecret, onSave, onClear });
+          const drawWebhook = (lastSecret?: string) => renderWebhook(contentEl, { webhook, isOwner, lastSecret, onSave, onClear });
           drawWebhook();
         }
         else if (tab === 'slackbot') {
@@ -213,15 +270,15 @@ export function renderOrgManager(root: HTMLElement): () => void {
           let slack = null as Awaited<ReturnType<typeof api.getSlack>> | null;
           if (isOwner) { try { slack = await api.getSlack(name); } catch { slack = null; } }
           const onSave = async (body: Parameters<typeof api.setSlack>[1]) => {
-            try { slack = await api.setSlack(name, body); renderSlackbot(bodyEl, { slack, isOwner, onSave, onClear }); }
+            try { slack = await api.setSlack(name, body); renderSlackbot(contentEl, { slack, isOwner, onSave, onClear }); }
             catch (e) { alert(String((e as Error).message)); }
           };
           const onClear = async () => { try { await api.clearSlack(name); void drawMain(); } catch (e) { alert(String((e as Error).message)); } };
-          renderSlackbot(bodyEl, { slack, isOwner, onSave, onClear });
+          renderSlackbot(contentEl, { slack, isOwner, onSave, onClear });
         }
       } catch (e) {
         if (e instanceof ApiError && e.status === 401) { clearSession(); showLogin(); return; }
-        bodyEl.innerHTML = '<p class="muted">Failed to load. Try again.</p>';
+        (bodyEl ?? mainEl).innerHTML = '<p class="muted">Failed to load. Try again.</p>';
       }
     };
 

@@ -10,6 +10,9 @@ import type {
   CliAuthApproveResponse,
   ListDevicesResponse,
   DeleteDeviceResponse,
+  SetOrgAccessRequest, SetOrgAccessResponse,
+  RotateOrgJoinTokenResponse,
+  RemoveOrgMemberResponse,
 } from '@token-derby/shared';
 import { getSession, setSession, clearSession } from './session.js';
 
@@ -122,3 +125,10 @@ export const listDevices = (f: FetchFn = fetch) =>
   authed<ListDevicesResponse>('GET', '/api/devices', undefined, f);
 export const deleteDevice = (deviceId: string, f: FetchFn = fetch) =>
   authed<DeleteDeviceResponse>('DELETE', `/api/devices/${u(deviceId)}`, undefined, f);
+
+export const setOrgAccess = (name: string, body: SetOrgAccessRequest, f: FetchFn = fetch) =>
+  authed<SetOrgAccessResponse>('PUT', `/api/organisations/${u(name)}/access`, body, f);
+export const rotateJoinToken = (name: string, f: FetchFn = fetch) =>
+  authed<RotateOrgJoinTokenResponse>('POST', `/api/organisations/${u(name)}/join-token/rotate`, undefined, f);
+export const removeMember = (name: string, userId: string, f: FetchFn = fetch) =>
+  authed<RemoveOrgMemberResponse>('DELETE', `/api/organisations/${u(name)}/members/${u(userId)}`, undefined, f);
