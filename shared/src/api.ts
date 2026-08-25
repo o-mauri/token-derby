@@ -104,7 +104,16 @@ export type GetOrganisationResponse = {
 };
 
 export type OrgMembersResponse = {
-  members: { user_id: string; user_name: string; joined_at: string }[];
+  members: {
+    user_id: string;
+    user_name: string;
+    joined_at: string;
+    // Owner-only. The server omits both keys entirely for a non-owner caller
+    // — never sends `false`/`n/a` in their place — so the disclosure is the
+    // presence of the key, not just its value.
+    linked_email?: boolean;
+    matches_domain?: 'yes' | 'no' | 'n/a';
+  }[];
 };
 
 export type RemoveOrgMemberResponse = { ok: true };

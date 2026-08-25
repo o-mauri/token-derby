@@ -189,6 +189,48 @@ describe('renderMembers', () => {
     expect(root.innerHTML).not.toContain('<script>evil</script>');
     expect(root.innerHTML).toContain('&lt;script&gt;evil&lt;/script&gt;');
   });
+
+  it('shows no linkage columns for a non-owner, even when the fields are present', () => {
+    renderMembers(root, {
+      members: [
+        { user_id: 'u1', user_name: 'omar', joined_at: '2026-05-14T00:00:00Z', linked_email: true, matches_domain: 'yes' },
+      ],
+      isOwner: false,
+    });
+    expect(root.textContent).not.toContain('Linked email');
+    expect(root.textContent).not.toContain('Matches domain');
+    expect(root.querySelectorAll('.org-tick, .org-cross, .org-na')).toHaveLength(0);
+  });
+
+  it('renders the three matches-domain states, and both linked-email states, distinguishably for the owner', () => {
+    renderMembers(root, {
+      members: [
+        { user_id: 'u1', user_name: 'linked-match', joined_at: '2026-05-14T00:00:00Z', linked_email: true, matches_domain: 'yes' },
+        { user_id: 'u2', user_name: 'linked-mismatch', joined_at: '2026-05-15T00:00:00Z', linked_email: true, matches_domain: 'no' },
+        { user_id: 'u3', user_name: 'unlinked', joined_at: '2026-05-16T00:00:00Z', linked_email: false, matches_domain: 'n/a' },
+      ],
+      isOwner: true,
+      ownerUserId: 'owner-not-in-list',
+      onRemove: vi.fn(),
+    });
+    expect(root.textContent).toContain('Linked email');
+    expect(root.textContent).toContain('Matches domain');
+
+    const rows = Array.from(root.querySelectorAll('tbody tr'));
+    expect(rows).toHaveLength(3);
+
+    const cellClasses = (row: Element) => Array.from(row.querySelectorAll('td')).map((td) => td.className);
+    expect(cellClasses(rows[0]!)).toEqual(['', 'muted', 'org-tick', 'org-tick', '']);
+    expect(cellClasses(rows[1]!)).toEqual(['', 'muted', 'org-tick', 'org-cross', '']);
+    expect(cellClasses(rows[2]!)).toEqual(['', 'muted', 'org-cross', 'org-na', '']);
+
+    // Distinguishable by glyph too, not colour alone — innerHTML resolves the
+    // numeric/named entities the markup was built with, so assert on the
+    // rendered characters rather than the entity source.
+    expect(rows[0]!.innerHTML).toContain('✓'); // tick
+    expect(rows[2]!.innerHTML).toContain('✗'); // cross for unlinked
+    expect(rows[2]!.innerHTML).toContain('—'); // dash for n/a
+  });
 });
 
 describe('renderLeagueEditor', () => {

@@ -1792,6 +1792,12 @@ label.label input:disabled, label.label select:disabled, label.label textarea:di
 .org-table td { padding: 10px 14px; font-size: 0.95rem; }
 .org-table tbody tr:nth-child(even) { background: rgba(255, 255, 255, 0.04); }
 
+/* Members tab linkage columns (owner-only). Distinguishable by glyph as well
+   as colour — tick/cross/dash reads the same even where colour doesn't. */
+.org-tick { color: var(--live); text-align: center; }
+.org-cross { color: var(--error); text-align: center; }
+.org-na { color: var(--muted); text-align: center; }
+
 .org-days { display: flex; flex-wrap: wrap; gap: 10px; }
 .org-day {
   display: inline-flex;

@@ -35,20 +35,38 @@ function removeConfirm(name: string, domainJoinEnabled: boolean): string {
     + rejoin;
 }
 
+// Both cells are owner-only columns: the server omits `linked_email` and
+// `matches_domain` from a non-owner's response entirely, so these render only
+// off the `isOwner` flag the caller already gates the Remove column on —
+// never off whether the fields happen to be present.
+function linkedCell(linked: boolean | undefined): string {
+  return linked
+    ? `<td class="org-tick" title="Has a verified Google account linked">&#10003;</td>`
+    : `<td class="org-cross" title="No verified Google account linked">&#10007;</td>`;
+}
+
+function domainCell(state: 'yes' | 'no' | 'n/a' | undefined): string {
+  if (state === 'yes') return `<td class="org-tick" title="A proven domain matches this org's allow-list">&#10003;</td>`;
+  if (state === 'no') return `<td class="org-cross" title="No proven domain matches this org's allow-list">&#10007;</td>`;
+  return `<td class="org-na" title="Not applicable — no allow-list, or no linked email to compare">&mdash;</td>`;
+}
+
 export function renderMembers(root: HTMLElement, deps: MembersDeps): void {
   const isOwner = deps.isOwner === true;
   const rows = deps.members.map((m) => {
     const canRemove = isOwner && m.user_id !== deps.ownerUserId;
+    const linkageCells = isOwner ? `${linkedCell(m.linked_email)}${domainCell(m.matches_domain)}` : '';
     const actionCell = isOwner
       ? `<td>${canRemove ? `<button type="button" class="org-member-remove" data-user="${esc(m.user_id)}" data-name="${esc(m.user_name)}">Remove</button>` : ''}</td>`
       : '';
-    return `<tr><td>${esc(m.user_name)}</td><td class="muted">${esc(m.joined_at.slice(0, 10))}</td>${actionCell}</tr>`;
+    return `<tr><td>${esc(m.user_name)}</td><td class="muted">${esc(m.joined_at.slice(0, 10))}</td>${linkageCells}${actionCell}</tr>`;
   }).join('');
 
+  const ownerHeaders = isOwner ? '<th>Linked email</th><th>Matches domain</th><th></th>' : '';
   root.innerHTML = `
     <div class="org-panel">
-      <table class="org-table"><thead><tr><th>Member</th><th>Joined</th>${isOwner ? '<th></th>' : ''}</tr></thead>
-      <tbody>${rows || `<tr><td colspan="${isOwner ? 3 : 2}" class="muted">No members.</td></tr>`}</tbody></table>
+      <table class="org-table"><thead><tr><th>Member</th><th>Joined</th>${ownerHeaders}</tr></thead>
+      <tbody>${rows || `<tr><td colspan="${isOwner ? 5 : 2}" class="muted">No members.</td></tr>`}</tbody></table>
     </div>
   `;
 

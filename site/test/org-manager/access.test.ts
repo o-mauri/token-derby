@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi, type Mock } from 'vitest';
 import type { OrgAccessSettings, GetOrganisationResponse } from '@token-derby/shared';
 import { renderAccess } from '../../src/org-manager/render/tabs/access.js';
 import { renderMembers } from '../../src/org-manager/render/tabs/members.js';
@@ -128,8 +128,10 @@ describe('renderAccess', () => {
   });
 
   describe('rotation', () => {
-    let confirmFn: ReturnType<typeof vi.fn>;
-    beforeEach(() => { confirmFn = vi.fn(() => true); vi.stubGlobal('confirm', confirmFn); });
+    // Typed with its argument, or mock.calls[0][0] is an out-of-bounds read on a
+    // zero-length tuple — invisible to the suite, which does not type-check.
+    let confirmFn: Mock<(message?: string) => boolean>;
+    beforeEach(() => { confirmFn = vi.fn((_message?: string) => true); vi.stubGlobal('confirm', confirmFn); });
     afterEach(() => vi.unstubAllGlobals());
 
     it('asks for confirmation before rotating', () => {
@@ -477,7 +479,9 @@ describe('Access tab & member removal — full flow', () => {
       ],
     });
     vi.spyOn(api, 'removeMember').mockResolvedValue({ ok: true });
-    const confirmFn = vi.fn(() => false);
+    // Parameter declared so mock.calls[0][0] is a real index, not an
+    // out-of-bounds read on a zero-length tuple that the suite cannot see.
+    const confirmFn = vi.fn((_message?: string) => false);
     vi.stubGlobal('confirm', confirmFn);
 
     dispose = renderOrgManager(root);

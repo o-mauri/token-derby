@@ -125,11 +125,11 @@ renderMembers(tabSection('Members tab (non-owner — no Remove column)'), {
   ],
 });
 
-renderMembers(tabSection('Members tab (owner — Remove available, never on their own row)'), {
+renderMembers(tabSection('Members tab (owner — Remove available, plus owner-only linkage columns)'), {
   members: [
-    { user_id: 'u1', user_name: 'omar', joined_at: '2026-05-14T00:00:00Z' },
-    { user_id: 'u2', user_name: 'jess', joined_at: '2026-06-01T00:00:00Z' },
-    { user_id: 'u3', user_name: 'sam', joined_at: '2026-06-20T00:00:00Z' },
+    { user_id: 'u1', user_name: 'omar', joined_at: '2026-05-14T00:00:00Z', linked_email: true, matches_domain: 'yes' },
+    { user_id: 'u2', user_name: 'jess', joined_at: '2026-06-01T00:00:00Z', linked_email: true, matches_domain: 'no' },
+    { user_id: 'u3', user_name: 'sam', joined_at: '2026-06-20T00:00:00Z', linked_email: false, matches_domain: 'n/a' },
   ],
   isOwner: true,
   ownerUserId: 'u1',

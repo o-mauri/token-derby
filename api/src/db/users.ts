@@ -48,6 +48,41 @@ export async function updateUserDisplayName(user_id: string, display_name: strin
   }));
 }
 
+/** The subset of a user row the members-linkage columns need to decide
+ *  ticks/crosses. A separate function rather than widening
+ *  getUserNamesByIds — that one has four callers and three of them have no
+ *  use for these fields; a members-list load can afford its own BatchGet. */
+export type UserLinkageInfo = Pick<UserRecord, 'email' | 'email_verified' | 'hd'>;
+
+/** Resolves linkage/domain-proof fields from the user rows. Missing users are
+ *  absent from the map — callers should treat that the same as "no linkage". */
+export async function getUserLinkageByIds(user_ids: string[]): Promise<Map<string, UserLinkageInfo>> {
+  const out = new Map<string, UserLinkageInfo>();
+  const unique = [...new Set(user_ids.filter(id => id !== ''))];
+  // BatchGet is limited to 100 keys per request — chunk to be safe.
+  for (let i = 0; i < unique.length; i += 100) {
+    const chunk = unique.slice(i, i + 100);
+    const { Responses } = await ddb.send(new BatchGetCommand({
+      RequestItems: {
+        [TABLE]: {
+          Keys: chunk.map(id => userMetaKey(id)),
+          ProjectionExpression: 'user_id, email, email_verified, hd',
+        },
+      },
+    }));
+    for (const row of Responses?.[TABLE] ?? []) {
+      if (row.user_id) {
+        out.set(String(row.user_id), {
+          email: row.email !== undefined ? String(row.email) : undefined,
+          email_verified: row.email_verified === true,
+          hd: row.hd !== undefined ? String(row.hd) : undefined,
+        });
+      }
+    }
+  }
+  return out;
+}
+
 /** Resolves display names from the user rows. Missing users are absent from the map. */
 export async function getUserNamesByIds(user_ids: string[]): Promise<Map<string, string>> {
   const out = new Map<string, string>();
