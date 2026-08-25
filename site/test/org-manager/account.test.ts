@@ -306,3 +306,45 @@ describe('the no-organisation empty state (Phase 1 review finding I5)', () => {
     expect(root.querySelector('.org-empty a[href="/cli"]')).not.toBeNull();
   });
 });
+
+describe('landing view after arriving from the CLI', () => {
+  let root: HTMLElement;
+  let dispose: (() => void) | null = null;
+
+  beforeEach(() => {
+    localStorage.clear();
+    document.body.innerHTML = '';
+    root = document.createElement('div');
+    document.body.appendChild(root);
+  });
+
+  afterEach(() => { dispose?.(); dispose = null; vi.restoreAllMocks(); });
+
+  it('opens the account view when a grant code brought you here', async () => {
+    goTo('/org-manager#code=grant-123');
+    vi.spyOn(api, 'exchangeCode').mockImplementation(async () => {
+      setSession('tok');
+      return { token: 'tok', expires_at: 'x', user: { user_id: 'u1', display_name: 'Omar' } } as any;
+    });
+    vi.spyOn(api, 'listOrganisations').mockResolvedValue({ organisations: [{ org_name: 'Acme' } as any] });
+    vi.spyOn(api, 'listDevices').mockResolvedValue({ devices: [device()] } as any);
+
+    dispose = renderOrgManager(root);
+
+    // You just linked or signed in, so the account is what you came for — even
+    // though an org exists and would otherwise have been selected.
+    await vi.waitFor(() => expect(root.textContent).toContain("Omar's Laptop"));
+    expect(root.querySelector('.org-tabs')).toBeNull();
+  });
+
+  it('opens the org view on a normal visit with no code', async () => {
+    goTo('/org-manager');
+    setSession('tok');
+    vi.spyOn(api, 'listOrganisations').mockResolvedValue({ organisations: [{ org_name: 'Acme' } as any] });
+    vi.spyOn(api, 'getOrganisation').mockResolvedValue({ org: { org_name: 'Acme' } } as any);
+
+    dispose = renderOrgManager(root);
+
+    await vi.waitFor(() => expect(root.querySelector('.org-tabs')).not.toBeNull());
+  });
+});

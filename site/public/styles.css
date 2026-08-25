@@ -1625,6 +1625,10 @@ body.tv .race-header .meta .btn {
   gap: 8px;
   padding: 10px 12px;
   background: var(--bg);
+  /* Explicit, because the account row is a <button>: without this it takes the
+     UA's buttontext, which is near-black on the black background. The org rows
+     are divs and inherit --text, so they never showed the problem. */
+  color: var(--text);
   border: 2px solid var(--border);
   border-radius: 4px;
   letter-spacing: 0.02em;

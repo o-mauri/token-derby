@@ -64,7 +64,9 @@ export function renderOrgManager(root: HTMLElement): () => void {
 
     let selected: string | null = orgs[0]?.org_name ?? null;
     let tab: Tab = 'overview';
-    let view: View = 'org';
+    // Arriving from the CLI means you just linked or signed in, so the account is
+    // what you came to see — and with no orgs yet the org view is an empty state.
+    let view: View = code ? 'account' : 'org';
     const ownerOrgs = new Set<string>();
 
     // The link flow always runs with a session, so its errors have to land here
