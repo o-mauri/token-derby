@@ -43,6 +43,12 @@ export const handler: ApiHandler = async (event) => {
     created_at: org.created_at,
     creator_user_id: org.creator_user_id,
     creator_user_name: creator?.display_name ?? org.creator_user_name,
+    access: {
+      allowed_domains: org.allowed_domains,
+      join_token_enabled: org.join_token_enabled,
+      domain_join_enabled: org.domain_join_enabled,
+      restrict_to_allowed_domains: org.restrict_to_allowed_domains,
+    },
   };
   return ok(response);
 };

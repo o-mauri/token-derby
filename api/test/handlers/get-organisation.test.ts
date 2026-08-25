@@ -76,6 +76,21 @@ describe('getOrganisation handler', () => {
     expect(body.creator_user_name).toBe('GetOrg_Alice');
   });
 
+  it('returns the four access fields so the Access tab can render its state', async () => {
+    const owner = await makeUser('GetOrg_Access');
+    await createOrg(createEvent('AccessRead', owner));
+    const res: any = await getOrg(infoEvent('AccessRead', owner));
+    const body = JSON.parse(res.body);
+    // A freshly created org has none of these attributes stored; the db layer
+    // defaults them, so the tab renders today's behaviour rather than a blank.
+    expect(body.access).toEqual({
+      allowed_domains: [],
+      join_token_enabled: true,
+      domain_join_enabled: false,
+      restrict_to_allowed_domains: false,
+    });
+  });
+
   it('rejects non-members with NOT_ORG_MEMBER', async () => {
     const alice = await makeUser('GetOrg_Owner');
     const stranger = await makeUser('GetOrg_Stranger');

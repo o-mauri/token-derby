@@ -1,4 +1,4 @@
-import type { CollectedHat, HatId, HorseColors, HorseView, Race, RaceStatus, RaceSummary, RaceView, OrganisationSummary, StableHorse, RaceSchedule, League, DivisionConfig, ModelKey, SeasonStandings, RaceSettings } from './types.js';
+import type { CollectedHat, HatId, HorseColors, HorseView, Race, RaceStatus, RaceSummary, RaceView, OrganisationSummary, OrgAccessSettings, StableHorse, RaceSchedule, League, DivisionConfig, ModelKey, SeasonStandings, RaceSettings } from './types.js';
 import type { StaminaConfig } from './scoring.js';
 
 export type CreateRaceRequest = {
@@ -76,7 +76,9 @@ export type CreateOrganisationResponse = {
 };
 
 export type JoinOrganisationRequest = {
-  join_token: string;
+  // Optional: omitted means "join by my email domain", which only resolves an
+  // org that has claimed that domain.
+  join_token?: string;
 };
 
 export type JoinOrganisationResponse = {
@@ -95,11 +97,17 @@ export type GetOrganisationResponse = {
   created_at: string;
   creator_user_id: string;
   creator_user_name: string;
+  // The access settings the Access tab renders. Always present: the db layer
+  // defaults them, so a pre-Phase-3 org reads as today's behaviour rather than
+  // as absent.
+  access: OrgAccessSettings;
 };
 
 export type OrgMembersResponse = {
   members: { user_id: string; user_name: string; joined_at: string }[];
 };
+
+export type RemoveOrgMemberResponse = { ok: true };
 
 export type ListOrgRacesResponse = {
   org_name: string;
@@ -168,6 +176,18 @@ export type UpdateStableHorseResponse = StableHorse;
 export type DeleteStableHorseResponse = {
   ok: true;
 };
+
+// A whole-settings replace, not a patch: the Access tab renders all four
+// fields and saves all four, so an omitted field is a malformed request rather
+// than "leave this one alone". Rotation is deliberately NOT a field here — see
+// RotateOrgJoinTokenResponse.
+export type SetOrgAccessRequest = OrgAccessSettings;
+export type SetOrgAccessResponse = { access: OrgAccessSettings };
+
+// The new token is returned because rotating is the only moment it is shown in
+// the rotation flow. Nothing else about the org comes back — widening an org
+// response with the token would leak it to every caller of that endpoint.
+export type RotateOrgJoinTokenResponse = { org_join_token: string };
 
 export type SetOrgWebhookRequest = { url: string };
 export type SetOrgWebhookResponse = { webhook_url: string; webhook_secret: string };
