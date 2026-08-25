@@ -136,6 +136,21 @@ export type Organisation = {
   created_at: string;
   creator_user_id: string;
   creator_user_name: string;
+  // Absent on every org row written before Phase 3 (org access control).
+  // Readers must default these, not treat their absence as falsy/truthy.
+  allowed_domains?: string[];
+  join_token_enabled?: boolean;
+  domain_join_enabled?: boolean;
+  restrict_to_allowed_domains?: boolean;
+};
+
+// The four fields above, always present with Phase 3 defaults applied —
+// what every reader in api/src/db/organisations.ts actually returns.
+export type OrgAccessSettings = {
+  allowed_domains: string[];
+  join_token_enabled: boolean;
+  domain_join_enabled: boolean;
+  restrict_to_allowed_domains: boolean;
 };
 
 export type OrganisationMember = {
