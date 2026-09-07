@@ -13,8 +13,8 @@ const BIN_BANNER = `#!/usr/bin/env node
  * ───────────────────────────────────────────────────────────────────────────
  *  TOKEN DERBY — FAIR PLAY NOTICE   (please read before going further)
  * ───────────────────────────────────────────────────────────────────────────
- *  This is a friendly game. Your horse moves on the REAL output tokens your
- *  Claude Code produces — that's the whole point. Faking, inflating, or
+ *  This is a friendly game. Your horse moves on REAL output tokens produced
+ *  through your coding agents and Pi models. Faking, inflating, or
  *  reverse-engineering the token count to gain an edge isn't a clever hack;
  *  it just quietly ruins a shared bit of fun for everyone else in the race.
  *

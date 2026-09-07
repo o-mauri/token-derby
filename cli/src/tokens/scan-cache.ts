@@ -13,7 +13,7 @@ import { homeDir } from '../paths.js';
 
 // Bump whenever the meaning of a folded value changes (e.g. which usage fields
 // count), so entries written by older logic are discarded rather than trusted.
-const CACHE_VERSION = 1;
+const CACHE_VERSION = 2;
 
 /** How a source turns appended lines into its running per-file value. */
 export type FileFold<T> = {
@@ -32,6 +32,7 @@ function isEntry(v: unknown): v is Entry {
 
 export class ScanCache {
   private readonly touched = new Set<string>();
+  private dirty = false;
 
   private constructor(
     private readonly source: string,
@@ -80,6 +81,7 @@ export class ScanCache {
     const { lines, tail, consumedTo } = await readCompleteLines(file, start, st.size);
     const committed = lines.length > 0 ? fold.append(acc, lines) : acc;
     this.entries.set(file, { mtimeMs: st.mtimeMs, size: st.size, offset: consumedTo, value: committed });
+    this.dirty = true;
     return tail === null ? committed : fold.append(committed, [tail]);
   }
 
@@ -95,20 +97,29 @@ export class ScanCache {
 
     const value = await compute(await fs.readFile(file, 'utf8'));
     this.entries.set(file, { mtimeMs: st.mtimeMs, size: st.size, offset: st.size, value });
+    this.dirty = true;
     return value;
   }
 
   /** Persist, dropping any entry not read since `open` so the file can't grow forever. */
   async save(): Promise<void> {
     for (const key of [...this.entries.keys()]) {
-      if (!this.touched.has(key)) this.entries.delete(key);
+      if (!this.touched.has(key)) {
+        this.entries.delete(key);
+        this.dirty = true;
+      }
     }
+    // Most heartbeat scans find no file changes. Avoid repeatedly serializing
+    // and rewriting what can be a large history cache in that common case.
+    if (!this.dirty) return;
+
     const target = cacheFile(this.source);
     const tmp = `${target}.tmp`;
     try {
       await fs.mkdir(path.dirname(target), { recursive: true });
       await fs.writeFile(tmp, JSON.stringify({ version: CACHE_VERSION, files: Object.fromEntries(this.entries) }));
       await fs.rename(tmp, target); // swap in whole, never leave a half-written cache
+      this.dirty = false;
     } catch {
       // A cache we can't write costs the next beat some speed, never correctness.
     }

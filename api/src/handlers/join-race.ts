@@ -29,7 +29,7 @@ export const handler: ApiHandler = async (event) => {
   }
 
   if (body.primary_model !== undefined && !isModelKey(body.primary_model)) {
-    return err('BAD_REQUEST', 'primary_model must be one of claude, codex, gemini');
+    return err('BAD_REQUEST', 'primary_model must be claude, codex, gemini, or a valid pi:<provider>/<model> key');
   }
   const primary_model: ModelKey = isModelKey(body.primary_model) ? body.primary_model : 'claude';
 

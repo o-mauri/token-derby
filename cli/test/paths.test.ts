@@ -3,7 +3,7 @@ import * as fs from 'node:fs/promises';
 import * as fsSync from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { homeDir, identityFile } from '../src/paths.js';
+import { homeDir, identityFile, piSessionsDir } from '../src/paths.js';
 import { setSelectedEnv } from '../src/env/env.js';
 import { deleteIdentity } from '../src/identity/identity.js';
 
@@ -13,11 +13,17 @@ beforeEach(async () => {
   tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'td-paths-'));
   process.env.TOKEN_DERBY_BASE = tmp;
   delete process.env.TOKEN_DERBY_HOME;
+  delete process.env.TOKEN_DERBY_PI_DIR;
+  delete process.env.PI_CODING_AGENT_SESSION_DIR;
+  delete process.env.PI_CODING_AGENT_DIR;
 });
 
 afterEach(async () => {
   delete process.env.TOKEN_DERBY_BASE;
   delete process.env.TOKEN_DERBY_HOME;
+  delete process.env.TOKEN_DERBY_PI_DIR;
+  delete process.env.PI_CODING_AGENT_SESSION_DIR;
+  delete process.env.PI_CODING_AGENT_DIR;
   await fs.rm(tmp, { recursive: true, force: true });
 });
 
@@ -36,6 +42,17 @@ describe('homeDir precedence', () => {
   it('staging env resolves to <base>/.token-derby-staging', () => {
     setSelectedEnv('staging');
     expect(homeDir()).toBe(path.join(tmp, '.token-derby-staging'));
+  });
+});
+
+describe('Pi session path precedence', () => {
+  it('prefers the Token Derby override, then Pi session/config overrides', () => {
+    process.env.PI_CODING_AGENT_DIR = '/pi-agent';
+    expect(piSessionsDir()).toBe('/pi-agent/sessions');
+    process.env.PI_CODING_AGENT_SESSION_DIR = '/pi-sessions';
+    expect(piSessionsDir()).toBe('/pi-sessions');
+    process.env.TOKEN_DERBY_PI_DIR = '/token-derby-pi';
+    expect(piSessionsDir()).toBe('/token-derby-pi');
   });
 });
 

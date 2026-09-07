@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { piModelKey } from '@token-derby/shared';
 import { RaceScoreTracker, type RaceScoreState } from '../../src/tokens/race-score.js';
 import type { AllSources } from '../../src/tokens/race-tokens.js';
 
@@ -9,6 +10,7 @@ function baseState(primaryConv: Record<string, number> = {}): RaceScoreState {
     lastGood: { claude: 0, codex: 0, gemini: 0 },
     primaryConvAcked: { ...primaryConv },
     primaryCounted: 0,
+    piPrimed: true,
     seq: 0,
   };
 }
@@ -30,6 +32,44 @@ describe('RaceScoreTracker — secondaries (scalar, unchanged)', () => {
     t.recordReading(reading({}, 0, 0));   // codex momentarily 0 → must keep 500
     expect(t.nextBeat().components.codex).toBe(500);
   });
+
+  it('tracks newly discovered Pi provider/model buckets independently', () => {
+    const qwen = piModelKey('qwen', 'qwen3-coder')!;
+    const t = new RaceScoreTracker(baseState(), 'claude', false);
+    t.recordReading({
+      secondary: { claude: 0, codex: 0, gemini: 0, [qwen]: 500 },
+      primaryByConv: new Map(),
+    });
+    const beat = t.nextBeat();
+    expect(beat.components[qwen]).toBe(500);
+    t.ack(beat, 1);
+    expect(t.toState().acked[qwen]).toBe(500);
+  });
+
+  it('primes secondary Pi history on the first successful read after a failed baseline', () => {
+    const qwen = piModelKey('qwen', 'qwen3-coder')!;
+    const init = { ...baseState(), piPrimed: false };
+    const t = new RaceScoreTracker(init, 'claude', false);
+
+    t.recordReading({
+      secondary: { claude: 0, codex: 0, gemini: 0 },
+      primaryByConv: new Map(),
+      piAvailable: false,
+    });
+    t.recordReading({
+      secondary: { claude: 0, codex: 0, gemini: 0, [qwen]: 500 },
+      primaryByConv: new Map(),
+      piAvailable: true,
+    });
+    expect(t.nextBeat().components[qwen]).toBe(0);
+
+    t.recordReading({
+      secondary: { claude: 0, codex: 0, gemini: 0, [qwen]: 550 },
+      primaryByConv: new Map(),
+      piAvailable: true,
+    });
+    expect(t.nextBeat().components[qwen]).toBe(50);
+  });
 });
 
 describe('RaceScoreTracker — primary top-N + forfeit', () => {
@@ -43,6 +83,38 @@ describe('RaceScoreTracker — primary top-N + forfeit', () => {
     const t = new RaceScoreTracker(baseState(), 'claude', true);
     t.recordReading(reading({ a: 10, b: 20, c: 30, d: 40, e: 50, f: 60 }));
     expect(t.nextBeat().components.claude).toBe(200); // top 5: 60+50+40+30+20, drops the 10
+  });
+
+  it('supports a Pi provider/model as the primary bucket', () => {
+    const qwen = piModelKey('qwen', 'qwen3-coder')!;
+    const t = new RaceScoreTracker(baseState({ a: 100 }), qwen, false);
+    t.recordReading({
+      secondary: { claude: 20, codex: 0, gemini: 0 },
+      primaryByConv: new Map([['a', 160]]),
+    });
+    const beat = t.nextBeat();
+    expect(beat.components[qwen]).toBe(60);
+    expect(beat.components.claude).toBe(20);
+  });
+
+  it('primes primary Pi history on the first successful read after a failed baseline', () => {
+    const qwen = piModelKey('qwen', 'qwen3-coder')!;
+    const init = { ...baseState(), piPrimed: false };
+    const t = new RaceScoreTracker(init, qwen, false);
+
+    t.recordReading({
+      secondary: { claude: 10, codex: 0, gemini: 0 },
+      primaryByConv: new Map([['old', 500]]),
+      piAvailable: true,
+    });
+    expect(t.nextBeat().components[qwen]).toBe(0);
+
+    t.recordReading({
+      secondary: { claude: 20, codex: 0, gemini: 0 },
+      primaryByConv: new Map([['old', 550]]),
+      piAvailable: true,
+    });
+    expect(t.nextBeat().components[qwen]).toBe(50);
   });
 
   it('flag ON: fewer than 5 conversations → sums all', () => {
@@ -116,6 +188,7 @@ describe('RaceScoreTracker — primary top-N + forfeit', () => {
     const s = t.toState();
     expect(s.primaryConvAcked).toEqual({ a: 100 });
     expect(s.primaryCounted).toBe(100);
+    expect(s.piPrimed).toBe(true);
     expect(s.seq).toBe(3);
   });
 });

@@ -55,6 +55,11 @@ describe('describeScanTimeout', () => {
     expect(msg).toContain('TOKEN_DERBY_CODEX_DIR');
   });
 
+  it('points Pi timeouts at the Pi history override', () => {
+    const msg = describeScanTimeout(45_000, [{ key: 'pi', bytes: 10_000 }]);
+    expect(msg).toContain('TOKEN_DERBY_PI_DIR');
+  });
+
   it('omits the size when it is not known yet (first ever scan)', () => {
     const msg = describeScanTimeout(45_000, [{ key: 'codex', bytes: 0 }]);
     expect(msg).toContain('codex');

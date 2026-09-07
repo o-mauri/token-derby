@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { piModelKey } from '@token-derby/shared';
 import { resolveHeartbeatDelta } from '../../src/lib/weighting.js';
 
 describe('resolveHeartbeatDelta', () => {
@@ -10,6 +11,16 @@ describe('resolveHeartbeatDelta', () => {
 
   it('all-primary components pass straight through', () => {
     expect(resolveHeartbeatDelta({ components: { claude: 300, codex: 0, gemini: 0 } }, 'claude')).toBe(300);
+  });
+
+  it('weights arbitrary Pi provider/model buckets', () => {
+    const qwen = piModelKey('qwen', 'qwen3-coder')!;
+    const openai = piModelKey('openai-codex', 'gpt-5.3-codex')!;
+    expect(resolveHeartbeatDelta({ components: { [qwen]: 400, [openai]: 200 } }, qwen)).toBe(500);
+  });
+
+  it('ignores unvalidated dynamic component names', () => {
+    expect(resolveHeartbeatDelta({ components: { claude: 100, made_up: 50_000 } }, 'claude')).toBe(100);
   });
 
   it('falls back to a legacy bare delta (primary-only semantics)', () => {

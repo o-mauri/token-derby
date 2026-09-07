@@ -1,7 +1,17 @@
 import type { RecentEvent } from './midrace.js';
 import type { StaminaConfig } from './scoring.js';
 
-export type ModelKey = 'claude' | 'codex' | 'gemini';
+export type BuiltinModelKey = 'claude' | 'codex' | 'gemini';
+
+// Pi can run any provider/model pair, so its buckets are namespaced dynamic
+// keys rather than another hard-coded model. The provider and model segments
+// are URI-encoded by piModelKey() before they enter this wire/storage type.
+export type PiModelKey = `pi:${string}/${string}`;
+export type ModelKey = BuiltinModelKey | PiModelKey;
+
+// Built-in sources are always present in CLI state. Pi buckets are discovered
+// from local sessions and therefore optional/dynamic.
+export type ModelTotals = Record<BuiltinModelKey, number> & Partial<Record<PiModelKey, number>>;
 
 export type HorseColors = {
   body: string;

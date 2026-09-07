@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { render } from 'ink-testing-library';
 import React from 'react';
+import { piModelKey } from '@token-derby/shared';
 import { ModelList } from '../../src/ui/StatusScreen.js';
 
 describe('ModelList', () => {
@@ -16,6 +17,15 @@ describe('ModelList', () => {
     expect(out).toMatch(/Codex \(primary\)/);
     expect(out).not.toMatch(/Claude \(primary\)/);
     expect(out).not.toMatch(/Gemini \(primary\)/);
+  });
+
+  it('renders discovered Pi provider/model buckets and can mark one primary', () => {
+    const qwen = piModelKey('qwen', 'qwen3-coder')!;
+    const openai = piModelKey('openai-codex', 'gpt-5.3-codex')!;
+    const out = render(<ModelList primaryModel={qwen} modelKeys={['claude', qwen, openai]} />).lastFrame()!;
+    expect(out).toMatch(/qwen\/qwen3-coder \(Pi\) \(primary\)/);
+    expect(out).toMatch(/openai-codex\/gpt-5\.3-codex \(Pi\) \(50%\)/);
+    expect(out).toMatch(/Claude \(50%\)/);
   });
 
   it('tags non-primary models with the secondary weight and shows no token counts', () => {

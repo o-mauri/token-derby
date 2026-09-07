@@ -34,7 +34,7 @@ export type JoinRaceResponse = {
 
 export type HeartbeatRequest = {
   seq: number;
-  components?: Record<ModelKey, number>;  // per-source deltas (each ≥ 0)
+  components?: Partial<Record<ModelKey, number>>; // built-in + discovered Pi provider/model deltas (each ≥ 0)
   delta?: number;                         // legacy single delta (pre-multi-model CLIs)
 };
 

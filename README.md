@@ -1,6 +1,6 @@
 # Token Derby
 
-A pixel-art daily horse race where each horse is a participant and every length gained is an output token their Claude Code produced. One-shot races, scheduled start/end times, customizable horses, terminal-as-life-support (close the terminal → your horse crashes).
+A pixel-art daily horse race where each horse is a participant and every length gained is a real token produced through Claude Code, Codex CLI, Gemini CLI, or any provider/model used in Pi. One-shot races, scheduled start/end times, customizable horses, terminal-as-life-support (close the terminal → your horse crashes).
 
 - **Site:** https://token-derby.mauricode.co.uk
 
