@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { piModelKey } from '@token-derby/shared';
+import { MAX_HEARTBEAT_COMPONENTS, piModelKey } from '@token-derby/shared';
 import { RaceScoreTracker, type RaceScoreState } from '../../src/tokens/race-score.js';
 import type { AllSources } from '../../src/tokens/race-tokens.js';
 
@@ -44,6 +44,29 @@ describe('RaceScoreTracker — secondaries (scalar, unchanged)', () => {
     expect(beat.components[qwen]).toBe(500);
     t.ack(beat, 1);
     expect(t.toState().acked[qwen]).toBe(500);
+  });
+
+  it('bounds dynamic heartbeat components and drains omitted deltas on later beats', () => {
+    const t = new RaceScoreTracker(baseState(), 'claude', false);
+    const dynamic = Object.fromEntries(Array.from({ length: MAX_HEARTBEAT_COMPONENTS + 10 }, (_, index) => [
+      piModelKey('provider', `model-${String(index).padStart(3, '0')}`)!,
+      index + 1,
+    ]));
+    t.recordReading({
+      secondary: { claude: 0, codex: 0, gemini: 0, ...dynamic },
+      primaryByConv: new Map(),
+    });
+
+    const first = t.nextBeat();
+    expect(Object.keys(first.components)).toHaveLength(MAX_HEARTBEAT_COMPONENTS);
+    expect(first.components.claude).toBe(0);
+    t.ack(first, 1);
+
+    const second = t.nextBeat();
+    const remaining = Object.entries(second.components)
+      .filter(([key, value]) => key.startsWith('pi:') && value! > 0);
+    expect(remaining.length).toBeGreaterThan(0);
+    expect(Object.keys(second.components).length).toBeLessThanOrEqual(MAX_HEARTBEAT_COMPONENTS);
   });
 
   it('primes secondary Pi history on the first successful read after a failed baseline', () => {

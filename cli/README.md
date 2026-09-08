@@ -65,7 +65,7 @@ The CLI reads cumulative usage from each supported tool's local session history.
 - **Claude Code** — sums `message.usage.output_tokens` across every `*.jsonl` under `~/.claude/projects/`. Subagent and dynamic-workflow transcripts are recursively included and rolled into their owning conversation.
 - **Codex CLI** — reads the final cumulative `token_count` from each rollout under `~/.codex/sessions/` and `archived_sessions/`.
 - **Gemini CLI** — sums per-turn usage from `~/.gemini/tmp/<project>/chats/session-*`.
-- **Pi** — reads standard Pi v3 sessions under `~/.pi/agent/sessions/` and creates a separate bucket for every exact provider/model pair, such as `qwen/qwen3-coder` or `openai-codex/gpt-5.3-codex`. It counts the same persisted usage sources as Pi's footer: assistant responses, summary generation, and tool-reported nested LLM usage (attributed to the active Pi model when the tool result has no model identity). Child sessions are included; copied entries in clones/forks are deduplicated so the same historical call cannot score twice.
+- **Pi** — reads standard Pi v3 sessions under `~/.pi/agent/sessions/` and creates a separate bucket for every exact provider/model pair, such as `qwen/qwen3-coder` or `openai-codex/gpt-5.3-codex`. It counts the same persisted usage sources as Pi's footer: assistant responses (using the concrete routed `responseModel` when present), summary generation, and tool-reported nested LLM usage when no native child session is referenced. Native child sessions are authoritative over aggregate tool usage; header lineage deduplicates copied clone/fork entries so cleanup cannot replay the same historical call.
 
 Races can optionally also count *fresh input tokens* in addition to output. Fresh input includes uncached input and cache writes; cache reads are never counted because they reflect passive context size rather than new work. The race creator opts in at `token-derby create` time; thresholds for Stampede!, Pulled Away!, and the heartbeat rate cap scale 10× in these races so the achievement cadence stays comparable.
 
@@ -83,7 +83,7 @@ Stamina is off by default; org owners turn it on and tune it from the Race Setti
 
 At join you pick one **primary** bucket, counted 1:1. Every other detected bucket counts at **50%**. The choice is locked for the whole race and can't be changed, even by rejoining.
 
-The interactive picker always includes Claude Code, Codex CLI, and Gemini CLI. It also discovers every provider/model pair in your Pi history, so models such as Qwen, Kimi, OpenRouter routes, or custom providers work without a Token Derby release adding another enum value.
+The interactive picker always includes Claude Code, Codex CLI, and Gemini CLI. It also discovers every provider/model pair in your Pi history, so models such as Qwen, Kimi, OpenRouter routes, or custom providers work without a Token Derby release adding another enum value. Because Pi is optional, discovery and the post-join baseline each have a 10-second Pi-only budget; on timeout built-in anchors are preserved and Pi safely primes on its first complete later scan.
 
 Pick a built-in source with `token-derby join <code> --primary codex`, or use a canonical Pi key, for example `token-derby join <code> --primary pi:qwen/qwen3-coder`. Provider/model segments containing `/` or other reserved characters are URI-encoded in the key; using the interactive picker avoids typing it manually.
 

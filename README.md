@@ -55,6 +55,12 @@ settings. `make deploy` also accepts a `none` bump, which deploys the site as-is
 with no version change, no changelog entry, and no announcement. `make
 publish-cli` rejects `none` — npm won't accept a duplicate version.
 
+Protocol-changing CLI releases require a new **minor** version because race
+compatibility is enforced at `MAJOR.MINOR`. For Pi dynamic model support,
+deploy the shared/API heartbeat changes first, then publish the CLI with a
+minor bump; a patch release would incorrectly admit older clients that cannot
+read a locked `pi:<provider>/<model>` primary.
+
 The announcement needs these in the root `.env` (gitignored):
 
 ```

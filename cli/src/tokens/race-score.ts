@@ -4,8 +4,10 @@
 // user Token Derby is meant to be played honestly. 🐎
 
 import {
+  MAX_HEARTBEAT_COMPONENTS,
   MODEL_KEYS,
   emptyModelTotals,
+  isBuiltinModelKey,
   isModelKey,
   isPiModelKey,
   type BuiltinModelKey,
@@ -119,9 +121,25 @@ export class RaceScoreTracker {
   /** Frozen payload for the next heartbeat. Pure — call repeatedly for retries. */
   nextBeat(): BeatSnapshot {
     const components: Partial<Record<ModelKey, number>> = {};
-    for (const key of modelKeys(this.acked, this.lastGood)) {
-      if (key === this.primary) continue;
-      components[key] = Math.max(0, (this.lastGood[key] ?? 0) - (this.acked[key] ?? 0));
+    const readings = emptyModelTotals();
+    const secondaryCandidates = modelKeys(this.acked, this.lastGood)
+      .filter(key => key !== this.primary)
+      .map(key => ({
+        key,
+        delta: Math.max(0, (this.lastGood[key] ?? 0) - (this.acked[key] ?? 0)),
+      }));
+    // Built-ins remain present for wire compatibility. When a malformed or
+    // unusually diverse Pi history produces more buckets than one heartbeat
+    // permits, send the largest pending dynamic deltas first. Omitted readings
+    // are deliberately not acknowledged, so they drain on later beats.
+    const builtins = secondaryCandidates.filter(({ key }) => isBuiltinModelKey(key));
+    const dynamic = secondaryCandidates
+      .filter(({ key }) => !isBuiltinModelKey(key))
+      .sort((a, b) => b.delta - a.delta || a.key.localeCompare(b.key));
+    const dynamicSlots = Math.max(0, MAX_HEARTBEAT_COMPONENTS - 1 - builtins.length);
+    for (const { key, delta } of [...builtins, ...dynamic.slice(0, dynamicSlots)]) {
+      components[key] = delta;
+      readings[key] = this.lastGood[key] ?? 0;
     }
 
     const pending: number[] = [];
@@ -137,7 +155,7 @@ export class RaceScoreTracker {
     return {
       seq: this.seq + 1,
       components,
-      readings: { ...this.lastGood },
+      readings,
       primaryConvReadings: { ...this.primaryConvLast },
     };
   }

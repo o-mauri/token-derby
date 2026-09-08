@@ -153,6 +153,29 @@ describe('ScanCache persistence', () => {
     expect(seen).toEqual([['three']]); // warm across process restarts
   });
 
+  it('does not let an older concurrent writer replace a newer generation', async () => {
+    const f = path.join(work, 'a.jsonl');
+    await fs.writeFile(f, 'one\n');
+    const older = await ScanCache.open('claude');
+    await older.readIncremental(f, collector());
+
+    const newer = await ScanCache.open('claude');
+    await fs.appendFile(f, 'two\n');
+    await newer.readIncremental(f, collector());
+    await newer.save();
+    await expect(older.save({ required: true })).rejects.toThrow('newer writer');
+
+    await fs.appendFile(f, 'three\n');
+    const reopened = await ScanCache.open('claude');
+    const seen: string[][] = [];
+    const spy: FileFold<string[]> = {
+      empty: () => [],
+      append: (acc, lines) => { seen.push(lines); return [...acc, ...lines]; },
+    };
+    expect(await reopened.readIncremental(f, spy)).toEqual(['one', 'two', 'three']);
+    expect(seen).toEqual([['three']]);
+  });
+
   it('does not rewrite an unchanged cache on every scan', async () => {
     const f = path.join(work, 'a.jsonl');
     await fs.writeFile(f, 'one\n');

@@ -9,6 +9,7 @@ import { ApiError } from '../api/client.js';
 import { saveActiveRace, type ActiveRace } from '../stable/active-race.js';
 import { RunRace, buildInitialState } from '../runtime/run-race.js';
 import { loadIdentity } from '../identity/identity.js';
+import { OPTIONAL_PI_SCAN_TIMEOUT_MS } from '../config.js';
 import { listPiModelKeys } from '../tokens/pi.js';
 
 /** Parse `--primary <model>` or `--primary=<model>` from argv. Throws on a bad value. */
@@ -188,7 +189,7 @@ async function pickHorse(horses: StableHorse[]): Promise<StableHorse | null> {
 
 async function primaryModelOptions(): Promise<ModelKey[]> {
   try {
-    return [...MODEL_KEYS, ...(await listPiModelKeys())];
+    return [...MODEL_KEYS, ...(await listPiModelKeys({ timeoutMs: OPTIONAL_PI_SCAN_TIMEOUT_MS }))];
   } catch {
     // Pi is optional. A missing/unreadable history must not block users who are
     // racing with one of the native CLI sources.

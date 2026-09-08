@@ -9,6 +9,7 @@ import {
 import { sumTokens, sumTokensByConversation, type TokenTotals } from './transcripts.js';
 import { sumCodexTokens, sumCodexByConversation } from './codex.js';
 import { sumGeminiTokens, sumGeminiByConversation } from './gemini.js';
+import { OPTIONAL_PI_SCAN_TIMEOUT_MS } from '../config.js';
 import { sumPiByModelAndConversation } from './pi.js';
 import type { ScanProgress } from './scan-progress.js';
 
@@ -77,6 +78,22 @@ function capture<T>(promise: Promise<T>): Promise<Captured<T>> {
   );
 }
 
+async function within<T>(promise: Promise<T>, timeoutMs: number | undefined): Promise<T> {
+  if (timeoutMs === undefined || !Number.isFinite(timeoutMs) || timeoutMs <= 0) return promise;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timedOut = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(Object.assign(
+      new Error(`Pi token scan timed out after ${Math.round(timeoutMs / 1000)}s`),
+      { code: 'ETIMEDOUT' },
+    )), timeoutMs);
+  });
+  try {
+    return await Promise.race([promise, timedOut]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function isMissing(err: any): boolean {
   return err?.code === 'ENOENT';
 }
@@ -96,7 +113,7 @@ export async function readAllSources(
   race: { counts_input?: boolean },
   primary: ModelKey,
   progress?: ScanProgress,
-  options?: { baseline?: boolean },
+  options?: { baseline?: boolean; piTimeoutMs?: number },
 ): Promise<BeatReading> {
   const builtinPrimary = isBuiltinModelKey(primary) ? primary : null;
 
@@ -118,7 +135,13 @@ export async function readAllSources(
   });
 
   progress?.begin('pi');
-  const piScan = capture(sumPiByModelAndConversation())
+  // Pi is optional during live built-in races, so bound it independently and
+  // preserve healthy native readings. When Pi itself is the live primary, the
+  // outer heartbeat budget remains authoritative; a valid slower Pi scan must
+  // not be cut off at the shorter optional-source budget.
+  const piTimeoutMs = options?.piTimeoutMs
+    ?? (options?.baseline || builtinPrimary ? OPTIONAL_PI_SCAN_TIMEOUT_MS : undefined);
+  const piScan = capture(within(sumPiByModelAndConversation(), piTimeoutMs))
     .finally(() => progress?.end('pi'));
 
   const [nativePrimary, nativeSecondary, piResult] = await Promise.all([

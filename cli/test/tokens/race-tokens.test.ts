@@ -3,6 +3,7 @@ import { piModelKey } from '@token-derby/shared';
 import { scoreFor, readAllSources, type AllSources } from '../../src/tokens/race-tokens.js';
 import { ScanProgress } from '../../src/tokens/scan-progress.js';
 import { buildInitialState } from '../../src/runtime/run-race.js';
+import { OPTIONAL_PI_SCAN_TIMEOUT_MS } from '../../src/config.js';
 
 vi.mock('../../src/tokens/transcripts.js', async (orig) => ({
   ...(await orig<typeof import('../../src/tokens/transcripts.js')>()),
@@ -21,7 +22,10 @@ import { sumPiByModelAndConversation } from '../../src/tokens/pi.js';
 beforeEach(() => {
   vi.mocked(sumPiByModelAndConversation).mockResolvedValue(new Map());
 });
-afterEach(() => vi.clearAllMocks());
+afterEach(() => {
+  vi.useRealTimers();
+  vi.clearAllMocks();
+});
 
 /** Assert a reading is usable (not a stall) and return it narrowed. */
 function ok(r: AllSources | { stall: string }): AllSources {
@@ -100,6 +104,54 @@ describe('readAllSources', () => {
       serverLastSeq: 4,
     });
     expect(initialized.initialState.piPrimed).toBe(false);
+  });
+
+  it('bounds optional Pi work during baseline without discarding completed built-in anchors', async () => {
+    vi.useFakeTimers();
+    vi.mocked(sumPiByModelAndConversation).mockReturnValue(new Promise(() => {}));
+    vi.mocked(sumTokensByConversation).mockResolvedValue(new Map([
+      ['claude/a', { input: 0, output: 100 }],
+    ]));
+    vi.mocked(sumCodexTokens).mockResolvedValue({ input: 0, output: 20 });
+    vi.mocked(sumGeminiTokens).mockResolvedValue({ input: 0, output: 30 });
+
+    const pending = readAllSources({}, 'claude', undefined, { baseline: true, piTimeoutMs: 25 });
+    await vi.advanceTimersByTimeAsync(25);
+    const res = ok(await pending);
+
+    expect(res.piAvailable).toBe(false);
+    expect(Object.fromEntries(res.primaryByConv)).toEqual({ 'claude/a': 100 });
+    expect(res.secondary).toMatchObject({ codex: 20, gemini: 30 });
+
+    const livePending = readAllSources({}, 'claude', undefined, { piTimeoutMs: 25 });
+    await vi.advanceTimersByTimeAsync(25);
+    const live = ok(await livePending);
+    expect(live.piAvailable).toBe(false);
+    expect(Object.fromEntries(live.primaryByConv)).toEqual({ 'claude/a': 100 });
+    expect(sumPiByModelAndConversation).toHaveBeenCalledTimes(2);
+  });
+
+  it('lets a live Pi primary use the outer heartbeat budget', async () => {
+    vi.useFakeTimers();
+    const qwen = piModelKey('qwen', 'qwen3-coder')!;
+    vi.mocked(sumPiByModelAndConversation).mockImplementation(() => new Promise(resolve => {
+      setTimeout(() => resolve(new Map([
+        [qwen, new Map([['pi/session', { input: 0, output: 100 }]])],
+      ])), OPTIONAL_PI_SCAN_TIMEOUT_MS + 100);
+    }));
+    vi.mocked(sumTokens).mockResolvedValue({ input: 0, output: 0 });
+    vi.mocked(sumCodexTokens).mockResolvedValue({ input: 0, output: 0 });
+    vi.mocked(sumGeminiTokens).mockResolvedValue({ input: 0, output: 0 });
+
+    let settled = false;
+    const pending = readAllSources({}, qwen).finally(() => { settled = true; });
+    await vi.advanceTimersByTimeAsync(OPTIONAL_PI_SCAN_TIMEOUT_MS);
+    expect(settled).toBe(false);
+    await vi.advanceTimersByTimeAsync(100);
+
+    const res = ok(await pending);
+    expect(Object.fromEntries(res.primaryByConv)).toEqual({ 'pi/session': 100 });
+    expect(res.piAvailable).toBe(true);
   });
 
   it('starts the secondary scans without waiting for the primary to finish', async () => {

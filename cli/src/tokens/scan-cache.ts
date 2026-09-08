@@ -7,13 +7,17 @@
 // stale-versioned cache simply means a full re-read. Read errors always
 // propagate so a scanner's fail-loud contract is preserved.
 
+import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { homeDir } from '../paths.js';
 
 // Bump whenever the meaning of a folded value changes (e.g. which usage fields
 // count), so entries written by older logic are discarded rather than trusted.
-const CACHE_VERSION = 2;
+const CACHE_VERSION = 6;
+const LOCK_STALE_MS = 5 * 60_000;
+const LOCK_WAIT_MS = 2_000;
+const LOCK_RETRY_MS = 20;
 
 /** How a source turns appended lines into its running per-file value. */
 export type FileFold<T> = {
@@ -24,6 +28,7 @@ export type FileFold<T> = {
 };
 
 type Entry = { mtimeMs: number; size: number; offset: number; value: unknown };
+type CacheSnapshot = { generation: number; entries: Map<string, Entry> };
 
 function isEntry(v: unknown): v is Entry {
   const e = v as Entry;
@@ -37,10 +42,12 @@ export class ScanCache {
   private constructor(
     private readonly source: string,
     private readonly entries: Map<string, Entry>,
+    private generation: number,
   ) {}
 
   static async open(source: string): Promise<ScanCache> {
-    return new ScanCache(source, await loadEntries(source));
+    const snapshot = await loadSnapshot(source);
+    return new ScanCache(source, snapshot.entries, snapshot.generation);
   }
 
   /**
@@ -49,12 +56,20 @@ export class ScanCache {
    */
   static async knownBytes(source: string): Promise<number> {
     let total = 0;
-    for (const entry of (await loadEntries(source)).values()) total += entry.size;
+    for (const entry of (await loadSnapshot(source)).entries.values()) total += entry.size;
     return total;
   }
 
   has(file: string): boolean {
     return this.entries.has(file);
+  }
+
+  /** Persist scanner-derived metadata added after an incremental fold. */
+  updateValue<T>(file: string, value: T): void {
+    const entry = this.entries.get(file);
+    if (!entry) return;
+    entry.value = value;
+    this.dirty = true;
   }
 
   /**
@@ -101,8 +116,12 @@ export class ScanCache {
     return value;
   }
 
-  /** Persist, dropping any entry not read since `open` so the file can't grow forever. */
-  async save(): Promise<void> {
+  /**
+   * Persist, dropping entries not read since `open`. Most scanners treat this
+   * as an optimization; callers whose folded value carries accounting identity
+   * can require a successful generation commit before accepting the scan.
+   */
+  async save(options: { required?: boolean } = {}): Promise<boolean> {
     for (const key of [...this.entries.keys()]) {
       if (!this.touched.has(key)) {
         this.entries.delete(key);
@@ -111,17 +130,44 @@ export class ScanCache {
     }
     // Most heartbeat scans find no file changes. Avoid repeatedly serializing
     // and rewriting what can be a large history cache in that common case.
-    if (!this.dirty) return;
+    if (!this.dirty) return true;
 
     const target = cacheFile(this.source);
-    const tmp = `${target}.tmp`;
     try {
       await fs.mkdir(path.dirname(target), { recursive: true });
-      await fs.writeFile(tmp, JSON.stringify({ version: CACHE_VERSION, files: Object.fromEntries(this.entries) }));
-      await fs.rename(tmp, target); // swap in whole, never leave a half-written cache
-      this.dirty = false;
-    } catch {
+      const committed = await withCacheLock(target, async () => {
+        const current = await loadSnapshot(this.source);
+        // This instance started from an older snapshot. Never replace a cache
+        // another process or a timed-out scan has already advanced.
+        if (current.generation !== this.generation) return false;
+
+        const nextGeneration = this.generation + 1;
+        const tmp = `${target}.${process.pid}.${randomUUID()}.tmp`;
+        try {
+          await fs.writeFile(tmp, JSON.stringify({
+            version: CACHE_VERSION,
+            generation: nextGeneration,
+            files: Object.fromEntries(this.entries),
+          }));
+          await fs.rename(tmp, target); // swap in whole, never leave a half-written cache
+        } finally {
+          await fs.rm(tmp, { force: true }).catch(() => {});
+        }
+        this.generation = nextGeneration;
+        return true;
+      });
+      if (committed) {
+        this.dirty = false;
+        return true;
+      }
+      if (options.required) {
+        throw new Error(`Could not commit ${this.source} scan cache: a newer writer won or the lock stayed busy`);
+      }
+      return false;
+    } catch (error) {
+      if (options.required) throw error;
       // A cache we can't write costs the next beat some speed, never correctness.
+      return false;
     }
   }
 }
@@ -130,21 +176,66 @@ function cacheFile(source: string): string {
   return path.join(homeDir(), 'scan-cache', `${source}.json`);
 }
 
-async function loadEntries(source: string): Promise<Map<string, Entry>> {
+async function loadSnapshot(source: string): Promise<CacheSnapshot> {
   let parsed: any;
   try {
     parsed = JSON.parse(await fs.readFile(cacheFile(source), 'utf8'));
   } catch {
-    return new Map(); // absent or corrupt → start cold
+    return { generation: 0, entries: new Map() }; // absent or corrupt → start cold
   }
   if (parsed?.version !== CACHE_VERSION || typeof parsed.files !== 'object' || parsed.files === null) {
-    return new Map();
+    return { generation: 0, entries: new Map() };
   }
-  const out = new Map<string, Entry>();
+  const entries = new Map<string, Entry>();
   for (const [file, entry] of Object.entries(parsed.files)) {
-    if (isEntry(entry)) out.set(file, entry);
+    if (isEntry(entry)) entries.set(file, entry);
   }
-  return out;
+  const generation = Number.isSafeInteger(parsed.generation) && parsed.generation >= 0
+    ? parsed.generation
+    : 0;
+  return { generation, entries };
+}
+
+async function withCacheLock<T>(target: string, fn: () => Promise<T>): Promise<T | undefined> {
+  const lock = `${target}.lock`;
+  const lockToken = `${process.pid}:${randomUUID()}`;
+  const deadline = Date.now() + LOCK_WAIT_MS;
+  let handle: fs.FileHandle | undefined;
+  while (!handle && Date.now() < deadline) {
+    try {
+      const opened = await fs.open(lock, 'wx');
+      try {
+        await opened.writeFile(lockToken);
+        handle = opened;
+      } catch (error) {
+        await opened.close().catch(() => {});
+        await fs.rm(lock, { force: true }).catch(() => {});
+        throw error;
+      }
+    } catch (err: any) {
+      if (err?.code !== 'EEXIST') throw err;
+      try {
+        const stat = await fs.stat(lock);
+        if (Date.now() - stat.mtimeMs > LOCK_STALE_MS) {
+          await fs.rm(lock, { force: true });
+          continue;
+        }
+      } catch (statErr: any) {
+        if (statErr?.code === 'ENOENT') continue;
+      }
+      await new Promise(resolve => setTimeout(resolve, LOCK_RETRY_MS));
+    }
+  }
+  if (!handle) return undefined;
+  try {
+    return await fn();
+  } finally {
+    await handle.close().catch(() => {});
+    // A stale-lock recovery may have replaced the path while this process still
+    // held the unlinked inode. Remove only the path this owner actually wrote.
+    const currentToken = await fs.readFile(lock, 'utf8').catch(() => null);
+    if (currentToken === lockToken) await fs.rm(lock, { force: true }).catch(() => {});
+  }
 }
 
 /**

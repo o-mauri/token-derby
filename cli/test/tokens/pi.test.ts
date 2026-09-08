@@ -33,8 +33,12 @@ function id(): string {
   return nextId.toString(16).padStart(8, '0');
 }
 
-function header(sessionId = 'session-1'): object {
-  return { type: 'session', version: 3, id: sessionId, timestamp: '2026-09-07T00:00:00.000Z', cwd: '/tmp/project' };
+function header(sessionId = 'session-1', parentSession?: string): object {
+  return {
+    type: 'session', version: 3, id: sessionId,
+    timestamp: '2026-09-07T00:00:00.000Z', cwd: '/tmp/project',
+    ...(parentSession ? { parentSession } : {}),
+  };
 }
 
 function modelChange(provider: string, model: string): object {
@@ -45,11 +49,20 @@ function modelChange(provider: string, model: string): object {
   };
 }
 
-function assistant(provider: string, model: string, usage: object, identity?: { id: string; timestamp: string }): object {
+function assistant(
+  provider: string,
+  model: string,
+  usage: object,
+  identity?: { id: string; timestamp: string },
+  responseModel?: string,
+): object {
   return {
     type: 'message', id: identity?.id ?? id(), parentId: null,
     timestamp: identity?.timestamp ?? `2026-09-07T00:01:${String(nextId).padStart(2, '0')}.000Z`,
-    message: { role: 'assistant', provider, model, usage, content: [], stopReason: 'stop', timestamp: 0 },
+    message: {
+      role: 'assistant', provider, model, usage, content: [], stopReason: 'stop', timestamp: 0,
+      ...(responseModel ? { responseModel } : {}),
+    },
   };
 }
 
@@ -61,11 +74,14 @@ function summary(type: 'compaction' | 'branch_summary', usage: object): object {
   };
 }
 
-function toolUsage(usage: object): object {
+function toolUsage(usage: object, details?: object): object {
   return {
     type: 'message', id: id(), parentId: null,
     timestamp: `2026-09-07T00:03:${String(nextId).padStart(2, '0')}.000Z`,
-    message: { role: 'toolResult', toolCallId: 'x', toolName: 'nested-llm', content: [], usage, isError: false },
+    message: {
+      role: 'toolResult', toolCallId: 'x', toolName: 'nested-llm', content: [], usage, isError: false,
+      ...(details ? { details } : {}),
+    },
   };
 }
 
@@ -87,11 +103,19 @@ async function writeJsonl(root: string, rel: string, entries: object[]): Promise
   return file;
 }
 
+async function writeExactJsonl(root: string, rel: string, entries: object[]): Promise<string> {
+  const file = path.join(root, rel);
+  await fs.mkdir(path.dirname(file), { recursive: true });
+  await fs.writeFile(file, entries.map(entry => JSON.stringify(entry)).join('\n') + '\n');
+  return file;
+}
+
 describe('Pi token scanning', () => {
   it('treats a missing optional Pi session root as empty history', async () => {
     process.env.TOKEN_DERBY_PI_DIR = path.join(os.tmpdir(), `td-pi-missing-${Math.random()}`);
     await expect(sumPiByModelAndConversation()).resolves.toEqual(new Map());
   });
+
 
   it('buckets usage by exact provider/model and matches Pi footer usage sources', async () => {
     const root = await tmpPi();
@@ -111,6 +135,81 @@ describe('Pi token scanning', () => {
     expect([...(byModel.get(qwen)?.values() ?? [])]).toEqual([{ input: 20, output: 24 }]);
     expect([...(byModel.get(openai)?.values() ?? [])]).toEqual([{ input: 8, output: 10 }]);
     expect(await listPiModelKeys()).toEqual([openai, qwen].sort());
+  });
+
+  it('attributes a routed response to responseModel while preserving requested branch state', async () => {
+    const root = await tmpPi();
+    const reply = assistant(
+      'openrouter', 'auto', { input: 1, output: 10 }, undefined, 'anthropic/claude-sonnet-4',
+    ) as any;
+    const compacted = summary('compaction', { input: 2, output: 5 }) as any;
+    compacted.parentId = reply.id;
+    await writeJsonl(root, 'scope/routed.jsonl', [header(), reply, compacted]);
+
+    const totals = await sumPiTokensByModel();
+    expect(totals.get(piModelKey('openrouter', 'anthropic/claude-sonnet-4')!)).toEqual({ input: 1, output: 10 });
+    expect(totals.get(piModelKey('openrouter', 'auto')!)).toEqual({ input: 2, output: 5 });
+  });
+
+  it('uses native child sessions instead of foreground subagent aggregate usage', async () => {
+    const root = await tmpPi();
+    const child = await writeJsonl(root, 'scope/parent/run-1/run-0/session.jsonl', [
+      header('child'),
+      assistant('qwen', 'qwen3-coder', { input: 2, output: 20 }),
+      assistant('openai-codex', 'gpt-5.6-sol', { input: 3, output: 30 }),
+    ]);
+    await writeJsonl(root, 'scope/parent.jsonl', [
+      header('parent'),
+      modelChange('qwen', 'qwen3-coder'),
+      toolUsage(
+        { input: 5, output: 50 },
+        { results: [{ agent: 'reviewer', model: 'qwen/qwen3-coder', sessionFile: child, usage: { input: 5, output: 50 } }] },
+      ),
+    ]);
+
+    const totals = await sumPiTokensByModel();
+    expect(totals.get(piModelKey('qwen', 'qwen3-coder')!)).toEqual({ input: 2, output: 20 });
+    expect(totals.get(piModelKey('openai-codex', 'gpt-5.6-sol')!)).toEqual({ input: 3, output: 30 });
+
+    // Removing native history must not make the persisted aggregate appear as
+    // newly attributable usage under a potentially different parent model.
+    await fs.rm(path.dirname(path.dirname(child)), { recursive: true, force: true });
+    expect(await sumPiTokensByModel()).toEqual(new Map());
+  });
+
+  it('keeps aggregate fallback when referenced native history was gone before the first scan', async () => {
+    const root = await tmpPi();
+    await writeJsonl(root, 'scope/cleaned-before-scan.jsonl', [
+      header(),
+      modelChange('qwen', 'qwen3-coder'),
+      toolUsage(
+        { input: 3, output: 30 },
+        { results: [{
+          agent: 'reviewer', model: 'openai-codex/gpt-5.6-sol:max',
+          sessionFile: path.join(root, 'scope/already-cleaned/session.jsonl'),
+          usage: { input: 3, output: 30 },
+        }] },
+      ),
+    ]);
+
+    expect((await sumPiTokensByModel()).get(piModelKey('openai-codex', 'gpt-5.6-sol')!))
+      .toEqual({ input: 3, output: 30 });
+  });
+
+  it('counts per-child aggregate fallback when no native session is referenced', async () => {
+    const root = await tmpPi();
+    await writeJsonl(root, 'scope/fallback.jsonl', [
+      header(),
+      modelChange('qwen', 'qwen3-coder'),
+      toolUsage(
+        { input: 3, output: 30 },
+        { results: [{ agent: 'external', model: 'openai-codex/gpt-5.6-sol:max', usage: { input: 3, output: 30 } }] },
+      ),
+    ]);
+
+    const totals = await sumPiTokensByModel();
+    expect(totals.get(piModelKey('openai-codex', 'gpt-5.6-sol')!)).toEqual({ input: 3, output: 30 });
+    expect(totals.has(piModelKey('qwen', 'qwen3-coder')!)).toBe(false);
   });
 
   it('attributes a branch summary to the abandoned branch model identified by fromId', async () => {
@@ -134,10 +233,10 @@ describe('Pi token scanning', () => {
     expect(totals.get(piModelKey('openai-codex', 'gpt-5.3-codex')!)).toEqual({ input: 5, output: 50 });
   });
 
-  it('keeps clone ownership stable when an earlier clone appears and its donor is deleted', async () => {
+  it('keeps header lineage stable when an earlier clone appears and its donor is deleted', async () => {
     const root = await tmpPi();
     const copied = assistant('qwen', 'qwen3-coder', { input: 10, output: 100 });
-    const donor = await writeJsonl(root, 'scope/z-donor.jsonl', [header(), copied]);
+    const donor = await writeJsonl(root, 'scope/z-donor.jsonl', [header('donor'), copied]);
     const key = piModelKey('qwen', 'qwen3-coder')!;
 
     const first = (await sumPiByModelAndConversation()).get(key)!;
@@ -145,7 +244,7 @@ describe('Pi token scanning', () => {
     expect([...first.values()]).toEqual([{ input: 10, output: 100 }]);
 
     await writeJsonl(root, 'scope/a-clone.jsonl', [
-      header(), copied, assistant('qwen', 'qwen3-coder', { input: 2, output: 20 }),
+      header('clone', donor), copied, assistant('qwen', 'qwen3-coder', { input: 2, output: 20 }),
     ]);
     const withClone = (await sumPiByModelAndConversation()).get(key)!;
     expect([...withClone.keys()]).toEqual([conversation]);
@@ -155,6 +254,28 @@ describe('Pi token scanning', () => {
     const withoutDonor = (await sumPiByModelAndConversation()).get(key)!;
     expect([...withoutDonor.keys()]).toEqual([conversation]);
     expect([...withoutDonor.values()]).toEqual([{ input: 12, output: 120 }]);
+  });
+
+  it('keeps an alternate-root branch clone in the same conversation after ancestor cleanup', async () => {
+    const root = await tmpPi();
+    const x = assistant('qwen', 'qwen3-coder', { input: 1, output: 10 }) as any;
+    const y = assistant('qwen', 'qwen3-coder', { input: 2, output: 20 }) as any;
+    x.parentId = null;
+    y.parentId = null;
+    const original = await writeExactJsonl(root, 'scope/original.jsonl', [header('original'), x, y]);
+    const clone = await writeExactJsonl(root, 'scope/clone.jsonl', [header('clone', original), y]);
+    await writeExactJsonl(root, 'scope/clone-of-clone.jsonl', [header('clone-2', clone), y]);
+    const key = piModelKey('qwen', 'qwen3-coder')!;
+
+    const before = (await sumPiByModelAndConversation()).get(key)!;
+    const [conversation] = [...before.keys()];
+    expect([...before.values()]).toEqual([{ input: 3, output: 30 }]);
+
+    await fs.rm(original);
+    await fs.rm(clone);
+    const after = (await sumPiByModelAndConversation()).get(key)!;
+    expect([...after.keys()]).toEqual([conversation]);
+    expect([...after.values()]).toEqual([{ input: 2, output: 20 }]);
   });
 
   it('rolls nested child/fork sessions into the owner and deduplicates copied entries', async () => {

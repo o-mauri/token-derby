@@ -1,6 +1,6 @@
 import type { ApiHandler } from '../lib/http.js';
 import type { HeartbeatRequest, HeartbeatResponse } from '@token-derby/shared';
-import { minorMatches, MIDRACE_THRESHOLDS, scoreTick, scoredOf } from '@token-derby/shared';
+import { MAX_HEARTBEAT_BODY_BYTES, minorMatches, MIDRACE_THRESHOLDS, scoreTick, scoredOf } from '@token-derby/shared';
 import { getRaceByJoinCode } from '../db/races.js';
 import { getHorseForHeartbeat, applyHeartbeatDelta, listHorses } from '../db/horses.js';
 import { appendSeriesPoint } from '../db/series.js';
@@ -27,6 +27,9 @@ export const handler: ApiHandler = async (event) => {
   const token = auth?.startsWith('Bearer ') ? auth.slice(7) : null;
   if (!token) return err('INVALID_TOKEN', 'Authorization: Bearer required');
 
+  if (event.body && Buffer.byteLength(event.body, 'utf8') > MAX_HEARTBEAT_BODY_BYTES) {
+    return err('BAD_REQUEST', `heartbeat body must not exceed ${MAX_HEARTBEAT_BODY_BYTES} bytes`);
+  }
   const body = parseJson<HeartbeatRequest>(event.body);
   if (!body || typeof body.seq !== 'number' || !Number.isFinite(body.seq) || body.seq < 1) {
     return err('BAD_REQUEST', 'seq (>=1) required');
