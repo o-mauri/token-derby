@@ -2,11 +2,13 @@
 // sources concurrently, so when the budget expires the useful question is which
 // source is STILL going — that one owns the stall.
 
-import type { ModelKey } from '@token-derby/shared';
+import type { BuiltinModelKey } from '@token-derby/shared';
 import { ScanCache } from './scan-cache.js';
 
+export type ScanSource = BuiltinModelKey | 'pi';
+
 /** Env var that repoints (or empties) a source's history directory. */
-function skipVar(key: ModelKey): string {
+function skipVar(key: ScanSource): string {
   return `TOKEN_DERBY_${key.toUpperCase()}_DIR`;
 }
 
@@ -17,19 +19,19 @@ function formatBytes(bytes: number): string {
 
 /** Tracks when each source's scan started and whether it ever finished. */
 export class ScanProgress {
-  private readonly started = new Map<ModelKey, number>();
-  private readonly finished = new Set<ModelKey>();
+  private readonly started = new Map<ScanSource, number>();
+  private readonly finished = new Set<ScanSource>();
 
-  begin(key: ModelKey): void {
+  begin(key: ScanSource): void {
     this.started.set(key, Date.now());
   }
 
-  end(key: ModelKey): void {
+  end(key: ScanSource): void {
     this.finished.add(key);
   }
 
   /** Sources begun but never finished, longest-running first. */
-  outstanding(): ModelKey[] {
+  outstanding(): ScanSource[] {
     return [...this.started.entries()]
       .filter(([key]) => !this.finished.has(key))
       .sort((a, b) => a[1] - b[1]) // earliest start = longest running
@@ -40,7 +42,7 @@ export class ScanProgress {
 /** Stall text for a scan that blew its budget. `bytes` of 0 means "not known yet". */
 export function describeScanTimeout(
   timeoutMs: number,
-  outstanding: ReadonlyArray<{ key: ModelKey; bytes: number }>,
+  outstanding: ReadonlyArray<{ key: ScanSource; bytes: number }>,
 ): string {
   const budget = `Token scan timed out after ${Math.round(timeoutMs / 1000)}s`;
   if (outstanding.length === 0) return budget;

@@ -1,7 +1,7 @@
 import React from 'react';
 import { render } from 'ink';
 import type { HorseColors, StableHorse } from '@token-derby/shared';
-import { isModelKey, type ModelKey } from '@token-derby/shared';
+import { MODEL_KEYS, emptyModelTotals, isModelKey, type ModelKey } from '@token-derby/shared';
 import { HorsePicker } from '../ui/HorsePicker.js';
 import { PrimaryPicker } from '../ui/PrimaryPicker.js';
 import { joinRace, getRace, listStable, listOrganisations } from '../api/endpoints.js';
@@ -9,6 +9,8 @@ import { ApiError } from '../api/client.js';
 import { saveActiveRace, type ActiveRace } from '../stable/active-race.js';
 import { RunRace, buildInitialState } from '../runtime/run-race.js';
 import { loadIdentity } from '../identity/identity.js';
+import { OPTIONAL_PI_SCAN_TIMEOUT_MS } from '../config.js';
+import { listPiModelKeys } from '../tokens/pi.js';
 
 /** Parse `--primary <model>` or `--primary=<model>` from argv. Throws on a bad value. */
 export function parsePrimaryFlag(argv: string[]): ModelKey | null {
@@ -18,7 +20,9 @@ export function parsePrimaryFlag(argv: string[]): ModelKey | null {
     if (a === '--primary') value = argv[i + 1];
     else if (a.startsWith('--primary=')) value = a.slice('--primary='.length);
     else continue;
-    if (!isModelKey(value)) throw new Error(`--primary must be one of claude, codex, gemini (got ${value ?? ''})`);
+    if (!isModelKey(value)) {
+      throw new Error(`--primary must be claude, codex, gemini, or a discovered pi:<provider>/<model> key (got ${value ?? ''})`);
+    }
     return value;
   }
   return null;
@@ -117,7 +121,7 @@ export async function joinCommand(joinCode: string | undefined, argv: string[] =
   let chosenPrimary: ModelKey = 'claude';
   if (!ownHorse) {
     if (primaryFlag) chosenPrimary = primaryFlag;
-    else if (process.stdout.isTTY) chosenPrimary = await pickPrimary();
+    else if (process.stdout.isTTY) chosenPrimary = await pickPrimary(await primaryModelOptions());
     // else: leave as 'claude' (non-interactive default)
   }
 
@@ -153,10 +157,11 @@ export async function joinCommand(joinCode: string | undefined, argv: string[] =
     last_heartbeat_at: new Date(0).toISOString(),
     primary_model: joinResp.primary_model,
     score: {
-      acked: { claude: 0, codex: 0, gemini: 0 },
-      lastGood: { claude: 0, codex: 0, gemini: 0 },
+      acked: emptyModelTotals(),
+      lastGood: emptyModelTotals(),
       primaryConvAcked: {},
       primaryCounted: 0,
+      piPrimed: false,
       seq: ownHorse?.last_seq ?? 0,
     },
     ...(race.counts_input ? { counts_input: true } : {}),
@@ -182,10 +187,21 @@ async function pickHorse(horses: StableHorse[]): Promise<StableHorse | null> {
   });
 }
 
-async function pickPrimary(): Promise<ModelKey> {
+async function primaryModelOptions(): Promise<ModelKey[]> {
+  try {
+    return [...MODEL_KEYS, ...(await listPiModelKeys({ timeoutMs: OPTIONAL_PI_SCAN_TIMEOUT_MS }))];
+  } catch {
+    // Pi is optional. A missing/unreadable history must not block users who are
+    // racing with one of the native CLI sources.
+    return [...MODEL_KEYS];
+  }
+}
+
+async function pickPrimary(models: readonly ModelKey[]): Promise<ModelKey> {
   return new Promise(resolve => {
     const app = render(
       React.createElement(PrimaryPicker, {
+        models,
         onPick: (m: ModelKey) => { app.unmount(); resolve(m); },
       }),
     );

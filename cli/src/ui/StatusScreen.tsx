@@ -1,24 +1,24 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import type { GetRaceResponse, HorseColors, HorseView } from '@token-derby/shared';
-import { levelInfo, MODEL_KEYS, resolveStaminaConfig, scoredOf, SECONDARY_WEIGHT, type ModelKey } from '@token-derby/shared';
+import { levelInfo, MODEL_KEYS, modelLabel, resolveStaminaConfig, scoredOf, SECONDARY_WEIGHT, type ModelKey } from '@token-derby/shared';
 import { HorseSprite } from './HorseSprite.js';
 import { MINI_SPRITE } from './sprite.js';
 
-const MODEL_LABELS: Record<ModelKey, string> = { claude: 'Claude', codex: 'Codex', gemini: 'Gemini' };
-
-export function ModelList(props: { primaryModel: ModelKey }) {
+export function ModelList(props: { primaryModel: ModelKey; modelKeys?: readonly ModelKey[] }) {
   const { primaryModel } = props;
+  const models = [...new Set(props.modelKeys ?? MODEL_KEYS)];
+  if (!models.includes(primaryModel)) models.unshift(primaryModel);
   const secondaryTag = ` (${Math.round(SECONDARY_WEIGHT * 100)}%)`;
   return (
     <Box marginTop={1}>
       <Text>
         {'Models:  '}
-        {MODEL_KEYS.map((m, i) => (
-          <Text key={m}>
+        {models.map((model, i) => (
+          <Text key={model}>
             {i > 0 ? ' · ' : ''}
-            {MODEL_LABELS[m]}
-            <Text dimColor>{m === primaryModel ? ' (primary)' : secondaryTag}</Text>
+            {modelLabel(model)}
+            <Text dimColor>{model === primaryModel ? ' (primary)' : secondaryTag}</Text>
           </Text>
         ))}
       </Text>
@@ -37,10 +37,11 @@ type Props = {
   stalled?: boolean;
   stallReason?: string | null;
   primaryModel?: ModelKey;
+  modelKeys?: readonly ModelKey[];
 };
 
 export function StatusScreen(props: Props) {
-  const { race, ownHorseId, ownHorseName, ownColors, ownUserName, lastHeartbeatAgoSec, lastHeartbeatOk, stalled, stallReason, primaryModel } = props;
+  const { race, ownHorseId, ownHorseName, ownColors, ownUserName, lastHeartbeatAgoSec, lastHeartbeatOk, stalled, stallReason, primaryModel, modelKeys } = props;
 
   if (!race) {
     return (
@@ -118,7 +119,7 @@ export function StatusScreen(props: Props) {
         )}
       </Box>
 
-      {primaryModel && <ModelList primaryModel={primaryModel} />}
+      {primaryModel && <ModelList primaryModel={primaryModel} modelKeys={modelKeys} />}
 
       <Box marginTop={1}>
         <Text dimColor>Press Ctrl+C to crash out of the race.</Text>

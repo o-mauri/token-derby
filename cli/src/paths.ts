@@ -32,3 +32,10 @@ export function codexSessionsDir(): string {
 export function geminiTmpDir(): string {
   return process.env.TOKEN_DERBY_GEMINI_DIR ?? path.join(os.homedir(), '.gemini', 'tmp');
 }
+
+export function piSessionsDir(): string {
+  if (process.env.TOKEN_DERBY_PI_DIR) return process.env.TOKEN_DERBY_PI_DIR;
+  if (process.env.PI_CODING_AGENT_SESSION_DIR) return process.env.PI_CODING_AGENT_SESSION_DIR;
+  const agentDir = process.env.PI_CODING_AGENT_DIR ?? path.join(os.homedir(), '.pi', 'agent');
+  return path.join(agentDir, 'sessions');
+}

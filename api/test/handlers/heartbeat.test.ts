@@ -8,7 +8,7 @@ import { ddb, TABLE } from '../../src/db/client.js';
 import { raceMetaKey } from '../../src/db/keys.js';
 import { UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { makeUser, makeHorse, type TestUser } from '../helpers/auth-helper.js';
-import type { ModelKey } from '@token-derby/shared';
+import { MAX_HEARTBEAT_BODY_BYTES, piModelKey, type ModelKey } from '@token-derby/shared';
 import { CURRENT_CLI_VERSION, SAME_MINOR_CLI_VERSION, MISMATCHED_MINOR_CLI_VERSION, OUTDATED_CLI_VERSION } from '../helpers/cli-version.js';
 
 const COLORS = { body: '#8B4513', mane: '#000', tail: '#000', saddle: '#C0392B' };
@@ -431,6 +431,19 @@ describe('heartbeat handler', () => {
     expect(own?.current_tokens).toBe(5500);
   });
 
+  it('weights a dynamic Pi provider/model primary before the rate cap', async () => {
+    const qwen = piModelKey('qwen', 'qwen3-coder')!;
+    const openai = piModelKey('openai-codex', 'gpt-5.3-codex')!;
+    const { join_code, race_id, horse_id, heartbeat_token } = await setupWithPrimary(qwen);
+    const res: any = await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, {
+      seq: 1,
+      components: { [qwen]: 5_000, [openai]: 1_000, claude: 200 },
+    }));
+    expect(res.statusCode).toBe(200);
+    const own = (await listHorses(race_id)).find(h => h.horse_id === horse_id);
+    expect(own?.current_tokens).toBe(5_600); // 5000 primary + 500 + 100
+  });
+
   it('accepts a legacy bare delta (primary defaults to claude for legacy horses)', async () => {
     // Join without primary_model; server defaults to 'claude'
     const { join_code, race_id, horse_id, heartbeat_token } = await setupWithPrimary(undefined);
@@ -442,6 +455,16 @@ describe('heartbeat handler', () => {
     const horses = await listHorses(race_id);
     const own = horses.find(h => h.horse_id === horse_id);
     expect(own?.current_tokens).toBe(250);
+  });
+
+  it('rejects an oversized heartbeat before parsing or database work', async () => {
+    const event = hbEvent('NOPE', 'horse', 'token', {
+      seq: 1,
+      padding: 'x'.repeat(MAX_HEARTBEAT_BODY_BYTES),
+    });
+    const res: any = await hbHandler(event);
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).message).toContain(`${MAX_HEARTBEAT_BODY_BYTES} bytes`);
   });
 
   it('rejects a heartbeat with neither components nor a delta', async () => {

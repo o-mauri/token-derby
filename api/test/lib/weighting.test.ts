@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { MAX_HEARTBEAT_COMPONENTS, piModelKey } from '@token-derby/shared';
 import { resolveHeartbeatDelta } from '../../src/lib/weighting.js';
 
 describe('resolveHeartbeatDelta', () => {
@@ -10,6 +11,30 @@ describe('resolveHeartbeatDelta', () => {
 
   it('all-primary components pass straight through', () => {
     expect(resolveHeartbeatDelta({ components: { claude: 300, codex: 0, gemini: 0 } }, 'claude')).toBe(300);
+  });
+
+  it('weights arbitrary Pi provider/model buckets', () => {
+    const qwen = piModelKey('qwen', 'qwen3-coder')!;
+    const openai = piModelKey('openai-codex', 'gpt-5.3-codex')!;
+    expect(resolveHeartbeatDelta({ components: { [qwen]: 400, [openai]: 200 } }, qwen)).toBe(500);
+  });
+
+  it('bounds oversized legacy maps without rejecting them or dropping the primary', () => {
+    const atLimit = Object.fromEntries(Array.from({ length: MAX_HEARTBEAT_COMPONENTS }, (_, index) => [
+      piModelKey('provider', `model-${index}`)!,
+      1,
+    ]));
+    expect(resolveHeartbeatDelta({ components: atLimit }, 'claude')).toBe(MAX_HEARTBEAT_COMPONENTS * 0.5);
+
+    const primary = piModelKey('provider', 'primary-after-cap')!;
+    const overLimit = { ...atLimit, [primary]: 10, [piModelKey('provider', 'ignored-overflow')!]: 1000 };
+    // Primary 10 + the first 63 secondaries at half weight. The extra key is
+    // ignored, but the heartbeat remains valid for a pre-cap same-minor client.
+    expect(resolveHeartbeatDelta({ components: overLimit }, primary)).toBe(41.5);
+  });
+
+  it('ignores unvalidated dynamic component names', () => {
+    expect(resolveHeartbeatDelta({ components: { claude: 100, made_up: 50_000 } }, 'claude')).toBe(100);
   });
 
   it('falls back to a legacy bare delta (primary-only semantics)', () => {

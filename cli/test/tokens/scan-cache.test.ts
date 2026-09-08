@@ -153,6 +153,45 @@ describe('ScanCache persistence', () => {
     expect(seen).toEqual([['three']]); // warm across process restarts
   });
 
+  it('does not let an older concurrent writer replace a newer generation', async () => {
+    const f = path.join(work, 'a.jsonl');
+    await fs.writeFile(f, 'one\n');
+    const older = await ScanCache.open('claude');
+    await older.readIncremental(f, collector());
+
+    const newer = await ScanCache.open('claude');
+    await fs.appendFile(f, 'two\n');
+    await newer.readIncremental(f, collector());
+    await newer.save();
+    await expect(older.save({ required: true })).rejects.toThrow('newer writer');
+
+    await fs.appendFile(f, 'three\n');
+    const reopened = await ScanCache.open('claude');
+    const seen: string[][] = [];
+    const spy: FileFold<string[]> = {
+      empty: () => [],
+      append: (acc, lines) => { seen.push(lines); return [...acc, ...lines]; },
+    };
+    expect(await reopened.readIncremental(f, spy)).toEqual(['one', 'two', 'three']);
+    expect(seen).toEqual([['three']]);
+  });
+
+  it('does not rewrite an unchanged cache on every scan', async () => {
+    const f = path.join(work, 'a.jsonl');
+    await fs.writeFile(f, 'one\n');
+    const first = await ScanCache.open('claude');
+    await first.readIncremental(f, collector());
+    await first.save();
+
+    const cacheFile = path.join(home, 'scan-cache', 'claude.json');
+    await setMtime(cacheFile, 1_700_000_000);
+    const second = await ScanCache.open('claude');
+    await second.readIncremental(f, collector());
+    await second.save();
+
+    expect((await fs.stat(cacheFile)).mtimeMs).toBe(1_700_000_000_000);
+  });
+
   it('drops entries for files it no longer sees, so the cache cannot grow forever', async () => {
     const a = path.join(work, 'a.jsonl');
     const b = path.join(work, 'b.jsonl');

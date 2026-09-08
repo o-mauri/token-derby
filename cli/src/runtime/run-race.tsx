@@ -6,7 +6,7 @@ import { describeAchievement, type RecentEvent } from '@token-derby/shared';
 import { runHeartbeatLoop } from './heartbeat-loop.js';
 import { readAllSources, isStall, scanWithTimeout, type BeatReading } from '../tokens/race-tokens.js';
 import { ScanProgress, diagnoseScanTimeout } from '../tokens/scan-progress.js';
-import { type ModelKey } from '@token-derby/shared';
+import { emptyModelTotals, isModelKey, type ModelKey } from '@token-derby/shared';
 import { RaceScoreTracker, type RaceScoreState } from '../tokens/race-score.js';
 import * as endpoints from '../api/endpoints.js';
 import { ApiError } from '../api/client.js';
@@ -35,6 +35,9 @@ export function RunRace({ active, initialState, pendingMode, ownUserName }: RunR
   const ctrl = useRef(new AbortController());
   const [stalled, setStalled] = useState(false);
   const [stallReason, setStallReason] = useState<string | null>(null);
+  const [trackedModels, setTrackedModels] = useState<ModelKey[]>(() =>
+    collectModelKeys(active.primary_model, initialState.lastGood),
+  );
 
   // Re-render every second so the "Ns ago" counter updates.
   useEffect(() => {
@@ -70,6 +73,9 @@ export function RunRace({ active, initialState, pendingMode, ownUserName }: RunR
       prepareBeat: async () => {
         const reading = await scanBeat();
         tracker.recordReading(reading);
+        if (!isStall(reading)) {
+          setTrackedModels(previous => collectModelKeys(active.primary_model, reading.secondary, previous));
+        }
         if (pendingRef.current && !isStall(reading)) tracker.reprime();
         setStalled(tracker.stalled);
         setStallReason(tracker.stalled ? tracker.stallReason : null);
@@ -146,6 +152,7 @@ export function RunRace({ active, initialState, pendingMode, ownUserName }: RunR
         stalled={stalled}
         stallReason={stallReason}
         primaryModel={active.primary_model}
+        modelKeys={trackedModels}
       />
       {achievements.length > 0 && (
         <Box flexDirection="column" marginTop={1}>
@@ -190,23 +197,36 @@ export async function buildInitialState(args: {
   raceStatus: 'pending' | 'live';
   serverLastSeq: number;
 }): Promise<{ initialState: RaceScoreState; pendingMode: boolean }> {
-  let secondary: Record<ModelKey, number> = { claude: 0, codex: 0, gemini: 0 };
+  let secondary = emptyModelTotals();
+  let piPrimed = false;
   const primaryConvAcked: Record<string, number> = {};
   try {
-    const now = await readAllSources(args.active, args.active.primary_model);
+    const now = await readAllSources(args.active, args.active.primary_model, undefined, { baseline: true });
     if (!isStall(now)) {
       secondary = now.secondary;
+      piPrimed = now.piAvailable !== false;
       for (const [id, v] of now.primaryByConv) primaryConvAcked[id] = v;
     }
-  } catch { /* leave zeros */ }
+  } catch { /* incomplete sources stay unprimed and recover conservatively */ }
   return {
     initialState: {
       acked: { ...secondary },
       lastGood: { ...secondary },
       primaryConvAcked,
       primaryCounted: 0,
+      piPrimed,
       seq: args.serverLastSeq,
     },
     pendingMode: args.raceStatus === 'pending',
   };
+}
+
+function collectModelKeys(
+  primary: ModelKey,
+  values: Partial<Record<ModelKey, number>>,
+  existing: readonly ModelKey[] = [],
+): ModelKey[] {
+  const keys = new Set<ModelKey>([primary, ...existing]);
+  for (const key of Object.keys(values)) if (isModelKey(key)) keys.add(key);
+  return [...keys];
 }

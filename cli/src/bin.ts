@@ -65,7 +65,10 @@ Races:
                                           Create a new race (interactive). When
                                           --organisation is set, only members of
                                           that org can join.
-  token-derby join <join-code>            Join (or resume) a race
+  token-derby join <join-code> [--primary <model>]
+                                          Join (or resume) a race. The picker
+                                          includes provider/model buckets found
+                                          in local Pi sessions.
   token-derby end <admin-code>            End a race early
 
 Cosmetics:
@@ -81,6 +84,7 @@ Environment:
                                           touches the other env's account.
   TOKEN_DERBY_API_BASE                    Hard-override API base URL (wins over env)
   TOKEN_DERBY_HOME                        Hard-override identity/stable directory
+  TOKEN_DERBY_PI_DIR                      Override Pi session directory
 `;
 
 async function main(): Promise<number> {

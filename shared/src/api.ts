@@ -1,6 +1,10 @@
 import type { CollectedHat, HatId, HorseColors, HorseView, Race, RaceStatus, RaceSummary, RaceView, OrganisationSummary, OrgAccessSettings, StableHorse, RaceSchedule, League, DivisionConfig, ModelKey, SeasonStandings, RaceSettings } from './types.js';
 import type { StaminaConfig } from './scoring.js';
 
+/** Application-level heartbeat bounds, kept below API Gateway's request limit. */
+export const MAX_HEARTBEAT_COMPONENTS = 64;
+export const MAX_HEARTBEAT_BODY_BYTES = 64 * 1024;
+
 export type CreateRaceRequest = {
   name: string;
   start_time: string;
@@ -34,7 +38,7 @@ export type JoinRaceResponse = {
 
 export type HeartbeatRequest = {
   seq: number;
-  components?: Record<ModelKey, number>;  // per-source deltas (each ≥ 0)
+  components?: Partial<Record<ModelKey, number>>; // built-in + discovered Pi provider/model deltas (each ≥ 0)
   delta?: number;                         // legacy single delta (pre-multi-model CLIs)
 };
 

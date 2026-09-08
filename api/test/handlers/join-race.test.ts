@@ -9,6 +9,7 @@ import { setRaceEnded } from '../../src/db/races.js';
 import { equipHat as dbEquipHat, applyRollResult } from '../../src/db/stable.js';
 import { makeUser, makeHorse, type TestUser } from '../helpers/auth-helper.js';
 import { CURRENT_CLI_VERSION } from '../helpers/cli-version.js';
+import { piModelKey } from '@token-derby/shared';
 
 const COLORS = { body: '#8B4513', mane: '#000', tail: '#000', saddle: '#C0392B' };
 
@@ -279,6 +280,21 @@ describe('joinRace handler', () => {
     // verify persistence: the race-horse stored in DB has primary_model 'codex'
     const horses = await listHorses(race_id);
     expect(horses[0]?.primary_model).toBe('codex');
+  });
+
+  it('stores a canonical Pi provider/model primary', async () => {
+    const creator = await makeUser('PM_Pi_C');
+    const joiner = await makeUser('PM_Pi_J');
+    const horse = await makeHorse(joiner, 'Bolt', COLORS);
+    const { join_code, race_id } = await createTestRace(creator);
+    const primary = piModelKey('qwen', 'qwen3-coder')!;
+    const res: any = await joinHandler(joinEvent(join_code, joiner, {
+      stable_horse_id: horse.stable_horse_id,
+      primary_model: primary,
+    }));
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body).primary_model).toBe(primary);
+    expect((await listHorses(race_id))[0]?.primary_model).toBe(primary);
   });
 
   it('defaults to claude when primary_model is omitted', async () => {
