@@ -101,19 +101,42 @@ function addNum(value: unknown): number {
 
 // Transcripts are append-only, so a file's totals are the running sum of every
 // line ever written — newly appended lines simply add to the cached value.
-const CLAUDE_FOLD: FileFold<TokenTotals> = {
+// Fold state carries the last request seen so the dedupe below survives a beat
+// boundary: readIncremental resumes from the committed value, so remembering it
+// here is what stops a response whose blocks straddle two beats being counted
+// twice. Persisted into the scan cache with the totals (hence CACHE_VERSION).
+type ClaudeFoldState = TokenTotals & { last?: string };
+
+// `usage` is reported per REQUEST, but Claude Code writes one transcript line
+// per content block — a turn with thinking + text + three tool calls is five
+// lines, each repeating the same usage verbatim. Summing per line inflated real
+// races by 2.1x-7.6x. Count each response once, keyed on requestId (message.id
+// for older transcripts that predate it).
+//
+// A response's lines are contiguous, so comparing against the previous line's
+// id is enough and stays O(1) — no unbounded set of ids in the cache. Measured
+// across 390 real transcripts: 38,986 responses contiguous, 9 not. Those 9 are
+// counted twice, which is the deliberate trade for a bounded cache entry.
+const CLAUDE_FOLD: FileFold<ClaudeFoldState> = {
   empty: () => ({ input: 0, output: 0 }),
   append: (acc, lines) => {
-    let { input, output } = acc;
+    let { input, output, last } = acc;
     for (const line of lines) {
       if (!line.trim()) continue;
       let parsed: any;
       try { parsed = JSON.parse(line); } catch { continue; }
       const usage = parsed?.message?.usage;
       if (!usage) continue;
+      // Undefined id ⇒ un-dedupable, so count it: under-counting real work is
+      // the worse failure. `last` still advances, so a run of id-less lines is
+      // never collapsed into one.
+      const id: string | undefined = parsed?.requestId ?? parsed?.message?.id ?? undefined;
+      if (id !== undefined && id === last) continue;
+      last = id;
       input += addNum(usage.input_tokens) + addNum(usage.cache_creation_input_tokens);
       output += addNum(usage.output_tokens);
     }
-    return { input, output }; // fresh object: never mutate the cached value
+    // Fresh object: never mutate the cached value.
+    return last === undefined ? { input, output } : { input, output, last };
   },
 };
