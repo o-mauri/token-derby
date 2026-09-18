@@ -59,27 +59,27 @@ describe('staminaStep — multiplier', () => {
 
 describe('staminaStep — drain', () => {
   it('does not drain at or below the sustainable pace', () => {
-    expect(staminaStep({ stamina: 50, pace: 4_000, minutes: 1, cfg }).stamina).toBeGreaterThan(50);
+    expect(staminaStep({ stamina: 50, pace: 40_000, minutes: 1, cfg }).stamina).toBeGreaterThan(50);
   });
 
   it('drains proportionally to the excess pace', () => {
-    // 8,000 = 2x sustainable -> (2 - 1) * 4 = 4 per minute
-    expect(staminaStep({ stamina: 100, pace: 8_000, minutes: 1, cfg }).stamina).toBeCloseTo(96);
+    // 80,000 = 2x sustainable -> (2 - 1) * 4 = 4 per minute
+    expect(staminaStep({ stamina: 100, pace: 80_000, minutes: 1, cfg }).stamina).toBeCloseTo(96);
   });
 
   it('clamps drain at MAX_DRAIN_PER_MIN', () => {
-    // 40,000 = 10x sustainable -> would be 36/min, clamped to 6
-    expect(staminaStep({ stamina: 100, pace: 40_000, minutes: 1, cfg }).stamina).toBeCloseTo(94);
+    // 400,000 = 10x sustainable -> would be 36/min, clamped to 6
+    expect(staminaStep({ stamina: 100, pace: 400_000, minutes: 1, cfg }).stamina).toBeCloseTo(94);
   });
 
   it('never falls below zero', () => {
-    expect(staminaStep({ stamina: 2, pace: 40_000, minutes: 10, cfg }).stamina).toBe(0);
+    expect(staminaStep({ stamina: 2, pace: 400_000, minutes: 10, cfg }).stamina).toBe(0);
   });
 });
 
 describe('staminaStep — recovery', () => {
   it('recovers at RECOVER_PER_MIN while under the sustainable pace', () => {
-    expect(staminaStep({ stamina: 50, pace: 1_000, minutes: 1, cfg }).stamina).toBeCloseTo(52);
+    expect(staminaStep({ stamina: 50, pace: 10_000, minutes: 1, cfg }).stamina).toBeCloseTo(52);
   });
 
   it('caps recovery credit per tick so a long absence cannot rest the horse', () => {
@@ -95,9 +95,9 @@ describe('staminaStep — recovery', () => {
 describe('scoreTick — stamina enabled', () => {
   it('scores at full rate while fresh and drains', () => {
     const r = scoreTick({
-      delta: 8_000, dt_ms: 60_000, race: { stamina: true }, state: { stamina: 100 },
+      delta: 80_000, dt_ms: 60_000, race: { stamina: true }, state: { stamina: 100 },
     });
-    expect(r.scored_delta).toBe(8_000);          // fresh: full multiplier
+    expect(r.scored_delta).toBe(80_000);         // fresh: full multiplier
     expect(r.state.stamina).toBeCloseTo(96);     // 2x sustainable -> 4/min
   });
 
@@ -119,15 +119,6 @@ describe('scoreTick — stamina enabled', () => {
       delta: 2000.5, dt_ms: 60_000, race: { stamina: true }, state: { stamina: 100 },
     });
     expect(r.scored_delta).toBe(2001);
-  });
-
-  it('scales the sustainable pace for counts_input races', () => {
-    // 8,000/min is under 4,000 x 10, so it recovers rather than drains
-    const r = scoreTick({
-      delta: 8_000, dt_ms: 60_000,
-      race: { stamina: true, counts_input: true }, state: { stamina: 50 },
-    });
-    expect(r.state.stamina).toBeCloseTo(52);
   });
 
   it('ignores stamina entirely when the toggle is off', () => {

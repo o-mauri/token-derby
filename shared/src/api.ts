@@ -8,8 +8,6 @@ export type CreateRaceRequest = {
   tz: string;
   max_participants?: number;
   organisation_name?: string;
-  counts_input?: boolean;
-  primary_top5?: boolean;
   stamina?: boolean;
 };
 
@@ -23,13 +21,11 @@ export type GetRaceResponse = RaceView;
 
 export type JoinRaceRequest = {
   stable_horse_id: string;
-  primary_model?: ModelKey;   // omitted ⇒ server locks 'claude'
 };
 
 export type JoinRaceResponse = {
   horse_id: string;
   heartbeat_token: string;
-  primary_model: ModelKey;    // the locked value (fresh join or resume)
 };
 
 export type HeartbeatRequest = {
@@ -256,8 +252,6 @@ export type SetOrgScheduleRequest = {
   tz: string;
   race_name?: string;
   max_participants?: number;
-  counts_input?: boolean;
-  primary_top5?: boolean;
   stamina?: boolean;
 };
 export type SetOrgScheduleResponse = { schedule: RaceSchedule };
@@ -274,8 +268,6 @@ export type SetOrgLeagueRequest = {
   tz: string;
   race_name?: string;
   max_participants?: number;
-  counts_input?: boolean;
-  primary_top5?: boolean;
   stamina?: boolean;
 };
 export type SetOrgLeagueResponse = { league: League };

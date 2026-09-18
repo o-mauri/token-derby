@@ -23,7 +23,9 @@ export type Horse = {
   user_name: string;
   xp: number;
   xp_awarded?: number;
-  primary_model?: ModelKey;   // locked model for this race-horse; absent ⇒ 'claude'
+  // Per-model token totals. Nested so more models (or more per-model figures)
+  // need no new top-level attribute. Absent on rows predating the split.
+  model_tokens?: Record<ModelKey, number>;
   last_seq?: number;          // highest applied heartbeat sequence (delta protocol)
   // Mid-race XP state — all optional for backwards compat with existing race-horse rows.
   live_xp?: number;
@@ -65,14 +67,6 @@ export type Race = {
   creator_user_name?: string;
   org_id?: string;
   organisation_name?: string;
-  // When true, races count input+output tokens (incl. cache reads/creations)
-  // instead of just output. Server-side achievement and rate-cap thresholds
-  // scale by TOKEN_INPUT_MULTIPLIER for these races.
-  counts_input?: boolean;
-  // When true, only each racer's 5 most-active conversations per heartbeat
-  // count toward their PRIMARY model's score (secondaries unaffected). Absent
-  // ⇒ off: every conversation counts. Locked at race creation.
-  primary_top5?: boolean;
   // League fixture tags — present only on races materialised for a league.
   // `league_id` is the org id (one league per org); `league_season`/`league_round`
   // locate the fixture within its season for scoring and the "round X/N" display.
@@ -274,8 +268,6 @@ export type RaceSchedule = {
   tz: string;                // IANA, e.g. "Europe/London"
   race_name?: string;        // optional name for created races
   max_participants?: number;
-  counts_input?: boolean;
-  primary_top5?: boolean;    // stamped onto each scheduled race (see Race.primary_top5)
   stamina?: boolean;         // stamped onto each scheduled race (see Race.stamina)
   created_at: string;
   creator_user_id: string;   // stamped onto each scheduled race
@@ -311,8 +303,6 @@ export type League = {
   tz: string;                     // IANA
   race_name?: string;
   max_participants?: number;
-  counts_input?: boolean;
-  primary_top5?: boolean;
   stamina?: boolean;         // stamped onto each fixture (see Race.stamina)
   current_season: number;         // 1-based; the season fixtures accrue into
   status: LeagueStatus;           // 'complete' is transient during rollover
