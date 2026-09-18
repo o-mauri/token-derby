@@ -13,6 +13,8 @@ import { whoamiCommand } from './commands/whoami.js';
 import { updateCommand } from './commands/update.js';
 import { rollCommand } from './commands/roll.js';
 import { claimCommand } from './commands/claim.js';
+import { parseFlag } from './args.js';
+import { stableDefaultCommand } from './commands/stable-default.js';
 import { orgJoinCommand } from './commands/org-join.js';
 import { webCommand } from './commands/web.js';
 import { envCommand } from './commands/env.js';
@@ -57,6 +59,9 @@ Stable management:
   token-derby stable list                 Show your saved horses
   token-derby stable edit [name]          Edit an existing horse's colors (interactive picker if no name)
   token-derby stable delete <name>        Remove a horse from your stable
+  token-derby stable default [name]       Show, set, or (--clear) unset the horse that
+                                          claim/join/stable edit use when none is named.
+                                          A stable of one is used automatically.
 
 Organisations:
   token-derby organisation join [token]   Join an organisation with a join token,
@@ -70,13 +75,17 @@ Races:
                                           Create a new race (interactive). When
                                           --organisation is set, only members of
                                           that org can join.
-  token-derby join <join-code>            Join (or resume) a race
+  token-derby join <join-code> [--horse <name>|--pick]
+                                          Join (or resume) a race
   token-derby end <admin-code>            End a race early
 
 Cosmetics:
-  token-derby roll                        Spend a pending roll to try for a hat.
-                                          Earn rolls by leveling up horses.
-  token-derby claim <token>               Redeem a claim token for a cosmetic
+  token-derby roll [--horse <name>]       Spend a pending roll to try for a hat.
+                                          Earn rolls by leveling up horses. The picker
+                                          is a confirmation step, so it is shown unless
+                                          --horse names the horse outright.
+  token-derby claim <token> [--horse <name>|--pick]
+                                          Redeem a claim token for a cosmetic
                                           awarded to you by an admin.
 
 Environment:
@@ -146,8 +155,9 @@ async function main(): Promise<number> {
     if (sub === 'list') return stableListCommand();
     if (sub === 'edit') return stableEditCommand(argv[2]);
     if (sub === 'delete') return stableDeleteCommand(argv[2]);
+    if (sub === 'default') return stableDefaultCommand(argv.slice(2));
     console.error(`Unknown stable subcommand: ${sub ?? '(none)'}`);
-    console.error('Try: stable create | stable list | stable edit <name> | stable delete <name>');
+    console.error('Try: stable create | stable list | stable edit <name> | stable delete <name> | stable default [<name>|--clear]');
     return 2;
   }
 
@@ -168,22 +178,13 @@ async function main(): Promise<number> {
   if (cmd === 'whoami') return whoamiCommand();
   if (cmd === 'join')   return joinCommand(argv[1], argv.slice(2));
   if (cmd === 'end')    return endCommand(argv[1]);
-  if (cmd === 'roll')      return rollCommand();
-  if (cmd === 'claim')  return claimCommand(argv[1]);
+  if (cmd === 'roll')      return rollCommand(argv.slice(1));
+  if (cmd === 'claim')  return claimCommand(argv[1], argv.slice(2));
   if (cmd === 'web')    return webCommand();
 
   console.error(`Unknown command: ${cmd}`);
   console.error(HELP);
   return 2;
-}
-
-function parseFlag(args: string[], flag: string): string | undefined {
-  for (let i = 0; i < args.length; i++) {
-    if (args[i] === flag) return args[i + 1];
-    const eq = `${flag}=`;
-    if (args[i]?.startsWith(eq)) return args[i]!.slice(eq.length);
-  }
-  return undefined;
 }
 
 // A crash that escapes main() still gets a line — these are exactly the runs

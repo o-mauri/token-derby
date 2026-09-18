@@ -6,6 +6,8 @@ import { ApiError } from '../api/client.js';
 import { listStable, rollHat, equipHat } from '../api/endpoints.js';
 import type { RollOutcome } from '../ui/RollReveal.js';
 import { RollHorsePicker } from '../ui/RollHorsePicker.js';
+import { parseFlag } from '../args.js';
+import { resolveHorse, noticeFor, noTtyMessage, interactive } from '../stable/resolve-horse.js';
 import { promptYesNo } from '../ui/prompt.js';
 import { runReveal } from '../ui/reveal.js';
 
@@ -17,7 +19,7 @@ function pendingFor(horse: StableHorse): number {
   return level - lastRolled;
 }
 
-export async function rollCommand(): Promise<number> {
+export async function rollCommand(args: string[] = []): Promise<number> {
   let stable;
   try {
     stable = await listStable();
@@ -35,15 +37,39 @@ export async function rollCommand(): Promise<number> {
     return 0;
   }
 
-  // Always show the picker, even with one eligible horse — it doubles as
-  // a confirmation step so the user can back out before spending a roll.
-  const picked = await new Promise<StableHorse | null>(resolve => {
-    const app = render(React.createElement(RollHorsePicker, {
-      horses: eligible,
-      onPick: (h) => { app.unmount(); resolve(h); },
-      onCancel: () => { app.unmount(); resolve(null); },
-    }));
+  // Show the picker even with one eligible horse — it doubles as a
+  // confirmation step so the user can back out before spending a roll.
+  // Hence autoSelect: false, unlike claim/join/stable edit — a stored default
+  // must not silently spend a consumable. Naming a horse outright is itself
+  // the confirmation, so --horse is still honoured.
+  const choice = await resolveHorse(eligible, {
+    name: parseFlag(args, '--horse'),
+    autoSelect: false,
   });
+  if (choice.kind === 'not_found') {
+    console.error(`No horse named "${choice.name}" has a roll available.`);
+    console.error(`With rolls: ${eligible.map(h => h.name).join(', ')}`);
+    return 1;
+  }
+  if (choice.kind === 'no_tty') {
+    console.error(noTtyMessage('token-derby roll'));
+    return 1;
+  }
+
+  let picked: StableHorse | null;
+  if (choice.kind === 'resolved') {
+    picked = choice.horse;
+    const notice = noticeFor(choice);
+    if (notice) console.log(notice);
+  } else {
+    picked = await new Promise<StableHorse | null>(resolve => {
+      const app = render(React.createElement(RollHorsePicker, {
+        horses: eligible,
+        onPick: (h) => { app.unmount(); resolve(h); },
+        onCancel: () => { app.unmount(); resolve(null); },
+      }));
+    });
+  }
   if (!picked) { console.log('Cancelled.'); return 0; }
   let chosen: StableHorse = picked;
 
@@ -89,7 +115,10 @@ export async function rollCommand(): Promise<number> {
         ? ` #${result.collected.variant + 1}`
         : '';
       console.log(`\n✨ ${hat.name}${variantSuffix} [${hat.rarity.toUpperCase()}]\n`);
-      if (await promptYesNo('Equip now? [Y/n] ')) {
+      // See claim.ts: no terminal means no answer, so take the reversible side.
+      if (!interactive()) {
+        console.log(`Not equipped — no terminal to confirm. Equip it with: token-derby stable edit "${chosen.name}"`);
+      } else if (await promptYesNo('Equip now? [Y/n] ')) {
         try {
           await equipHat(chosen.stable_horse_id, { hat_index: result.hat_index });
           console.log(`Equipped on ${chosen.name}.`);
@@ -107,6 +136,10 @@ export async function rollCommand(): Promise<number> {
     }
 
     if (result.remaining_rolls <= 0) return 0;
+    if (!interactive()) {
+      console.log(`${result.remaining_rolls} more roll${result.remaining_rolls === 1 ? '' : 's'} available. Run again to spend another.`);
+      return 0;
+    }
     if (!(await promptYesNo(`${result.remaining_rolls} more roll${result.remaining_rolls === 1 ? '' : 's'} available. Roll again? [Y/n] `))) return 0;
   }
 }

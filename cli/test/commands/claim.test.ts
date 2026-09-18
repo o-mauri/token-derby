@@ -1,4 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import * as fs from 'node:fs/promises';
+import * as os from 'node:os';
+import * as path from 'node:path';
 
 vi.mock('../../src/api/endpoints.js', () => ({
   probeClaim: vi.fn(),
@@ -21,7 +24,8 @@ vi.mock('ink', () => ({
 }));
 
 import { claimCommand } from '../../src/commands/claim.js';
-import { probeClaim, redeemClaim, listStable } from '../../src/api/endpoints.js';
+import { probeClaim, redeemClaim, listStable, equipHat } from '../../src/api/endpoints.js';
+import { promptYesNo } from '../../src/ui/prompt.js';
 import { runReveal } from '../../src/ui/reveal.js';
 import { ApiError } from '../../src/api/client.js';
 
@@ -31,14 +35,40 @@ const horse = {
   created_at: '2026-01-01T00:00:00Z', xp: 0,
 };
 
+const horse2 = { ...horse, stable_horse_id: 'sh-2', name: 'Bess' };
+
 let out: string[];
 let errs: string[];
-beforeEach(() => {
+let tmp: string;
+let stdinTty: PropertyDescriptor | undefined;
+let stdoutTty: PropertyDescriptor | undefined;
+
+/** Horse resolution asks whether Ink can draw, so each test has to say. */
+function setTty(value: boolean): void {
+  Object.defineProperty(process.stdin, 'isTTY', { value, configurable: true });
+  Object.defineProperty(process.stdout, 'isTTY', { value, configurable: true });
+}
+
+beforeEach(async () => {
   vi.clearAllMocks();
   out = [];
   errs = [];
+  // A real prefs.json on the machine running the tests must not decide which
+  // horse these cases pick.
+  tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'td-claim-'));
+  process.env.TOKEN_DERBY_HOME = tmp;
+  stdinTty = Object.getOwnPropertyDescriptor(process.stdin, 'isTTY');
+  stdoutTty = Object.getOwnPropertyDescriptor(process.stdout, 'isTTY');
+  setTty(true);
   vi.spyOn(console, 'log').mockImplementation((...a: unknown[]) => { out.push(a.join(' ')); });
   vi.spyOn(console, 'error').mockImplementation((...a: unknown[]) => { errs.push(a.join(' ')); });
+});
+
+afterEach(async () => {
+  delete process.env.TOKEN_DERBY_HOME;
+  if (stdinTty) Object.defineProperty(process.stdin, 'isTTY', stdinTty);
+  if (stdoutTty) Object.defineProperty(process.stdout, 'isTTY', stdoutTty);
+  await fs.rm(tmp, { recursive: true, force: true });
 });
 
 describe('claimCommand', () => {
@@ -76,7 +106,9 @@ describe('claimCommand', () => {
 });
 
 describe('claim opening line', () => {
-  const stocked = () => vi.mocked(listStable).mockResolvedValue({ horses: [horse] } as any);
+  // Two horses so the picker is still mounted (and cancelled) after the
+  // opening line: a stable of one is now resolved without asking.
+  const stocked = () => vi.mocked(listStable).mockResolvedValue({ horses: [horse, horse2] } as any);
 
   it('announces a single cosmetic for a one-entry claim', async () => {
     vi.mocked(probeClaim).mockResolvedValue({ item_type: 'hat', entry_count: 1, remaining: 1 });
@@ -100,5 +132,75 @@ describe('claim opening line', () => {
     expect(await claimCommand('ABCD-EFGH-JKLM')).toBe(1);
     expect(errs.join('\n')).toContain('CLAIM_EXHAUSTED');
     expect(listStable).not.toHaveBeenCalled();
+  });
+});
+
+describe('claim horse selection', () => {
+  const redeemed = () => vi.mocked(redeemClaim).mockResolvedValue(
+    { result: 'hat', collected: { id: 'flat_cap', variant: 0 }, hat_index: 0 } as any);
+
+  beforeEach(() => {
+    vi.mocked(probeClaim).mockResolvedValue({ item_type: 'hat', entry_count: 1, remaining: 1 });
+  });
+
+  it('uses the only horse without asking', async () => {
+    vi.mocked(listStable).mockResolvedValue({ horses: [horse] } as any);
+    redeemed();
+    expect(await claimCommand('ABCD-EFGH-JKLM')).toBe(0);
+    expect(redeemClaim).toHaveBeenCalledWith('ABCD-EFGH-JKLM', { stable_horse_id: 'sh-1' });
+    expect(out.join('\n')).toContain('your only horse');
+  });
+
+  it('honours --horse when several could be meant', async () => {
+    vi.mocked(listStable).mockResolvedValue({ horses: [horse, horse2] } as any);
+    redeemed();
+    expect(await claimCommand('ABCD-EFGH-JKLM', ['--horse', 'Bess'])).toBe(0);
+    expect(redeemClaim).toHaveBeenCalledWith('ABCD-EFGH-JKLM', { stable_horse_id: 'sh-2' });
+  });
+
+  it('spends nothing when --horse names a horse that is not there', async () => {
+    vi.mocked(listStable).mockResolvedValue({ horses: [horse, horse2] } as any);
+    expect(await claimCommand('ABCD-EFGH-JKLM', ['--horse', 'ghost'])).toBe(1);
+    expect(redeemClaim).not.toHaveBeenCalled();
+    expect(errs.join('\n')).toContain('ghost');
+  });
+
+  // The bug that started all this: outside a terminal the picker used to crash
+  // inside Ink. Say what is wrong, and leave the token unspent.
+  it('explains itself outside a terminal instead of crashing', async () => {
+    setTty(false);
+    vi.mocked(listStable).mockResolvedValue({ horses: [horse, horse2] } as any);
+    expect(await claimCommand('ABCD-EFGH-JKLM')).toBe(1);
+    expect(redeemClaim).not.toHaveBeenCalled();
+    const joined = errs.join('\n');
+    expect(joined).toContain('--horse');
+    expect(joined).toContain('unspent');
+  });
+
+  // readline never answers on a non-terminal stdin, so the old prompt would
+  // have hung the run at its last step.
+  it('does not stop to ask about equipping when it cannot be answered', async () => {
+    setTty(false);
+    vi.mocked(listStable).mockResolvedValue({ horses: [horse] } as any);
+    redeemed();
+    expect(await claimCommand('ABCD-EFGH-JKLM')).toBe(0);
+    expect(promptYesNo).not.toHaveBeenCalled();
+    expect(equipHat).not.toHaveBeenCalled();
+    expect(out.join('\n')).toContain('stable edit');
+  });
+
+  it('still offers to equip when there is a terminal', async () => {
+    vi.mocked(listStable).mockResolvedValue({ horses: [horse] } as any);
+    redeemed();
+    expect(await claimCommand('ABCD-EFGH-JKLM')).toBe(0);
+    expect(promptYesNo).toHaveBeenCalled();
+  });
+
+  it('needs no terminal once a stable of one settles it', async () => {
+    setTty(false);
+    vi.mocked(listStable).mockResolvedValue({ horses: [horse] } as any);
+    redeemed();
+    expect(await claimCommand('ABCD-EFGH-JKLM')).toBe(0);
+    expect(redeemClaim).toHaveBeenCalledWith('ABCD-EFGH-JKLM', { stable_horse_id: 'sh-1' });
   });
 });

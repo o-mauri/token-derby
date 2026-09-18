@@ -3,10 +3,17 @@ import { render } from 'ink';
 import { levelFromXp, type StableHorse } from '@token-derby/shared';
 import { HorseCreator } from '../ui/HorseCreator.js';
 import { HorsePicker } from '../ui/HorsePicker.js';
+import { resolveHorse, noticeFor, noTtyMessage, interactive } from '../stable/resolve-horse.js';
 import { listStable, updateStableHorse, equipHat } from '../api/endpoints.js';
 import { ApiError } from '../api/client.js';
 
 export async function stableEditCommand(name: string | undefined): Promise<number> {
+  // The editor itself is a raw-mode Ink UI, so resolving a horse first would
+  // only get further before failing. Say so before the API call.
+  if (!interactive()) {
+    console.error('`token-derby stable edit` needs an interactive terminal.');
+    return 1;
+  }
   const horses = await fetchStable();
   if (!horses) return 1;
 
@@ -21,6 +28,10 @@ export async function stableEditCommand(name: string | undefined): Promise<numbe
   }
   if (existing === 'cancelled') {
     console.log('Cancelled.');
+    return 1;
+  }
+  if (existing === 'no_tty') {
+    console.error(noTtyMessage('token-derby stable edit'));
     return 1;
   }
 
@@ -91,12 +102,17 @@ async function fetchStable() {
 async function pickHorseToEdit(
   horses: StableHorse[],
   name: string | undefined,
-): Promise<StableHorse | 'not_found' | 'empty' | 'cancelled'> {
-  if (name) {
-    const found = horses.find(h => h.name === name);
-    return found ?? 'not_found';
+): Promise<StableHorse | 'not_found' | 'empty' | 'cancelled' | 'no_tty'> {
+  // The positional name is this command's own spelling of --horse.
+  const choice = await resolveHorse(horses, { name });
+  if (choice.kind === 'empty') return 'empty';
+  if (choice.kind === 'not_found') return 'not_found';
+  if (choice.kind === 'no_tty') return 'no_tty';
+  if (choice.kind === 'resolved') {
+    const notice = noticeFor(choice);
+    if (notice) console.log(notice);
+    return choice.horse;
   }
-  if (horses.length === 0) return 'empty';
   const picked = await new Promise<StableHorse | null>(resolve => {
     const app = render(
       React.createElement(HorsePicker, {
