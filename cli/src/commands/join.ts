@@ -3,6 +3,8 @@ import { render } from 'ink';
 import type { HorseColors, StableHorse } from '@token-derby/shared';
 import { isModelKey, type ModelKey } from '@token-derby/shared';
 import { HorsePicker } from '../ui/HorsePicker.js';
+import { parseFlag, hasFlag } from '../args.js';
+import { resolveHorse, noticeFor, noTtyMessage } from '../stable/resolve-horse.js';
 import { PrimaryPicker } from '../ui/PrimaryPicker.js';
 import { joinRace, getRace, listStable, listOrganisations } from '../api/endpoints.js';
 import { ApiError } from '../api/client.js';
@@ -109,7 +111,27 @@ export async function joinCommand(joinCode: string | undefined, argv: string[] =
       console.error('Your stable is empty. Run `token-derby stable create` first.');
       return 1;
     }
-    const picked = await pickHorse(horses);
+    const choice = await resolveHorse(horses, {
+      name: parseFlag(argv, '--horse'),
+      pick: hasFlag(argv, '--pick'),
+    });
+    if (choice.kind === 'not_found') {
+      console.error(`No horse named "${choice.name}" in your stable.`);
+      console.error(`Your stable: ${horses.map(h => h.name).join(', ')}`);
+      return 1;
+    }
+    if (choice.kind === 'no_tty') {
+      console.error(noTtyMessage('token-derby join'));
+      return 1;
+    }
+    let picked: StableHorse | null;
+    if (choice.kind === 'resolved') {
+      picked = choice.horse;
+      const notice = noticeFor(choice);
+      if (notice) console.log(notice);
+    } else {
+      picked = await pickHorse(horses);
+    }
     if (!picked) { console.log('Cancelled.'); return 1; }
     chosenStableHorseId = picked.stable_horse_id;
     chosenName = picked.name;

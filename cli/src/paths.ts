@@ -13,6 +13,10 @@ export function identityFile(): string {
   return path.join(homeDir(), 'identity.json');
 }
 
+export function prefsFile(): string {
+  return path.join(homeDir(), 'prefs.json');
+}
+
 export function activeRaceFile(joinCode: string): string {
   return path.join(homeDir(), 'active-races', `${joinCode}.json`);
 }
