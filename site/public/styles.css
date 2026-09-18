@@ -1816,7 +1816,71 @@ label.label input:disabled, label.label select:disabled, label.label textarea:di
 .org-day:has(input:checked) { border-color: var(--accent); color: var(--accent); }
 .org-day input[type="checkbox"] { accent-color: var(--accent); }
 
-.org-stamina-toggle { flex-direction: row !important; align-items: center; gap: 8px; max-width: none !important; }
+/* Race settings tab (render/tabs/race-settings.ts). One collapsible section per
+   scoring mechanic: the header carries the on/off switch, the tuning lives
+   inside so the page stays quiet until someone wants to tune it. */
+/* No border of its own — it sits inside the tab's .org-panel, and a box inside
+   a box just doubles the rule. Sibling sections are separated instead. */
+.org-accordion + .org-accordion { border-top: 1px solid var(--border); }
+.org-accordion-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 4px 0;
+  cursor: pointer;
+  list-style: none;
+}
+.org-accordion-head::-webkit-details-marker { display: none; }
+.org-accordion-heading { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+/* Disclosure caret, inline with the title so it reads as part of that line
+   rather than floating beside a wrapped description. */
+.org-accordion-title::before {
+  content: '';
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 8px;
+  border-left: 5px solid var(--muted);
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  transition: transform 120ms ease;
+}
+.org-accordion[open] .org-accordion-title::before { transform: rotate(90deg); }
+.org-accordion-title { color: var(--text); font-size: 1rem; }
+.org-accordion-sub { font-size: 0.85rem; }
+.org-accordion-body {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 16px 0 6px;
+}
+
+/* On/off switch. A real button with role="switch" rather than a checkbox, so
+   the header reads as a control rather than a form field. */
+.org-switch {
+  flex: none;
+  position: relative;
+  width: 40px; height: 22px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg);
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+.org-switch::after {
+  content: '';
+  position: absolute;
+  top: 2px; left: 2px;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition: transform 120ms ease, background 120ms ease;
+}
+.org-switch[aria-checked="true"] { background: var(--accent); border-color: var(--accent); }
+.org-switch[aria-checked="true"]::after { transform: translateX(18px); background: var(--bg); }
+.org-switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.org-switch:disabled { cursor: not-allowed; opacity: 0.5; }
+
 .org-sliders { display: flex; flex-direction: column; gap: 14px; }
 .org-slider-row { display: flex; flex-direction: column; gap: 4px; }
 .org-slider-row input[type="range"] { width: 100%; accent-color: var(--accent); }
@@ -1837,9 +1901,8 @@ label.label input:disabled, label.label select:disabled, label.label textarea:di
 }
 .org-secret code { font-size: 1rem; letter-spacing: 0.03em; word-break: break-all; }
 
-/* Access tab (render/tabs/access.ts). Toggle rows match .org-stamina-toggle's
-   row layout; given its own name because "stamina" would be a misleading
-   class on an access-control checkbox. */
+/* Access tab (render/tabs/access.ts). Lays a checkbox and its label out on one
+   row, against .org-panel's column default. */
 .org-access-toggle { flex-direction: row !important; align-items: center; gap: 8px; max-width: none !important; }
 /* A sub-section within the tab's own .org-panel, not a nested panel — a box
    inside a box would just double the border. A top rule is enough to set the
