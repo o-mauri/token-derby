@@ -18,6 +18,7 @@ import * as events from 'aws-cdk-lib/aws-events';
 import * as eventsTargets from 'aws-cdk-lib/aws-events-targets';
 import * as path from 'path';
 import type { EnvConfig } from './env-config';
+import { SPA_REWRITE_CODE } from './spa-rewrite';
 
 const HOSTED_ZONE_DOMAIN = 'mauricode.co.uk';
 
@@ -446,11 +447,25 @@ export class TokenDerbyStack extends cdk.Stack {
       protocolPolicy: cloudfront.OriginProtocolPolicy.HTTPS_ONLY,
     });
 
+    // Rewrites SPA deep links to the shell. See spa-rewrite.ts for why this
+    // replaces a distribution-wide errorResponses block, and spa-rewrite.test.ts
+    // for the guard on the rule it uses.
+    const spaRewrite = new cloudfront.Function(this, 'SpaRewriteFn', {
+      code: cloudfront.FunctionCode.fromInline(SPA_REWRITE_CODE),
+      runtime: cloudfront.FunctionRuntime.JS_2_0,
+    });
+
+    const spaRewriteAssociation = [{
+      function: spaRewrite,
+      eventType: cloudfront.FunctionEventType.VIEWER_REQUEST,
+    }];
+
     const distribution = new cloudfront.Distribution(this, 'Distribution', {
       defaultBehavior: {
         origin: origins.S3BucketOrigin.withOriginAccessControl(siteBucket),
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
         cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
+        functionAssociations: spaRewriteAssociation,
       },
       additionalBehaviors: {
         '/api/*': {
@@ -464,10 +479,6 @@ export class TokenDerbyStack extends cdk.Stack {
       domainNames: [DOMAIN_NAME],
       certificate: certificate as unknown as acm.ICertificate,
       defaultRootObject: 'index.html',
-      errorResponses: [
-        { httpStatus: 403, responseHttpStatus: 200, responsePagePath: '/index.html' },
-        { httpStatus: 404, responseHttpStatus: 200, responsePagePath: '/index.html' },
-      ],
     });
 
     new s3deploy.BucketDeployment(this, 'DeploySite', {
@@ -500,6 +511,7 @@ export class TokenDerbyStack extends cdk.Stack {
         origin: origins.S3BucketOrigin.withOriginAccessControl(adminBucket),
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
         cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
+        functionAssociations: spaRewriteAssociation,
       },
       additionalBehaviors: {
         '/api/*': {
@@ -513,10 +525,6 @@ export class TokenDerbyStack extends cdk.Stack {
       domainNames: [ADMIN_DOMAIN_NAME],
       certificate: adminCertificate as unknown as acm.ICertificate,
       defaultRootObject: 'index.html',
-      errorResponses: [
-        { httpStatus: 403, responseHttpStatus: 200, responsePagePath: '/index.html' },
-        { httpStatus: 404, responseHttpStatus: 200, responsePagePath: '/index.html' },
-      ],
     });
 
     new s3deploy.BucketDeployment(this, 'DeployAdminSite', {
