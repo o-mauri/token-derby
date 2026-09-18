@@ -76,9 +76,9 @@ Stamina is off by default; org owners turn it on and tune it from the Race Setti
 
 ## Other models (Codex, Gemini)
 
-At join you pick one **primary** model — Claude, Codex, or Gemini — counted 1:1.
-The other two count at **10%**. The choice is locked for the whole race and can't
-be changed, even by rejoining.
+Claude, Codex and Gemini all count the same — every token is worth the same
+wherever it came from. Your usage is read per model, so you can use one tool or
+all three; nothing needs choosing at join.
 
 - **Codex CLI** — counted from `~/.codex/sessions/**/rollout-*.jsonl` (and
   `archived_sessions/`). Fresh input = `input_tokens − cached_input_tokens`;
@@ -87,8 +87,8 @@ be changed, even by rejoining.
 - **Gemini CLI** — counted from `~/.gemini/tmp/<project>/chats/session-*.jsonl`.
   Fresh input = `input − cached`; output = `output` (thoughts included).
 
-Pick at join with `token-derby join <code> --primary codex` (or the interactive
-picker). Overrides: `TOKEN_DERBY_CODEX_DIR`, `TOKEN_DERBY_GEMINI_DIR`.
+A tool you've never run simply contributes nothing — no configuration needed.
+Overrides: `TOKEN_DERBY_CODEX_DIR`, `TOKEN_DERBY_GEMINI_DIR`.
 
 All of this counts **real** tokens you actually generated. Please don't point it
 at usage you didn't produce.
@@ -136,5 +136,4 @@ URLs they travel in.
 
 Token Derby counts usage from this machine's filesystem only. If Claude Code runs
 in a container, over SSH, or on another machine, join the race from there — `join`
-warns before entering a race whose primary model has no transcripts to read.
-- **Top-5 conversations (primary):** a race can be created so that only each racer's **5 most-active conversations per heartbeat** count toward their **primary** model's score (secondaries unaffected). The race creator opts in at `token-derby create` (prompt) or, for organisation-scheduled races, via the "Primary top-5 cap" option on the schedule tab of `token-derby web`. Off by default (every conversation counts).
+warns before entering a race when none of the three tools has transcripts to read.

@@ -6,9 +6,8 @@ import { describeAchievement, type RecentEvent } from '@token-derby/shared';
 import { runHeartbeatLoop } from './heartbeat-loop.js';
 import { readAllSources, isStall, scanWithTimeout, type BeatReading } from '../tokens/race-tokens.js';
 import { ScanProgress, diagnoseScanTimeout } from '../tokens/scan-progress.js';
-import { type ModelKey } from '@token-derby/shared';
+import { MODEL_KEYS, zeroPerModel, type ModelKey } from '@token-derby/shared';
 import { RaceScoreTracker, type RaceScoreState } from '../tokens/race-score.js';
-import { sourceDir } from '../tokens/source-probe.js';
 import * as endpoints from '../api/endpoints.js';
 import { ApiError } from '../api/client.js';
 import { saveActiveRace, type ActiveRace } from '../stable/active-race.js';
@@ -31,12 +30,12 @@ export function RunRace({ active, initialState, pendingMode, ownUserName }: RunR
   const [achievements, setAchievements] = useState<Array<{ key: string; event: RecentEvent }>>([]);
   const shownAchievementAtRef = useRef<number>(0);
 
-  const trackerRef = useRef(new RaceScoreTracker(initialState, active.primary_model, active.primary_top5 ?? false));
+  const trackerRef = useRef(new RaceScoreTracker(initialState));
   const pendingRef = useRef(pendingMode);
   const ctrl = useRef(new AbortController());
   const [stalled, setStalled] = useState(false);
   const [stallReason, setStallReason] = useState<string | null>(null);
-  const [primarySilent, setPrimarySilent] = useState(false);
+  const [sourcesSilent, setSourcesSilent] = useState(false);
 
   // Re-render every second so the "Ns ago" counter updates.
   useEffect(() => {
@@ -59,7 +58,7 @@ export function RunRace({ active, initialState, pendingMode, ownUserName }: RunR
       const progress = new ScanProgress();
       try {
         return await scanWithTimeout(
-          () => readAllSources(active, active.primary_model, progress),
+          () => readAllSources(progress),
           SCAN_TIMEOUT_MS,
           () => diagnoseScanTimeout(SCAN_TIMEOUT_MS, progress),
         );
@@ -75,7 +74,7 @@ export function RunRace({ active, initialState, pendingMode, ownUserName }: RunR
         if (pendingRef.current && !isStall(reading)) tracker.reprime();
         setStalled(tracker.stalled);
         setStallReason(tracker.stalled ? tracker.stallReason : null);
-        setPrimarySilent(tracker.primarySilent);
+        setSourcesSilent(tracker.sourcesSilent);
         return tracker.nextBeat();
       },
       sendBeat: async (snapshot) => {
@@ -148,15 +147,13 @@ export function RunRace({ active, initialState, pendingMode, ownUserName }: RunR
         lastHeartbeatOk={lastHbOk}
         stalled={stalled}
         stallReason={stallReason}
-        primarySilent={primarySilent}
-        primarySourceDir={sourceDir(active.primary_model)}
-        primaryModel={active.primary_model}
+        sourcesSilent={sourcesSilent}
       />
       {achievements.length > 0 && (
         <Box flexDirection="column" marginTop={1}>
           <Text bold>Achievements</Text>
           {achievements.map(({ key, event }) => {
-            const description = describeAchievement(event, active);
+            const description = describeAchievement(event);
             return (
               <Box key={key} flexDirection="row">
                 <Text dimColor>  {formatClockTime(event.at)}  </Text>
@@ -195,21 +192,21 @@ export async function buildInitialState(args: {
   raceStatus: 'pending' | 'live';
   serverLastSeq: number;
 }): Promise<{ initialState: RaceScoreState; pendingMode: boolean }> {
-  let secondary: Record<ModelKey, number> = { claude: 0, codex: 0, gemini: 0 };
-  const primaryConvAcked: Record<string, number> = {};
+  // Anchors always come from a fresh scan, never from the persisted state — that
+  // is what stops a rejoin counting the player's whole transcript history.
+  const convAcked: Record<ModelKey, Record<string, number>> = { claude: {}, codex: {}, gemini: {} };
   try {
-    const now = await readAllSources(args.active, args.active.primary_model);
+    const now = await readAllSources();
     if (!isStall(now)) {
-      secondary = now.secondary;
-      for (const [id, v] of now.primaryByConv) primaryConvAcked[id] = v;
+      for (const key of MODEL_KEYS) {
+        for (const [id, value] of now.byConv[key]) convAcked[key][id] = value;
+      }
     }
-  } catch { /* leave zeros */ }
+  } catch { /* leave empty */ }
   return {
     initialState: {
-      acked: { ...secondary },
-      lastGood: { ...secondary },
-      primaryConvAcked,
-      primaryCounted: 0,
+      convAcked,
+      counted: zeroPerModel(),
       seq: args.serverLastSeq,
     },
     pendingMode: args.raceStatus === 'pending',

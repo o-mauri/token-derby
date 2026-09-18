@@ -114,35 +114,28 @@ function screenWith(props: Record<string, unknown>) {
   return lastFrame() ?? '';
 }
 
-describe('primary source silence warning', () => {
-  it('is absent while the primary source is producing conversations', () => {
-    expect(screenWith({ primaryModel: 'claude' })).not.toMatch(/No Claude transcripts/i);
+describe('source silence warning', () => {
+  it('is absent while any source is producing conversations', () => {
+    expect(screenWith({})).not.toMatch(/No Claude, Codex or Gemini transcripts/i);
   });
 
-  it('names the source and the directory it could not read', () => {
-    const frame = screenWith({
-      primaryModel: 'claude',
-      primarySilent: true,
-      primarySourceDir: '/home/y/.claude/projects',
-    });
-    expect(frame).toMatch(/No Claude transcripts/i);
-    expect(frame).toContain('/home/y/.claude/projects');
+  it('names every source once none of them can be read', () => {
+    const frame = screenWith({ sourcesSilent: true });
+    expect(frame).toMatch(/No Claude, Codex or Gemini transcripts/i);
   });
 
   it('reassures the player the race is still running', () => {
-    const frame = screenWith({ primarySilent: true, primarySourceDir: '/p', primaryModel: 'claude' });
-    expect(frame).toMatch(/race continues/i);
+    const frame = screenWith({ sourcesSilent: true });
+    expect(frame).toMatch(/race\s+continues/i);
   });
 
   it('yields to a stall, which names a more specific cause', () => {
     const frame = screenWith({
-      primaryModel: 'claude',
-      primarySilent: true,
-      primarySourceDir: '/p',
+      sourcesSilent: true,
       stalled: true,
       stallReason: 'Token scan timed out after 45s',
     });
     expect(frame).toContain('Token scan timed out after 45s');
-    expect(frame).not.toMatch(/No Claude transcripts/i);
+    expect(frame).not.toMatch(/No Claude, Codex or Gemini transcripts/i);
   });
 });

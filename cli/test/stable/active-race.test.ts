@@ -23,12 +23,9 @@ const sample: ActiveRace = {
   horse_colors: { body: 'brown', mane: 'black' } as ActiveRace['horse_colors'],
   joined_at: '2026-06-23T00:00:00.000Z',
   last_heartbeat_at: '1970-01-01T00:00:00.000Z',
-  primary_model: 'codex',
   score: {
-    acked: { claude: 0, codex: 0, gemini: 0 },
-    lastGood: { claude: 0, codex: 0, gemini: 0 },
-    primaryConvAcked: {},
-    primaryCounted: 0,
+    convAcked: { claude: {}, codex: {}, gemini: {} },
+    counted: { claude: 0, codex: 0, gemini: 0 },
     seq: 0,
   },
 };
@@ -38,7 +35,7 @@ describe('active-race persistence', () => {
     await tmpHome();
     await saveActiveRace(sample);
     const loaded = await loadActiveRace('ABCDEF');
-    expect(loaded?.primary_model).toBe('codex');
+    expect(loaded?.horse_name).toBe('Bolt');
     expect(loaded?.score.seq).toBe(0);
   });
 
@@ -47,19 +44,16 @@ describe('active-race persistence', () => {
     await saveActiveRace({
       ...sample,
       score: {
-        acked: { claude: 1234, codex: 0, gemini: 0 },
-        lastGood: { claude: 1300, codex: 0, gemini: 0 },
-        primaryConvAcked: { 'proj/sess': 1300 },
-        primaryCounted: 1300,
+        convAcked: { claude: { 'proj/sess': 1300 }, codex: { 'rollout-1': 42 }, gemini: {} },
+        counted: { claude: 1300, codex: 42, gemini: 0 },
         seq: 7,
       },
     });
     const loaded = await loadActiveRace('ABCDEF');
-    expect(loaded?.score.acked.claude).toBe(1234);
-    expect(loaded?.score.lastGood.claude).toBe(1300);
     expect(loaded?.score.seq).toBe(7);
-    expect(loaded?.score.primaryConvAcked).toEqual({ 'proj/sess': 1300 });
-    expect(loaded?.score.primaryCounted).toBe(1300);
+    expect(loaded?.score.convAcked.claude).toEqual({ 'proj/sess': 1300 });
+    expect(loaded?.score.convAcked.codex).toEqual({ 'rollout-1': 42 });
+    expect(loaded?.score.counted).toEqual({ claude: 1300, codex: 42, gemini: 0 });
   });
 
   it('returns null when missing, and lists/deletes', async () => {
@@ -71,17 +65,4 @@ describe('active-race persistence', () => {
     expect(await loadActiveRace('ABCDEF')).toBeNull();
   });
 
-  it('round-trips the primary_top5 flag', async () => {
-    await tmpHome();
-    await saveActiveRace({ ...sample, primary_top5: true });
-    const loaded = await loadActiveRace('ABCDEF');
-    expect(loaded?.primary_top5).toBe(true);
-  });
-
-  it('omits primary_top5 when the race did not set it (default off)', async () => {
-    await tmpHome();
-    await saveActiveRace(sample);
-    const loaded = await loadActiveRace('ABCDEF');
-    expect(loaded?.primary_top5).toBeUndefined();
-  });
 });
