@@ -33,7 +33,6 @@ function input(overrides: Partial<EvaluateInput>): EvaluateInput {
     total_horses: 4,
     second_place_tokens: null,
     warm_up_active: false,
-    counts_input: false,
     ...overrides,
   };
 }
@@ -235,12 +234,12 @@ describe('evaluateAchievements — Pacesetter!', () => {
 });
 
 describe('evaluateAchievements — Stampede!', () => {
-  it('fires when current_tokens grows by 7000+ since prev tick', () => {
+  it('fires when current_tokens grows by 70,000+ since prev tick', () => {
     const prev = emptyState();
     const result = evaluateAchievements(input({
       prev,
-      current_tokens: 10_000,
-      prev_current_tokens: 2_500,
+      current_tokens: 100_000,
+      prev_current_tokens: 25_000,
       now_ms: 1_000_000,
     }));
     expect(result.xp_delta).toBeGreaterThanOrEqual(2);
@@ -250,22 +249,22 @@ describe('evaluateAchievements — Stampede!', () => {
     expect(result.next.last_stampede_at).toBe(1_000_000);
   });
 
-  it('does not fire when token gain is exactly 6999', () => {
+  it('does not fire when token gain is exactly 69,999', () => {
     const prev = emptyState();
     const result = evaluateAchievements(input({
       prev,
-      current_tokens: 7_999,
-      prev_current_tokens: 1_000,  // gain = 6999
+      current_tokens: 79_999,
+      prev_current_tokens: 10_000,  // gain = 69,999
     }));
     expect(result.events_this_tick.find(e => e.name === 'Stampede!')).toBeUndefined();
   });
 
-  it('fires when token gain is exactly 7000', () => {
+  it('fires when token gain is exactly 70,000', () => {
     const prev = emptyState();
     const result = evaluateAchievements(input({
       prev,
-      current_tokens: 8_000,
-      prev_current_tokens: 1_000,  // gain = 7000 exactly
+      current_tokens: 80_000,
+      prev_current_tokens: 10_000,  // gain = 70,000 exactly
     }));
     expect(result.events_this_tick.find(e => e.name === 'Stampede!')).toBeDefined();
   });
@@ -276,7 +275,7 @@ describe('evaluateAchievements — Stampede!', () => {
     const result = evaluateAchievements(input({
       prev,
       now_ms: 1_000_000 + 60 * 60 * 1000,  // 1 hour later
-      current_tokens: 20_000,
+      current_tokens: 100_000,
       prev_current_tokens: 10_000,
     }));
     expect(result.events_this_tick.find(e => e.name === 'Stampede!')).toBeUndefined();
@@ -288,33 +287,12 @@ describe('evaluateAchievements — Stampede!', () => {
     const result = evaluateAchievements(input({
       prev,
       now_ms: 1_000_000 + 2 * 60 * 60 * 1000 + 1,
-      current_tokens: 20_000,
+      current_tokens: 100_000,
       prev_current_tokens: 10_000,
     }));
     expect(result.events_this_tick.find(e => e.name === 'Stampede!')).toBeDefined();
   });
 
-  it('does NOT fire at 7,000 gain when counts_input is true (threshold scales 10x → 70,000)', () => {
-    const prev = emptyState();
-    const result = evaluateAchievements(input({
-      prev,
-      current_tokens: 8_000,
-      prev_current_tokens: 1_000,  // gain = 7000
-      counts_input: true,
-    }));
-    expect(result.events_this_tick.find(e => e.name === 'Stampede!')).toBeUndefined();
-  });
-
-  it('fires at 70,000 gain when counts_input is true', () => {
-    const prev = emptyState();
-    const result = evaluateAchievements(input({
-      prev,
-      current_tokens: 80_000,
-      prev_current_tokens: 10_000,  // gain = 70_000
-      counts_input: true,
-    }));
-    expect(result.events_this_tick.find(e => e.name === 'Stampede!')).toBeDefined();
-  });
 });
 
 describe('evaluateAchievements — Comeback!', () => {
@@ -402,33 +380,33 @@ describe('evaluateAchievements — Pulled Away!', () => {
     expect(result.next.last_gap_in_1st).toBeUndefined();
   });
 
-  it('fires when gap grows by 5000+ since previous tick', () => {
+  it('fires when gap grows by 50,000+ since previous tick', () => {
     const prev = emptyState();
     prev.last_rank = 1;
     prev.last_gap_in_1st = 1_000;
     const result = evaluateAchievements(input({
       prev,
       new_rank: 1,
-      current_tokens: 100_000,
-      second_place_tokens: 90_000,  // gap now 10_000, growth 9_000
+      current_tokens: 200_000,
+      second_place_tokens: 149_000,  // gap now 51_000, growth 50_000
       now_ms: 1_000_000,
     }));
     expect(result.events_this_tick).toContainEqual({
       at: 1_000_000, name: 'Pulled Away!', xp: 3,
     });
     expect(result.next.last_pulled_away_at).toBe(1_000_000);
-    expect(result.next.last_gap_in_1st).toBe(10_000);
+    expect(result.next.last_gap_in_1st).toBe(51_000);
   });
 
-  it('does not fire below the 5000 growth threshold', () => {
+  it('does not fire below the 50,000 growth threshold', () => {
     const prev = emptyState();
     prev.last_rank = 1;
     prev.last_gap_in_1st = 1_000;
     const result = evaluateAchievements(input({
       prev,
       new_rank: 1,
-      current_tokens: 100_000,
-      second_place_tokens: 95_500,  // gap 4_500, growth 3_500
+      current_tokens: 200_000,
+      second_place_tokens: 149_001,  // gap 50_999, growth 49_999
     }));
     expect(result.events_this_tick.find(e => e.name === 'Pulled Away!')).toBeUndefined();
   });
@@ -441,8 +419,8 @@ describe('evaluateAchievements — Pulled Away!', () => {
     const result = evaluateAchievements(input({
       prev,
       new_rank: 1,
-      current_tokens: 100_000,
-      second_place_tokens: 80_000,
+      current_tokens: 200_000,
+      second_place_tokens: 149_000,  // gap 51_000, growth 50_000
       now_ms: 1_000_000 + 60 * 60 * 1000,
     }));
     expect(result.events_this_tick.find(e => e.name === 'Pulled Away!')).toBeUndefined();
@@ -462,33 +440,6 @@ describe('evaluateAchievements — Pulled Away!', () => {
     expect(result.next.last_gap_in_1st).toBe(50_000);
   });
 
-  it('does NOT fire at 5,000 growth when counts_input is true (threshold scales 10x → 50,000)', () => {
-    const prev = emptyState();
-    prev.last_rank = 1;
-    prev.last_gap_in_1st = 1_000;
-    const result = evaluateAchievements(input({
-      prev,
-      new_rank: 1,
-      current_tokens: 100_000,
-      second_place_tokens: 94_000,  // gap 6_000, growth 5_000
-      counts_input: true,
-    }));
-    expect(result.events_this_tick.find(e => e.name === 'Pulled Away!')).toBeUndefined();
-  });
-
-  it('fires at 50,000 growth when counts_input is true', () => {
-    const prev = emptyState();
-    prev.last_rank = 1;
-    prev.last_gap_in_1st = 1_000;
-    const result = evaluateAchievements(input({
-      prev,
-      new_rank: 1,
-      current_tokens: 200_000,
-      second_place_tokens: 149_000,  // gap 51_000, growth 50_000
-      counts_input: true,
-    }));
-    expect(result.events_this_tick.find(e => e.name === 'Pulled Away!')).toBeDefined();
-  });
 });
 
 describe('evaluateAchievements — bookkeeping', () => {

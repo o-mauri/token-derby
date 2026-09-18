@@ -22,8 +22,6 @@ export type CreateRaceInput = {
   end_time: string;     // ISO 8601
   tz: string;
   max_participants?: number;
-  counts_input?: boolean;
-  primary_top5?: boolean;
   stamina?: boolean;
   creator_user_id: string;
   creator_user_name: string;
@@ -85,8 +83,6 @@ export async function createRace(input: CreateRaceInput): Promise<CreateRaceResu
       creator_user_name: input.creator_user_name,
       ...(input.cli_version ? { cli_version: input.cli_version } : {}),
       ...(input.org ? { org_id: input.org.org_id, organisation_name: input.org.org_name } : {}),
-      ...(input.counts_input ? { counts_input: true } : {}),
-      ...(input.primary_top5 ? { primary_top5: true } : {}),
       ...(input.stamina ? { stamina: true } : {}),
       ...(stamina_config ? { stamina_config } : {}),
       ...(input.league

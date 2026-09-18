@@ -57,8 +57,6 @@ export function renderLeagueEditor(root: HTMLElement, deps: LeagueEditorDeps): v
       <div class="label">Options</div>
       <label class="label">Race name <input name="race_name" value="${esc(src?.race_name ?? '')}"${dis}></label>
       <label class="label">Max <input name="max" type="number" value="${src?.max_participants ?? ''}"${dis}></label>
-      <label class="label"><input type="checkbox" name="primary_top5"${src?.primary_top5 ? ' checked' : ''}${dis}> Primary top-5 cap</label>
-      <label class="label"><input type="checkbox" name="counts_input"${src?.counts_input ? ' checked' : ''}${dis}> Counts as input</label>
 
       <p class="org-error"></p>
       ${controls}
@@ -168,8 +166,6 @@ export function renderLeagueEditor(root: HTMLElement, deps: LeagueEditorDeps): v
         tz: root.querySelector<HTMLInputElement>('input[name="tz"]')!.value.trim(),
         ...(raceName ? { race_name: raceName } : {}),
         ...(maxRaw ? { max_participants: Number(maxRaw) } : {}),
-        ...(root.querySelector<HTMLInputElement>('input[name="primary_top5"]')!.checked ? { primary_top5: true } : {}),
-        ...(root.querySelector<HTMLInputElement>('input[name="counts_input"]')!.checked ? { counts_input: true } : {}),
         ...(src?.stamina ? { stamina: true } : {}),
       };
       // Reuse the shared validator so client rules never drift from the server's.

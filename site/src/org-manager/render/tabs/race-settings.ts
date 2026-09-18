@@ -39,28 +39,41 @@ export function renderRaceSettings(root: HTMLElement, deps: RaceSettingsDeps): v
       </div>`;
   };
 
+  // The switch lives in the <summary>, so its own click must not also open or
+  // close the accordion — the two controls are independent.
   root.innerHTML = `
     <div class="org-panel org-race-settings">
-      <label class="label org-stamina-toggle">
-        <input type="checkbox" data-action="toggle-stamina" ${deps.staminaOn ? 'checked' : ''}${dis}>
-        Stamina mechanic
-      </label>
-      <p class="muted">Toggling this writes through to the organisation's race schedule or league — set one up on the Racing tab first.</p>
+      <details class="org-accordion">
+        <summary class="org-accordion-head">
+          <span class="org-accordion-heading">
+            <span class="org-accordion-title">Stamina</span>
+            <span class="org-accordion-sub muted">Horses running above a sustainable pace tire and score less until they recover.</span>
+          </span>
+          <button type="button" class="org-switch" role="switch"
+            aria-label="Stamina mechanic"
+            aria-checked="${deps.staminaOn ? 'true' : 'false'}"
+            data-action="toggle-stamina"${dis}></button>
+        </summary>
 
-      <div class="org-sliders">${PARAM_KEYS.map(sliderRow).join('')}</div>
+        <div class="org-accordion-body">
+          <p class="muted">Toggling this writes through to the organisation's race schedule or league — set one up on the Racing tab first.</p>
 
-      <div class="org-readout">
-        <div class="label">Consequences</div>
-        <p>Draining begins above <strong data-readout="drain-start"></strong>.</p>
-        <p>At twice the sustainable pace, full stamina reaches the taper floor in <strong data-readout="time-to-red"></strong>.</p>
-        <p>A fully spent horse scores at <strong data-readout="tired-multiplier"></strong> of normal.</p>
-        <p>Recovering from empty to full stamina takes <strong data-readout="recovery-time"></strong>.</p>
-      </div>
+          <div class="org-sliders">${PARAM_KEYS.map(sliderRow).join('')}</div>
 
-      <div class="org-actions">
-        <button type="button" class="org-btn" data-action="save"${dis}>Save</button>
-        <button type="button" class="org-btn" data-action="reset"${dis}>Reset to defaults</button>
-      </div>
+          <div class="org-readout">
+            <div class="label">Consequences</div>
+            <p>Draining begins above <strong data-readout="drain-start"></strong>.</p>
+            <p>At twice the sustainable pace, full stamina reaches the taper floor in <strong data-readout="time-to-red"></strong>.</p>
+            <p>A fully spent horse scores at <strong data-readout="tired-multiplier"></strong> of normal.</p>
+            <p>Recovering from empty to full stamina takes <strong data-readout="recovery-time"></strong>.</p>
+          </div>
+
+          <div class="org-actions">
+            <button type="button" class="org-btn" data-action="save"${dis}>Save</button>
+            <button type="button" class="org-btn" data-action="reset"${dis}>Reset to defaults</button>
+          </div>
+        </div>
+      </details>
     </div>
   `;
 
@@ -104,8 +117,14 @@ export function renderRaceSettings(root: HTMLElement, deps: RaceSettingsDeps): v
 
   if (!deps.isOwner) return;
 
-  root.querySelector('[data-action="toggle-stamina"]')!.addEventListener('change', (e) =>
-    deps.onToggleStamina((e.target as HTMLInputElement).checked));
+  const sw = root.querySelector<HTMLButtonElement>('[data-action="toggle-stamina"]')!;
+  sw.addEventListener('click', (e) => {
+    e.preventDefault();   // keep the click off the <summary>'s open/close
+    e.stopPropagation();
+    const on = sw.getAttribute('aria-checked') !== 'true';
+    sw.setAttribute('aria-checked', on ? 'true' : 'false');
+    deps.onToggleStamina(on);
+  });
 
   root.querySelector('[data-action="save"]')!.addEventListener('click', () => {
     const cfg = currentCfg();

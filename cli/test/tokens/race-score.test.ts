@@ -1,162 +1,150 @@
 import { describe, it, expect } from 'vitest';
 import { RaceScoreTracker, type RaceScoreState } from '../../src/tokens/race-score.js';
-import { PRIMARY_SILENT_THRESHOLD } from '../../src/config.js';
+import { SILENT_THRESHOLD } from '../../src/config.js';
 import type { AllSources } from '../../src/tokens/race-tokens.js';
 
-// Primary = claude in these tests. secondary holds codex/gemini scalars.
-function baseState(primaryConv: Record<string, number> = {}): RaceScoreState {
+function baseState(convAcked: Partial<RaceScoreState['convAcked']> = {}): RaceScoreState {
   return {
-    acked: { claude: 0, codex: 0, gemini: 0 },
-    lastGood: { claude: 0, codex: 0, gemini: 0 },
-    primaryConvAcked: { ...primaryConv },
-    primaryCounted: 0,
+    convAcked: { claude: {}, codex: {}, gemini: {}, ...convAcked },
+    counted: { claude: 0, codex: 0, gemini: 0 },
     seq: 0,
   };
 }
-function reading(primaryByConv: Record<string, number>, codex = 0, gemini = 0): AllSources {
-  return { secondary: { claude: 0, codex, gemini }, primaryByConv: new Map(Object.entries(primaryByConv)) };
+
+/** A reading built from per-model conversation maps; omitted models read empty. */
+function reading(by: Partial<Record<keyof AllSources['byConv'], Record<string, number>>>): AllSources {
+  return {
+    byConv: {
+      claude: new Map(Object.entries(by.claude ?? {})),
+      codex: new Map(Object.entries(by.codex ?? {})),
+      gemini: new Map(Object.entries(by.gemini ?? {})),
+    },
+  };
 }
 
-describe('RaceScoreTracker — secondaries (scalar, unchanged)', () => {
-  it('emits secondary components as scalar deltas above the anchor', () => {
-    const t = new RaceScoreTracker(baseState(), 'claude', false);
-    t.recordReading(reading({}, 500, 0));
-    t.recordReading(reading({}, 530, 0));
-    expect(t.nextBeat().components.codex).toBe(530);
+describe('RaceScoreTracker — every model counts the same', () => {
+  it('emits a delta per model from its own conversations', () => {
+    const t = new RaceScoreTracker(baseState());
+    t.recordReading(reading({ claude: { a: 100 }, codex: { r1: 40 }, gemini: { g: 7 } }));
+    const beat = t.nextBeat();
+    expect(beat.components).toEqual({ claude: 100, codex: 40, gemini: 7 });
   });
 
-  it('never lowers a secondary lastGood on a transient 0 read', () => {
-    const t = new RaceScoreTracker(baseState(), 'claude', false);
-    t.recordReading(reading({}, 500, 0)); // codex = 500
-    t.recordReading(reading({}, 0, 0));   // codex momentarily 0 → must keep 500
-    expect(t.nextBeat().components.codex).toBe(500);
-  });
-});
-
-describe('RaceScoreTracker — primary top-N + forfeit', () => {
-  it('flag OFF: sums ALL conversation deltas (today behavior)', () => {
-    const t = new RaceScoreTracker(baseState(), 'claude', false);
-    t.recordReading(reading({ a: 10, b: 20, c: 30, d: 40, e: 50, f: 60 }));
-    expect(t.nextBeat().components.claude).toBe(210); // all six summed
-  });
-
-  it('flag ON: sums only the top 5 conversation deltas', () => {
-    const t = new RaceScoreTracker(baseState(), 'claude', true);
-    t.recordReading(reading({ a: 10, b: 20, c: 30, d: 40, e: 50, f: 60 }));
-    expect(t.nextBeat().components.claude).toBe(200); // top 5: 60+50+40+30+20, drops the 10
-  });
-
-  it('flag ON: fewer than 5 conversations → sums all', () => {
-    const t = new RaceScoreTracker(baseState(), 'claude', true);
-    t.recordReading(reading({ a: 10, b: 20, c: 30 }));
-    expect(t.nextBeat().components.claude).toBe(60);
-  });
-
-  it('flag ON: forfeits non-top-5 growth on ack (the 6th never counts later)', () => {
-    const t = new RaceScoreTracker(baseState(), 'claude', true);
-    t.recordReading(reading({ a: 10, b: 20, c: 30, d: 40, e: 50, f: 5 })); // f=5 is the 6th
-    const b1 = t.nextBeat();
-    expect(b1.components.claude).toBe(150); // 50+40+30+20+10, f forfeited
-    t.ack(b1, 1);
-    // next beat: only f grows further to 9 (delta 4 since its anchor was advanced to 5)
-    t.recordReading(reading({ a: 10, b: 20, c: 30, d: 40, e: 50, f: 9 }));
-    const b2 = t.nextBeat();
-    expect(b2.components.claude).toBe(4); // f's growth since forfeit anchor; a..e have no new growth
-  });
-
-  it('baseline excludes pre-join per-conversation tokens', () => {
-    const t = new RaceScoreTracker(baseState({ a: 1000 }), 'claude', false); // a already had 1000 at join
-    t.recordReading(reading({ a: 1050 }));
-    expect(t.nextBeat().components.claude).toBe(50); // only post-join growth
-  });
-
-  it('default (disabled) counts every conversation — legacy races behavior', () => {
-    const t = new RaceScoreTracker(baseState(), 'claude', false);
-    t.recordReading(reading({ a: 10, b: 20, c: 30, d: 40, e: 50, f: 60 }));
+  it('sums every conversation within a model', () => {
+    const t = new RaceScoreTracker(baseState());
+    t.recordReading(reading({ claude: { a: 10, b: 20, c: 30, d: 40, e: 50, f: 60 } }));
     expect(t.nextBeat().components.claude).toBe(210);
   });
 
-  it('accumulates primaryCounted across acked beats', () => {
-    const t = new RaceScoreTracker(baseState(), 'claude', false);
-    t.recordReading(reading({ a: 100 }));
-    const b1 = t.nextBeat(); t.ack(b1, 1);
-    t.recordReading(reading({ a: 250 }));
-    const b2 = t.nextBeat(); t.ack(b2, 2);
-    expect(t.primaryCounted()).toBe(250); // 100 then +150
+  it('applies the per-conversation monotonic floor to every model, not just one', () => {
+    const t = new RaceScoreTracker(baseState());
+    t.recordReading(reading({ codex: { r1: 500 } }));
+    t.recordReading(reading({ codex: { r1: 0 } }));   // a truncated read must not retract
+    expect(t.nextBeat().components.codex).toBe(500);
   });
 
-  it('reprime pins primary conv anchors so the next delta is 0', () => {
-    const t = new RaceScoreTracker(baseState(), 'claude', false);
-    t.recordReading(reading({ a: 300 }));
-    t.reprime();
+  it('excludes pre-join tokens for every model', () => {
+    const t = new RaceScoreTracker(baseState({ claude: { a: 1000 }, gemini: { g: 20 } }));
+    t.recordReading(reading({ claude: { a: 1050 }, gemini: { g: 25 } }));
+    const beat = t.nextBeat();
+    expect(beat.components.claude).toBe(50);
+    expect(beat.components.gemini).toBe(5);
+  });
+});
+
+describe('RaceScoreTracker — acking', () => {
+  it('accumulates counted per model across acked beats', () => {
+    const t = new RaceScoreTracker(baseState());
+    t.recordReading(reading({ claude: { a: 100 }, codex: { r: 10 } }));
+    t.ack(t.nextBeat(), 1);
+    t.recordReading(reading({ claude: { a: 250 }, codex: { r: 10 } }));
+    t.ack(t.nextBeat(), 2);
+    expect(t.countedPerModel()).toEqual({ claude: 250, codex: 10, gemini: 0 });
+    expect(t.countedTotal()).toBe(260);
+  });
+
+  it('an acked beat is not counted twice', () => {
+    const t = new RaceScoreTracker(baseState());
+    t.recordReading(reading({ claude: { a: 100 } }));
+    t.ack(t.nextBeat(), 1);
     expect(t.nextBeat().components.claude).toBe(0);
   });
 
-  it('a null reading is a stall and does not move anchors', () => {
-    const t = new RaceScoreTracker(baseState(), 'claude', false);
-    for (let i = 0; i < 5; i++) t.recordReading(null);
-    expect(t.stalled).toBe(true);
-    t.recordReading(reading({ a: 10 }));
-    expect(t.stalled).toBe(false);
+  it('reprime pins anchors for every model so the next deltas are 0', () => {
+    const t = new RaceScoreTracker(baseState());
+    t.recordReading(reading({ claude: { a: 300 }, codex: { r: 50 }, gemini: { g: 9 } }));
+    t.reprime();
+    expect(t.nextBeat().components).toEqual({ claude: 0, codex: 0, gemini: 0 });
   });
 
-  it('surfaces the reason of a stall reading, and clears it on recovery', () => {
-    const t = new RaceScoreTracker(baseState(), 'claude', false);
-    for (let i = 0; i < 5; i++) t.recordReading({ stall: "Can't read gemini token usage (ENOENT)" });
-    expect(t.stalled).toBe(true);
-    expect(t.stallReason).toContain('gemini');
-    t.recordReading(reading({ a: 10 })); // a good read recovers
-    expect(t.stalled).toBe(false);
-    expect(t.stallReason).toBeNull();
-  });
-
-  it('toState round-trips the new fields', () => {
-    const t = new RaceScoreTracker(baseState(), 'claude', false);
-    t.recordReading(reading({ a: 100 }, 5, 0));
-    const b = t.nextBeat(); t.ack(b, 3);
+  it('toState round-trips anchors, counts and seq', () => {
+    const t = new RaceScoreTracker(baseState());
+    t.recordReading(reading({ claude: { a: 100 }, codex: { r: 5 } }));
+    t.ack(t.nextBeat(), 3);
     const s = t.toState();
-    expect(s.primaryConvAcked).toEqual({ a: 100 });
-    expect(s.primaryCounted).toBe(100);
+    expect(s.convAcked.claude).toEqual({ a: 100 });
+    expect(s.convAcked.codex).toEqual({ r: 5 });
+    expect(s.counted).toEqual({ claude: 100, codex: 5, gemini: 0 });
     expect(s.seq).toBe(3);
   });
 });
 
-describe('RaceScoreTracker — primary source silence', () => {
-  it('is not silent before the threshold is reached', () => {
-    const t = new RaceScoreTracker(baseState(), 'claude', false);
-    for (let i = 0; i < PRIMARY_SILENT_THRESHOLD - 1; i++) t.recordReading(reading({}));
-    expect(t.primarySilent).toBe(false);
+describe('RaceScoreTracker — stalls', () => {
+  it('a null reading is a stall and does not move anchors', () => {
+    const t = new RaceScoreTracker(baseState());
+    for (let i = 0; i < 5; i++) t.recordReading(null);
+    expect(t.stalled).toBe(true);
+    t.recordReading(reading({ claude: { a: 10 } }));
+    expect(t.stalled).toBe(false);
   });
 
-  it('reports silence once the primary yields no conversations for the whole threshold', () => {
-    const t = new RaceScoreTracker(baseState(), 'claude', false);
-    for (let i = 0; i < PRIMARY_SILENT_THRESHOLD; i++) t.recordReading(reading({}));
-    expect(t.primarySilent).toBe(true);
+  it('surfaces the reason of a stall reading, and clears it on recovery', () => {
+    const t = new RaceScoreTracker(baseState());
+    for (let i = 0; i < 5; i++) t.recordReading({ stall: "Can't read gemini token usage (EACCES)" });
+    expect(t.stalled).toBe(true);
+    expect(t.stallReason).toContain('gemini');
+    t.recordReading(reading({ claude: { a: 10 } }));
+    expect(t.stalled).toBe(false);
+    expect(t.stallReason).toBeNull();
+  });
+});
+
+describe('RaceScoreTracker — source silence', () => {
+  it('is not silent before the threshold is reached', () => {
+    const t = new RaceScoreTracker(baseState());
+    for (let i = 0; i < SILENT_THRESHOLD - 1; i++) t.recordReading(reading({}));
+    expect(t.sourcesSilent).toBe(false);
+  });
+
+  it('reports silence once no source yields a conversation for the whole threshold', () => {
+    const t = new RaceScoreTracker(baseState());
+    for (let i = 0; i < SILENT_THRESHOLD; i++) t.recordReading(reading({}));
+    expect(t.sourcesSilent).toBe(true);
+  });
+
+  it('one live source is enough to stay quiet — you only need one tool installed', () => {
+    const t = new RaceScoreTracker(baseState());
+    for (let i = 0; i < SILENT_THRESHOLD * 2; i++) t.recordReading(reading({ gemini: { g: 5 } }));
+    expect(t.sourcesSilent).toBe(false);
   });
 
   it('does not flag an idle player, whose conversations exist but are not growing', () => {
-    const t = new RaceScoreTracker(baseState(), 'claude', false);
-    for (let i = 0; i < PRIMARY_SILENT_THRESHOLD * 2; i++) t.recordReading(reading({ a: 100 }));
-    expect(t.primarySilent).toBe(false);
-    expect(t.nextBeat().components.claude).toBe(100); // still a real, countable conversation
+    const t = new RaceScoreTracker(baseState());
+    for (let i = 0; i < SILENT_THRESHOLD * 2; i++) t.recordReading(reading({ claude: { a: 100 } }));
+    expect(t.sourcesSilent).toBe(false);
+    expect(t.nextBeat().components.claude).toBe(100);
   });
 
   it('clears the silence as soon as a conversation reappears', () => {
-    const t = new RaceScoreTracker(baseState(), 'claude', false);
-    for (let i = 0; i < PRIMARY_SILENT_THRESHOLD; i++) t.recordReading(reading({}));
-    t.recordReading(reading({ a: 5 }));
-    expect(t.primarySilent).toBe(false);
+    const t = new RaceScoreTracker(baseState());
+    for (let i = 0; i < SILENT_THRESHOLD; i++) t.recordReading(reading({}));
+    t.recordReading(reading({ codex: { r: 5 } }));
+    expect(t.sourcesSilent).toBe(false);
   });
 
   it('does not count a stalled beat as silence — a stall reports its own cause', () => {
-    const t = new RaceScoreTracker(baseState(), 'claude', false);
-    for (let i = 0; i < PRIMARY_SILENT_THRESHOLD * 2; i++) t.recordReading({ stall: 'timed out' });
-    expect(t.primarySilent).toBe(false);
-  });
-
-  it('only considers the primary — busy secondaries do not mask a silent primary', () => {
-    const t = new RaceScoreTracker(baseState(), 'claude', false);
-    for (let i = 0; i < PRIMARY_SILENT_THRESHOLD; i++) t.recordReading(reading({}, 1000 * i, 0));
-    expect(t.primarySilent).toBe(true);
+    const t = new RaceScoreTracker(baseState());
+    for (let i = 0; i < SILENT_THRESHOLD * 2; i++) t.recordReading({ stall: 'timed out' });
+    expect(t.sourcesSilent).toBe(false);
   });
 });

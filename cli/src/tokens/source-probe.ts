@@ -60,20 +60,51 @@ function overrideVar(key: ModelKey): string {
 }
 
 /**
- * The join-time gate: warn when the primary source has nothing to count, and let
- * the player decide. Returns whether to go ahead with the join. A non-interactive
- * caller is warned but never blocked — there is nobody there to answer.
+ * The join-time gate. Every model counts the same, so one readable source is
+ * enough to race — the warning is for the player who has none at all. Returns
+ * whether to go ahead with the join. A non-interactive caller is warned but
+ * never blocked: there is nobody there to answer.
  */
-export async function confirmEmptySource(opts: {
-  probe: SourceProbe;
+export async function confirmNoSources(opts: {
+  probes: SourceProbe[];
   interactive: boolean;
   warn: (text: string) => void;
   ask: () => Promise<boolean>;
 }): Promise<boolean> {
-  if (opts.probe.transcripts > 0) return true;
-  opts.warn(describeEmptySource(opts.probe));
+  if (opts.probes.some(p => p.transcripts > 0)) return true;
+  opts.warn(describeNoSources(opts.probes));
   if (!opts.interactive) return true;
   return opts.ask();
+}
+
+/** What to tell a player with no countable transcripts from any source. */
+export function describeNoSources(probes: SourceProbe[]): string {
+  const lines = [
+    `⚠ No transcripts found for any source — your horse will not move.`,
+    ``,
+  ];
+  for (const probe of probes) {
+    lines.push(`  ${LABELS[probe.key]}: ${probe.dir}`, `  ${' '.repeat(LABELS[probe.key].length)}  (${reasonFor(probe)})`);
+  }
+  lines.push(
+    ``,
+    `  Token Derby counts usage from this machine's own filesystem. If your`,
+    `  coding agent runs in a container, over SSH, or on another machine, join`,
+    `  the race from there instead.`,
+    ``,
+    `  To read them from somewhere else: export ${overrideVar('claude')}=<dir>`,
+    `  (and likewise ${overrideVar('codex')} / ${overrideVar('gemini')})`,
+  );
+  return lines.join('\n');
+}
+
+/** Why a probe came back empty, phrased for the player. */
+function reasonFor(probe: SourceProbe): string {
+  if (!probe.exists) return 'does not exist';
+  if (probe.projects > 0) {
+    return `holds ${probe.projects} project ${probe.projects === 1 ? 'directory' : 'directories'}, none of which could be read`;
+  }
+  return 'exists, but holds no transcripts';
 }
 
 /** What to tell a player whose primary source has no transcripts to count. */
@@ -82,11 +113,7 @@ export function describeEmptySource(probe: SourceProbe): string {
   // A root full of projects that yields no transcripts is a different problem
   // from a root with nothing in it, and wants different advice.
   const populated = probe.exists && probe.projects > 0;
-  const reason = !probe.exists
-    ? 'does not exist'
-    : populated
-      ? `holds ${probe.projects} project ${probe.projects === 1 ? 'directory' : 'directories'}, none of which could be read`
-      : 'exists, but holds no transcripts';
+  const reason = reasonFor(probe);
   const lines = [
     `⚠ No ${label} transcripts found — your horse will not move.`,
     ``,

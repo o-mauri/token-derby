@@ -21,10 +21,15 @@ describe('clampDelta', () => {
     expect(clampDelta({ delta: 2_000, elapsedMs: -10, max_rate_per_second: RATE })).toBe(0);
   });
 
-  it('scales the ceiling by TOKEN_INPUT_MULTIPLIER for input races', () => {
-    // ceiling = 500 × 60 × 10 = 300_000
-    expect(clampDelta({ delta: 200_000, elapsedMs: 60_000, max_rate_per_second: RATE, counts_input: true })).toBe(200_000);
-    expect(clampDelta({ delta: 5_000_000, elapsedMs: 60_000, max_rate_per_second: RATE, counts_input: true })).toBe(300_000);
+  it('falls back to the 7,500/s default with no override and no env', () => {
+    const prev = process.env.TOKEN_DERBY_MAX_RATE;   // the suite sets one globally
+    delete process.env.TOKEN_DERBY_MAX_RATE;
+    try {
+      // ceiling = 7_500 × 60 = 450_000
+      expect(clampDelta({ delta: 9_999_999, elapsedMs: 60_000 })).toBe(450_000);
+    } finally {
+      if (prev !== undefined) process.env.TOKEN_DERBY_MAX_RATE = prev;
+    }
   });
 
   it('uses TOKEN_DERBY_MAX_RATE env when no override is passed', () => {

@@ -5,15 +5,21 @@ import { ScanProgress } from '../../src/tokens/scan-progress.js';
 
 vi.mock('../../src/tokens/transcripts.js', async (orig) => ({
   ...(await orig<typeof import('../../src/tokens/transcripts.js')>()),
-  sumTokens: vi.fn(),
   sumTokensByConversation: vi.fn(),
 }));
-vi.mock('../../src/tokens/codex.js', () => ({ sumCodexTokens: vi.fn(), sumCodexByConversation: vi.fn() }));
-vi.mock('../../src/tokens/gemini.js', () => ({ sumGeminiTokens: vi.fn(), sumGeminiByConversation: vi.fn() }));
+vi.mock('../../src/tokens/codex.js', () => ({ sumCodexByConversation: vi.fn() }));
+vi.mock('../../src/tokens/gemini.js', () => ({ sumGeminiByConversation: vi.fn() }));
 
-import { sumTokens, sumTokensByConversation } from '../../src/tokens/transcripts.js';
-import { sumCodexTokens, sumCodexByConversation } from '../../src/tokens/codex.js';
-import { sumGeminiTokens, sumGeminiByConversation } from '../../src/tokens/gemini.js';
+import { sumTokensByConversation } from '../../src/tokens/transcripts.js';
+import { sumCodexByConversation } from '../../src/tokens/codex.js';
+import { sumGeminiByConversation } from '../../src/tokens/gemini.js';
+
+/** Every mocked reader resolves empty unless a test says otherwise. */
+function allEmpty() {
+  vi.mocked(sumTokensByConversation).mockResolvedValue(new Map());
+  vi.mocked(sumCodexByConversation).mockResolvedValue(new Map());
+  vi.mocked(sumGeminiByConversation).mockResolvedValue(new Map());
+}
 
 afterEach(() => vi.clearAllMocks());
 
@@ -24,119 +30,81 @@ function ok(r: AllSources | { stall: string }): AllSources {
 }
 
 describe('scoreFor', () => {
-  it('output-only when the race does not count input', () => {
-    expect(scoreFor({}, { input: 100, output: 20 })).toBe(20);
-  });
-  it('input+output when the race counts input', () => {
-    expect(scoreFor({ counts_input: true }, { input: 100, output: 20 })).toBe(120);
+  it('sums input and output', () => {
+    expect(scoreFor({ input: 100, output: 20 })).toBe(120);
   });
 });
 
 describe('readAllSources', () => {
-  it('reads the primary by-conversation (scored) and secondaries scalar (scored)', async () => {
+  it('reads every model by conversation, scored as input+output', async () => {
+    allEmpty();
     vi.mocked(sumTokensByConversation).mockResolvedValue(new Map([
       ['proj/a', { input: 1, output: 100 }],
       ['proj/b', { input: 2, output: 200 }],
     ]));
-    vi.mocked(sumCodexTokens).mockResolvedValue({ input: 7, output: 50 });
-    vi.mocked(sumGeminiTokens).mockResolvedValue({ input: 3, output: 9 });
-    const res = ok(await readAllSources({}, 'claude'));
-    expect(res.secondary.codex).toBe(50);
-    expect(res.secondary.gemini).toBe(9);
-    expect(Object.fromEntries(res.primaryByConv)).toEqual({ 'proj/a': 100, 'proj/b': 200 });
+    vi.mocked(sumCodexByConversation).mockResolvedValue(new Map([['rollout-x', { input: 7, output: 50 }]]));
+    vi.mocked(sumGeminiByConversation).mockResolvedValue(new Map([['chat-1', { input: 3, output: 9 }]]));
+
+    const res = ok(await readAllSources());
+    expect(Object.fromEntries(res.byConv.claude)).toEqual({ 'proj/a': 101, 'proj/b': 202 });
+    expect(Object.fromEntries(res.byConv.codex)).toEqual({ 'rollout-x': 57 });
+    expect(Object.fromEntries(res.byConv.gemini)).toEqual({ 'chat-1': 12 });
   });
 
-  it('scores the primary conversations in input+output mode', async () => {
-    vi.mocked(sumCodexByConversation).mockResolvedValue(new Map([['rollout-x', { input: 5, output: 50 }]]));
-    vi.mocked(sumTokens).mockResolvedValue({ input: 0, output: 0 });
-    vi.mocked(sumGeminiTokens).mockResolvedValue({ input: 0, output: 0 });
-    const res = ok(await readAllSources({ counts_input: true }, 'codex'));
-    expect(Object.fromEntries(res.primaryByConv)).toEqual({ 'rollout-x': 55 });
-  });
+  it('scans every source concurrently — a beat costs the slowest, not the sum', async () => {
+    allEmpty();
+    let releaseClaude!: (m: Map<string, { input: number; output: number }>) => void;
+    vi.mocked(sumTokensByConversation).mockReturnValue(new Promise((r) => { releaseClaude = r; }));
+    vi.mocked(sumCodexByConversation).mockResolvedValue(new Map([['r', { input: 0, output: 50 }]]));
 
-  it('starts the secondary scans without waiting for the primary to finish', async () => {
-    // The beat should cost the SLOWEST source, not the sum of all of them.
-    let releasePrimary!: (m: Map<string, { input: number; output: number }>) => void;
-    vi.mocked(sumTokensByConversation).mockReturnValue(new Promise((r) => { releasePrimary = r; }));
-    vi.mocked(sumCodexTokens).mockResolvedValue({ input: 0, output: 50 });
-    vi.mocked(sumGeminiTokens).mockResolvedValue({ input: 0, output: 9 });
+    const pending = readAllSources();
+    await Promise.resolve();
+    expect(sumCodexByConversation).toHaveBeenCalled();
+    expect(sumGeminiByConversation).toHaveBeenCalled();
 
-    const pending = readAllSources({}, 'claude');
-    await Promise.resolve(); // flush scheduling; primary is still in flight
-    expect(sumCodexTokens).toHaveBeenCalled();
-    expect(sumGeminiTokens).toHaveBeenCalled();
-
-    releasePrimary(new Map([['proj/a', { input: 0, output: 100 }]]));
+    releaseClaude(new Map([['proj/a', { input: 0, output: 100 }]]));
     const res = ok(await pending);
-    expect(res.secondary.codex).toBe(50);
-    expect(Object.fromEntries(res.primaryByConv)).toEqual({ 'proj/a': 100 });
+    expect(Object.fromEntries(res.byConv.codex)).toEqual({ r: 50 });
+    expect(Object.fromEntries(res.byConv.claude)).toEqual({ 'proj/a': 100 });
   });
 
   it('records which sources are still scanning when a beat runs long', async () => {
+    allEmpty();
     vi.mocked(sumTokensByConversation).mockReturnValue(new Promise(() => {})); // never settles
-    vi.mocked(sumCodexTokens).mockResolvedValue({ input: 0, output: 50 });
-    vi.mocked(sumGeminiTokens).mockResolvedValue({ input: 0, output: 9 });
-
     const progress = new ScanProgress();
-    void readAllSources({}, 'claude', progress);
+    void readAllSources(progress);
     await vi.waitFor(() => expect(progress.outstanding()).toEqual(['claude']));
   });
 
-  it('a secondary source failure contributes 0, not a stall', async () => {
-    vi.mocked(sumTokensByConversation).mockResolvedValue(new Map([['proj/a', { input: 0, output: 100 }]]));
-    vi.mocked(sumCodexTokens).mockRejectedValue(new Error('boom'));
-    vi.mocked(sumGeminiTokens).mockResolvedValue({ input: 0, output: 9 });
-    const res = ok(await readAllSources({}, 'claude'));
-    expect(res.secondary.codex).toBe(0);
-    expect(res.secondary.gemini).toBe(9);
-  });
-
-  it('a genuine PRIMARY read error stalls the beat and reports the cause', async () => {
+  it('a genuine read error on ANY source stalls the beat and reports the cause', async () => {
+    allEmpty();
     vi.mocked(sumCodexByConversation).mockRejectedValue(new Error('disk exploded'));
-    vi.mocked(sumTokens).mockResolvedValue({ input: 0, output: 0 });
-    vi.mocked(sumGeminiTokens).mockResolvedValue({ input: 0, output: 0 });
-    const res = await readAllSources({}, 'codex');
+    const res = await readAllSources();
     expect(res).toHaveProperty('stall');
     const reason = (res as { stall: string }).stall;
-    expect(reason).toContain('codex');       // names the source that failed…
-    expect(reason).toContain('disk exploded'); // …and the underlying cause
+    expect(reason).toContain('codex');          // names the source that failed…
+    expect(reason).toContain('disk exploded');  // …and the underlying cause
   });
 
-  it('a PRIMARY with a missing home dir (ENOENT) reads as empty — never a stall', async () => {
-    // The user's real bug: primary = a CLI they've never run, so its home dir is
-    // absent. That must count as "0 tokens", not freeze the whole race.
+  it('a missing home dir reads as empty — an uninstalled tool never freezes a race', async () => {
+    allEmpty();
     vi.mocked(sumGeminiByConversation).mockRejectedValue(new SourceRootMissing('/home/u/.gemini/tmp'));
-    vi.mocked(sumTokens).mockResolvedValue({ input: 4, output: 40 });
-    vi.mocked(sumCodexTokens).mockResolvedValue({ input: 7, output: 70 });
-    const res = await readAllSources({}, 'gemini');
-    expect(res).not.toHaveProperty('stall');
-    const ok = res as AllSources;
-    expect(ok.primaryByConv.size).toBe(0); // gemini has no data → empty
-    expect(ok.secondary.claude).toBe(40);  // secondaries keep counting normally
-    expect(ok.secondary.codex).toBe(70);
-  });
-});
+    vi.mocked(sumTokensByConversation).mockResolvedValue(new Map([['proj/a', { input: 4, output: 40 }]]));
+    vi.mocked(sumCodexByConversation).mockResolvedValue(new Map([['r', { input: 7, output: 70 }]]));
 
-describe('readAllSources — an unreadable primary must never pass as zero', () => {
-  it('stalls on an ENOENT from INSIDE the tree instead of reading as empty', async () => {
-    // A dangling symlink deep under the projects root. Before, this shared the
-    // missing-root escape hatch and silently scored 0 for the whole race.
-    vi.mocked(sumTokensByConversation).mockRejectedValue(
-      Object.assign(new Error("ENOENT: no such file or directory, stat '/p/proj/node_modules'"), { code: 'ENOENT' }),
-    );
-    vi.mocked(sumCodexTokens).mockResolvedValue({ input: 0, output: 0 });
-    vi.mocked(sumGeminiTokens).mockResolvedValue({ input: 0, output: 0 });
-    const res = await readAllSources({}, 'claude');
-    expect(res).toHaveProperty('stall');
-    expect((res as { stall: string }).stall).toContain('node_modules');
+    const res = await readAllSources();
+    expect(res).not.toHaveProperty('stall');
+    const usable = res as AllSources;
+    expect(usable.byConv.gemini.size).toBe(0);
+    expect(Object.fromEntries(usable.byConv.claude)).toEqual({ 'proj/a': 44 });
+    expect(Object.fromEntries(usable.byConv.codex)).toEqual({ r: 77 });
   });
 
-  it('reads as empty only when the root itself is absent', async () => {
-    vi.mocked(sumTokensByConversation).mockRejectedValue(new SourceRootMissing('/home/u/.claude/projects'));
-    vi.mocked(sumCodexTokens).mockResolvedValue({ input: 0, output: 0 });
-    vi.mocked(sumGeminiTokens).mockResolvedValue({ input: 0, output: 0 });
-    const res = await readAllSources({}, 'claude');
-    expect(res).not.toHaveProperty('stall');
-    expect(ok(res).primaryByConv.size).toBe(0);
+  it('names sources in a stable order when more than one fails', async () => {
+    allEmpty();
+    vi.mocked(sumCodexByConversation).mockRejectedValue(new Error('codex broke'));
+    vi.mocked(sumGeminiByConversation).mockRejectedValue(new Error('gemini broke'));
+    const res = await readAllSources();
+    expect((res as { stall: string }).stall).toContain('codex');  // MODEL_KEYS order
   });
 });

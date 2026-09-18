@@ -4,15 +4,12 @@
  * enabled the chain is empty and scored_delta === delta.
  */
 
-import { tokenMultiplier } from './midrace.js';
-
 export type ScoringState = {
   stamina?: number;
 };
 
 export type ScoringRace = {
   stamina?: boolean;
-  counts_input?: boolean;
   stamina_config?: StaminaConfig;
 };
 
@@ -39,8 +36,7 @@ export function scoreTick(tick: ScoringTick): ScoringResult {
       state.stamina = stamina;
     } else {
       const cfg = resolveStaminaConfig(tick.race);
-      const scaled = { ...cfg, sustainable_pace: cfg.sustainable_pace * tokenMultiplier(tick.race) };
-      const step = staminaStep({ stamina, pace: tick.delta / minutes, minutes, cfg: scaled });
+      const step = staminaStep({ stamina, pace: tick.delta / minutes, minutes, cfg });
       multiplier *= step.multiplier;
       state.stamina = step.stamina;
     }
@@ -58,7 +54,7 @@ export function scoredOf(horse: { current_tokens: number; scored_tokens?: number
 }
 
 export const STAMINA = {
-  SUSTAINABLE_PACE: 4_000,
+  SUSTAINABLE_PACE: 40_000,
   DRAIN_PER_MIN: 4,
   MAX_DRAIN_PER_MIN: 6,
   RECOVER_PER_MIN: 2,
@@ -91,7 +87,7 @@ export function resolveStaminaConfig(race: { stamina_config?: StaminaConfig }): 
 }
 
 export const STAMINA_PARAM_BOUNDS = {
-  sustainable_pace:  { min: 1_000, max: 20_000, step: 250,  default: STAMINA.SUSTAINABLE_PACE },
+  sustainable_pace:  { min: 10_000, max: 200_000, step: 2_500, default: STAMINA.SUSTAINABLE_PACE },
   drain_per_min:     { min: 1,     max: 12,     step: 1,    default: STAMINA.DRAIN_PER_MIN },
   max_drain_per_min: { min: 2,     max: 20,     step: 1,    default: STAMINA.MAX_DRAIN_PER_MIN },
   recover_per_min:   { min: 1,     max: 8,      step: 1,    default: STAMINA.RECOVER_PER_MIN },

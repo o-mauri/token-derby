@@ -1,15 +1,14 @@
 import { MODEL_KEYS, type ModelKey } from '@token-derby/shared';
-import { sumTokens, sumTokensByConversation, type TokenTotals } from './transcripts.js';
-import { sumCodexTokens, sumCodexByConversation } from './codex.js';
-import { sumGeminiTokens, sumGeminiByConversation } from './gemini.js';
+import { sumTokensByConversation, type TokenTotals } from './transcripts.js';
+import { sumCodexByConversation } from './codex.js';
+import { sumGeminiByConversation } from './gemini.js';
 import type { ScanProgress } from './scan-progress.js';
 import { SourceRootMissing } from './source-root.js';
 import { logWarn, logError } from '../log/logger.js';
 
-/** Per-source reading for one beat: the two secondary scalars + the primary, per conversation. */
+/** Per-source reading for one beat: every model, broken down by conversation. */
 export type AllSources = {
-  secondary: Record<ModelKey, number>; // scored scalar; only the 2 non-primary keys are meaningful
-  primaryByConv: Map<string, number>;  // convId → scored value, for the primary source
+  byConv: Record<ModelKey, Map<string, number>>; // model → convId → scored value
 };
 
 /** A beat that could not be read. `stall` is a human-readable cause for the UI. */
@@ -65,79 +64,62 @@ export async function scanWithTimeout(
   }
 }
 
-const SCALAR_READERS: Record<ModelKey, () => Promise<TokenTotals>> = {
-  claude: sumTokens,
-  codex: sumCodexTokens,
-  gemini: sumGeminiTokens,
-};
-
 const BY_CONVERSATION_READERS: Record<ModelKey, () => Promise<Map<string, TokenTotals>>> = {
   claude: sumTokensByConversation,
   codex: sumCodexByConversation,
   gemini: sumGeminiByConversation,
 };
 
-/** Collapse a source's totals to a single number in the race's mode. */
-export function scoreFor(race: { counts_input?: boolean }, t: TokenTotals): number {
-  return race.counts_input ? t.input + t.output : t.output;
+/** Collapse a source's totals to a single number. */
+export function scoreFor(t: TokenTotals): number {
+  return t.input + t.output;
+}
+
+function emptyByConv(): Record<ModelKey, Map<string, number>> {
+  return { claude: new Map(), codex: new Map(), gemini: new Map() };
 }
 
 /**
- * Read all sources for a beat. The PRIMARY source is read per-conversation and is
- * the critical path — a genuine read failure stalls the whole beat and reports its
- * cause. The one exception is a MISSING ROOT (SourceRootMissing): choosing a primary
- * CLI you've never run means it has simply produced 0 tokens, so it reads as empty
- * and must NOT freeze the race. The two secondary sources are scalar and resilient:
- * a failure of any kind contributes 0.
+ * Read every source for a beat, each broken down by conversation. All three are
+ * kicked off together, so a beat costs the SLOWEST source rather than the sum.
+ *
+ * Every model counts the same now, so every model is load-bearing: a genuine read
+ * error on any of them stalls the beat and reports its cause, rather than silently
+ * scoring that source 0 for the rest of the race. The one exception is a MISSING
+ * ROOT (SourceRootMissing) — hardly any machine has all three tools installed, so
+ * an absent root simply means that source produced nothing and must never freeze
+ * a race.
  */
-export async function readAllSources(
-  race: { counts_input?: boolean },
-  primary: ModelKey,
-  progress?: ScanProgress,
-): Promise<BeatReading> {
-  // Every source is kicked off together, so a beat costs the SLOWEST source
-  // rather than the sum of all of them. The primary's outcome is captured
-  // rather than thrown so a failure there doesn't abandon the secondaries.
-  progress?.begin(primary);
-  const primaryScan = BY_CONVERSATION_READERS[primary]().then(
-    map => ({ ok: true as const, map }),
-    (err: any) => ({ ok: false as const, err }),
-  ).finally(() => progress?.end(primary));
-  const secondaryKeys = MODEL_KEYS.filter(k => k !== primary);
-  const secondaryScans = secondaryKeys.map((k) => {
-    progress?.begin(k);
-    return SCALAR_READERS[k]()
-      .then(t => scoreFor(race, t))
-      .catch((err) => {
-        // An absent root is the normal case — few machines have all three tools —
-        // so only a real read error earns a line, or a missing source would write
-        // one every beat and bury the failures that matter.
-        if (!(err instanceof SourceRootMissing)) {
-          logWarn('scan.source.err', { source: k, message: err?.message ?? String(err) });
-        }
-        return 0;
-      })
-      .finally(() => progress?.end(k));
+export async function readAllSources(progress?: ScanProgress): Promise<BeatReading> {
+  const scans = MODEL_KEYS.map((key) => {
+    progress?.begin(key);
+    return BY_CONVERSATION_READERS[key]()
+      .then(map => ({ ok: true as const, key, map }))
+      .catch((err: any) => ({ ok: false as const, key, err }))
+      .finally(() => progress?.end(key));
   });
+  const results = await Promise.all(scans);
 
-  const [primaryResult, secondaryValues] = await Promise.all([
-    primaryScan,
-    Promise.all(secondaryScans),
-  ]);
-
-  const primaryByConv = new Map<string, number>();
-  if (primaryResult.ok) {
-    for (const [id, totals] of primaryResult.map) primaryByConv.set(id, scoreFor(race, totals));
-  } else if (!(primaryResult.err instanceof SourceRootMissing)) {
-    // An ABSENT ROOT → treat as empty (0), never a stall. Every other failure is
-    // a real read error → stall, carrying the cause so the UI can show it. The
-    // distinction matters: a bare ENOENT can come from a dangling symlink deep in
-    // the tree, and swallowing that scores 0 for the whole race without a word.
-    const err = primaryResult.err;
-    return { stall: `Can't read ${primary} token usage: ${err?.message ?? String(err)}` };
+  const byConv = emptyByConv();
+  let firstFailure: { key: ModelKey; message: string } | null = null;
+  // MODEL_KEYS order, so a beat that breaks two sources always names the same one.
+  for (const result of results) {
+    if (result.ok) {
+      for (const [id, totals] of result.map) byConv[result.key].set(id, scoreFor(totals));
+      continue;
+    }
+    // An absent root is the normal case — few machines have all three tools — so
+    // only a real read error earns a line, or a missing source would write one
+    // every beat and bury the failures that matter.
+    if (result.err instanceof SourceRootMissing) continue;
+    const message = result.err?.message ?? String(result.err);
+    logWarn('scan.source.err', { source: result.key, message });
+    // Every source is logged, but only the first names the stall, so the UI
+    // message stays stable when two break at once.
+    firstFailure ??= { key: result.key, message };
   }
-
-  const secondary: Record<ModelKey, number> = { claude: 0, codex: 0, gemini: 0 };
-  secondaryKeys.forEach((k, i) => { secondary[k] = secondaryValues[i] ?? 0; });
-  return { secondary, primaryByConv };
+  if (firstFailure) {
+    return { stall: `Can't read ${firstFailure.key} token usage: ${firstFailure.message}` };
+  }
+  return { byConv };
 }

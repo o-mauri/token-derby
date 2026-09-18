@@ -1,4 +1,4 @@
-.PHONY: install build build-site build-admin test dynamodb-up dynamodb-down local-api bootstrap deploy _deploy-site deploy-staging destroy destroy-staging smoke-api publish-cli announce-release
+.PHONY: install build build-site build-admin test dynamodb-up dynamodb-down local-api bootstrap deploy _deploy-site deploy-staging destroy destroy-staging publish-cli announce-release
 
 # AWS profile for all deployment targets. Override with: make deploy AWS_PROFILE=other
 AWS_PROFILE ?= personal
@@ -52,10 +52,6 @@ deploy-staging: build-site build-admin
 
 destroy-staging:
 	cd infra && AWS_PROFILE=$(AWS_PROFILE) npx cdk destroy -c env=staging
-
-# Run end-to-end smoke test against the deployed API
-smoke-api:
-	@bash scripts/smoke-api.sh
 
 # Bump the CLI version, record a changelog entry, then publish to npm.
 publish-cli:

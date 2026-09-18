@@ -81,8 +81,8 @@ async function heartbeat(opts: {
   return JSON.parse(res.body);
 }
 
-/** Like setup() but locks a specific primary_model at join time. */
-async function setupWithPrimary(primary_model: ModelKey | undefined, cliVersion = CURRENT_CLI_VERSION) {
+/** Like setup() but lets a test pin the CLI version sent at join time. */
+async function setupWithCliVersion(cliVersion = CURRENT_CLI_VERSION) {
   const user = await makeUser('HB_PM_User');
   const horse = await makeHorse(user, 'HB_PM_Gary', COLORS);
   const createRes: any = await createHandler({
@@ -98,7 +98,6 @@ async function setupWithPrimary(primary_model: ModelKey | undefined, cliVersion 
   });
   const { join_code, race_id } = JSON.parse(createRes.body);
   const joinBody: Record<string, unknown> = { stable_horse_id: horse.stable_horse_id };
-  if (primary_model !== undefined) joinBody.primary_model = primary_model;
   const joinRes: any = await joinHandler({
     version: '2.0', routeKey: 'POST /races/{join_code}/join', rawPath: `/races/${join_code}/join`, rawQueryString: '',
     pathParameters: { join_code },
@@ -381,8 +380,8 @@ describe('heartbeat handler', () => {
     // First heartbeat — initializes state.
     await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { seq: 1, delta: 100 }));
     await new Promise(r => setTimeout(r, 5));
-    // Second heartbeat with a big token jump should trigger Stampede! (delta >= 7000).
-    const res: any = await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { seq: 2, delta: 9900 }));
+    // Second heartbeat with a big token jump should trigger Stampede! (delta >= 70,000).
+    const res: any = await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { seq: 2, delta: 99_000 }));
     expect(res.statusCode).toBe(200);
     const body = JSON.parse(res.body);
     const own = body.horses.find((h: any) => h.horse_id === horse_id);
@@ -415,25 +414,70 @@ describe('heartbeat handler', () => {
     expect(JSON.parse(res.body).code).toBe('VERSION_MISMATCH');
   });
 
-  // --- multi-model weighting ---
+  // --- per-model components ---
 
-  it('weights components by the horse primary before the rate cap', async () => {
-    // Join with primary_model='codex'; rate cap disabled via TOKEN_DERBY_MAX_RATE=1B
-    const { join_code, race_id, horse_id, heartbeat_token } = await setupWithPrimary('codex');
-    // raw weighted = codex:5000*1 + claude:1000*0.5 + gemini:0*0.5 = 5500
+  it('counts every model at equal weight', async () => {
+    const { join_code, race_id, horse_id, heartbeat_token } = await setupWithCliVersion();
     const res: any = await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, {
       seq: 1,
-      components: { claude: 1000, codex: 5000, gemini: 0 },
+      components: { claude: 1000, codex: 5000, gemini: 200 },
     }));
     expect(res.statusCode).toBe(200);
     const horses = await listHorses(race_id);
     const own = horses.find(h => h.horse_id === horse_id);
-    expect(own?.current_tokens).toBe(5500);
+    expect(own?.current_tokens).toBe(6200);
   });
 
-  it('accepts a legacy bare delta (primary defaults to claude for legacy horses)', async () => {
-    // Join without primary_model; server defaults to 'claude'
-    const { join_code, race_id, horse_id, heartbeat_token } = await setupWithPrimary(undefined);
+  it('accumulates the per-model split, and it sums to current_tokens', async () => {
+    const { join_code, race_id, horse_id, heartbeat_token } = await setupWithCliVersion();
+    await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, {
+      seq: 1, components: { claude: 1000, codex: 5000, gemini: 200 },
+    }));
+    await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, {
+      seq: 2, components: { claude: 500, codex: 0, gemini: 300 },
+    }));
+    const horses = await listHorses(race_id);
+    const own = horses.find(h => h.horse_id === horse_id)!;
+    expect(own.model_tokens).toEqual({ claude: 1500, codex: 5000, gemini: 500 });
+    const summed = own.model_tokens!.claude + own.model_tokens!.codex + own.model_tokens!.gemini;
+    expect(summed).toBe(own.current_tokens);
+  });
+
+  it('reports the per-model split in the response, not one beat behind', async () => {
+    const { join_code, horse_id, heartbeat_token } = await setupWithCliVersion();
+    const res: any = await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, {
+      seq: 1, components: { claude: 300, codex: 200, gemini: 100 },
+    }));
+    const own = JSON.parse(res.body).horses.find((h: any) => h.horse_id === horse_id);
+    expect(own.model_tokens).toEqual({ claude: 300, codex: 200, gemini: 100 });
+    const summed = own.model_tokens.claude + own.model_tokens.codex + own.model_tokens.gemini;
+    expect(summed).toBe(own.current_tokens);
+  });
+
+  it('trims the per-model split with the rate cap so it never outruns the total', async () => {
+    const prev = process.env.TOKEN_DERBY_MAX_RATE;
+    process.env.TOKEN_DERBY_MAX_RATE = '1';   // ceiling = 1 token/sec
+    try {
+      const { join_code, race_id, horse_id, heartbeat_token } = await setupWithCliVersion();
+      await new Promise(r => setTimeout(r, 20));
+      await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, {
+        seq: 1, components: { claude: 900_000, codex: 100_000, gemini: 0 },
+      }));
+      const horses = await listHorses(race_id);
+      const own = horses.find(h => h.horse_id === horse_id)!;
+      const summed = own.model_tokens!.claude + own.model_tokens!.codex + own.model_tokens!.gemini;
+      expect(own.current_tokens).toBeLessThan(1_000_000);   // the cap bit
+      expect(summed).toBeCloseTo(own.current_tokens, 6);
+      // and the split keeps its 9:1 shape through the trim
+      expect(own.model_tokens!.claude).toBeCloseTo(own.current_tokens * 0.9, 6);
+    } finally {
+      if (prev === undefined) delete process.env.TOKEN_DERBY_MAX_RATE;
+      else process.env.TOKEN_DERBY_MAX_RATE = prev;
+    }
+  });
+
+  it('accepts a legacy bare delta, attributed to claude', async () => {
+    const { join_code, race_id, horse_id, heartbeat_token } = await setupWithCliVersion();
     const res: any = await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, {
       seq: 1,
       delta: 250,
@@ -445,7 +489,7 @@ describe('heartbeat handler', () => {
   });
 
   it('rejects a heartbeat with neither components nor a delta', async () => {
-    const { join_code, horse_id, heartbeat_token } = await setupWithPrimary('claude');
+    const { join_code, horse_id, heartbeat_token } = await setupWithCliVersion();
     const res: any = await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { seq: 1 }));
     expect(res.statusCode).toBe(400);
   });
@@ -474,7 +518,7 @@ describe('heartbeat handler', () => {
     // Big token jump that would normally trigger Stampede!
     await hbHandler(hbEvent(join_code, hid, hbt, { seq: 1, delta: 100 }));
     await new Promise(r => setTimeout(r, 5));
-    const res: any = await hbHandler(hbEvent(join_code, hid, hbt, { seq: 2, delta: 9900 }));
+    const res: any = await hbHandler(hbEvent(join_code, hid, hbt, { seq: 2, delta: 99_000 }));
     const body = JSON.parse(res.body);
     const own = body.horses.find((h: any) => h.horse_id === hid);
     expect(own.live_xp ?? 0).toBe(0);
@@ -487,11 +531,11 @@ describe('heartbeat handler', () => {
     const { join_code, horse_id, token, race_id } = await setupLiveRaceWithHorse({ stamina: true });
 
     vi.useFakeTimers();
-    // Twenty minutes of flat-out pace: 40,000/min is 10x sustainable, so drain
+    // Twenty minutes of flat-out pace: 400,000/min is 10x sustainable, so drain
     // clamps at 6/min and the horse is well past the taper floor by the end.
     let body: Record<string, any> = {};
     for (let seq = 1; seq <= 20; seq++) {
-      body = await heartbeat({ join_code, horse_id, token, seq, delta: 40_000, advanceMs: 60_000 });
+      body = await heartbeat({ join_code, horse_id, token, seq, delta: 400_000, advanceMs: 60_000 });
     }
 
     const [horse] = await listHorses(race_id);
