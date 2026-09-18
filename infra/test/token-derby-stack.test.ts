@@ -227,3 +227,41 @@ describe('admin claim redemptions route', () => {
     expect(fnLogicalId.startsWith('AdminListClaimRedemptionsFn'), `redemptions route -> ${fnLogicalId}`).toBe(true);
   });
 });
+
+describe('CloudFront must not swallow API errors', () => {
+  // The SPA deep-link fallback used to be `errorResponses: 403/404 → 200
+  // /index.html`, which CloudFront applies to the WHOLE distribution — /api/*
+  // included. A CLAIM_NOT_FOUND (404) reached the CLI as `200 text/html`, so it
+  // saw the site shell where it expected JSON. SPA routing now happens in a
+  // viewer-request function on the site behaviour only, leaving /api/* alone.
+  for (const env of ['prod', 'staging'] as const) {
+    it(`rewrites no error status on any ${env} distribution`, () => {
+      const distributions = synth(env).findResources('AWS::CloudFront::Distribution');
+
+      expect(Object.keys(distributions).length).toBeGreaterThan(0);
+      for (const [id, resource] of Object.entries(distributions)) {
+        const rewrites = resource.Properties?.DistributionConfig?.CustomErrorResponses ?? [];
+        expect(rewrites, `${id} still rewrites an error status`).toEqual([]);
+      }
+    });
+
+    it(`attaches the SPA rewrite to the site behaviour but not to /api/* on ${env}`, () => {
+      const distributions = synth(env).findResources('AWS::CloudFront::Distribution');
+
+      for (const [id, resource] of Object.entries(distributions)) {
+        const config = resource.Properties.DistributionConfig;
+        expect(
+          config.DefaultCacheBehavior.FunctionAssociations,
+          `${id} default behaviour has no SPA rewrite`,
+        ).toBeDefined();
+
+        const apiBehaviour = (config.CacheBehaviors ?? []).find((b: any) => b.PathPattern === '/api/*');
+        expect(apiBehaviour, `${id} has no /api/* behaviour`).toBeDefined();
+        expect(
+          apiBehaviour.FunctionAssociations,
+          `${id} rewrites /api/* requests`,
+        ).toBeUndefined();
+      }
+    });
+  }
+});
