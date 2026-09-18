@@ -31,7 +31,6 @@ export function renderSchedule(root: HTMLElement, deps: ScheduleDeps): void {
       <label class="label">End <input name="end" value="${esc(s?.end_local ?? '17:30')}" ${deps.isOwner ? '' : 'disabled'}></label>
       <label class="label">Timezone <input name="tz" value="${esc(s?.tz ?? 'Europe/London')}" ${deps.isOwner ? '' : 'disabled'}></label>
       <label class="label">Max <input name="max" type="number" value="${s?.max_participants ?? ''}" ${deps.isOwner ? '' : 'disabled'}></label>
-      <label class="label"><input type="checkbox" name="primary_top5" ${s?.primary_top5 ? 'checked' : ''} ${deps.isOwner ? '' : 'disabled'}> Primary top-5 cap</label>
       ${controls}
     </div>
   `;
@@ -46,7 +45,6 @@ export function renderSchedule(root: HTMLElement, deps: ScheduleDeps): void {
         end_local: (root.querySelector('input[name="end"]') as HTMLInputElement).value.trim(),
         tz: (root.querySelector('input[name="tz"]') as HTMLInputElement).value.trim(),
         ...(maxRaw ? { max_participants: Number(maxRaw) } : {}),
-        ...((root.querySelector('input[name="primary_top5"]') as HTMLInputElement).checked ? { primary_top5: true } : {}),
         ...(s?.stamina ? { stamina: true } : {}),
       };
       deps.onSave(body);
