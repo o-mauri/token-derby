@@ -1,13 +1,13 @@
 import type { ApiHandler } from '../lib/http.js';
 import type { HeartbeatRequest, HeartbeatResponse } from '@token-derby/shared';
-import { minorMatches, MIDRACE_THRESHOLDS, scoreTick, scoredOf } from '@token-derby/shared';
+import { minorMatches, MIDRACE_THRESHOLDS, MODEL_KEYS, scoreTick, scoredOf, zeroPerModel, type ModelKey } from '@token-derby/shared';
 import { getRaceByJoinCode } from '../db/races.js';
 import { getHorseForHeartbeat, applyHeartbeatDelta, listHorses } from '../db/horses.js';
 import { appendSeriesPoint } from '../db/series.js';
 import { evaluateAchievements } from '../lib/evaluate-achievements.js';
 import { computeStatus, timeLeftSeconds } from '../lib/status.js';
 import { clampDelta } from '../lib/rate-cap.js';
-import { resolveHeartbeatDelta } from '../lib/weighting.js';
+import { resolveHeartbeatDelta } from '../lib/heartbeat-delta.js';
 import { rankHorses } from '../lib/rank-horses.js';
 import { finaliseRace } from '../lib/finalise-race.js';
 import { ok, err, parseJson } from '../lib/http.js';
@@ -49,9 +49,8 @@ export const handler: ApiHandler = async (event) => {
   const horse = await getHorseForHeartbeat(race.race_id, horse_id, token);
   if (!horse) return err('INVALID_TOKEN', 'heartbeat token does not match');
 
-  const primary = horse.primary_model ?? 'claude';
-  const rawDelta = resolveHeartbeatDelta(body, primary);
-  if (rawDelta === null) {
+  const resolved = resolveHeartbeatDelta(body);
+  if (resolved === null) {
     return err('BAD_REQUEST', 'components or delta (>=0) required');
   }
 
@@ -70,7 +69,13 @@ export const handler: ApiHandler = async (event) => {
       const prevMs = Date.parse(horse.last_heartbeat);
       return Number.isFinite(prevMs) ? now.getTime() - prevMs : 0;
     })();
-    const applied = clampDelta({ delta: rawDelta, elapsedMs, counts_input: race.counts_input });
+    const applied = clampDelta({ delta: resolved.total, elapsedMs });
+    // The rate cap trims the total, so the per-model split is trimmed with it —
+    // otherwise the counters would outrun current_tokens on a capped beat.
+    const capScale = resolved.total > 0 ? applied / resolved.total : 0;
+    const appliedComponents = Object.fromEntries(
+      MODEL_KEYS.map(k => [k, resolved.components[k] * capScale]),
+    ) as Record<ModelKey, number>;
     const scoring = scoreTick({
       delta: applied,
       dt_ms: elapsedMs,
@@ -82,9 +87,21 @@ export const handler: ApiHandler = async (event) => {
     const newScored = scoredOf(horse) + scoredApplied;
 
     const allHorsesBefore = await listHorses(race.race_id);
+    // Project the per-model split forward too, or the response would report the
+    // split one beat behind the total it is supposed to add up to.
+    const prevModelTokens = horse.model_tokens ?? zeroPerModel();
+    const newModelTokens = Object.fromEntries(
+      MODEL_KEYS.map(k => [k, (prevModelTokens[k] ?? 0) + appliedComponents[k]]),
+    ) as Record<ModelKey, number>;
     const updatedHorses = allHorsesBefore.map(h =>
       h.horse_id === horse_id
-        ? { ...h, current_tokens: newTokens, scored_tokens: newScored, stamina: scoring.state.stamina }
+        ? {
+            ...h,
+            current_tokens: newTokens,
+            scored_tokens: newScored,
+            stamina: scoring.state.stamina,
+            model_tokens: newModelTokens,
+          }
         : h,
     );
     const ranked = rankHorses(updatedHorses);
@@ -120,13 +137,13 @@ export const handler: ApiHandler = async (event) => {
       total_horses: ranked.length,
       second_place_tokens: second ? scoredOf(second) : null,
       warm_up_active: now.getTime() < warmUpEnd,
-      counts_input: race.counts_input ?? false,
     });
 
     const didApply = await applyHeartbeatDelta({
       race_id: race.race_id, horse_id, seq: body.seq, applied, scored_applied: scoredApplied,
       stamina: scoring.state.stamina, last_heartbeat: now.toISOString(), state: evalResult.next,
-      needsSeed: horse.scored_tokens === undefined,
+      components: appliedComponents,
+      needsSeed: horse.scored_tokens === undefined || horse.model_tokens === undefined,
     });
 
     if (didApply) {

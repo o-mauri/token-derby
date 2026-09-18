@@ -106,61 +106,6 @@ describe('createRace handler', () => {
     expect(race?.max_participants).toBe(5);
   });
 
-  it('persists counts_input when set to true', async () => {
-    const user = await makeUser('CR_CountsIn');
-    const res: any = await handler(event({
-      name: 'Input+output race',
-      start_time: '2026-04-22T09:00:00Z',
-      end_time: '2026-04-22T17:00:00Z',
-      tz: 'UTC',
-      counts_input: true,
-    }, user));
-    expect(res.statusCode).toBe(200);
-    const body = JSON.parse(res.body);
-    const race = await getRaceByJoinCode(body.join_code);
-    expect(race?.counts_input).toBe(true);
-  });
-
-  it('omits counts_input from the row when not set (default false)', async () => {
-    const user = await makeUser('CR_CountsOut');
-    const res: any = await handler(event({
-      name: 'Output-only race',
-      start_time: '2026-04-22T09:00:00Z',
-      end_time: '2026-04-22T17:00:00Z',
-      tz: 'UTC',
-    }, user));
-    const body = JSON.parse(res.body);
-    const race = await getRaceByJoinCode(body.join_code);
-    expect(race?.counts_input).toBeUndefined();
-  });
-
-  it('persists primary_top5 when requested', async () => {
-    const user = await makeUser('CR_Top5');
-    const res: any = await handler(event({
-      name: 'Top5 Derby',
-      start_time: '2026-04-22T09:00:00Z',
-      end_time: '2026-04-22T17:00:00Z',
-      tz: 'Europe/London',
-      primary_top5: true,
-    }, user));
-    expect(res.statusCode).toBe(200);
-    const race = await getRaceByJoinCode(JSON.parse(res.body).join_code);
-    expect(race?.primary_top5).toBe(true);
-  });
-
-  it('leaves primary_top5 unset by default (off)', async () => {
-    const user = await makeUser('CR_NoTop5');
-    const res: any = await handler(event({
-      name: 'Default Derby',
-      start_time: '2026-04-22T09:00:00Z',
-      end_time: '2026-04-22T17:00:00Z',
-      tz: 'Europe/London',
-    }, user));
-    expect(res.statusCode).toBe(200);
-    const race = await getRaceByJoinCode(JSON.parse(res.body).join_code);
-    expect(race?.primary_top5).toBeUndefined();
-  });
-
   it('persists the stamina flag from the create request', async () => {
     const user = await makeUser('CR_Stamina');
     const res: any = await handler(event({

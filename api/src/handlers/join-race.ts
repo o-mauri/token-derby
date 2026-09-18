@@ -1,6 +1,6 @@
 import type { ApiHandler } from '../lib/http.js';
-import type { JoinRaceRequest, JoinRaceResponse, CollectedHat, ModelKey } from '@token-derby/shared';
-import { minorMatches, isModelKey } from '@token-derby/shared';
+import type { JoinRaceRequest, JoinRaceResponse, CollectedHat } from '@token-derby/shared';
+import { minorMatches } from '@token-derby/shared';
 import { generateHorseId, generateHeartbeatToken } from '../lib/codes.js';
 import { getRaceByJoinCode } from '../db/races.js';
 import { putHorse, countHorses, findHorseByUser, rotateHeartbeatToken } from '../db/horses.js';
@@ -27,11 +27,6 @@ export const handler: ApiHandler = async (event) => {
   if (!body || typeof body.stable_horse_id !== 'string' || !body.stable_horse_id) {
     return err('BAD_REQUEST', 'stable_horse_id is required');
   }
-
-  if (body.primary_model !== undefined && !isModelKey(body.primary_model)) {
-    return err('BAD_REQUEST', 'primary_model must be one of claude, codex, gemini');
-  }
-  const primary_model: ModelKey = isModelKey(body.primary_model) ? body.primary_model : 'claude';
 
   const stable_horse = await getStableHorse(auth.user_id, body.stable_horse_id);
   if (!stable_horse) {
@@ -74,7 +69,6 @@ export const handler: ApiHandler = async (event) => {
       const resume: JoinRaceResponse = {
         horse_id: existing_horse.horse_id,
         heartbeat_token: new_token,
-        primary_model: existing_horse.primary_model ?? 'claude',
       };
       return ok(resume);
     }
@@ -116,12 +110,11 @@ export const handler: ApiHandler = async (event) => {
       user_id: auth.user_id,
       user_name: auth.display_name,
       xp: stable_horse.xp,
-      primary_model,
       ...(equipped_hat ? { equipped_hat } : {}),
     },
     heartbeat_token,
   );
 
-  const response: JoinRaceResponse = { horse_id, heartbeat_token, primary_model };
+  const response: JoinRaceResponse = { horse_id, heartbeat_token };
   return ok(response);
 };

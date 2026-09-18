@@ -78,8 +78,6 @@ export const handler: ApiHandler = async (event) => {
     time_left_seconds: timeLeftSeconds(race, now),
     ...(race.org_id ? { org_id: race.org_id } : {}),
     ...(race.organisation_name ? { organisation_name: race.organisation_name } : {}),
-    ...(race.counts_input ? { counts_input: true } : {}),
-    ...(race.primary_top5 ? { primary_top5: true } : {}),
     ...(race.league_id ? { league_id: race.league_id } : {}),
     ...(race.league_season !== undefined ? { league_season: race.league_season } : {}),
     ...(race.league_round !== undefined ? { league_round: race.league_round } : {}),
