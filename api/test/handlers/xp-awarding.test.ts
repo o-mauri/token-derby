@@ -96,8 +96,6 @@ async function getStableHorse(user: TestUser): Promise<any> {
 }
 
 describe('XP awarding on race end', () => {
-  beforeEach(() => { process.env.TOKEN_DERBY_MAX_RATE = '1000000000'; });
-  afterEach(() => { delete process.env.TOKEN_DERBY_MAX_RATE; });
 
   // tokensByPlace = [1000, 800, 500, 100], winner = 1000
   // Position XP + token bonus:

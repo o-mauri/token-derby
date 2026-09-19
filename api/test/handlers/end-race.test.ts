@@ -36,8 +36,6 @@ function evt(
 }
 
 describe('endRace handler', () => {
-  beforeEach(() => { process.env.TOKEN_DERBY_MAX_RATE = '1000000000'; });
-  afterEach(() => { delete process.env.TOKEN_DERBY_MAX_RATE; });
 
   it('ends the race and freezes final_tokens', async () => {
     const creator = await makeUser('End_Creator');

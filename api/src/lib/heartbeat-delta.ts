@@ -11,7 +11,7 @@ export type ResolvedDelta = {
 };
 
 /**
- * The raw (pre-rate-cap) delta for a heartbeat. Every family counts the same, so
+ * The delta for a heartbeat. Every family counts the same, so
  * the total is a plain sum; the split is carried alongside it for the per-family
  * counters.
  *

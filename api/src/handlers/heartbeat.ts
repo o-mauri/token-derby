@@ -1,12 +1,11 @@
 import type { ApiHandler } from '../lib/http.js';
 import type { HeartbeatRequest, HeartbeatResponse } from '@token-derby/shared';
-import { minorMatches, MIDRACE_THRESHOLDS, MODEL_FAMILIES, isModelFamily, scoreTick, scoredOf, zeroPerFamily, type ModelFamily } from '@token-derby/shared';
+import { minorMatches, MIDRACE_THRESHOLDS, MODEL_FAMILIES, scoreTick, scoredOf, zeroPerFamily, type ModelFamily } from '@token-derby/shared';
 import { getRaceByJoinCode } from '../db/races.js';
 import { getHorseForHeartbeat, applyHeartbeatDelta, listHorses } from '../db/horses.js';
 import { appendSeriesPoint } from '../db/series.js';
 import { evaluateAchievements } from '../lib/evaluate-achievements.js';
 import { computeStatus, timeLeftSeconds } from '../lib/status.js';
-import { clampDelta } from '../lib/rate-cap.js';
 import { resolveHeartbeatDelta } from '../lib/heartbeat-delta.js';
 import { rankHorses } from '../lib/rank-horses.js';
 import { finaliseRace } from '../lib/finalise-race.js';
@@ -69,13 +68,10 @@ export const handler: ApiHandler = async (event) => {
       const prevMs = Date.parse(horse.last_heartbeat);
       return Number.isFinite(prevMs) ? now.getTime() - prevMs : 0;
     })();
-    const applied = clampDelta({ delta: resolved.total, elapsedMs });
-    // The rate cap trims the total, so the per-model split is trimmed with it —
-    // otherwise the counters would outrun current_tokens on a capped beat.
-    const capScale = resolved.total > 0 ? applied / resolved.total : 0;
-    const appliedComponents = Object.fromEntries(
-      MODEL_FAMILIES.map(k => [k, resolved.components[k] * capScale]),
-    ) as Record<ModelFamily, number>;
+    // Nothing trims the claimed delta: the per-beat rate cap was removed, so
+    // what the client reports is what counts.
+    const applied = resolved.total;
+    const appliedComponents = resolved.components;
     const scoring = scoreTick({
       delta: applied,
       dt_ms: elapsedMs,

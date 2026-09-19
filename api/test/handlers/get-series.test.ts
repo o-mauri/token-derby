@@ -28,8 +28,6 @@ function evt(
 }
 
 describe('getSeries handler', () => {
-  beforeEach(() => { process.env.TOKEN_DERBY_MAX_RATE = '1000000000'; });
-  afterEach(() => { delete process.env.TOKEN_DERBY_MAX_RATE; });
 
   async function setup() {
     const user = await makeUser('GS_User');

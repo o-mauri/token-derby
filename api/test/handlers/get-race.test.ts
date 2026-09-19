@@ -43,8 +43,6 @@ function evt(
 }
 
 describe('getRace handler', () => {
-  beforeEach(() => { process.env.TOKEN_DERBY_MAX_RATE = '1000000000'; });
-  afterEach(() => { delete process.env.TOKEN_DERBY_MAX_RATE; });
   async function setupRace(creator: TestUser, overrides: Record<string, any> = {}) {
     const createRes: any = await createHandler(evt({
       name: 'GetRace Test',

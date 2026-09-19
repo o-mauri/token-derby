@@ -132,8 +132,7 @@ function hbEvent(
 }
 
 describe('heartbeat handler', () => {
-  beforeEach(() => { process.env.TOKEN_DERBY_MAX_RATE = '1000000000'; });
-  afterEach(() => { delete process.env.TOKEN_DERBY_MAX_RATE; vi.useRealTimers(); });
+  afterEach(() => { vi.useRealTimers(); });
 
   it('accumulates applied deltas onto current_tokens and returns last_seq', async () => {
     const { join_code, race_id, horse_id, heartbeat_token } = await setup();
@@ -490,27 +489,6 @@ describe('heartbeat handler', () => {
     expect(summed).toBe(own.current_tokens);
   });
 
-  it('trims the per-model split with the rate cap so it never outruns the total', async () => {
-    const prev = process.env.TOKEN_DERBY_MAX_RATE;
-    process.env.TOKEN_DERBY_MAX_RATE = '1';   // ceiling = 1 token/sec
-    try {
-      const { join_code, race_id, horse_id, heartbeat_token } = await setupWithCliVersion();
-      await new Promise(r => setTimeout(r, 20));
-      await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, {
-        seq: 1, components: { anthropic: 900_000, openai: 100_000, google: 0 },
-      }));
-      const horses = await listHorses(race_id);
-      const own = horses.find(h => h.horse_id === horse_id)!;
-      const summed = own.model_tokens!.anthropic + own.model_tokens!.openai + own.model_tokens!.google;
-      expect(own.current_tokens).toBeLessThan(1_000_000);   // the cap bit
-      expect(summed).toBeCloseTo(own.current_tokens, 6);
-      // and the split keeps its 9:1 shape through the trim
-      expect(own.model_tokens!.anthropic).toBeCloseTo(own.current_tokens * 0.9, 6);
-    } finally {
-      if (prev === undefined) delete process.env.TOKEN_DERBY_MAX_RATE;
-      else process.env.TOKEN_DERBY_MAX_RATE = prev;
-    }
-  });
 
   it('accepts a legacy bare delta, attributed to anthropic', async () => {
     const { join_code, race_id, horse_id, heartbeat_token } = await setupWithCliVersion();
