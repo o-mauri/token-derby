@@ -1,8 +1,8 @@
 import { PutCommand, QueryCommand, UpdateCommand, GetCommand } from '@aws-sdk/lib-dynamodb';
 import { ddb, TABLE } from './client.js';
 import { horseKey, parseHorseId, RACE_PK_PREFIX, HORSE_SK_PREFIX } from './keys.js';
-import { MODEL_KEYS, zeroPerModel } from '@token-derby/shared';
-import type { Horse, RecentEvent, ModelKey } from '@token-derby/shared';
+import { MODEL_FAMILIES, LEGACY_FAMILY_KEYS, zeroPerFamily } from '@token-derby/shared';
+import type { Horse, RecentEvent, ModelFamily } from '@token-derby/shared';
 import type { AchievementState } from '../lib/evaluate-achievements.js';
 
 export async function putHorse(race_id: string, horse: Horse, heartbeat_token: string): Promise<void> {
@@ -10,7 +10,7 @@ export async function putHorse(race_id: string, horse: Horse, heartbeat_token: s
     TableName: TABLE,
     Item: {
       ...horseKey(race_id, horse.horse_id),
-      model_tokens: zeroPerModel(),
+      model_tokens: zeroPerFamily(),
       ...horse,
       heartbeat_token,
     },
@@ -138,7 +138,7 @@ export type HorseHeartbeatRecord = {
   stamina?: number;
   last_heartbeat: string;
   last_seq: number;
-  model_tokens?: Record<ModelKey, number>;
+  model_tokens?: Record<ModelFamily, number>;
   live_xp: number;
   last_rank: number | undefined;
   racer_streak_ms: number;
@@ -171,7 +171,7 @@ export async function getHorseForHeartbeat(
     stamina: Item.stamina === undefined ? undefined : Number(Item.stamina),
     last_heartbeat: String(Item.last_heartbeat ?? ''),
     last_seq: Number(Item.last_seq ?? 0),
-    model_tokens: Item.model_tokens as Record<ModelKey, number> | undefined,
+    model_tokens: Item.model_tokens as Record<ModelFamily, number> | undefined,
     live_xp: Number(Item.live_xp ?? 0),
     last_rank: Item.last_rank == null ? undefined : Number(Item.last_rank),
     racer_streak_ms: Number(Item.racer_streak_ms ?? 0),
@@ -237,17 +237,31 @@ async function seedScoredTokens(race_id: string, horse_id: string): Promise<void
   }
 }
 
-// The per-model map has to exist before its members can be incremented: a SET on
-// `model_tokens.claude` is rejected outright when `model_tokens` itself is absent.
-// Rows created before the per-model split have no map, hence this seed.
-async function seedModelTokens(race_id: string, horse_id: string): Promise<void> {
+// The per-family map has to exist before its members can be incremented: a SET on
+// `model_tokens.anthropic` is rejected outright when `model_tokens` itself is
+// absent. Rows created before the split have no map, hence this seed.
+//
+// A row written before families replaced harness-named keys carries the OLD
+// spelling, so the map exists but under the wrong names. Left alone, the new
+// keys would be added beside the old ones and the per-family figures would stop
+// summing to current_tokens. `existing` carries that row forward instead.
+async function seedModelTokens(
+  race_id: string,
+  horse_id: string,
+  existing?: Record<string, number>,
+): Promise<void> {
+  const seed = zeroPerFamily();
+  for (const [key, family] of Object.entries(LEGACY_FAMILY_KEYS)) {
+    const carried = existing?.[key];
+    if (typeof carried === 'number' && Number.isFinite(carried)) seed[family] += carried;
+  }
   try {
     await ddb.send(new UpdateCommand({
       TableName: TABLE,
       Key: horseKey(race_id, horse_id),
-      UpdateExpression: 'SET model_tokens = :zero',
-      ConditionExpression: 'attribute_exists(pk) AND attribute_not_exists(model_tokens)',
-      ExpressionAttributeValues: { ':zero': zeroPerModel() },
+      UpdateExpression: 'SET model_tokens = :seed',
+      ConditionExpression: 'attribute_exists(pk)',
+      ExpressionAttributeValues: { ':seed': seed },
     }));
   } catch (e: any) {
     if (e?.name !== 'ConditionalCheckFailedException') throw e;
@@ -265,18 +279,20 @@ export type ApplyHeartbeatDeltaInput = {
   state: AchievementState;
   // This beat's applied delta split by source. Sums to `applied`, and is written
   // in the same conditional update so the split can never drift from the total.
-  components: Record<ModelKey, number>;
-  // True only on a horse's first-ever apply (scored_tokens / model_tokens not yet
-  // on the row). Skips the redundant seed round-trips on every later heartbeat.
+  components: Record<ModelFamily, number>;
+  // True only on a horse's first-ever apply, or on the first apply after the
+  // harness/family rename. Skips the redundant seed round-trips on later beats.
   needsSeed: boolean;
+  // A pre-rename model_tokens map, carried into the renamed one when seeding.
+  legacyModelTokens?: Record<string, number>;
 };
 
 // Atomic, idempotent heartbeat apply. Adds `applied` to current_tokens and
 // advances last_seq ONLY when the incoming seq is newer. Returns false (no
 // mutation) for a duplicate/out-of-order seq.
 export async function applyHeartbeatDelta(input: ApplyHeartbeatDeltaInput): Promise<boolean> {
-  const { race_id, horse_id, seq, applied, scored_applied, stamina, last_heartbeat, state, components, needsSeed } = input;
-  if (needsSeed) await Promise.all([seedScoredTokens(race_id, horse_id), seedModelTokens(race_id, horse_id)]);
+  const { race_id, horse_id, seq, applied, scored_applied, stamina, last_heartbeat, state, components, needsSeed, legacyModelTokens } = input;
+  if (needsSeed) await Promise.all([seedScoredTokens(race_id, horse_id), seedModelTokens(race_id, horse_id, legacyModelTokens)]);
 
   const eav: Record<string, unknown> = {
     ':seq': seq,
@@ -310,7 +326,7 @@ export async function applyHeartbeatDelta(input: ApplyHeartbeatDeltaInput): Prom
   // DynamoDB Local accepts `ADD model_tokens.claude` but the real service does
   // not — using it would pass the suite here and fail on deploy.
   const ean: Record<string, string> = {};
-  for (const key of MODEL_KEYS) {
+  for (const key of MODEL_FAMILIES) {
     setParts.push(`model_tokens.#m_${key} = if_not_exists(model_tokens.#m_${key}, :zero) + :mt_${key}`);
     ean[`#m_${key}`] = key;
     eav[`:mt_${key}`] = components[key];

@@ -27,7 +27,7 @@ function readLog(): string {
   return fsSync.existsSync(logFile()) ? fsSync.readFileSync(logFile(), 'utf8') : '';
 }
 
-const snapshot = { seq: 1, components: { claude: 0, codex: 0, gemini: 0 }, convReadings: { claude: {}, codex: {}, gemini: {} } };
+const snapshot = { seq: 1, components: { anthropic: 0, openai: 0, google: 0 }, convReadings: { anthropic: {}, openai: {}, google: {} } };
 const okResponse = { race_status: 'live', horses: [], race: {}, server_time: '', time_left_seconds: 1, last_seq: 1 } as any;
 
 describe('heartbeat loop logging', () => {

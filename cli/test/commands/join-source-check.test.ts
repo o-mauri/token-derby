@@ -1,16 +1,17 @@
 import { describe, it, expect, vi } from 'vitest';
-import { confirmNoSources, type SourceProbe } from '../../src/tokens/source-probe.js';
+import { confirmNoSources, type HarnessProbe } from '../../src/tokens/source-probe.js';
+import { HARNESSES } from '../../src/tokens/harnesses/registry.js';
 
-const probe = (key: SourceProbe['key'], transcripts: number): SourceProbe =>
-  ({ key, dir: `/${key}`, exists: transcripts > 0, projects: 0, transcripts });
+const probe = (key: keyof typeof HARNESSES, transcripts: number): HarnessProbe =>
+  ({ harness: HARNESSES[key], dir: `/${key}`, exists: transcripts > 0, projects: 0, transcripts });
 
-const none: SourceProbe[] = [probe('claude', 0), probe('codex', 0), probe('gemini', 0)];
+const none: HarnessProbe[] = [probe('claude-code', 0), probe('codex-cli', 0), probe('gemini-cli', 0)];
 
 describe('confirmNoSources', () => {
   it('proceeds silently when any one source has transcripts', async () => {
     const warn = vi.fn();
     const ask = vi.fn();
-    const probes = [probe('claude', 0), probe('codex', 3), probe('gemini', 0)];
+    const probes = [probe('claude-code', 0), probe('codex-cli', 3), probe('gemini-cli', 0)];
     await expect(confirmNoSources({ probes, interactive: true, warn, ask })).resolves.toBe(true);
     expect(warn).not.toHaveBeenCalled();
     expect(ask).not.toHaveBeenCalled();
@@ -22,9 +23,9 @@ describe('confirmNoSources', () => {
     await expect(confirmNoSources({ probes: none, interactive: true, warn, ask })).resolves.toBe(true);
     expect(warn).toHaveBeenCalledOnce();
     // every source's directory is named, so the player knows where it looked
-    expect(warn.mock.calls[0]![0]).toContain('/claude');
-    expect(warn.mock.calls[0]![0]).toContain('/codex');
-    expect(warn.mock.calls[0]![0]).toContain('/gemini');
+    expect(warn.mock.calls[0]![0]).toContain('/claude-code');
+    expect(warn.mock.calls[0]![0]).toContain('/codex-cli');
+    expect(warn.mock.calls[0]![0]).toContain('/gemini-cli');
   });
 
   it('aborts the join when the player declines', async () => {

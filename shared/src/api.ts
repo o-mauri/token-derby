@@ -1,4 +1,4 @@
-import type { CollectedHat, HatId, HorseColors, HorseView, Race, RaceStatus, RaceSummary, RaceView, OrganisationSummary, OrgAccessSettings, StableHorse, RaceSchedule, League, DivisionConfig, ModelKey, SeasonStandings, RaceSettings } from './types.js';
+import type { CollectedHat, HatId, HorseColors, HorseView, Race, RaceStatus, RaceSummary, RaceView, OrganisationSummary, OrgAccessSettings, StableHorse, RaceSchedule, League, DivisionConfig, ModelFamily, SeasonStandings, RaceSettings } from './types.js';
 import type { StaminaConfig } from './scoring.js';
 
 export type CreateRaceRequest = {
@@ -30,7 +30,7 @@ export type JoinRaceResponse = {
 
 export type HeartbeatRequest = {
   seq: number;
-  components?: Record<ModelKey, number>;  // per-source deltas (each ≥ 0)
+  components?: Record<string, number>;     // per-family deltas (each ≥ 0); legacy keys accepted
   delta?: number;                         // legacy single delta (pre-multi-model CLIs)
 };
 

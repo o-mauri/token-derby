@@ -43,6 +43,11 @@ export function geminiTmpDir(): string {
   return process.env.TOKEN_DERBY_GEMINI_DIR ?? path.join(os.homedir(), '.gemini', 'tmp');
 }
 
+/** Pi keeps one JSONL per session, nested under its agent home. */
+export function piSessionsDir(): string {
+  return process.env.TOKEN_DERBY_PI_DIR ?? path.join(os.homedir(), '.pi', 'agent', 'sessions');
+}
+
 export function logDir(): string {
   return path.join(homeDir(), 'logs');
 }

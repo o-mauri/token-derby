@@ -1,17 +1,28 @@
-import { MODEL_KEYS, type ModelKey } from '@token-derby/shared';
-import { sumTokensByConversation, type TokenTotals } from './transcripts.js';
-import { sumCodexByConversation } from './codex.js';
-import { sumGeminiByConversation } from './gemini.js';
+import { MODEL_FAMILIES, type ModelFamily } from '@token-derby/shared';
+import { count, type CountResult } from './harnesses/engine.js';
+import { HARNESSES, type HarnessKey } from './harnesses/registry.js';
+import { loadPrefs, enabledHarnesses } from '../stable/prefs.js';
+import type { TokenTotals } from './harnesses/harness.js';
 import type { ScanProgress } from './scan-progress.js';
 import { SourceRootMissing } from './source-root.js';
 import { logWarn, logError } from '../log/logger.js';
 
-/** Per-source reading for one beat: every model, broken down by conversation. */
+/** A harness that could be reached but not counted this beat. */
+export type DegradedSource = { harness: HarnessKey; label: string; message: string };
+
+/**
+ * Per-family reading for one beat. A degraded harness contributes no
+ * conversations — skipped rather than partially counted — and is named so the
+ * UI can say which tool failed and why. `notices` carries partial-count caveats
+ * from harnesses that counted, but not all of what they saw.
+ */
 export type AllSources = {
-  byConv: Record<ModelKey, Map<string, number>>; // model → convId → scored value
+  byFamily: Record<ModelFamily, Map<string, number>>; // family → convId → scored value
+  degraded: DegradedSource[];
+  notices: string[];
 };
 
-/** A beat that could not be read. `stall` is a human-readable cause for the UI. */
+/** A beat that could not be read at all. `stall` is a human-readable cause for the UI. */
 export type StallReading = { stall: string };
 
 /** The result of one scan: either usable numbers or a stall carrying its cause. */
@@ -64,62 +75,72 @@ export async function scanWithTimeout(
   }
 }
 
-const BY_CONVERSATION_READERS: Record<ModelKey, () => Promise<Map<string, TokenTotals>>> = {
-  claude: sumTokensByConversation,
-  codex: sumCodexByConversation,
-  gemini: sumGeminiByConversation,
-};
+function emptyByFamily(): Record<ModelFamily, Map<string, number>> {
+  return { anthropic: new Map(), openai: new Map(), google: new Map() };
+}
 
-/** Collapse a source's totals to a single number. */
+/** Collapse a conversation's totals to a single number. */
 export function scoreFor(t: TokenTotals): number {
   return t.input + t.output;
 }
 
-function emptyByConv(): Record<ModelKey, Map<string, number>> {
-  return { claude: new Map(), codex: new Map(), gemini: new Map() };
-}
-
 /**
- * Read every source for a beat, each broken down by conversation. All three are
- * kicked off together, so a beat costs the SLOWEST source rather than the sum.
+ * Read every harness for a beat, merged by the model family that produced the
+ * tokens. All harnesses are kicked off together, so a beat costs the SLOWEST
+ * rather than the sum.
  *
- * Every model counts the same now, so every model is load-bearing: a genuine read
- * error on any of them stalls the beat and reports its cause, rather than silently
- * scoring that source 0 for the rest of the race. The one exception is a MISSING
- * ROOT (SourceRootMissing) — hardly any machine has all three tools installed, so
- * an absent root simply means that source produced nothing and must never freeze
- * a race.
+ * Harnesses this machine has turned off are not scanned at all. A harness that
+ * cannot be read is SKIPPED for this beat, not fatal: the others still count and
+ * the race keeps running. Nothing is lost by skipping — the
+ * tracker's per-conversation floor only ever moves a conversation up, so a
+ * harness that reports nothing leaves its anchors untouched and catches up as
+ * soon as it reads cleanly again. A MISSING ROOT is not a failure at all: few
+ * machines have every tool installed, so an absent root counts as zero and earns
+ * no warning.
  */
 export async function readAllSources(progress?: ScanProgress): Promise<BeatReading> {
-  const scans = MODEL_KEYS.map((key) => {
+  // Read per beat, not at join: toggling a harness takes effect on the next
+  // heartbeat rather than needing a restart. A disabled harness is never
+  // scanned at all, so this doubles as the escape hatch for a history large
+  // enough to threaten the scan budget.
+  const enabled = enabledHarnesses(await loadPrefs());
+  const scans = enabled.map((key) => {
     progress?.begin(key);
-    return BY_CONVERSATION_READERS[key]()
-      .then(map => ({ ok: true as const, key, map }))
+    return count(HARNESSES[key])
+      .then(result => ({ ok: true as const, key, result }))
       .catch((err: any) => ({ ok: false as const, key, err }))
       .finally(() => progress?.end(key));
   });
   const results = await Promise.all(scans);
 
-  const byConv = emptyByConv();
-  let firstFailure: { key: ModelKey; message: string } | null = null;
-  // MODEL_KEYS order, so a beat that breaks two sources always names the same one.
-  for (const result of results) {
-    if (result.ok) {
-      for (const [id, totals] of result.map) byConv[result.key].set(id, scoreFor(totals));
+  const byFamily = emptyByFamily();
+  const degraded: DegradedSource[] = [];
+  const notices = new Set<string>();
+  // Registry order, so warnings list harnesses the same way every beat.
+  for (const outcome of results) {
+    const harness = HARNESSES[outcome.key];
+    if (!outcome.ok) {
+      if (outcome.err instanceof SourceRootMissing) continue; // not installed → 0
+      const message = outcome.err?.message ?? String(outcome.err);
+      logWarn('scan.source.err', { harness: outcome.key, message });
+      degraded.push({ harness: outcome.key, label: harness.label, message });
       continue;
     }
-    // An absent root is the normal case — few machines have all three tools — so
-    // only a real read error earns a line, or a missing source would write one
-    // every beat and bury the failures that matter.
-    if (result.err instanceof SourceRootMissing) continue;
-    const message = result.err?.message ?? String(result.err);
-    logWarn('scan.source.err', { source: result.key, message });
-    // Every source is logged, but only the first names the stall, so the UI
-    // message stays stable when two break at once.
-    firstFailure ??= { key: result.key, message };
+    mergeInto(byFamily, outcome.result);
+    for (const notice of outcome.result.notices) notices.add(notice);
   }
-  if (firstFailure) {
-    return { stall: `Can't read ${firstFailure.key} token usage: ${firstFailure.message}` };
+  return { byFamily, degraded, notices: [...notices] };
+}
+
+/**
+ * Fold one harness's contribution into the shared per-family maps. Several
+ * harnesses can feed the same family, which is the whole point of the split.
+ */
+function mergeInto(byFamily: Record<ModelFamily, Map<string, number>>, result: CountResult): void {
+  for (const family of MODEL_FAMILIES) {
+    const conversations = result.byFamily.get(family);
+    if (!conversations) continue;
+    const target = byFamily[family];
+    for (const [id, totals] of conversations) target.set(id, scoreFor(totals));
   }
-  return { byConv };
 }

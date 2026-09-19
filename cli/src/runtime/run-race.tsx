@@ -4,13 +4,15 @@ import type { GetRaceResponse, HeartbeatResponse } from '@token-derby/shared';
 import { StatusScreen } from '../ui/StatusScreen.js';
 import { describeAchievement, type RecentEvent } from '@token-derby/shared';
 import { runHeartbeatLoop } from './heartbeat-loop.js';
-import { readAllSources, isStall, scanWithTimeout, type BeatReading } from '../tokens/race-tokens.js';
+import { readAllSources, isStall, scanWithTimeout, type BeatReading, type DegradedSource } from '../tokens/race-tokens.js';
 import { ScanProgress, diagnoseScanTimeout } from '../tokens/scan-progress.js';
-import { MODEL_KEYS, zeroPerModel, type ModelKey } from '@token-derby/shared';
+import { MODEL_FAMILIES, zeroPerFamily, type ModelFamily } from '@token-derby/shared';
 import { RaceScoreTracker, type RaceScoreState } from '../tokens/race-score.js';
 import * as endpoints from '../api/endpoints.js';
 import { ApiError } from '../api/client.js';
 import { saveActiveRace, type ActiveRace } from '../stable/active-race.js';
+import { loadPrefs, isHarnessEnabled } from '../stable/prefs.js';
+import { HARNESS_KEYS, type HarnessKey } from '../tokens/harnesses/registry.js';
 import { HEARTBEAT_INTERVAL_MS, HEARTBEAT_RETRY_DELAYS_MS, SCAN_TIMEOUT_MS } from '../config.js';
 
 export type RunRaceProps = {
@@ -36,6 +38,9 @@ export function RunRace({ active, initialState, pendingMode, ownUserName }: RunR
   const [stalled, setStalled] = useState(false);
   const [stallReason, setStallReason] = useState<string | null>(null);
   const [sourcesSilent, setSourcesSilent] = useState(false);
+  const [degraded, setDegraded] = useState<DegradedSource[]>([]);
+  const [notices, setNotices] = useState<string[]>([]);
+  const [disabledHarnesses, setDisabledHarnesses] = useState<HarnessKey[]>([]);
 
   // Re-render every second so the "Ns ago" counter updates.
   useEffect(() => {
@@ -75,6 +80,13 @@ export function RunRace({ active, initialState, pendingMode, ownUserName }: RunR
         setStalled(tracker.stalled);
         setStallReason(tracker.stalled ? tracker.stallReason : null);
         setSourcesSilent(tracker.sourcesSilent);
+        // Tracks the current beat rather than a streak: a source that reads
+        // cleanly again clears its own warning immediately.
+        setDegraded(isStall(reading) ? [] : reading.degraded);
+        setNotices(isStall(reading) ? [] : reading.notices);
+        // Re-read each beat so a toggle shows up without restarting.
+        const prefs = await loadPrefs();
+        setDisabledHarnesses(HARNESS_KEYS.filter(k => !isHarnessEnabled(prefs, k)));
         return tracker.nextBeat();
       },
       sendBeat: async (snapshot) => {
@@ -148,6 +160,9 @@ export function RunRace({ active, initialState, pendingMode, ownUserName }: RunR
         stalled={stalled}
         stallReason={stallReason}
         sourcesSilent={sourcesSilent}
+        degraded={degraded}
+        notices={notices}
+        disabledHarnesses={disabledHarnesses}
       />
       {achievements.length > 0 && (
         <Box flexDirection="column" marginTop={1}>
@@ -194,19 +209,19 @@ export async function buildInitialState(args: {
 }): Promise<{ initialState: RaceScoreState; pendingMode: boolean }> {
   // Anchors always come from a fresh scan, never from the persisted state — that
   // is what stops a rejoin counting the player's whole transcript history.
-  const convAcked: Record<ModelKey, Record<string, number>> = { claude: {}, codex: {}, gemini: {} };
+  const convAcked: Record<ModelFamily, Record<string, number>> = { anthropic: {}, openai: {}, google: {} };
   try {
     const now = await readAllSources();
     if (!isStall(now)) {
-      for (const key of MODEL_KEYS) {
-        for (const [id, value] of now.byConv[key]) convAcked[key][id] = value;
+      for (const family of MODEL_FAMILIES) {
+        for (const [id, value] of now.byFamily[family]) convAcked[family][id] = value;
       }
     }
   } catch { /* leave empty */ }
   return {
     initialState: {
       convAcked,
-      counted: zeroPerModel(),
+      counted: zeroPerFamily(),
       seq: args.serverLastSeq,
     },
     pendingMode: args.raceStatus === 'pending',

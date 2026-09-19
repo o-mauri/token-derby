@@ -11,64 +11,64 @@ describe('ScanProgress', () => {
 
   it('reports a source that has not finished as outstanding', () => {
     const p = new ScanProgress();
-    p.begin('claude');
-    p.begin('codex');
+    p.begin('claude-code');
+    p.begin('codex-cli');
     vi.advanceTimersByTime(5_000);
-    p.end('claude');
+    p.end('claude-code');
     vi.advanceTimersByTime(40_000);
-    expect(p.outstanding()).toEqual(['codex']);
+    expect(p.outstanding()).toEqual(['codex-cli']);
   });
 
   it('reports nothing outstanding once every source has finished', () => {
     const p = new ScanProgress();
-    p.begin('claude');
-    p.end('claude');
+    p.begin('claude-code');
+    p.end('claude-code');
     expect(p.outstanding()).toEqual([]);
   });
 
   it('orders outstanding sources longest-running first', () => {
     const p = new ScanProgress();
-    p.begin('gemini');
+    p.begin('gemini-cli');
     vi.advanceTimersByTime(1_000);
-    p.begin('codex');
+    p.begin('codex-cli');
     vi.advanceTimersByTime(1_000);
-    expect(p.outstanding()).toEqual(['gemini', 'codex']);
+    expect(p.outstanding()).toEqual(['gemini-cli', 'codex-cli']);
   });
 
   it('does not report a source that was never started', () => {
     const p = new ScanProgress();
-    p.begin('claude');
-    expect(p.outstanding()).toEqual(['claude']);
+    p.begin('claude-code');
+    expect(p.outstanding()).toEqual(['claude-code']);
   });
 });
 
 describe('describeScanTimeout', () => {
   it('names the source still scanning and its size', () => {
-    const msg = describeScanTimeout(45_000, [{ key: 'codex', bytes: 2_010_000_000 }]);
+    const msg = describeScanTimeout(45_000, [{ key: 'codex-cli', bytes: 2_010_000_000 }]);
     expect(msg).toContain('45s');
-    expect(msg).toContain('codex');
+    expect(msg).toContain('codex-cli');
     expect(msg).toContain('2.0 GB');
   });
 
   it('points at the env var that skips the offending source', () => {
-    const msg = describeScanTimeout(45_000, [{ key: 'codex', bytes: 2_010_000_000 }]);
+    const msg = describeScanTimeout(45_000, [{ key: 'codex-cli', bytes: 2_010_000_000 }]);
     expect(msg).toContain('TOKEN_DERBY_CODEX_DIR');
   });
 
   it('omits the size when it is not known yet (first ever scan)', () => {
-    const msg = describeScanTimeout(45_000, [{ key: 'codex', bytes: 0 }]);
-    expect(msg).toContain('codex');
+    const msg = describeScanTimeout(45_000, [{ key: 'codex-cli', bytes: 0 }]);
+    expect(msg).toContain('codex-cli');
     expect(msg).not.toContain('GB');
     expect(msg).not.toContain('MB');
   });
 
   it('names every outstanding source, hinting at the largest', () => {
     const msg = describeScanTimeout(45_000, [
-      { key: 'claude', bytes: 1_450_000_000 },
-      { key: 'codex', bytes: 2_010_000_000 },
+      { key: 'claude-code', bytes: 1_450_000_000 },
+      { key: 'codex-cli', bytes: 2_010_000_000 },
     ]);
-    expect(msg).toContain('claude');
-    expect(msg).toContain('codex');
+    expect(msg).toContain('claude-code');
+    expect(msg).toContain('codex-cli');
     expect(msg).toContain('TOKEN_DERBY_CODEX_DIR'); // the bigger of the two
   });
 
@@ -82,15 +82,15 @@ describe('describeScanTimeout', () => {
   it('does not end in punctuation, because the UI appends ". Your race continues."', () => {
     for (const outstanding of [
       [],
-      [{ key: 'codex' as const, bytes: 2_010_000_000 }],
-      [{ key: 'claude' as const, bytes: 1_000 }, { key: 'codex' as const, bytes: 2_000 }],
+      [{ key: 'codex-cli' as const, bytes: 2_010_000_000 }],
+      [{ key: 'claude-code' as const, bytes: 1_000 }, { key: 'codex-cli' as const, bytes: 2_000 }],
     ]) {
       expect(describeScanTimeout(45_000, outstanding)).not.toMatch(/[.,;:]$/);
     }
   });
 
   it('shows sub-gigabyte sizes in MB', () => {
-    const msg = describeScanTimeout(45_000, [{ key: 'gemini', bytes: 3_000_000 }]);
+    const msg = describeScanTimeout(45_000, [{ key: 'gemini-cli', bytes: 3_000_000 }]);
     expect(msg).toContain('3 MB');
   });
 });
@@ -113,18 +113,18 @@ describe('diagnoseScanTimeout', () => {
   it('sizes the outstanding source from the cache that source wrote', async () => {
     const f = path.join(work, 'r.jsonl');
     await fs.writeFile(f, 'x'.repeat(2_010_000_00) + '\n'); // ~201 MB
-    const cache = await ScanCache.open('codex');
+    const cache = await ScanCache.open('codex-cli');
     await cache.readIncremental(f, { empty: () => 0, append: (a, l) => a + l.length });
     await cache.save();
 
     const progress = new ScanProgress();
-    progress.begin('codex');   // started, never ended → outstanding
-    progress.begin('claude');
-    progress.end('claude');
+    progress.begin('codex-cli');   // started, never ended → outstanding
+    progress.begin('claude-code');
+    progress.end('claude-code');
 
     const msg = await diagnoseScanTimeout(45_000, progress);
-    expect(msg).toContain('codex');
+    expect(msg).toContain('codex-cli');
     expect(msg).toContain('201 MB');
-    expect(msg).not.toContain('claude'); // finished sources aren't the culprit
+    expect(msg).not.toContain('claude-code'); // finished sources aren't the culprit
   });
 });

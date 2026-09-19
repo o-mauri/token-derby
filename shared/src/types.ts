@@ -1,7 +1,12 @@
 import type { RecentEvent } from './midrace.js';
 import type { StaminaConfig } from './scoring.js';
 
-export type ModelKey = 'claude' | 'codex' | 'gemini';
+/**
+ * Which vendor's model produced a token. Deliberately NOT the tool it came
+ * from: one harness (Pi) can run models from several vendors, and several
+ * harnesses (Claude Code, Pi) can produce the same vendor's tokens.
+ */
+export type ModelFamily = 'anthropic' | 'openai' | 'google';
 
 export type HorseColors = {
   body: string;
@@ -25,7 +30,7 @@ export type Horse = {
   xp_awarded?: number;
   // Per-model token totals. Nested so more models (or more per-model figures)
   // need no new top-level attribute. Absent on rows predating the split.
-  model_tokens?: Record<ModelKey, number>;
+  model_tokens?: Record<ModelFamily, number>;
   last_seq?: number;          // highest applied heartbeat sequence (delta protocol)
   // Mid-race XP state — all optional for backwards compat with existing race-horse rows.
   live_xp?: number;

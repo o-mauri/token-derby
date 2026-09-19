@@ -74,11 +74,15 @@ Nothing here asks you to hold work back. A flat-out day still beats a lazy one �
 
 Stamina is off by default; org owners turn it on and tune it from the Race Settings tab of `token-derby web`. When it's on, the live view shows your horse's stamina as a percentage and bar, plus a multiplier once you're actually losing score to fatigue.
 
-## Other models (Codex, Gemini)
+## Other coding agents (Codex CLI, Gemini CLI)
 
-Claude, Codex and Gemini all count the same — every token is worth the same
-wherever it came from. Your usage is read per model, so you can use one tool or
-all three; nothing needs choosing at join.
+Every token is worth the same wherever it came from, so you can use one tool or
+all three and nothing needs choosing at join.
+
+Tokens are counted per **model family** — Anthropic, OpenAI or Google — rather
+than per tool. The two are usually the same thing today, since each tool runs one
+vendor's models, but they are tracked separately so a tool that can run several
+vendors' models counts each one correctly.
 
 - **Codex CLI** — counted from `~/.codex/sessions/**/rollout-*.jsonl` (and
   `archived_sessions/`). Fresh input = `input_tokens − cached_input_tokens`;
@@ -89,6 +93,35 @@ all three; nothing needs choosing at join.
 
 A tool you've never run simply contributes nothing — no configuration needed.
 Overrides: `TOKEN_DERBY_CODEX_DIR`, `TOKEN_DERBY_GEMINI_DIR`.
+
+- **Pi** — counted from `~/.pi/agent/sessions/**/*.jsonl`, and **off until you
+  turn it on**: `token-derby harness enable pi`.
+
+  Pi is the one agent that can run models from several vendors, so its tokens
+  are attributed to whichever vendor actually produced them — a Pi session that
+  starts on Claude and switches to GPT counts as both. Fresh input is uncached
+  input plus cache writes; cache reads are excluded, as everywhere else.
+
+  Usage on a provider outside those three is not counted, and the race view says
+  so rather than leaving you to wonder. That includes gateways such as Bedrock,
+  OpenRouter and Cloudflare: they can serve models we score, but their model ids
+  do not reliably say which vendor is behind them, so we decline to guess.
+
+### Choosing what gets counted
+
+```
+token-derby harness list              # what this machine counts, and what it found
+token-derby harness disable codex-cli # stop counting one
+token-derby harness enable codex-cli  # start counting it again
+```
+
+A disabled agent is not scanned at all, which is also the way to keep a very
+large history from eating into the per-beat scan budget. Changes take effect on
+your next heartbeat — no need to rejoin — and the race view marks anything
+turned off, so it is never a mystery why work is not counting.
+
+Nothing is lost by turning one off mid-race: your totals hold where they are and
+catch up when you turn it back on.
 
 All of this counts **real** tokens you actually generated. Please don't point it
 at usage you didn't produce.

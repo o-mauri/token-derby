@@ -24,8 +24,8 @@ const sample: ActiveRace = {
   joined_at: '2026-06-23T00:00:00.000Z',
   last_heartbeat_at: '1970-01-01T00:00:00.000Z',
   score: {
-    convAcked: { claude: {}, codex: {}, gemini: {} },
-    counted: { claude: 0, codex: 0, gemini: 0 },
+    convAcked: { anthropic: {}, openai: {}, google: {} },
+    counted: { anthropic: 0, openai: 0, google: 0 },
     seq: 0,
   },
 };
@@ -44,16 +44,16 @@ describe('active-race persistence', () => {
     await saveActiveRace({
       ...sample,
       score: {
-        convAcked: { claude: { 'proj/sess': 1300 }, codex: { 'rollout-1': 42 }, gemini: {} },
-        counted: { claude: 1300, codex: 42, gemini: 0 },
+        convAcked: { anthropic: { 'proj/sess': 1300 }, openai: { 'rollout-1': 42 }, google: {} },
+        counted: { anthropic: 1300, openai: 42, google: 0 },
         seq: 7,
       },
     });
     const loaded = await loadActiveRace('ABCDEF');
     expect(loaded?.score.seq).toBe(7);
-    expect(loaded?.score.convAcked.claude).toEqual({ 'proj/sess': 1300 });
-    expect(loaded?.score.convAcked.codex).toEqual({ 'rollout-1': 42 });
-    expect(loaded?.score.counted).toEqual({ claude: 1300, codex: 42, gemini: 0 });
+    expect(loaded?.score.convAcked.anthropic).toEqual({ 'proj/sess': 1300 });
+    expect(loaded?.score.convAcked.openai).toEqual({ 'rollout-1': 42 });
+    expect(loaded?.score.counted).toEqual({ anthropic: 1300, openai: 42, google: 0 });
   });
 
   it('returns null when missing, and lists/deletes', async () => {

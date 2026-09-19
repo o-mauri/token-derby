@@ -1,6 +1,6 @@
 import type { ApiHandler } from '../lib/http.js';
 import type { HeartbeatRequest, HeartbeatResponse } from '@token-derby/shared';
-import { minorMatches, MIDRACE_THRESHOLDS, MODEL_KEYS, scoreTick, scoredOf, zeroPerModel, type ModelKey } from '@token-derby/shared';
+import { minorMatches, MIDRACE_THRESHOLDS, MODEL_FAMILIES, isModelFamily, scoreTick, scoredOf, zeroPerFamily, type ModelFamily } from '@token-derby/shared';
 import { getRaceByJoinCode } from '../db/races.js';
 import { getHorseForHeartbeat, applyHeartbeatDelta, listHorses } from '../db/horses.js';
 import { appendSeriesPoint } from '../db/series.js';
@@ -74,8 +74,8 @@ export const handler: ApiHandler = async (event) => {
     // otherwise the counters would outrun current_tokens on a capped beat.
     const capScale = resolved.total > 0 ? applied / resolved.total : 0;
     const appliedComponents = Object.fromEntries(
-      MODEL_KEYS.map(k => [k, resolved.components[k] * capScale]),
-    ) as Record<ModelKey, number>;
+      MODEL_FAMILIES.map(k => [k, resolved.components[k] * capScale]),
+    ) as Record<ModelFamily, number>;
     const scoring = scoreTick({
       delta: applied,
       dt_ms: elapsedMs,
@@ -89,10 +89,10 @@ export const handler: ApiHandler = async (event) => {
     const allHorsesBefore = await listHorses(race.race_id);
     // Project the per-model split forward too, or the response would report the
     // split one beat behind the total it is supposed to add up to.
-    const prevModelTokens = horse.model_tokens ?? zeroPerModel();
+    const prevModelTokens = horse.model_tokens ?? zeroPerFamily();
     const newModelTokens = Object.fromEntries(
-      MODEL_KEYS.map(k => [k, (prevModelTokens[k] ?? 0) + appliedComponents[k]]),
-    ) as Record<ModelKey, number>;
+      MODEL_FAMILIES.map(k => [k, (prevModelTokens[k] ?? 0) + appliedComponents[k]]),
+    ) as Record<ModelFamily, number>;
     const updatedHorses = allHorsesBefore.map(h =>
       h.horse_id === horse_id
         ? {
@@ -143,7 +143,8 @@ export const handler: ApiHandler = async (event) => {
       race_id: race.race_id, horse_id, seq: body.seq, applied, scored_applied: scoredApplied,
       stamina: scoring.state.stamina, last_heartbeat: now.toISOString(), state: evalResult.next,
       components: appliedComponents,
-      needsSeed: horse.scored_tokens === undefined || horse.model_tokens === undefined,
+      needsSeed: horse.scored_tokens === undefined || !hasFamilyKeys(horse.model_tokens),
+      ...(horse.model_tokens && !hasFamilyKeys(horse.model_tokens) ? { legacyModelTokens: horse.model_tokens } : {}),
     });
 
     if (didApply) {
@@ -195,3 +196,8 @@ export const handler: ApiHandler = async (event) => {
   };
   return ok(response);
 };
+
+/** Whether a stored map already uses family keys rather than the old harness ones. */
+function hasFamilyKeys(map: Record<string, number> | undefined): boolean {
+  return map !== undefined && MODEL_FAMILIES.every(f => typeof map[f] === 'number');
+}

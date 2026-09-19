@@ -1,7 +1,6 @@
 import React from 'react';
 import { render } from 'ink';
 import type { HorseColors, StableHorse } from '@token-derby/shared';
-import { MODEL_KEYS } from '@token-derby/shared';
 import { HorsePicker } from '../ui/HorsePicker.js';
 import { parseFlag, hasFlag } from '../args.js';
 import { resolveHorse, noticeFor, noTtyMessage } from '../stable/resolve-horse.js';
@@ -10,7 +9,7 @@ import { ApiError } from '../api/client.js';
 import { saveActiveRace, type ActiveRace } from '../stable/active-race.js';
 import { RunRace, buildInitialState } from '../runtime/run-race.js';
 import { loadIdentity } from '../identity/identity.js';
-import { probeSource, confirmNoSources } from '../tokens/source-probe.js';
+import { probeAll, confirmNoSources } from '../tokens/source-probe.js';
 import { promptYesNo } from '../ui/prompt.js';
 
 export async function joinCommand(joinCode: string | undefined, argv: string[] = []): Promise<number> {
@@ -116,7 +115,7 @@ export async function joinCommand(joinCode: string | undefined, argv: string[] =
   }
 
   const proceed = await confirmNoSources({
-    probes: await Promise.all(MODEL_KEYS.map(probeSource)),
+    probes: await probeAll(),
     interactive: Boolean(process.stdin.isTTY && process.stdout.isTTY),
     warn: (text) => console.error(`\n${text}\n`),
     ask: () => promptYesNo('Join anyway? [y/N] ', { defaultYes: false }),
@@ -157,8 +156,8 @@ export async function joinCommand(joinCode: string | undefined, argv: string[] =
     joined_at: ownHorse?.joined_at ?? new Date().toISOString(),
     last_heartbeat_at: new Date(0).toISOString(),
     score: {
-      convAcked: { claude: {}, codex: {}, gemini: {} },
-      counted: { claude: 0, codex: 0, gemini: 0 },
+      convAcked: { anthropic: {}, openai: {}, google: {} },
+      counted: { anthropic: 0, openai: 0, google: 0 },
       seq: ownHorse?.last_seq ?? 0,
     },
   };
