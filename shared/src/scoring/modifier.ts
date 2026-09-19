@@ -55,9 +55,20 @@ export type ModifierContext = {
   state: Readonly<ModifierState>;
 };
 
+/**
+ * What a modifier did to the beat.
+ *
+ * A plain number applies to the whole beat. A per-family map applies only to
+ * the families it names, leaving the rest alone -- which is the only way a
+ * mechanic like "Anthropic counts double" can compose with another one like
+ * "OpenAI counts triple". Expressed as a single whole-beat number, two such
+ * mechanics would each inflate the other's untouched share.
+ */
+export type ModifierMultiplier = number | Partial<Record<ModelFamily, number>>;
+
 export type ModifierOutcome = {
   /** 1 leaves the beat untouched. Below 1 slows the horse, above 1 speeds it. */
-  multiplier: number;
+  multiplier: ModifierMultiplier;
   /** Replaces this modifier's state bag. Omit to leave it unchanged. */
   state?: ModifierState;
 };

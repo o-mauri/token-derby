@@ -4,16 +4,25 @@
 import { describe, it, expect, vi } from 'vitest';
 import { runModifiers, type ActiveModifier, type BeatContext } from '../../src/scoring/engine.js';
 import type { Modifier } from '../../src/scoring/modifier.js';
-import { zeroPerFamily } from '../../src/models.js';
 
+// components always sum to delta: that is guaranteed upstream, and a per-family
+// modifier scores from the split rather than the total.
 const beat: BeatContext = {
   delta: 1_000,
-  components: zeroPerFamily(),
+  components: { anthropic: 400, openai: 600, google: 0 },
   dt_ms: 60_000,
   now_ms: 1_700_000_000_000,
   horse: { horse_id: 'h1', current_tokens: 0, joined_at: '2026-01-01T00:00:00Z' },
   field: [],
 };
+
+/**
+ * A beat of a different size. Changing `delta` alone would break the invariant
+ * that `components` sums to it, and the engine scores from the split.
+ */
+function withDelta(delta: number): BeatContext {
+  return { ...beat, delta, components: { anthropic: delta, openai: 0, google: 0 } };
+}
 
 /** A modifier returning whatever the test asks for. */
 function fake(apply: Modifier['apply'], id = 'stamina'): ActiveModifier {
@@ -27,11 +36,60 @@ function fake(apply: Modifier['apply'], id = 'stamina'): ActiveModifier {
   };
 }
 
+describe('runModifiers — per-family multipliers', () => {
+  it('applies a family multiplier only to that family', () => {
+    // 400 anthropic doubled, 600 openai untouched
+    const result = runModifiers([fake(() => ({ multiplier: { anthropic: 2 } }))], beat);
+    expect(result.scored_delta).toBe(1_400);
+  });
+
+  it('composes two family multipliers without either inflating the other', () => {
+    // The case a single whole-beat number cannot express: as scalars these
+    // would be 1.4 and 2.2, multiplying to 3,080 instead of the correct 2,600.
+    const result = runModifiers([
+      fake(() => ({ multiplier: { anthropic: 2 } })),
+      fake(() => ({ multiplier: { openai: 3 } }), 'stamina'),
+    ], beat);
+    expect(result.scored_delta).toBe(400 * 2 + 600 * 3);
+  });
+
+  it('still commutes when families are treated differently', () => {
+    const a = fake(() => ({ multiplier: { anthropic: 2 } }));
+    const b = fake(() => ({ multiplier: { openai: 3 } }), 'stamina');
+    expect(runModifiers([a, b], beat).scored_delta).toBe(runModifiers([b, a], beat).scored_delta);
+  });
+
+  it('combines a whole-beat multiplier with a per-family one', () => {
+    // Stamina halves everything; the boost doubles anthropic's share.
+    const result = runModifiers([
+      fake(() => ({ multiplier: 0.5 })),
+      fake(() => ({ multiplier: { anthropic: 2 } }), 'stamina'),
+    ], beat);
+    expect(result.scored_delta).toBe((400 * 2 + 600) * 0.5);
+  });
+
+  it('leaves families the modifier did not name alone', () => {
+    const result = runModifiers([fake(() => ({ multiplier: { google: 10 } }))], beat);
+    expect(result.scored_delta).toBe(1_000);   // no google tokens in this beat
+  });
+
+  it('reports the multiplier a family mechanic EFFECTIVELY had on this beat', () => {
+    // Nominally 2x, but only 400 of the 1,000 were anthropic.
+    const result = runModifiers([fake(() => ({ multiplier: { anthropic: 2 } }))], beat);
+    expect(result.attribution).toEqual([{ id: 'stamina', multiplier: 1.4 }]);
+  });
+
+  it('guards a broken value inside a per-family map', () => {
+    const result = runModifiers([fake(() => ({ multiplier: { anthropic: NaN, openai: 2 } }))], beat);
+    expect(result.scored_delta).toBe(400 + 600 * 2);
+  });
+});
+
 describe('runModifiers', () => {
   it('passes the delta through untouched when nothing is active', () => {
     // Byte-for-byte, NOT rounded: a race running no mechanics must score exactly
     // what it produced, fractions and all.
-    const result = runModifiers([], { ...beat, delta: 1234.5 });
+    const result = runModifiers([], withDelta(1234.5));
     expect(result.scored_delta).toBe(1234.5);
     expect(result.attribution).toEqual([]);
   });
@@ -42,7 +100,7 @@ describe('runModifiers', () => {
   });
 
   it('rounds once a mechanic is active, even at multiplier 1', () => {
-    const result = runModifiers([fake(() => ({ multiplier: 1 }))], { ...beat, delta: 2000.5 });
+    const result = runModifiers([fake(() => ({ multiplier: 1 }))], withDelta(2000.5));
     expect(result.scored_delta).toBe(2001);
   });
 
@@ -85,7 +143,7 @@ describe('runModifiers', () => {
     expect(result.attribution).toEqual([{ id: 'stamina', multiplier: 0.75 }]);
   });
 
-  it('records what a modifier returned, whatever its size', () => {
+  it('records what a whole-beat modifier returned, whatever its size', () => {
     const result = runModifiers([fake(() => ({ multiplier: 100 }))], beat);
     expect(result.attribution[0]!.multiplier).toBe(100);
   });

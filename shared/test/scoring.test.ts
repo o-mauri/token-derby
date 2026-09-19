@@ -4,27 +4,27 @@ import type { StaminaConfig } from '../src/scoring.js';
 
 describe('scoreTick — no toggles', () => {
   it('returns the delta unchanged when no mechanic is enabled', () => {
-    const r = scoreTick({ delta: 1234, dt_ms: 60_000, race: {}, state: {} });
+    const r = scoreTick({ delta: 1234, components: { anthropic: 1234, openai: 0, google: 0 }, dt_ms: 60_000, race: {}, state: {} });
     expect(r.scored_delta).toBe(1234);
   });
 
   it('is the identity for a zero delta', () => {
-    expect(scoreTick({ delta: 0, dt_ms: 60_000, race: {}, state: {} }).scored_delta).toBe(0);
+    expect(scoreTick({ delta: 0, components: { anthropic: 0, openai: 0, google: 0 }, dt_ms: 60_000, race: {}, state: {} }).scored_delta).toBe(0);
   });
 
   it('leaves state untouched when no mechanic is enabled', () => {
-    const r = scoreTick({ delta: 500, dt_ms: 30_000, race: {}, state: {} });
+    const r = scoreTick({ delta: 500, components: { anthropic: 500, openai: 0, google: 0 }, dt_ms: 30_000, race: {}, state: {} });
     expect(r.state).toEqual({});
   });
 
   it('is the identity regardless of dt', () => {
     for (const dt_ms of [1_000, 60_000, 7_200_000]) {
-      expect(scoreTick({ delta: 999, dt_ms, race: {}, state: {} }).scored_delta).toBe(999);
+      expect(scoreTick({ delta: 999, components: { anthropic: 999, openai: 0, google: 0 }, dt_ms, race: {}, state: {} }).scored_delta).toBe(999);
     }
   });
 
   it('passes a fractional delta through byte-for-byte, without rounding', () => {
-    const r = scoreTick({ delta: 2000.5, dt_ms: 60_000, race: {}, state: {} });
+    const r = scoreTick({ delta: 2000.5, components: { anthropic: 2000.5, openai: 0, google: 0 }, dt_ms: 60_000, race: {}, state: {} });
     expect(r.scored_delta).toBe(2000.5);
   });
 });
@@ -95,7 +95,7 @@ describe('staminaStep — recovery', () => {
 describe('scoreTick — stamina enabled', () => {
   it('scores at full rate while fresh and drains', () => {
     const r = scoreTick({
-      delta: 80_000, dt_ms: 60_000, race: { stamina: true }, state: { stamina: 100 },
+      delta: 80_000, components: { anthropic: 80_000, openai: 0, google: 0 }, dt_ms: 60_000, race: { stamina: true }, state: { stamina: 100 },
     });
     expect(r.scored_delta).toBe(80_000);         // fresh: full multiplier
     expect(r.state.stamina).toBeCloseTo(96);     // 2x sustainable -> 4/min
@@ -103,34 +103,34 @@ describe('scoreTick — stamina enabled', () => {
 
   it('tapers the delta once below the floor', () => {
     const r = scoreTick({
-      delta: 1_000, dt_ms: 60_000, race: { stamina: true }, state: { stamina: 12.5 },
+      delta: 1_000, components: { anthropic: 1_000, openai: 0, google: 0 }, dt_ms: 60_000, race: { stamina: true }, state: { stamina: 12.5 },
     });
     expect(r.scored_delta).toBeCloseTo(750);
   });
 
   it('starts an absent stamina at 100', () => {
-    const r = scoreTick({ delta: 100, dt_ms: 60_000, race: { stamina: true }, state: {} });
+    const r = scoreTick({ delta: 100, components: { anthropic: 100, openai: 0, google: 0 }, dt_ms: 60_000, race: { stamina: true }, state: {} });
     expect(r.scored_delta).toBe(100);
     expect(r.state.stamina).toBe(100);
   });
 
   it('rounds a fractional delta even at full stamina, once the mechanic is on', () => {
     const r = scoreTick({
-      delta: 2000.5, dt_ms: 60_000, race: { stamina: true }, state: { stamina: 100 },
+      delta: 2000.5, components: { anthropic: 2000.5, openai: 0, google: 0 }, dt_ms: 60_000, race: { stamina: true }, state: { stamina: 100 },
     });
     expect(r.scored_delta).toBe(2001);
   });
 
   it('ignores stamina entirely when the toggle is off', () => {
     const r = scoreTick({
-      delta: 40_000, dt_ms: 60_000, race: {}, state: { stamina: 3 },
+      delta: 40_000, components: { anthropic: 40_000, openai: 0, google: 0 }, dt_ms: 60_000, race: {}, state: { stamina: 3 },
     });
     expect(r.scored_delta).toBe(40_000);
     expect(r.state.stamina).toBe(3);
   });
 
   it('treats a zero dt as a no-op rather than dividing by zero', () => {
-    const r = scoreTick({ delta: 500, dt_ms: 0, race: { stamina: true }, state: { stamina: 100 } });
+    const r = scoreTick({ delta: 500, components: { anthropic: 500, openai: 0, google: 0 }, dt_ms: 0, race: { stamina: true }, state: { stamina: 100 } });
     expect(Number.isFinite(r.scored_delta)).toBe(true);
     expect(r.state.stamina).toBe(100);
   });

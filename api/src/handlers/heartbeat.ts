@@ -72,17 +72,23 @@ export const handler: ApiHandler = async (event) => {
     // what the client reports is what counts.
     const applied = resolved.total;
     const appliedComponents = resolved.components;
+    const allHorsesBefore = await listHorses(race.race_id);
     const scoring = scoreTick({
       delta: applied,
+      components: appliedComponents,
       dt_ms: elapsedMs,
+      now_ms: now.getTime(),
       race,
       state: { stamina: horse.stamina },
+      // The field as it was BEFORE this beat: a modifier's view of the race
+      // necessarily lags one beat, since rank depends on what it returns.
+      horse: { ...horse, horse_id, joined_at: ownJoinedAt(allHorsesBefore, horse_id) },
+      field: allHorsesBefore,
     });
     const scoredApplied = scoring.scored_delta;
     const newTokens = prevTokens + applied;
     const newScored = scoredOf(horse) + scoredApplied;
 
-    const allHorsesBefore = await listHorses(race.race_id);
     // Project the per-model split forward too, or the response would report the
     // split one beat behind the total it is supposed to add up to.
     const prevModelTokens = horse.model_tokens ?? zeroPerFamily();
@@ -196,4 +202,9 @@ export const handler: ApiHandler = async (event) => {
 /** Whether a stored map already uses family keys rather than the old harness ones. */
 function hasFamilyKeys(map: Record<string, number> | undefined): boolean {
   return map !== undefined && MODEL_FAMILIES.every(f => typeof map[f] === 'number');
+}
+
+/** A horse's join time, the tie-break every rank comparison falls back to. */
+function ownJoinedAt(field: Array<{ horse_id: string; joined_at: string }>, horse_id: string): string {
+  return field.find(h => h.horse_id === horse_id)?.joined_at ?? '';
 }

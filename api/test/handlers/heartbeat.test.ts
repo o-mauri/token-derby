@@ -452,6 +452,18 @@ describe('heartbeat handler', () => {
     expect(summed).toBe(own.current_tokens);
   });
 
+  it('scores from the per-family split, not a zeroed placeholder', async () => {
+    // components is load-bearing now: a per-family modifier scores from it, so
+    // a beat whose split never reached the pipeline would score nothing.
+    const { join_code, race_id, horse_id, heartbeat_token } = await setupWithCliVersion();
+    await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, {
+      seq: 1, components: { anthropic: 700, openai: 300, google: 0 },
+    }));
+    const own = (await listHorses(race_id)).find(h => h.horse_id === horse_id)!;
+    expect(own.current_tokens).toBe(1000);
+    expect(own.scored_tokens).toBe(1000);   // no modifier active: untouched
+  });
+
   it('accepts the component keys an un-upgraded CLI sends', async () => {
     const { join_code, race_id, horse_id, heartbeat_token } = await setupWithCliVersion();
     // Pre-rename CLIs key components by tool, not by model family.

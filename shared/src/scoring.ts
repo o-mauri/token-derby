@@ -7,7 +7,6 @@
  * here re-implements them.
  */
 
-import { zeroPerFamily } from './models.js';
 import type { ModelFamily } from './types.js';
 import { MODIFIERS } from './scoring/registry.js';
 import {
@@ -40,9 +39,12 @@ export type ScoringTick = {
   dt_ms: number;
   race: ScoringRace;
   state: ScoringState;
-  // Optional until every caller supplies them: a modifier that reads the field
-  // or the per-family split needs them, and stamina does not.
-  components?: Record<ModelFamily, number>;
+  /**
+   * The delta split by the family that produced it. REQUIRED, and must sum to
+   * `delta`: a per-family modifier scores from this, so a zeroed or partial
+   * split would silently score nothing.
+   */
+  components: Record<ModelFamily, number>;
   now_ms?: number;
   horse?: ScoringHorse;
   field?: readonly ScoringHorse[];
@@ -68,7 +70,7 @@ export function scoreTick(tick: ScoringTick): ScoringResult {
   const active = modifiersForRace(tick.race, tick.state);
   const result = runModifiers(active, {
     delta: tick.delta,
-    components: tick.components ?? zeroPerFamily(),
+    components: tick.components,
     dt_ms: tick.dt_ms,
     now_ms: tick.now_ms ?? 0,
     horse: tick.horse ?? { horse_id: '', current_tokens: 0, joined_at: '' },
