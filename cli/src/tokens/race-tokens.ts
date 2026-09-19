@@ -1,17 +1,23 @@
 import { MODEL_KEYS, type ModelKey } from '@token-derby/shared';
-import { sumTokensByConversation, type TokenTotals } from './transcripts.js';
-import { sumCodexByConversation } from './codex.js';
-import { sumGeminiByConversation } from './gemini.js';
+import { COUNTERS, type TokenTotals } from './counters/index.js';
 import type { ScanProgress } from './scan-progress.js';
 import { SourceRootMissing } from './source-root.js';
 import { logWarn, logError } from '../log/logger.js';
 
-/** Per-source reading for one beat: every model, broken down by conversation. */
+/** A source that could be reached but not counted this beat. */
+export type DegradedSource = { key: ModelKey; message: string };
+
+/**
+ * Per-source reading for one beat. A degraded source contributes no
+ * conversations — skipped rather than partially counted — and is named so the
+ * UI can say which one and why.
+ */
 export type AllSources = {
   byConv: Record<ModelKey, Map<string, number>>; // model → convId → scored value
+  degraded: DegradedSource[];
 };
 
-/** A beat that could not be read. `stall` is a human-readable cause for the UI. */
+/** A beat that could not be read at all. `stall` is a human-readable cause for the UI. */
 export type StallReading = { stall: string };
 
 /** The result of one scan: either usable numbers or a stall carrying its cause. */
@@ -64,36 +70,31 @@ export async function scanWithTimeout(
   }
 }
 
-const BY_CONVERSATION_READERS: Record<ModelKey, () => Promise<Map<string, TokenTotals>>> = {
-  claude: sumTokensByConversation,
-  codex: sumCodexByConversation,
-  gemini: sumGeminiByConversation,
-};
+function emptyByConv(): Record<ModelKey, Map<string, number>> {
+  return { claude: new Map(), codex: new Map(), gemini: new Map() };
+}
 
 /** Collapse a source's totals to a single number. */
 export function scoreFor(t: TokenTotals): number {
   return t.input + t.output;
 }
 
-function emptyByConv(): Record<ModelKey, Map<string, number>> {
-  return { claude: new Map(), codex: new Map(), gemini: new Map() };
-}
-
 /**
  * Read every source for a beat, each broken down by conversation. All three are
  * kicked off together, so a beat costs the SLOWEST source rather than the sum.
  *
- * Every model counts the same now, so every model is load-bearing: a genuine read
- * error on any of them stalls the beat and reports its cause, rather than silently
- * scoring that source 0 for the rest of the race. The one exception is a MISSING
- * ROOT (SourceRootMissing) — hardly any machine has all three tools installed, so
- * an absent root simply means that source produced nothing and must never freeze
- * a race.
+ * A source that cannot be read is SKIPPED for this beat, not fatal: the other
+ * sources still count and the race keeps running. Nothing is lost by skipping —
+ * the tracker's per-conversation floor only ever moves a conversation up, so a
+ * source that reports nothing leaves its anchors untouched and catches up as
+ * soon as it reads cleanly again. A MISSING ROOT is not a failure at all: few
+ * machines have all three tools, so an absent root simply counts as zero and
+ * earns no warning.
  */
 export async function readAllSources(progress?: ScanProgress): Promise<BeatReading> {
   const scans = MODEL_KEYS.map((key) => {
     progress?.begin(key);
-    return BY_CONVERSATION_READERS[key]()
+    return COUNTERS[key].byConversation()
       .then(map => ({ ok: true as const, key, map }))
       .catch((err: any) => ({ ok: false as const, key, err }))
       .finally(() => progress?.end(key));
@@ -101,25 +102,17 @@ export async function readAllSources(progress?: ScanProgress): Promise<BeatReadi
   const results = await Promise.all(scans);
 
   const byConv = emptyByConv();
-  let firstFailure: { key: ModelKey; message: string } | null = null;
-  // MODEL_KEYS order, so a beat that breaks two sources always names the same one.
+  const degraded: DegradedSource[] = [];
+  // MODEL_KEYS order, so the warning lists sources the same way every beat.
   for (const result of results) {
     if (result.ok) {
       for (const [id, totals] of result.map) byConv[result.key].set(id, scoreFor(totals));
       continue;
     }
-    // An absent root is the normal case — few machines have all three tools — so
-    // only a real read error earns a line, or a missing source would write one
-    // every beat and bury the failures that matter.
-    if (result.err instanceof SourceRootMissing) continue;
+    if (result.err instanceof SourceRootMissing) continue; // not installed → 0
     const message = result.err?.message ?? String(result.err);
     logWarn('scan.source.err', { source: result.key, message });
-    // Every source is logged, but only the first names the stall, so the UI
-    // message stays stable when two break at once.
-    firstFailure ??= { key: result.key, message };
+    degraded.push({ key: result.key, message });
   }
-  if (firstFailure) {
-    return { stall: `Can't read ${firstFailure.key} token usage: ${firstFailure.message}` };
-  }
-  return { byConv };
+  return { byConv, degraded };
 }

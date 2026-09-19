@@ -114,6 +114,50 @@ function screenWith(props: Record<string, unknown>) {
   return lastFrame() ?? '';
 }
 
+describe('degraded source warning', () => {
+  it('is absent when every source read cleanly', () => {
+    expect(screenWith({ degraded: [] })).not.toMatch(/not counted this beat/i);
+  });
+
+  it('names the source that could not be read, and why', () => {
+    const frame = screenWith({ degraded: [{ key: 'codex', message: 'EACCES: permission denied' }] });
+    expect(frame).toMatch(/Codex not counted this beat/i);
+    expect(frame).toContain('EACCES');
+  });
+
+  it('reassures the player the other sources still count', () => {
+    const frame = screenWith({ degraded: [{ key: 'codex', message: 'boom' }] });
+    expect(frame).toMatch(/other sources\s+still count/i);
+  });
+
+  it('lists every degraded source, not just the first', () => {
+    const frame = screenWith({
+      degraded: [{ key: 'codex', message: 'boom' }, { key: 'gemini', message: 'bang' }],
+    });
+    expect(frame).toMatch(/Codex not counted/i);
+    expect(frame).toMatch(/Gemini not counted/i);
+  });
+
+  it('yields to a stall, which names a more specific cause', () => {
+    const frame = screenWith({
+      degraded: [{ key: 'codex', message: 'boom' }],
+      stalled: true,
+      stallReason: 'Token scan timed out after 45s',
+    });
+    expect(frame).toContain('Token scan timed out after 45s');
+    expect(frame).not.toMatch(/not counted this beat/i);
+  });
+
+  it('takes the warning slot ahead of the all-quiet message', () => {
+    const frame = screenWith({
+      degraded: [{ key: 'codex', message: 'boom' }],
+      sourcesSilent: true,
+    });
+    expect(frame).toMatch(/Codex not counted/i);
+    expect(frame).not.toMatch(/No Claude, Codex or Gemini transcripts/i);
+  });
+});
+
 describe('source silence warning', () => {
   it('is absent while any source is producing conversations', () => {
     expect(screenWith({})).not.toMatch(/No Claude, Codex or Gemini transcripts/i);

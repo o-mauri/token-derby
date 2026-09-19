@@ -8,14 +8,12 @@ import { SourceRootMissing } from '../../src/tokens/source-root.js';
 const codexConvs = vi.fn();
 const geminiConvs = vi.fn();
 
-vi.mock('../../src/tokens/transcripts.js', () => ({
-  sumTokensByConversation: vi.fn(async () => new Map()),
-}));
-vi.mock('../../src/tokens/codex.js', () => ({
-  sumCodexByConversation: (...a: unknown[]) => codexConvs(...a),
-}));
-vi.mock('../../src/tokens/gemini.js', () => ({
-  sumGeminiByConversation: (...a: unknown[]) => geminiConvs(...a),
+vi.mock('../../src/tokens/counters/index.js', () => ({
+  COUNTERS: {
+    claude: { key: 'claude', label: 'Claude', byConversation: async () => new Map() },
+    codex: { key: 'codex', label: 'Codex', byConversation: () => codexConvs() },
+    gemini: { key: 'gemini', label: 'Gemini', byConversation: () => geminiConvs() },
+  },
 }));
 
 const { readAllSources, isStall } = await import('../../src/tokens/race-tokens.js');
@@ -45,25 +43,29 @@ function readLog(): string {
 }
 
 describe('source read failures', () => {
-  it('records a real read error, and stalls rather than scoring a silent zero', async () => {
+  it('records a real read error, and skips that source rather than scoring it zero', async () => {
     codexConvs.mockRejectedValue(new Error('EACCES: permission denied'));
 
     const reading = await readAllSources();
 
-    expect(isStall(reading)).toBe(true); // every model counts, so none may fail quietly
+    // The beat still goes out — one broken tool must not freeze the race.
+    expect(isStall(reading)).toBe(false);
+    expect((reading as any).degraded).toEqual([
+      { key: 'codex', message: 'EACCES: permission denied' },
+    ]);
     const text = readLog();
     expect(text).toContain('scan.source.err');
     expect(text).toContain('"source":"codex"');
     expect(text).toContain('EACCES');
   });
 
-  it('logs every failing source, not just the one that names the stall', async () => {
+  it('logs every failing source, not just the first', async () => {
     codexConvs.mockRejectedValue(new Error('codex broke'));
     geminiConvs.mockRejectedValue(new Error('gemini broke'));
 
     const reading = await readAllSources();
 
-    expect(isStall(reading)).toBe(true);
+    expect((reading as any).degraded).toHaveLength(2);
     const text = readLog();
     expect(text).toContain('"source":"codex"');
     expect(text).toContain('"source":"gemini"');

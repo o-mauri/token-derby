@@ -4,7 +4,7 @@ import type { GetRaceResponse, HeartbeatResponse } from '@token-derby/shared';
 import { StatusScreen } from '../ui/StatusScreen.js';
 import { describeAchievement, type RecentEvent } from '@token-derby/shared';
 import { runHeartbeatLoop } from './heartbeat-loop.js';
-import { readAllSources, isStall, scanWithTimeout, type BeatReading } from '../tokens/race-tokens.js';
+import { readAllSources, isStall, scanWithTimeout, type BeatReading, type DegradedSource } from '../tokens/race-tokens.js';
 import { ScanProgress, diagnoseScanTimeout } from '../tokens/scan-progress.js';
 import { MODEL_KEYS, zeroPerModel, type ModelKey } from '@token-derby/shared';
 import { RaceScoreTracker, type RaceScoreState } from '../tokens/race-score.js';
@@ -36,6 +36,7 @@ export function RunRace({ active, initialState, pendingMode, ownUserName }: RunR
   const [stalled, setStalled] = useState(false);
   const [stallReason, setStallReason] = useState<string | null>(null);
   const [sourcesSilent, setSourcesSilent] = useState(false);
+  const [degraded, setDegraded] = useState<DegradedSource[]>([]);
 
   // Re-render every second so the "Ns ago" counter updates.
   useEffect(() => {
@@ -75,6 +76,9 @@ export function RunRace({ active, initialState, pendingMode, ownUserName }: RunR
         setStalled(tracker.stalled);
         setStallReason(tracker.stalled ? tracker.stallReason : null);
         setSourcesSilent(tracker.sourcesSilent);
+        // Tracks the current beat rather than a streak: a source that reads
+        // cleanly again clears its own warning immediately.
+        setDegraded(isStall(reading) ? [] : reading.degraded);
         return tracker.nextBeat();
       },
       sendBeat: async (snapshot) => {
@@ -148,6 +152,7 @@ export function RunRace({ active, initialState, pendingMode, ownUserName }: RunR
         stalled={stalled}
         stallReason={stallReason}
         sourcesSilent={sourcesSilent}
+        degraded={degraded}
       />
       {achievements.length > 0 && (
         <Box flexDirection="column" marginTop={1}>

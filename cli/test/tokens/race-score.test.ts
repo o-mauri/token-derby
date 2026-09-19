@@ -19,6 +19,7 @@ function reading(by: Partial<Record<keyof AllSources['byConv'], Record<string, n
       codex: new Map(Object.entries(by.codex ?? {})),
       gemini: new Map(Object.entries(by.gemini ?? {})),
     },
+    degraded: [],
   };
 }
 

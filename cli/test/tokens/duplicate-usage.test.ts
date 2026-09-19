@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { sumTokens } from '../../src/tokens/transcripts.js';
+import { COUNTERS } from '../../src/tokens/counters/index.js';
+import { totalOf } from './counters/helpers.js';
 
 const dirs: string[] = [];
 async function tmpProjects(): Promise<string> {
@@ -39,11 +40,11 @@ describe('duplicate per-request usage across content blocks', () => {
     await fs.writeFile(path.join(root, 'proj', 'sess.jsonl'),
       line('aa0994fc', 'thinking') + line('0cb10f01', 'text') + line('ede3ba11', 'tool_use'));
 
-    const totals = await sumTokens();
+    const totals = await totalOf(COUNTERS.claude);
     const oneResponse = { input: USAGE.input_tokens + USAGE.cache_creation_input_tokens, output: USAGE.output_tokens };
 
     console.log(`\n  one API response is worth : in=${oneResponse.input.toLocaleString()} out=${oneResponse.output.toLocaleString()}`);
-    console.log(`  shipped sumTokens() returns: in=${totals.input.toLocaleString()} out=${totals.output.toLocaleString()}`);
+    console.log(`  shipped totalOf(COUNTERS.claude) returns: in=${totals.input.toLocaleString()} out=${totals.output.toLocaleString()}`);
     console.log(`  inflation: ${(totals.output / oneResponse.output).toFixed(2)}x\n`);
 
     expect(totals).toEqual(oneResponse);
@@ -56,12 +57,12 @@ describe('duplicate per-request usage across content blocks', () => {
 
     // Beat 1 sees only the thinking block...
     await fs.writeFile(file, line('aa0994fc', 'thinking'));
-    const first = await sumTokens();
+    const first = await totalOf(COUNTERS.claude);
 
     // ...beat 2 sees the rest of the SAME response appended. The scan cache
     // resumes from the committed value, so the dedupe key must have survived.
     await fs.appendFile(file, line('0cb10f01', 'text') + line('ede3ba11', 'tool_use'));
-    const second = await sumTokens();
+    const second = await totalOf(COUNTERS.claude);
 
     const oneResponse = { input: USAGE.input_tokens + USAGE.cache_creation_input_tokens, output: USAGE.output_tokens };
     expect(first).toEqual(oneResponse);
@@ -78,7 +79,7 @@ describe('duplicate per-request usage across content blocks', () => {
     await fs.writeFile(path.join(root, 'proj', 'sess.jsonl'),
       line('aa0994fc', 'thinking') + line('0cb10f01', 'text') + other);
 
-    const totals = await sumTokens();
+    const totals = await totalOf(COUNTERS.claude);
     expect(totals.output).toBe(USAGE.output_tokens * 2);
   });
 
@@ -88,7 +89,7 @@ describe('duplicate per-request usage across content blocks', () => {
     const bare = JSON.stringify({ type: 'assistant', message: { usage: USAGE } }) + '\n';
     await fs.writeFile(path.join(root, 'proj', 'sess.jsonl'), bare + bare + bare);
 
-    const totals = await sumTokens();
+    const totals = await totalOf(COUNTERS.claude);
     expect(totals.output).toBe(USAGE.output_tokens * 3);
   });
 });

@@ -1,57 +1,19 @@
-// Answers "can this machine see any transcripts for this source?" without
-// parsing a byte of token data. A scan that finds no history is indistinguishable
-// from one that finds no WORK, so the race reports 0 either way; probing the
-// directory up front turns that silent 0 into something a player can act on.
+// The join-time gate: can this machine count anything at all? Probing is the
+// counters' own job -- this module only decides what to say about the result.
 
 import type { ModelKey } from '@token-derby/shared';
-import * as fs from 'node:fs/promises';
-import { claudeProjectsDir, codexSessionsDir, geminiTmpDir } from '../paths.js';
-import { listJsonlFiles } from './transcripts.js';
-import { listCodexRollouts } from './codex.js';
-import { listChatFiles } from './gemini.js';
+import { COUNTERS, type SourceProbe } from './counters/index.js';
 
-export type SourceProbe = {
-  key: ModelKey;
-  dir: string;         // the root that was searched
-  exists: boolean;     // whether that root is a directory at all
-  projects: number;    // project directories directly beneath it
-  transcripts: number; // transcript files found anywhere beneath it
-};
-
-const ROOTS: Record<ModelKey, () => string> = {
-  claude: claudeProjectsDir,
-  codex: codexSessionsDir,
-  gemini: geminiTmpDir,
-};
-
-// The scanners' own discovery rules, reused rather than restated — a probe that
-// disagreed with the scan about what counts would be worse than no probe.
-const LISTERS: Record<ModelKey, (root: string) => Promise<string[]>> = {
-  claude: listJsonlFiles,
-  codex: listCodexRollouts,
-  gemini: listChatFiles,
-};
-
-const LABELS: Record<ModelKey, string> = { claude: 'Claude', codex: 'Codex', gemini: 'Gemini' };
+export type { SourceProbe };
 
 /** Directory a source reads from, for messages that need to name it. */
 export function sourceDir(key: ModelKey): string {
-  return ROOTS[key]();
+  return COUNTERS[key].root();
 }
 
-/**
- * Look for a source's transcripts. Never throws — an unreadable root reads as
- * empty. `projects` is counted separately so "nothing here" and "plenty here,
- * none of it readable" produce different advice.
- */
-export async function probeSource(key: ModelKey): Promise<SourceProbe> {
-  const dir = ROOTS[key]();
-  const exists = await fs.stat(dir).then(st => st.isDirectory()).catch(() => false);
-  if (!exists) return { key, dir, exists: false, projects: 0, transcripts: 0 };
-  const entries = await fs.readdir(dir, { withFileTypes: true }).catch(() => []);
-  const projects = entries.filter(e => e.isDirectory() || e.isSymbolicLink()).length;
-  const files = await LISTERS[key](dir).catch(() => [] as string[]);
-  return { key, dir, exists: true, projects, transcripts: files.length };
+/** Look for a source's countable files. Never throws; an unreadable root reads as empty. */
+export function probeSource(key: ModelKey): Promise<SourceProbe> {
+  return COUNTERS[key].probe();
 }
 
 /** Env var that repoints a source's history directory. */
@@ -84,7 +46,8 @@ export function describeNoSources(probes: SourceProbe[]): string {
     ``,
   ];
   for (const probe of probes) {
-    lines.push(`  ${LABELS[probe.key]}: ${probe.dir}`, `  ${' '.repeat(LABELS[probe.key].length)}  (${reasonFor(probe)})`);
+    const label = COUNTERS[probe.key].label;
+    lines.push(`  ${label}: ${probe.dir}`, `  ${' '.repeat(label.length)}  (${reasonFor(probe)})`);
   }
   lines.push(
     ``,
@@ -109,7 +72,7 @@ function reasonFor(probe: SourceProbe): string {
 
 /** What to tell a player whose primary source has no transcripts to count. */
 export function describeEmptySource(probe: SourceProbe): string {
-  const label = LABELS[probe.key];
+  const label = COUNTERS[probe.key].label;
   // A root full of projects that yields no transcripts is a different problem
   // from a root with nothing in it, and wants different advice.
   const populated = probe.exists && probe.projects > 0;
