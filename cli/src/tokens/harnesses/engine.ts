@@ -7,7 +7,7 @@ import type { ModelFamily } from '@token-derby/shared';
 import { mapWithConcurrency, SCAN_CONCURRENCY } from '../pool.js';
 import { ScanCache } from '../scan-cache.js';
 import { SourceRootMissing } from '../source-root.js';
-import type { FileReading, Harness, TokenTotals } from './harness.js';
+import type { FamilyTotals, FileReading, Harness, TokenTotals } from './harness.js';
 
 /** What a harness contributed for one beat. */
 export type CountResult = {
@@ -27,6 +27,7 @@ export type HarnessProbe = {
 /** Read one file through the cache, using whichever mode the harness declared. */
 async function readFile(harness: Harness, cache: ScanCache, file: string): Promise<FileReading> {
   const counting = harness.counting;
+  if (counting.mode === 'custom') throw new Error('custom counting is read whole-history, not per file');
   if (counting.mode === 'whole-file') {
     return cache.readWhenChanged(file, async raw => counting.parse(raw, file));
   }
@@ -46,24 +47,39 @@ export async function count(harness: Harness): Promise<CountResult> {
   const root = harness.root();
   const files = await harness.discover(root);
   const cache = await ScanCache.open(harness.id);
-  const readings = await mapWithConcurrency(files, SCAN_CONCURRENCY, f => readFile(harness, cache, f));
-  await cache.save(); // only after a clean scan — a throw above must not commit
 
   const byFamily = new Map<ModelFamily, Map<string, TokenTotals>>();
   const notices = new Set<string>(); // the same caveat from many files reads once
+
+  const add = (id: string, families: FamilyTotals) => {
+    const prefixed = `${harness.id}:${id}`;
+    for (const [family, totals] of Object.entries(families) as [ModelFamily, TokenTotals][]) {
+      if (!totals) continue;
+      const conversations = byFamily.get(family) ?? new Map<string, TokenTotals>();
+      const acc = conversations.get(prefixed) ?? { input: 0, output: 0 };
+      acc.input += totals.input;
+      acc.output += totals.output;
+      conversations.set(prefixed, acc);
+      byFamily.set(family, conversations);
+    }
+  };
+
+  if (harness.counting.mode === 'custom') {
+    // Whole-history: the harness groups its own conversations because its work
+    // cannot be attributed a file at a time.
+    const reading = await harness.counting.read(cache, files, root);
+    await cache.save();
+    for (const notice of reading.notices ?? []) notices.add(notice);
+    for (const [id, families] of reading.byConversation) add(id, families);
+    return { byFamily, notices: [...notices] };
+  }
+
+  const readings = await mapWithConcurrency(files, SCAN_CONCURRENCY, f => readFile(harness, cache, f));
+  await cache.save(); // only after a clean scan — a throw above must not commit
   files.forEach((file, i) => {
     const reading = readings[i]!;
     for (const notice of reading.notices ?? []) notices.add(notice);
-    const id = `${harness.id}:${harness.conversationId(file, root)}`;
-    for (const [family, totals] of Object.entries(reading.families) as [ModelFamily, TokenTotals][]) {
-      if (!totals) continue;
-      const conversations = byFamily.get(family) ?? new Map<string, TokenTotals>();
-      const acc = conversations.get(id) ?? { input: 0, output: 0 };
-      acc.input += totals.input;
-      acc.output += totals.output;
-      conversations.set(id, acc);
-      byFamily.set(family, conversations);
-    }
+    add(harness.conversationId(file, root), reading.families);
   });
   return { byFamily, notices: [...notices] };
 }

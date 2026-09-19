@@ -14,10 +14,10 @@
 // bypassed -- a harness declares HOW it counts and never runs the pipeline.
 
 import type { ModelFamily } from '@token-derby/shared';
-import type { FileFold } from '../scan-cache.js';
+import type { FileFold, ScanCache } from '../scan-cache.js';
 
 /** Which coding agent's history a counter reads. Never leaves this machine. */
-export type HarnessKey = 'claude-code' | 'codex-cli' | 'gemini-cli';
+export type HarnessKey = 'claude-code' | 'codex-cli' | 'gemini-cli' | 'pi';
 
 /** `input` is FRESH input only: passive cache reads are never counted. */
 export type TokenTotals = { input: number; output: number };
@@ -48,7 +48,22 @@ export type Counting<S = unknown> =
       // Rewritten in place: no offset to resume from, recompute when it changes.
       mode: 'whole-file';
       parse(raw: string, file: string): FileReading;
+    }
+  | {
+      // Whole-history: this harness cannot be counted a file at a time, because
+      // work can appear in more than one file and must be reconciled across all
+      // of them. It still gets the engine's discovery, probing and cache -- it
+      // just does its own grouping.
+      mode: 'custom';
+      read(cache: ScanCache, files: string[], root: string): Promise<CustomReading>;
     };
+
+/** What a whole-history harness produces: conversations already grouped. */
+export type CustomReading = {
+  /** Conversation id (unprefixed) -> its tokens, split by family. */
+  byConversation: Map<string, FamilyTotals>;
+  notices?: string[];
+};
 
 export interface Harness {
   readonly id: HarnessKey;
@@ -99,6 +114,13 @@ export function incremental<S>(
   notices?: (state: S) => string[],
 ): Counting<S> {
   return { mode: 'incremental', fold, families, ...(notices ? { notices } : {}) };
+}
+
+/** Declare a whole-history harness that reconciles across its own files. */
+export function custom(
+  read: (cache: ScanCache, files: string[], root: string) => Promise<CustomReading>,
+): Counting<unknown> {
+  return { mode: 'custom', read };
 }
 
 /** Declare a rewritten-in-place harness. */

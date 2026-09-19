@@ -12,6 +12,7 @@ const counts: Record<HarnessKey, ReturnType<typeof vi.fn>> = {
   'claude-code': vi.fn(),
   'codex-cli': vi.fn(),
   'gemini-cli': vi.fn(),
+  pi: vi.fn(),
 };
 
 // Mock the engine, not the harnesses: readAllSources' job is merging by family
@@ -169,6 +170,15 @@ describe('readAllSources', () => {
 
     await setHarnessEnabled('codex-cli', true);
     expect(ok(await readAllSources()).byFamily.openai.size).toBe(1);
+  });
+
+  it('does not scan a harness that ships disabled until it is asked for', async () => {
+    allEmpty();
+    await readAllSources();
+    expect(counts.pi).not.toHaveBeenCalled();   // Pi is opt-in
+    await setHarnessEnabled('pi', true);
+    await readAllSources();
+    expect(counts.pi).toHaveBeenCalled();
   });
 
   it('scans nothing, and fails nothing, when every harness is off', async () => {

@@ -38,14 +38,32 @@ async function makeRoot(key: HarnessKey): Promise<string> {
 }
 
 /** A file this harness will discover, holding `raw`. */
+/**
+ * Pi only counts a v3 session, so its fixture needs a header line before the
+ * usage line every other harness gets away with on its own.
+ */
+function shapeFor(key: HarnessKey, raw: string): string {
+  if (key !== 'pi') return raw;
+  const header = JSON.stringify({ type: 'session', version: 3 });
+  const message = JSON.stringify({
+    type: 'message', id: 'e1', timestamp: '2026-09-19T00:00:00Z',
+    message: {
+      role: 'assistant', provider: 'anthropic', model: 'claude-sonnet-4-5',
+      usage: JSON.parse(raw).piUsage ?? { input: 1, cacheWrite: 0, output: 2 },
+    },
+  });
+  return `${header}\n${message}\n`;
+}
+
 async function writeCountable(key: HarnessKey, root: string, raw: string): Promise<string> {
   const file = {
     'claude-code': path.join(root, 'proj', 'session-1.jsonl'),
     'codex-cli': path.join(root, 'sessions', '2026', '09', 'rollout-a.jsonl'),
     'gemini-cli': path.join(root, 'projhash', 'chats', 'session-a.json'),
+    pi: path.join(root, 'session-a.jsonl'),
   }[key];
   await fs.mkdir(path.dirname(file), { recursive: true });
-  await fs.writeFile(file, raw, 'utf8');
+  await fs.writeFile(file, shapeFor(key, raw), 'utf8');
   return file;
 }
 
@@ -98,6 +116,7 @@ describe.each(HARNESS_KEYS)('Harness contract — %s', (key) => {
       message: { usage: { input_tokens: 1, cache_creation_input_tokens: 0, output_tokens: 2 } },
       payload: { type: 'token_count', info: { total_token_usage: { input_tokens: 1, cached_input_tokens: 9_999, output_tokens: 2 } } },
       messages: [{ tokens: { input: 1, cached: 9_999, output: 2 } }],
+      piUsage: { input: 1, cacheWrite: 0, output: 2, cacheRead: 9_999 },
     }) + '\n');
     for (const conversations of (await count(harness)).byFamily.values()) {
       for (const totals of conversations.values()) {

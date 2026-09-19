@@ -2,6 +2,7 @@ import type { Harness, HarnessKey } from './harness.js';
 import { claudeCode } from './claude-code/index.js';
 import { codexCli } from './codex-cli/index.js';
 import { geminiCli } from './gemini-cli/index.js';
+import { pi } from './pi/index.js';
 
 /**
  * The one place that knows which harnesses exist. The race, the join-time probe
@@ -11,6 +12,7 @@ export const HARNESSES: Record<HarnessKey, Harness> = {
   'claude-code': claudeCode,
   'codex-cli': codexCli,
   'gemini-cli': geminiCli,
+  pi,
 };
 
 /** Every harness, in a stable order, so warnings always read the same way. */

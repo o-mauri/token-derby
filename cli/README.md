@@ -94,6 +94,19 @@ vendors' models counts each one correctly.
 A tool you've never run simply contributes nothing — no configuration needed.
 Overrides: `TOKEN_DERBY_CODEX_DIR`, `TOKEN_DERBY_GEMINI_DIR`.
 
+- **Pi** — counted from `~/.pi/agent/sessions/**/*.jsonl`, and **off until you
+  turn it on**: `token-derby harness enable pi`.
+
+  Pi is the one agent that can run models from several vendors, so its tokens
+  are attributed to whichever vendor actually produced them — a Pi session that
+  starts on Claude and switches to GPT counts as both. Fresh input is uncached
+  input plus cache writes; cache reads are excluded, as everywhere else.
+
+  Usage on a provider outside those three is not counted, and the race view says
+  so rather than leaving you to wonder. That includes gateways such as Bedrock,
+  OpenRouter and Cloudflare: they can serve models we score, but their model ids
+  do not reliably say which vendor is behind them, so we decline to guess.
+
 ### Choosing what gets counted
 
 ```
