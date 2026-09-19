@@ -1,34 +1,29 @@
 // The join-time gate: can this machine count anything at all? Probing is the
-// counters' own job -- this module only decides what to say about the result.
+// engine's job -- this module only decides what to say about the result.
 
-import type { ModelKey } from '@token-derby/shared';
-import { COUNTERS, type SourceProbe } from './counters/index.js';
+import { probe, type HarnessProbe } from './harnesses/engine.js';
+import { HARNESSES, HARNESS_KEYS, type HarnessKey } from './harnesses/registry.js';
 
-export type { SourceProbe };
+export type { HarnessProbe };
 
-/** Directory a source reads from, for messages that need to name it. */
-export function sourceDir(key: ModelKey): string {
-  return COUNTERS[key].root();
+/** Directory a harness reads from, for messages that need to name it. */
+export function harnessDir(key: HarnessKey): string {
+  return HARNESSES[key].root();
 }
 
-/** Look for a source's countable files. Never throws; an unreadable root reads as empty. */
-export function probeSource(key: ModelKey): Promise<SourceProbe> {
-  return COUNTERS[key].probe();
-}
-
-/** Env var that repoints a source's history directory. */
-function overrideVar(key: ModelKey): string {
-  return `TOKEN_DERBY_${key.toUpperCase()}_DIR`;
+/** Probe every harness. Never throws; an unreadable root reads as empty. */
+export function probeAll(): Promise<HarnessProbe[]> {
+  return Promise.all(HARNESS_KEYS.map(key => probe(HARNESSES[key])));
 }
 
 /**
- * The join-time gate. Every model counts the same, so one readable source is
- * enough to race — the warning is for the player who has none at all. Returns
+ * The join-time gate. Every family counts the same, so one readable tool is
+ * enough to race -- the warning is for the player who has none at all. Returns
  * whether to go ahead with the join. A non-interactive caller is warned but
  * never blocked: there is nobody there to answer.
  */
 export async function confirmNoSources(opts: {
-  probes: SourceProbe[];
+  probes: HarnessProbe[];
   interactive: boolean;
   warn: (text: string) => void;
   ask: () => Promise<boolean>;
@@ -39,15 +34,25 @@ export async function confirmNoSources(opts: {
   return opts.ask();
 }
 
-/** What to tell a player with no countable transcripts from any source. */
-export function describeNoSources(probes: SourceProbe[]): string {
+/** What to tell a player with no countable transcripts from any tool. */
+export function describeNoSources(probes: HarnessProbe[]): string {
   const lines = [
-    `⚠ No transcripts found for any source — your horse will not move.`,
+    `⚠ No transcripts found for any coding agent — your horse will not move.`,
     ``,
   ];
-  for (const probe of probes) {
-    const label = COUNTERS[probe.key].label;
-    lines.push(`  ${label}: ${probe.dir}`, `  ${' '.repeat(label.length)}  (${reasonFor(probe)})`);
+  for (const p of probes) {
+    const label = p.harness.label;
+    lines.push(`  ${label}: ${p.dir}`, `  ${' '.repeat(label.length)}  (${reasonFor(p)})`);
+    // A root full of projects that yields no transcripts is a different problem
+    // from an empty one, and wants different advice.
+    if (p.exists && p.projects > 0) {
+      lines.push(
+        `    Has history in it, so this is usually a dangling symlink or a`,
+        `    permissions problem. To find dangling links:`,
+        `      find ${p.dir} -type l ! -exec test -e {} \\; -print`,
+      );
+    }
+    for (const hint of p.harness.hints ?? []) lines.push(`    ${hint}`);
   }
   lines.push(
     ``,
@@ -55,55 +60,17 @@ export function describeNoSources(probes: SourceProbe[]): string {
     `  coding agent runs in a container, over SSH, or on another machine, join`,
     `  the race from there instead.`,
     ``,
-    `  To read them from somewhere else: export ${overrideVar('claude')}=<dir>`,
-    `  (and likewise ${overrideVar('codex')} / ${overrideVar('gemini')})`,
+    `  To read them from somewhere else, set the matching directory override:`,
+    `    ${HARNESS_KEYS.map(k => HARNESSES[k].overrideVar).join('  ')}`,
   );
   return lines.join('\n');
 }
 
 /** Why a probe came back empty, phrased for the player. */
-function reasonFor(probe: SourceProbe): string {
+function reasonFor(probe: HarnessProbe): string {
   if (!probe.exists) return 'does not exist';
   if (probe.projects > 0) {
     return `holds ${probe.projects} project ${probe.projects === 1 ? 'directory' : 'directories'}, none of which could be read`;
   }
   return 'exists, but holds no transcripts';
-}
-
-/** What to tell a player whose primary source has no transcripts to count. */
-export function describeEmptySource(probe: SourceProbe): string {
-  const label = COUNTERS[probe.key].label;
-  // A root full of projects that yields no transcripts is a different problem
-  // from a root with nothing in it, and wants different advice.
-  const populated = probe.exists && probe.projects > 0;
-  const reason = reasonFor(probe);
-  const lines = [
-    `⚠ No ${label} transcripts found — your horse will not move.`,
-    ``,
-    `  Looked in: ${probe.dir}`,
-    `             (${reason})`,
-    ``,
-  ];
-  if (populated) {
-    lines.push(
-      `  The directory is there and has history in it, so this is usually a`,
-      `  dangling symlink or a permissions problem on one of those projects.`,
-      `  To find dangling links:`,
-      `    find ${probe.dir} -type l ! -exec test -e {} \\; -print`,
-      ``,
-    );
-  }
-  lines.push(
-    `  Token Derby counts ${label} usage from this machine's own filesystem.`,
-    `  If ${label} runs in a container, over SSH, or on another machine, join`,
-    `  the race from there instead.`,
-  );
-  if (probe.key === 'claude') {
-    lines.push(
-      `  If CLAUDE_CONFIG_DIR relocated your config, Token Derby follows it —`,
-      `  check it points at the config root, not the projects directory.`,
-    );
-  }
-  lines.push(``, `  To read them from somewhere else: export ${overrideVar(probe.key)}=<dir>`);
-  return lines.join('\n');
 }

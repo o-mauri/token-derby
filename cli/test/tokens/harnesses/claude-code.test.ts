@@ -2,8 +2,10 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { COUNTERS } from '../../../src/tokens/counters/index.js';
-import { totalOf } from './helpers.js';
+import { claudeCode } from '../../../src/tokens/harnesses/claude-code/index.js';
+import { totalOf, conversationsOf } from './helpers.js';
+
+const FAMILY = 'anthropic';
 
 const dirs: string[] = [];
 async function tmpProjects(): Promise<string> {
@@ -34,14 +36,14 @@ describe('sumTokens (fail-loud)', () => {
     const proj = path.join(root, 'proj1');
     await fs.mkdir(proj, { recursive: true });
     await fs.writeFile(path.join(proj, 'a.jsonl'), line(100, 5, 20) + '\n' + line(50) + '\n');
-    const t = await totalOf(COUNTERS.claude);
+    const t = await totalOf(claudeCode);
     expect(t.output).toBe(150);
     expect(t.input).toBe(25);
   });
 
   it('throws when the projects directory is missing (not 0)', async () => {
     process.env.TOKEN_DERBY_CLAUDE_DIR = path.join(os.tmpdir(), 'td-does-not-exist-' + Math.random());
-    await expect(totalOf(COUNTERS.claude)).rejects.toThrow();
+    await expect(totalOf(claudeCode)).rejects.toThrow();
   });
 
   it('throws when a transcript file cannot be read (not a partial sum)', async () => {
@@ -50,7 +52,7 @@ describe('sumTokens (fail-loud)', () => {
     await fs.mkdir(proj, { recursive: true });
     // A directory named like a .jsonl file makes readFile fail with EISDIR.
     await fs.mkdir(path.join(proj, 'broken.jsonl'));
-    await expect(totalOf(COUNTERS.claude)).rejects.toThrow();
+    await expect(totalOf(claudeCode)).rejects.toThrow();
   });
 
   it('counts subagent and dynamic-workflow agent transcripts nested under the session', async () => {
@@ -67,7 +69,7 @@ describe('sumTokens (fail-loud)', () => {
     await fs.mkdir(wf, { recursive: true });
     await fs.writeFile(path.join(wf, 'agent-awf.jsonl'), line(444) + '\n');
 
-    const t = await totalOf(COUNTERS.claude);
+    const t = await totalOf(claudeCode);
     expect(t.output).toBe(777); // 111 main + 222 subagent + 444 workflow
   });
 });
@@ -79,10 +81,10 @@ describe('incremental scanning', () => {
     await fs.mkdir(proj, { recursive: true });
     const f = path.join(proj, 'a.jsonl');
     await fs.writeFile(f, line(100) + '\n');
-    expect((await totalOf(COUNTERS.claude)).output).toBe(100);
+    expect((await totalOf(claudeCode)).output).toBe(100);
 
     await fs.appendFile(f, line(25) + '\n');
-    expect((await totalOf(COUNTERS.claude)).output).toBe(125); // 100 from cache + 25 newly parsed
+    expect((await totalOf(claudeCode)).output).toBe(125); // 100 from cache + 25 newly parsed
   });
 
   it('serves an unchanged transcript from cache instead of re-reading it', async () => {
@@ -92,12 +94,12 @@ describe('incremental scanning', () => {
     const f = path.join(proj, 'a.jsonl');
     await fs.writeFile(f, line(100) + '\n');
     await fs.utimes(f, 1_700_000_000, 1_700_000_000);
-    expect((await totalOf(COUNTERS.claude)).output).toBe(100);
+    expect((await totalOf(claudeCode)).output).toBe(100);
 
     // Same size, same mtime, different tokens: only a re-read would see 999.
     await fs.writeFile(f, line(999) + '\n');
     await fs.utimes(f, 1_700_000_000, 1_700_000_000);
-    expect((await totalOf(COUNTERS.claude)).output).toBe(100);
+    expect((await totalOf(claudeCode)).output).toBe(100);
   });
 
   it('picks up a transcript that was rewritten shorter', async () => {
@@ -106,10 +108,10 @@ describe('incremental scanning', () => {
     await fs.mkdir(proj, { recursive: true });
     const f = path.join(proj, 'a.jsonl');
     await fs.writeFile(f, line(100) + '\n' + line(200) + '\n');
-    expect((await totalOf(COUNTERS.claude)).output).toBe(300);
+    expect((await totalOf(claudeCode)).output).toBe(300);
 
     await fs.writeFile(f, line(7) + '\n');
-    expect((await totalOf(COUNTERS.claude)).output).toBe(7);
+    expect((await totalOf(claudeCode)).output).toBe(7);
   });
 });
 
@@ -125,7 +127,7 @@ describe('sumTokensByConversation', () => {
     await fs.mkdir(wf, { recursive: true });
     await fs.writeFile(path.join(wf, 'agent-b.jsonl'), line(444) + '\n');
 
-    const map = await COUNTERS.claude.byConversation();
+    const map = await conversationsOf(claudeCode, FAMILY);
     expect(map.get('proj/sess')?.output).toBe(777); // 111 + 222 + 444 rolled up
     expect(map.size).toBe(1);
   });
@@ -138,7 +140,7 @@ describe('sumTokensByConversation', () => {
     await fs.writeFile(path.join(root, 'projA', 's2.jsonl'), line(20) + '\n');
     await fs.writeFile(path.join(root, 'projB', 's1.jsonl'), line(30) + '\n');
 
-    const map = await COUNTERS.claude.byConversation();
+    const map = await conversationsOf(claudeCode, FAMILY);
     expect(map.get('projA/s1')?.output).toBe(10);
     expect(map.get('projA/s2')?.output).toBe(20);
     expect(map.get('projB/s1')?.output).toBe(30);
@@ -149,8 +151,8 @@ describe('sumTokensByConversation', () => {
     const root = await tmpProjects();
     await fs.mkdir(path.join(root, 'projA'), { recursive: true });
     await fs.writeFile(path.join(root, 'projA', 's1.jsonl'), line(100, 5, 20) + '\n' + line(50) + '\n');
-    const total = await totalOf(COUNTERS.claude);
-    const map = await COUNTERS.claude.byConversation();
+    const total = await totalOf(claudeCode);
+    const map = await conversationsOf(claudeCode, FAMILY);
     let input = 0, output = 0;
     for (const t of map.values()) { input += t.input; output += t.output; }
     expect({ input, output }).toEqual(total);
@@ -158,7 +160,7 @@ describe('sumTokensByConversation', () => {
 
   it('throws when the projects directory is missing (fail-loud)', async () => {
     process.env.TOKEN_DERBY_CLAUDE_DIR = path.join(os.tmpdir(), 'td-tx-missing-' + Math.random());
-    await expect(COUNTERS.claude.byConversation()).rejects.toThrow();
+    await expect(conversationsOf(claudeCode, FAMILY)).rejects.toThrow();
   });
 });
 
@@ -171,7 +173,7 @@ describe('sumTokens — resilience of the directory walk', () => {
     await fs.mkdir(proj, { recursive: true });
     await fs.writeFile(path.join(proj, 'a.jsonl'), line(5000, 100) + '\n');
     await fs.symlink(path.join(os.tmpdir(), 'td-gone-' + Math.random()), path.join(proj, 'node_modules'));
-    const t = await totalOf(COUNTERS.claude);
+    const t = await totalOf(claudeCode);
     expect(t.output).toBe(5000);
   });
 
@@ -182,7 +184,7 @@ describe('sumTokens — resilience of the directory walk', () => {
     await fs.mkdir(real, { recursive: true });
     await fs.writeFile(path.join(real, 'deep.jsonl'), line(700) + '\n');
     await fs.symlink(real, path.join(proj, 'linked'));
-    const t = await totalOf(COUNTERS.claude);
+    const t = await totalOf(claudeCode);
     expect(t.output).toBe(1400); // once through the real dir, once through the link
   });
 
@@ -192,12 +194,12 @@ describe('sumTokens — resilience of the directory walk', () => {
     await fs.mkdir(good, { recursive: true });
     await fs.writeFile(path.join(good, 'a.jsonl'), line(250) + '\n');
     await fs.symlink(path.join(os.tmpdir(), 'td-gone-' + Math.random()), path.join(root, 'proj-dangling'));
-    const t = await totalOf(COUNTERS.claude);
+    const t = await totalOf(claudeCode);
     expect(t.output).toBe(250);
   });
 
   it('still throws when the projects root itself is missing', async () => {
     process.env.TOKEN_DERBY_CLAUDE_DIR = path.join(os.tmpdir(), 'td-tx-none-' + Math.random());
-    await expect(totalOf(COUNTERS.claude)).rejects.toThrow();
+    await expect(totalOf(claudeCode)).rejects.toThrow();
   });
 });

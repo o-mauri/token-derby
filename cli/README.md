@@ -74,11 +74,15 @@ Nothing here asks you to hold work back. A flat-out day still beats a lazy one �
 
 Stamina is off by default; org owners turn it on and tune it from the Race Settings tab of `token-derby web`. When it's on, the live view shows your horse's stamina as a percentage and bar, plus a multiplier once you're actually losing score to fatigue.
 
-## Other models (Codex, Gemini)
+## Other coding agents (Codex CLI, Gemini CLI)
 
-Claude, Codex and Gemini all count the same — every token is worth the same
-wherever it came from. Your usage is read per model, so you can use one tool or
-all three; nothing needs choosing at join.
+Every token is worth the same wherever it came from, so you can use one tool or
+all three and nothing needs choosing at join.
+
+Tokens are counted per **model family** — Anthropic, OpenAI or Google — rather
+than per tool. The two are usually the same thing today, since each tool runs one
+vendor's models, but they are tracked separately so a tool that can run several
+vendors' models counts each one correctly.
 
 - **Codex CLI** — counted from `~/.codex/sessions/**/rollout-*.jsonl` (and
   `archived_sessions/`). Fresh input = `input_tokens − cached_input_tokens`;

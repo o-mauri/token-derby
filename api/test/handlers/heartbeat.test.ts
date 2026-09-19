@@ -8,7 +8,6 @@ import { ddb, TABLE } from '../../src/db/client.js';
 import { raceMetaKey } from '../../src/db/keys.js';
 import { UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { makeUser, makeHorse, type TestUser } from '../helpers/auth-helper.js';
-import type { ModelKey } from '@token-derby/shared';
 import { CURRENT_CLI_VERSION, SAME_MINOR_CLI_VERSION, MISMATCHED_MINOR_CLI_VERSION, OUTDATED_CLI_VERSION } from '../helpers/cli-version.js';
 
 const COLORS = { body: '#8B4513', mane: '#000', tail: '#000', saddle: '#C0392B' };
@@ -420,7 +419,7 @@ describe('heartbeat handler', () => {
     const { join_code, race_id, horse_id, heartbeat_token } = await setupWithCliVersion();
     const res: any = await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, {
       seq: 1,
-      components: { claude: 1000, codex: 5000, gemini: 200 },
+      components: { anthropic: 1000, openai: 5000, google: 200 },
     }));
     expect(res.statusCode).toBe(200);
     const horses = await listHorses(race_id);
@@ -431,26 +430,63 @@ describe('heartbeat handler', () => {
   it('accumulates the per-model split, and it sums to current_tokens', async () => {
     const { join_code, race_id, horse_id, heartbeat_token } = await setupWithCliVersion();
     await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, {
-      seq: 1, components: { claude: 1000, codex: 5000, gemini: 200 },
+      seq: 1, components: { anthropic: 1000, openai: 5000, google: 200 },
     }));
     await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, {
-      seq: 2, components: { claude: 500, codex: 0, gemini: 300 },
+      seq: 2, components: { anthropic: 500, openai: 0, google: 300 },
     }));
     const horses = await listHorses(race_id);
     const own = horses.find(h => h.horse_id === horse_id)!;
-    expect(own.model_tokens).toEqual({ claude: 1500, codex: 5000, gemini: 500 });
-    const summed = own.model_tokens!.claude + own.model_tokens!.codex + own.model_tokens!.gemini;
+    expect(own.model_tokens).toEqual({ anthropic: 1500, openai: 5000, google: 500 });
+    const summed = own.model_tokens!.anthropic + own.model_tokens!.openai + own.model_tokens!.google;
     expect(summed).toBe(own.current_tokens);
   });
 
   it('reports the per-model split in the response, not one beat behind', async () => {
     const { join_code, horse_id, heartbeat_token } = await setupWithCliVersion();
     const res: any = await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, {
-      seq: 1, components: { claude: 300, codex: 200, gemini: 100 },
+      seq: 1, components: { anthropic: 300, openai: 200, google: 100 },
     }));
     const own = JSON.parse(res.body).horses.find((h: any) => h.horse_id === horse_id);
-    expect(own.model_tokens).toEqual({ claude: 300, codex: 200, gemini: 100 });
-    const summed = own.model_tokens.claude + own.model_tokens.codex + own.model_tokens.gemini;
+    expect(own.model_tokens).toEqual({ anthropic: 300, openai: 200, google: 100 });
+    const summed = own.model_tokens.anthropic + own.model_tokens.openai + own.model_tokens.google;
+    expect(summed).toBe(own.current_tokens);
+  });
+
+  it('accepts the component keys an un-upgraded CLI sends', async () => {
+    const { join_code, race_id, horse_id, heartbeat_token } = await setupWithCliVersion();
+    // Pre-rename CLIs key components by tool, not by model family.
+    const res: any = await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, {
+      seq: 1, components: { claude: 1000, codex: 500, gemini: 200 },
+    }));
+    expect(res.statusCode).toBe(200);
+    const own = (await listHorses(race_id)).find(h => h.horse_id === horse_id)!;
+    expect(own.current_tokens).toBe(1700);
+    expect(own.model_tokens).toEqual({ anthropic: 1000, openai: 500, google: 200 });
+  });
+
+  it('carries a pre-rename model_tokens map onto the family keys', async () => {
+    const { join_code, race_id, horse_id, heartbeat_token } = await setupWithCliVersion();
+    const { putHorse: _p } = await import('../../src/db/horses.js');
+    const { ddb, TABLE } = await import('../../src/db/client.js');
+    const { UpdateCommand } = await import('@aws-sdk/lib-dynamodb');
+    const { horseKey } = await import('../../src/db/keys.js');
+    // A horse mid-race when the rename deployed: map exists, wrong spelling.
+    await ddb.send(new UpdateCommand({
+      TableName: TABLE,
+      Key: horseKey(race_id, horse_id),
+      UpdateExpression: 'SET model_tokens = :old, current_tokens = :t, scored_tokens = :t',
+      ExpressionAttributeValues: { ':old': { claude: 700, codex: 300, gemini: 0 }, ':t': 1000 },
+    }));
+
+    await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, {
+      seq: 1, components: { anthropic: 100, openai: 0, google: 0 },
+    }));
+
+    const own = (await listHorses(race_id)).find(h => h.horse_id === horse_id)!;
+    // The old figures survive under their new names, and the invariant holds.
+    expect(own.model_tokens).toEqual({ anthropic: 800, openai: 300, google: 0 });
+    const summed = own.model_tokens!.anthropic + own.model_tokens!.openai + own.model_tokens!.google;
     expect(summed).toBe(own.current_tokens);
   });
 
@@ -461,22 +497,22 @@ describe('heartbeat handler', () => {
       const { join_code, race_id, horse_id, heartbeat_token } = await setupWithCliVersion();
       await new Promise(r => setTimeout(r, 20));
       await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, {
-        seq: 1, components: { claude: 900_000, codex: 100_000, gemini: 0 },
+        seq: 1, components: { anthropic: 900_000, openai: 100_000, google: 0 },
       }));
       const horses = await listHorses(race_id);
       const own = horses.find(h => h.horse_id === horse_id)!;
-      const summed = own.model_tokens!.claude + own.model_tokens!.codex + own.model_tokens!.gemini;
+      const summed = own.model_tokens!.anthropic + own.model_tokens!.openai + own.model_tokens!.google;
       expect(own.current_tokens).toBeLessThan(1_000_000);   // the cap bit
       expect(summed).toBeCloseTo(own.current_tokens, 6);
       // and the split keeps its 9:1 shape through the trim
-      expect(own.model_tokens!.claude).toBeCloseTo(own.current_tokens * 0.9, 6);
+      expect(own.model_tokens!.anthropic).toBeCloseTo(own.current_tokens * 0.9, 6);
     } finally {
       if (prev === undefined) delete process.env.TOKEN_DERBY_MAX_RATE;
       else process.env.TOKEN_DERBY_MAX_RATE = prev;
     }
   });
 
-  it('accepts a legacy bare delta, attributed to claude', async () => {
+  it('accepts a legacy bare delta, attributed to anthropic', async () => {
     const { join_code, race_id, horse_id, heartbeat_token } = await setupWithCliVersion();
     const res: any = await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, {
       seq: 1,

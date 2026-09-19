@@ -1,5 +1,5 @@
 // Counts real tokens the Codex CLI produced — same honesty rules as
-// counters/claude.ts. Codex stores one rollout JSONL per session under
+// harnesses/claude-code. Codex stores one rollout JSONL per session under
 //   <codexDir>/sessions/YYYY/MM/DD/rollout-*.jsonl   (+ archived_sessions/)
 // Token usage lives in `token_count` events whose info.total_token_usage is a
 // CUMULATIVE session total, so we take the LAST such event per file (never sum
@@ -9,11 +9,10 @@
 
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import type { ModelKey } from '@token-derby/shared';
-import { codexSessionsDir } from '../../paths.js';
-import { ScanCache, type FileFold } from '../scan-cache.js';
-import { readRoot } from '../source-root.js';
-import { TokenCounter, type TokenTotals } from './counter.js';
+import { codexSessionsDir } from '../../../paths.js';
+import type { FileFold } from '../../scan-cache.js';
+import { readRoot } from '../../source-root.js';
+import { constant, incremental, type Harness, type TokenTotals } from '../harness.js';
 
 // Live and archived sessions both count; each is an independent subtree that
 // may be absent on its own without meaning the Codex home is missing.
@@ -49,31 +48,26 @@ function num(v: unknown): number {
   return typeof v === 'number' && Number.isFinite(v) ? v : 0;
 }
 
-export class CodexCounter extends TokenCounter {
-  readonly key: ModelKey = 'codex';
-  readonly label = 'Codex';
+export const codexCli: Harness = {
+  id: 'codex-cli',
+  label: 'Codex CLI',
+  overrideVar: 'TOKEN_DERBY_CODEX_DIR',
+  root: codexSessionsDir,
+  counting: incremental(CODEX_FOLD, constant('openai')),
 
-  root(): string {
-    return codexSessionsDir();
-  }
-
-  protected async discover(root: string): Promise<string[]> {
+  async discover(root) {
     // The Codex home itself must exist; its two session subtrees need not.
     await readRoot(root, () => fs.stat(root));
     const out: string[] = [];
     for (const dir of SESSION_DIRS) out.push(...(await collect(path.join(root, dir))));
     return out;
-  }
+  },
 
   /** One rollout file is one conversation. */
-  protected conversationId(file: string): string {
+  conversationId(file) {
     return file;
-  }
-
-  protected read(cache: ScanCache, file: string): Promise<TokenTotals> {
-    return cache.readIncremental(file, CODEX_FOLD);
-  }
-}
+  },
+};
 
 /** Recursively find rollout files. A missing subtree is normal → []. */
 async function collect(dir: string): Promise<string[]> {

@@ -126,7 +126,7 @@ describe('horses db', () => {
     const now = new Date().toISOString();
     const applied = await applyHeartbeatDelta({
       race_id, horse_id: h.horse_id, seq: 1, applied: 50, scored_applied: 50,
-      stamina: undefined, last_heartbeat: now, state: emptyState, components: { claude: 0, codex: 0, gemini: 0 }, needsSeed: true,
+      stamina: undefined, last_heartbeat: now, state: emptyState, components: { anthropic: 0, openai: 0, google: 0 }, needsSeed: true,
     });
     expect(applied).toBe(true);
     const [u] = await listHorses(race_id);
@@ -141,7 +141,7 @@ describe('horses db', () => {
     const now = new Date().toISOString();
     const call = (seq: number) => applyHeartbeatDelta({
       race_id, horse_id: h.horse_id, seq, applied: 50, scored_applied: 50,
-      stamina: undefined, last_heartbeat: now, state: emptyState, components: { claude: 0, codex: 0, gemini: 0 }, needsSeed: true,
+      stamina: undefined, last_heartbeat: now, state: emptyState, components: { anthropic: 0, openai: 0, google: 0 }, needsSeed: true,
     });
     await call(2); // -> 150, last_seq 2
     const dup = await call(2);
@@ -162,7 +162,7 @@ describe('horses db', () => {
     const sendSpy = vi.spyOn(ddb, 'send');
     await applyHeartbeatDelta({
       race_id, horse_id: h.horse_id, seq: 1, applied: 50, scored_applied: 50,
-      stamina: undefined, last_heartbeat: now, state: emptyState, components: { claude: 0, codex: 0, gemini: 0 }, needsSeed: false,
+      stamina: undefined, last_heartbeat: now, state: emptyState, components: { anthropic: 0, openai: 0, google: 0 }, needsSeed: false,
     });
     const seedAttempted = sendSpy.mock.calls.some(([cmd]: any) =>
       cmd?.input?.UpdateExpression === 'SET scored_tokens = current_tokens');

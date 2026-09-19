@@ -8,11 +8,11 @@ import { SourceRootMissing } from '../../src/tokens/source-root.js';
 const codexConvs = vi.fn();
 const geminiConvs = vi.fn();
 
-vi.mock('../../src/tokens/counters/index.js', () => ({
-  COUNTERS: {
-    claude: { key: 'claude', label: 'Claude', byConversation: async () => new Map() },
-    codex: { key: 'codex', label: 'Codex', byConversation: () => codexConvs() },
-    gemini: { key: 'gemini', label: 'Gemini', byConversation: () => geminiConvs() },
+vi.mock('../../src/tokens/harnesses/engine.js', () => ({
+  count: (h: { id: string }) => {
+    if (h.id === 'codex-cli') return codexConvs();
+    if (h.id === 'gemini-cli') return geminiConvs();
+    return Promise.resolve({ byFamily: new Map(), notices: [] });
   },
 }));
 
@@ -28,8 +28,8 @@ beforeEach(async () => {
   _resetLoggerForTests();
   codexConvs.mockReset();
   geminiConvs.mockReset();
-  codexConvs.mockResolvedValue(new Map());
-  geminiConvs.mockResolvedValue(new Map());
+  codexConvs.mockResolvedValue({ byFamily: new Map(), notices: [] });
+  geminiConvs.mockResolvedValue({ byFamily: new Map(), notices: [] });
 });
 
 afterEach(async () => {
@@ -51,11 +51,11 @@ describe('source read failures', () => {
     // The beat still goes out — one broken tool must not freeze the race.
     expect(isStall(reading)).toBe(false);
     expect((reading as any).degraded).toEqual([
-      { key: 'codex', message: 'EACCES: permission denied' },
+      { harness: 'codex-cli', label: 'Codex CLI', message: 'EACCES: permission denied' },
     ]);
     const text = readLog();
     expect(text).toContain('scan.source.err');
-    expect(text).toContain('"source":"codex"');
+    expect(text).toContain('"harness":"codex-cli"');
     expect(text).toContain('EACCES');
   });
 
@@ -67,8 +67,8 @@ describe('source read failures', () => {
 
     expect((reading as any).degraded).toHaveLength(2);
     const text = readLog();
-    expect(text).toContain('"source":"codex"');
-    expect(text).toContain('"source":"gemini"');
+    expect(text).toContain('"harness":"codex-cli"');
+    expect(text).toContain('"harness":"gemini-cli"');
   });
 
   it('stays quiet when a source is simply not installed', async () => {

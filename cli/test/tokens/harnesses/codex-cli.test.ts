@@ -2,8 +2,10 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { COUNTERS } from '../../../src/tokens/counters/index.js';
-import { totalOf } from './helpers.js';
+import { codexCli } from '../../../src/tokens/harnesses/codex-cli/index.js';
+import { totalOf, conversationsOf } from './helpers.js';
+
+const FAMILY = 'openai';
 
 const dirs: string[] = [];
 async function tmpCodex(): Promise<string> {
@@ -48,12 +50,12 @@ async function writeRollout(root: string, rel: string, lines: string[]): Promise
 describe('sumCodexTokens', () => {
   it('throws when the codex dir does not exist (fail-loud for a missing primary)', async () => {
     process.env.TOKEN_DERBY_CODEX_DIR = path.join(os.tmpdir(), 'td-cdx-missing-' + Math.random());
-    await expect(totalOf(COUNTERS.codex)).rejects.toThrow();
+    await expect(totalOf(codexCli)).rejects.toThrow();
   });
 
   it('returns zero when the codex dir exists but has no sessions yet', async () => {
     await tmpCodex(); // creates the root dir, no rollout files
-    expect(await totalOf(COUNTERS.codex)).toEqual({ input: 0, output: 0 });
+    expect(await totalOf(codexCli)).toEqual({ input: 0, output: 0 });
   });
 
   it('uses the LAST cumulative token_count per session (no summing of events)', async () => {
@@ -63,7 +65,7 @@ describe('sumCodexTokens', () => {
       tokenCountEvent(500, 200, 150),  // final cumulative snapshot → use this
     ]);
     // input = 500 - 200 = 300 ; output = 150
-    expect(await totalOf(COUNTERS.codex)).toEqual({ input: 300, output: 150 });
+    expect(await totalOf(codexCli)).toEqual({ input: 300, output: 150 });
   });
 
   it('sums the final snapshot across multiple session files, incl. archived', async () => {
@@ -71,20 +73,20 @@ describe('sumCodexTokens', () => {
     await writeRollout(root, 'sessions/2026/06/23/rollout-a.jsonl', [tokenCountEvent(300, 100, 80)]);
     await writeRollout(root, 'archived_sessions/2026/06/22/rollout-b.jsonl', [tokenCountEvent(200, 50, 20)]);
     // input = (300-100) + (200-50) = 350 ; output = 80 + 20 = 100
-    expect(await totalOf(COUNTERS.codex)).toEqual({ input: 350, output: 100 });
+    expect(await totalOf(codexCli)).toEqual({ input: 350, output: 100 });
   });
 
   it('contributes 0 for a session with no token_count event, and tolerates corrupt lines', async () => {
     const root = await tmpCodex();
     await writeRollout(root, 'sessions/2026/06/23/rollout-empty.jsonl', ['{"payload":{"type":"message"}}', 'not json']);
     await writeRollout(root, 'sessions/2026/06/23/rollout-real.jsonl', [tokenCountEvent(10, 0, 5)]);
-    expect(await totalOf(COUNTERS.codex)).toEqual({ input: 10, output: 5 });
+    expect(await totalOf(codexCli)).toEqual({ input: 10, output: 5 });
   });
 
   it('never returns negative fresh input when cached exceeds input', async () => {
     const root = await tmpCodex();
     await writeRollout(root, 'sessions/2026/06/23/rollout-c.jsonl', [tokenCountEvent(50, 80, 12)]);
-    expect(await totalOf(COUNTERS.codex)).toEqual({ input: 0, output: 12 });
+    expect(await totalOf(codexCli)).toEqual({ input: 0, output: 12 });
   });
 });
 
@@ -93,7 +95,7 @@ describe('sumCodexByConversation', () => {
     const root = await tmpCodex();
     await writeRollout(root, 'sessions/2026/06/23/rollout-a.jsonl', [tokenCountEvent(100, 40, 30), tokenCountEvent(500, 200, 150)]);
     await writeRollout(root, 'archived_sessions/2026/06/22/rollout-b.jsonl', [tokenCountEvent(200, 50, 20)]);
-    const map = await COUNTERS.codex.byConversation();
+    const map = await conversationsOf(codexCli, FAMILY);
     expect(map.size).toBe(2);
     const vals = [...map.values()];
     // a: input 500-200=300 out 150 ; b: input 200-50=150 out 20
@@ -104,8 +106,8 @@ describe('sumCodexByConversation', () => {
     const root = await tmpCodex();
     await writeRollout(root, 'sessions/2026/06/23/rollout-a.jsonl', [tokenCountEvent(300, 100, 80)]);
     await writeRollout(root, 'sessions/2026/06/23/rollout-b.jsonl', [tokenCountEvent(10, 0, 5)]);
-    const total = await totalOf(COUNTERS.codex);
-    const map = await COUNTERS.codex.byConversation();
+    const total = await totalOf(codexCli);
+    const map = await conversationsOf(codexCli, FAMILY);
     let input = 0, output = 0;
     for (const t of map.values()) { input += t.input; output += t.output; }
     expect({ input, output }).toEqual(total);
@@ -113,7 +115,7 @@ describe('sumCodexByConversation', () => {
 
   it('throws when the codex dir does not exist (fail-loud)', async () => {
     process.env.TOKEN_DERBY_CODEX_DIR = path.join(os.tmpdir(), 'td-cdx-missing-' + Math.random());
-    await expect(COUNTERS.codex.byConversation()).rejects.toThrow();
+    await expect(conversationsOf(codexCli, FAMILY)).rejects.toThrow();
   });
 });
 
@@ -122,25 +124,25 @@ describe('incremental scanning', () => {
     // total_token_usage is cumulative per session, so folding must be last-wins.
     const root = await tmpCodex();
     await writeRollout(root, 'sessions/2026/06/23/rollout-a.jsonl', [tokenCountEvent(300, 100, 80)]);
-    expect(await totalOf(COUNTERS.codex)).toEqual({ input: 200, output: 80 });
+    expect(await totalOf(codexCli)).toEqual({ input: 200, output: 80 });
 
     await fs.appendFile(
       path.join(root, 'sessions/2026/06/23/rollout-a.jsonl'),
       tokenCountEvent(500, 100, 130) + '\n',
     );
-    expect(await totalOf(COUNTERS.codex)).toEqual({ input: 400, output: 130 }); // not 600/210
+    expect(await totalOf(codexCli)).toEqual({ input: 400, output: 130 }); // not 600/210
   });
 
   it('keeps the cached total when appended lines carry no token_count event', async () => {
     const root = await tmpCodex();
     await writeRollout(root, 'sessions/2026/06/23/rollout-a.jsonl', [tokenCountEvent(300, 100, 80)]);
-    expect(await totalOf(COUNTERS.codex)).toEqual({ input: 200, output: 80 });
+    expect(await totalOf(codexCli)).toEqual({ input: 200, output: 80 });
 
     await fs.appendFile(
       path.join(root, 'sessions/2026/06/23/rollout-a.jsonl'),
       JSON.stringify({ payload: { type: 'message', text: 'hi' } }) + '\n',
     );
-    expect(await totalOf(COUNTERS.codex)).toEqual({ input: 200, output: 80 });
+    expect(await totalOf(codexCli)).toEqual({ input: 200, output: 80 });
   });
 
   it('serves an unchanged rollout from cache instead of re-reading it', async () => {
@@ -149,10 +151,10 @@ describe('incremental scanning', () => {
     await writeRollout(root, rel, [tokenCountEvent(300, 100, 80)]);
     const f = path.join(root, rel);
     await fs.utimes(f, 1_700_000_000, 1_700_000_000);
-    expect(await totalOf(COUNTERS.codex)).toEqual({ input: 200, output: 80 });
+    expect(await totalOf(codexCli)).toEqual({ input: 200, output: 80 });
 
     await fs.writeFile(f, tokenCountEvent(999, 100, 999) + '\n');
     await fs.utimes(f, 1_700_000_000, 1_700_000_000);
-    expect(await totalOf(COUNTERS.codex)).toEqual({ input: 200, output: 80 });
+    expect(await totalOf(codexCli)).toEqual({ input: 200, output: 80 });
   });
 });

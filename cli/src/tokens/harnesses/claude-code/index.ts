@@ -14,11 +14,10 @@
 
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import type { ModelKey } from '@token-derby/shared';
-import { claudeProjectsDir } from '../../paths.js';
-import { ScanCache, type FileFold } from '../scan-cache.js';
-import { readRoot } from '../source-root.js';
-import { TokenCounter, type TokenTotals } from './counter.js';
+import { claudeProjectsDir } from '../../../paths.js';
+import type { FileFold } from '../../scan-cache.js';
+import { readRoot } from '../../source-root.js';
+import { constant, incremental, type Harness, type TokenTotals } from '../harness.js';
 
 // How deep to recurse below each project dir. Subagents and dynamic workflows
 // write their OWN transcripts nested under the session, e.g.
@@ -79,15 +78,18 @@ function addNum(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : 0;
 }
 
-export class ClaudeCounter extends TokenCounter {
-  readonly key: ModelKey = 'claude';
-  readonly label = 'Claude';
+export const claudeCode: Harness = {
+  id: 'claude-code',
+  label: 'Claude Code',
+  overrideVar: 'TOKEN_DERBY_CLAUDE_DIR',
+  hints: [
+    `If CLAUDE_CONFIG_DIR relocated your config, Token Derby follows it —`,
+    `check it points at the config root, not the projects directory.`,
+  ],
+  root: claudeProjectsDir,
+  counting: incremental(CLAUDE_FOLD, constant('anthropic')),
 
-  root(): string {
-    return claudeProjectsDir();
-  }
-
-  protected async discover(root: string): Promise<string[]> {
+  async discover(root) {
     const entries = await readRoot(root, () => fs.readdir(root, { withFileTypes: true }));
     const out: string[] = [];
     for (const entry of entries) {
@@ -95,22 +97,18 @@ export class ClaudeCounter extends TokenCounter {
       await collect(path.join(root, entry.name), MAX_PROJECT_DEPTH, out);
     }
     return out;
-  }
+  },
 
   // A "conversation" is one top-level session: <project>/<session>. The main
   // session transcript and everything nested under <session>/subagents/** roll
   // up into the same id.
-  protected conversationId(file: string, root: string): string {
+  conversationId(file, root) {
     const rel = path.relative(root, file);
     const [project, session] = rel.split(path.sep);
     if (project === undefined || session === undefined) return rel.replace(/\.jsonl$/, '');
     return `${project}/${session.replace(/\.jsonl$/, '')}`;
-  }
-
-  protected read(cache: ScanCache, file: string): Promise<TokenTotals> {
-    return cache.readIncremental(file, CLAUDE_FOLD);
-  }
-}
+  },
+};
 
 /**
  * Recursively collect transcripts up to `depth` levels below `dir`.

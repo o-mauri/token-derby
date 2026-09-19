@@ -1,13 +1,14 @@
 // Turns a timed-out beat into something a player can act on. The scan runs all
-// sources concurrently, so when the budget expires the useful question is which
-// source is STILL going — that one owns the stall.
+// harnesses concurrently, so when the budget expires the useful question is which
+// harness is STILL going — that one owns the stall.
 
-import type { ModelKey } from '@token-derby/shared';
+import type { HarnessKey } from './harnesses/harness.js';
+import { HARNESSES } from './harnesses/registry.js';
 import { ScanCache } from './scan-cache.js';
 
-/** Env var that repoints (or empties) a source's history directory. */
-function skipVar(key: ModelKey): string {
-  return `TOKEN_DERBY_${key.toUpperCase()}_DIR`;
+/** Env var that repoints (or empties) a harness's history directory. */
+function skipVar(key: HarnessKey): string {
+  return HARNESSES[key].overrideVar;
 }
 
 function formatBytes(bytes: number): string {
@@ -15,21 +16,21 @@ function formatBytes(bytes: number): string {
   return `${Math.round(bytes / 1e6)} MB`;
 }
 
-/** Tracks when each source's scan started and whether it ever finished. */
+/** Tracks when each harness's scan started and whether it ever finished. */
 export class ScanProgress {
-  private readonly started = new Map<ModelKey, number>();
-  private readonly finished = new Set<ModelKey>();
+  private readonly started = new Map<HarnessKey, number>();
+  private readonly finished = new Set<HarnessKey>();
 
-  begin(key: ModelKey): void {
+  begin(key: HarnessKey): void {
     this.started.set(key, Date.now());
   }
 
-  end(key: ModelKey): void {
+  end(key: HarnessKey): void {
     this.finished.add(key);
   }
 
   /** Sources begun but never finished, longest-running first. */
-  outstanding(): ModelKey[] {
+  outstanding(): HarnessKey[] {
     return [...this.started.entries()]
       .filter(([key]) => !this.finished.has(key))
       .sort((a, b) => a[1] - b[1]) // earliest start = longest running
@@ -40,7 +41,7 @@ export class ScanProgress {
 /** Stall text for a scan that blew its budget. `bytes` of 0 means "not known yet". */
 export function describeScanTimeout(
   timeoutMs: number,
-  outstanding: ReadonlyArray<{ key: ModelKey; bytes: number }>,
+  outstanding: ReadonlyArray<{ key: HarnessKey; bytes: number }>,
 ): string {
   const budget = `Token scan timed out after ${Math.round(timeoutMs / 1000)}s`;
   if (outstanding.length === 0) return budget;

@@ -1,5 +1,5 @@
 // Counts real tokens the Gemini CLI produced — same honesty rules as
-// counters/claude.ts. Sessions live at
+// harnesses/claude-code. Sessions live at
 //   <geminiDir>/<projectHash>/chats/session-*.json[l]
 // Each "gemini" message carries a per-turn `tokens` object:
 //   { input, output, cached, thoughts, tool, total }
@@ -9,11 +9,9 @@
 
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import type { ModelKey } from '@token-derby/shared';
-import { geminiTmpDir } from '../../paths.js';
-import { ScanCache } from '../scan-cache.js';
-import { readRoot } from '../source-root.js';
-import { TokenCounter, type TokenTotals } from './counter.js';
+import { geminiTmpDir } from '../../../paths.js';
+import { readRoot } from '../../source-root.js';
+import { wholeFile, type Harness, type TokenTotals } from '../harness.js';
 
 // Chats hang off each project directory; a project without one is normal.
 const CHATS_DIR = 'chats';
@@ -23,15 +21,16 @@ function num(v: unknown): number {
   return typeof v === 'number' && Number.isFinite(v) ? v : 0;
 }
 
-export class GeminiCounter extends TokenCounter {
-  readonly key: ModelKey = 'gemini';
-  readonly label = 'Gemini';
+export const geminiCli: Harness = {
+  id: 'gemini-cli',
+  label: 'Gemini CLI',
+  overrideVar: 'TOKEN_DERBY_GEMINI_DIR',
+  root: geminiTmpDir,
+  // Gemini chats are rewritten whole rather than appended to, so there is no
+  // offset to resume from — the cache gates on mtime+size and recomputes in full.
+  counting: wholeFile((raw, file) => ({ families: { google: sumRaw(file, raw) } })),
 
-  root(): string {
-    return geminiTmpDir();
-  }
-
-  protected async discover(root: string): Promise<string[]> {
+  async discover(root) {
     const entries = await readRoot(root, () => fs.readdir(root));
     const out: string[] = [];
     for (const entry of entries) {
@@ -47,19 +46,13 @@ export class GeminiCounter extends TokenCounter {
       }
     }
     return out;
-  }
+  },
 
   /** One chat file is one conversation. */
-  protected conversationId(file: string): string {
+  conversationId(file) {
     return file;
-  }
-
-  // Gemini chats are rewritten whole rather than appended to, so there is no
-  // offset to resume from — the cache gates on mtime+size and recomputes in full.
-  protected read(cache: ScanCache, file: string): Promise<TokenTotals> {
-    return cache.readWhenChanged(file, async raw => sumRaw(file, raw));
-  }
-}
+  },
+};
 
 function sumRaw(file: string, raw: string): TokenTotals {
   const messages = file.endsWith('.jsonl') ? parseJsonl(raw) : parseJson(raw);

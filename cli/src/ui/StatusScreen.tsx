@@ -1,23 +1,24 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import type { GetRaceResponse, HorseColors, HorseView } from '@token-derby/shared';
-import { levelInfo, MODEL_KEYS, resolveStaminaConfig, scoredOf, type ModelKey } from '@token-derby/shared';
+import { levelInfo, resolveStaminaConfig, scoredOf } from '@token-derby/shared';
 import { HorseSprite } from './HorseSprite.js';
 import { MINI_SPRITE } from './sprite.js';
 import { SILENT_THRESHOLD } from '../config.js';
 import type { DegradedSource } from '../tokens/race-tokens.js';
+import { HARNESSES, HARNESS_KEYS } from '../tokens/harnesses/registry.js';
 
-const MODEL_LABELS: Record<ModelKey, string> = { claude: 'Claude', codex: 'Codex', gemini: 'Gemini' };
+
 
 export function ModelList() {
   return (
     <Box marginTop={1}>
       <Text>
         {'Counting:  '}
-        {MODEL_KEYS.map((m, i) => (
-          <Text key={m}>
+        {HARNESS_KEYS.map((key, i) => (
+          <Text key={key}>
             {i > 0 ? ' · ' : ''}
-            {MODEL_LABELS[m]}
+            {HARNESSES[key].label}
           </Text>
         ))}
         <Text dimColor>{'  (all count the same)'}</Text>
@@ -38,10 +39,11 @@ type Props = {
   stallReason?: string | null;
   sourcesSilent?: boolean;
   degraded?: DegradedSource[];
+  notices?: string[];
 };
 
 export function StatusScreen(props: Props) {
-  const { race, ownHorseId, ownHorseName, ownColors, ownUserName, lastHeartbeatAgoSec, lastHeartbeatOk, stalled, stallReason, sourcesSilent, degraded } = props;
+  const { race, ownHorseId, ownHorseName, ownColors, ownUserName, lastHeartbeatAgoSec, lastHeartbeatOk, stalled, stallReason, sourcesSilent, degraded, notices } = props;
 
   if (!race) {
     return (
@@ -119,14 +121,17 @@ export function StatusScreen(props: Props) {
         )}
         {/* A stall names a more specific cause, so it wins the one warning slot. */}
         {!stalled && (degraded?.length ?? 0) > 0 && degraded!.map(d => (
-          <Text key={d.key} color="yellow">
-            ⚠ {MODEL_LABELS[d.key]} not counted this beat — {d.message}. Your other sources
-            still count, and {MODEL_LABELS[d.key]} catches up once it can be read.
+          <Text key={d.harness} color="yellow">
+            ⚠ {d.label} not counted this beat — {d.message}. Your other sources
+            still count, and {d.label} catches up once it can be read.
           </Text>
+        ))}
+        {!stalled && (notices?.length ?? 0) > 0 && notices!.map(n => (
+          <Text key={n} color="yellow">⚠ {n}</Text>
         ))}
         {!stalled && (degraded?.length ?? 0) === 0 && sourcesSilent && (
           <Text color="yellow">
-            ⚠ No Claude, Codex or Gemini transcripts in {SILENT_THRESHOLD} beats. Your race
+            ⚠ No transcripts from any coding agent in {SILENT_THRESHOLD} beats. Your race
             continues, but your horse cannot move until they can be read.
           </Text>
         )}
