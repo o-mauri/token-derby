@@ -3,6 +3,7 @@
 
 import { probe, type HarnessProbe } from './harnesses/engine.js';
 import { HARNESSES, HARNESS_KEYS, type HarnessKey } from './harnesses/registry.js';
+import { loadPrefs, enabledHarnesses } from '../stable/prefs.js';
 
 export type { HarnessProbe };
 
@@ -11,9 +12,14 @@ export function harnessDir(key: HarnessKey): string {
   return HARNESSES[key].root();
 }
 
-/** Probe every harness. Never throws; an unreadable root reads as empty. */
-export function probeAll(): Promise<HarnessProbe[]> {
-  return Promise.all(HARNESS_KEYS.map(key => probe(HARNESSES[key])));
+/**
+ * Probe the harnesses this machine counts. Never throws; an unreadable root
+ * reads as empty. A harness turned off is left out rather than listed as though
+ * it were broken -- the player already knows they turned it off.
+ */
+export async function probeAll(): Promise<HarnessProbe[]> {
+  const enabled = enabledHarnesses(await loadPrefs());
+  return Promise.all(enabled.map(key => probe(HARNESSES[key])));
 }
 
 /**
@@ -29,7 +35,7 @@ export async function confirmNoSources(opts: {
   ask: () => Promise<boolean>;
 }): Promise<boolean> {
   if (opts.probes.some(p => p.transcripts > 0)) return true;
-  opts.warn(describeNoSources(opts.probes));
+  opts.warn(opts.probes.length === 0 ? describeAllDisabled() : describeNoSources(opts.probes));
   if (!opts.interactive) return true;
   return opts.ask();
 }
@@ -64,6 +70,16 @@ export function describeNoSources(probes: HarnessProbe[]): string {
     `    ${HARNESS_KEYS.map(k => HARNESSES[k].overrideVar).join('  ')}`,
   );
   return lines.join('\n');
+}
+
+/** Every harness is turned off, which is a different problem from none having history. */
+export function describeAllDisabled(): string {
+  return [
+    `⚠ Every coding agent is turned off — your horse will not move.`,
+    ``,
+    `  Turn one back on with:  token-derby harness enable <id>`,
+    `  See what is available:  token-derby harness list`,
+  ].join('\n');
 }
 
 /** Why a probe came back empty, phrased for the player. */

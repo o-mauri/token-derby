@@ -11,6 +11,8 @@ import { RaceScoreTracker, type RaceScoreState } from '../tokens/race-score.js';
 import * as endpoints from '../api/endpoints.js';
 import { ApiError } from '../api/client.js';
 import { saveActiveRace, type ActiveRace } from '../stable/active-race.js';
+import { loadPrefs, isHarnessEnabled } from '../stable/prefs.js';
+import { HARNESS_KEYS, type HarnessKey } from '../tokens/harnesses/registry.js';
 import { HEARTBEAT_INTERVAL_MS, HEARTBEAT_RETRY_DELAYS_MS, SCAN_TIMEOUT_MS } from '../config.js';
 
 export type RunRaceProps = {
@@ -38,6 +40,7 @@ export function RunRace({ active, initialState, pendingMode, ownUserName }: RunR
   const [sourcesSilent, setSourcesSilent] = useState(false);
   const [degraded, setDegraded] = useState<DegradedSource[]>([]);
   const [notices, setNotices] = useState<string[]>([]);
+  const [disabledHarnesses, setDisabledHarnesses] = useState<HarnessKey[]>([]);
 
   // Re-render every second so the "Ns ago" counter updates.
   useEffect(() => {
@@ -81,6 +84,9 @@ export function RunRace({ active, initialState, pendingMode, ownUserName }: RunR
         // cleanly again clears its own warning immediately.
         setDegraded(isStall(reading) ? [] : reading.degraded);
         setNotices(isStall(reading) ? [] : reading.notices);
+        // Re-read each beat so a toggle shows up without restarting.
+        const prefs = await loadPrefs();
+        setDisabledHarnesses(HARNESS_KEYS.filter(k => !isHarnessEnabled(prefs, k)));
         return tracker.nextBeat();
       },
       sendBeat: async (snapshot) => {
@@ -156,6 +162,7 @@ export function RunRace({ active, initialState, pendingMode, ownUserName }: RunR
         sourcesSilent={sourcesSilent}
         degraded={degraded}
         notices={notices}
+        disabledHarnesses={disabledHarnesses}
       />
       {achievements.length > 0 && (
         <Box flexDirection="column" marginTop={1}>

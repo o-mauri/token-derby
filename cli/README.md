@@ -94,6 +94,22 @@ vendors' models counts each one correctly.
 A tool you've never run simply contributes nothing — no configuration needed.
 Overrides: `TOKEN_DERBY_CODEX_DIR`, `TOKEN_DERBY_GEMINI_DIR`.
 
+### Choosing what gets counted
+
+```
+token-derby harness list              # what this machine counts, and what it found
+token-derby harness disable codex-cli # stop counting one
+token-derby harness enable codex-cli  # start counting it again
+```
+
+A disabled agent is not scanned at all, which is also the way to keep a very
+large history from eating into the per-beat scan budget. Changes take effect on
+your next heartbeat — no need to rejoin — and the race view marks anything
+turned off, so it is never a mystery why work is not counting.
+
+Nothing is lost by turning one off mid-race: your totals hold where they are and
+catch up when you turn it back on.
+
 All of this counts **real** tokens you actually generated. Please don't point it
 at usage you didn't produce.
 

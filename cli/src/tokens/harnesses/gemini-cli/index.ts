@@ -24,6 +24,7 @@ function num(v: unknown): number {
 export const geminiCli: Harness = {
   id: 'gemini-cli',
   label: 'Gemini CLI',
+  enabledByDefault: true,   // counted since before harnesses were configurable
   overrideVar: 'TOKEN_DERBY_GEMINI_DIR',
   root: geminiTmpDir,
   // Gemini chats are rewritten whole rather than appended to, so there is no

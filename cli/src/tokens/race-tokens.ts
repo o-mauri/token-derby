@@ -1,6 +1,7 @@
 import { MODEL_FAMILIES, type ModelFamily } from '@token-derby/shared';
 import { count, type CountResult } from './harnesses/engine.js';
-import { HARNESSES, HARNESS_KEYS, type HarnessKey } from './harnesses/registry.js';
+import { HARNESSES, type HarnessKey } from './harnesses/registry.js';
+import { loadPrefs, enabledHarnesses } from '../stable/prefs.js';
 import type { TokenTotals } from './harnesses/harness.js';
 import type { ScanProgress } from './scan-progress.js';
 import { SourceRootMissing } from './source-root.js';
@@ -88,8 +89,9 @@ export function scoreFor(t: TokenTotals): number {
  * tokens. All harnesses are kicked off together, so a beat costs the SLOWEST
  * rather than the sum.
  *
- * A harness that cannot be read is SKIPPED for this beat, not fatal: the others
- * still count and the race keeps running. Nothing is lost by skipping — the
+ * Harnesses this machine has turned off are not scanned at all. A harness that
+ * cannot be read is SKIPPED for this beat, not fatal: the others still count and
+ * the race keeps running. Nothing is lost by skipping — the
  * tracker's per-conversation floor only ever moves a conversation up, so a
  * harness that reports nothing leaves its anchors untouched and catches up as
  * soon as it reads cleanly again. A MISSING ROOT is not a failure at all: few
@@ -97,7 +99,12 @@ export function scoreFor(t: TokenTotals): number {
  * no warning.
  */
 export async function readAllSources(progress?: ScanProgress): Promise<BeatReading> {
-  const scans = HARNESS_KEYS.map((key) => {
+  // Read per beat, not at join: toggling a harness takes effect on the next
+  // heartbeat rather than needing a restart. A disabled harness is never
+  // scanned at all, so this doubles as the escape hatch for a history large
+  // enough to threaten the scan budget.
+  const enabled = enabledHarnesses(await loadPrefs());
+  const scans = enabled.map((key) => {
     progress?.begin(key);
     return count(HARNESSES[key])
       .then(result => ({ ok: true as const, key, result }))

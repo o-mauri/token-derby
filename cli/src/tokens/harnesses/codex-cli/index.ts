@@ -51,6 +51,7 @@ function num(v: unknown): number {
 export const codexCli: Harness = {
   id: 'codex-cli',
   label: 'Codex CLI',
+  enabledByDefault: true,   // counted since before harnesses were configurable
   overrideVar: 'TOKEN_DERBY_CODEX_DIR',
   root: codexSessionsDir,
   counting: incremental(CODEX_FOLD, constant('openai')),

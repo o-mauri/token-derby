@@ -5,7 +5,8 @@
 // the same vendor's tokens.
 //
 // Adding a harness is four steps and touches nothing else:
-//   1. write harnesses/<id>/index.ts exporting one Harness
+//   1. write harnesses/<id>/index.ts exporting one Harness (enabledByDefault:
+//      false unless it is one of the originals)
 //   2. add its root to paths.ts, and name the env override it honours
 //   3. add one line to harnesses/registry.ts
 //   4. add its id to HarnessKey below
@@ -53,6 +54,14 @@ export interface Harness {
   readonly id: HarnessKey;
   /** How the player refers to this tool. Used by warnings, never by scoring. */
   readonly label: string;
+
+  /**
+   * Whether this machine counts the harness unless told otherwise. The
+   * long-standing agents are on, so nobody has to opt in to what already
+   * worked; anything newer is off until asked for, so adding a harness can
+   * never start counting someone's history behind their back.
+   */
+  readonly enabledByDefault: boolean;
 
   /**
    * Env var that repoints this harness's history directory. Declared rather

@@ -114,6 +114,20 @@ function screenWith(props: Record<string, unknown>) {
   return lastFrame() ?? '';
 }
 
+describe('disabled harnesses', () => {
+  it('marks a harness this machine has turned off, rather than hiding it', () => {
+    const frame = screenWith({ disabledHarnesses: ['codex-cli'] });
+    expect(frame).toMatch(/Codex CLI \(off\)/);
+    // The others are still listed plainly, so the line stays readable.
+    expect(frame).toMatch(/Claude Code/);
+    expect(frame).not.toMatch(/Claude Code \(off\)/);
+  });
+
+  it('marks nothing when every harness is counted', () => {
+    expect(screenWith({ disabledHarnesses: [] })).not.toMatch(/\(off\)/);
+  });
+});
+
 describe('degraded source warning', () => {
   it('is absent when every source read cleanly', () => {
     expect(screenWith({ degraded: [] })).not.toMatch(/not counted this beat/i);

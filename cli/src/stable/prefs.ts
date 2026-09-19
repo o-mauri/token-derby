@@ -1,5 +1,6 @@
 import * as fs from 'node:fs/promises';
 import { prefsFile, homeDir } from '../paths.js';
+import { HARNESSES, HARNESS_KEYS, type HarnessKey } from '../tokens/harnesses/registry.js';
 
 /**
  * Local, per-environment preferences. Lives beside identity.json, so prod and
@@ -12,6 +13,13 @@ export type Prefs = {
    * drop the default, and two horses may share a name.
    */
   default_stable_horse_id?: string;
+  /**
+   * Explicit per-agent choices. Only agents the player has actually decided
+   * about appear here; anything absent falls back to that harness's own
+   * `enabledByDefault`. Storing the choice even when it matches today's default
+   * means a later change of default cannot silently overturn it.
+   */
+  harnesses?: Partial<Record<HarnessKey, boolean>>;
 };
 
 /**
@@ -34,8 +42,57 @@ export async function loadPrefs(): Promise<Prefs> {
     return {};
   }
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return {};
-  const id = (parsed as Record<string, unknown>).default_stable_horse_id;
-  return typeof id === 'string' && id !== '' ? { default_stable_horse_id: id } : {};
+  const obj = parsed as Record<string, unknown>;
+  const id = obj.default_stable_horse_id;
+  const harnesses = readHarnessChoices(obj);
+  return {
+    ...(typeof id === 'string' && id !== '' ? { default_stable_horse_id: id } : {}),
+    ...(Object.keys(harnesses).length > 0 ? { harnesses } : {}),
+  };
+}
+
+/**
+ * Only ids and values this version understands are honoured. A choice written by
+ * a newer CLI is ignored rather than guessed at -- but setHarnessEnabled writes
+ * through the RAW object, so it survives rather than being dropped.
+ */
+function readHarnessChoices(obj: Record<string, unknown>): Partial<Record<HarnessKey, boolean>> {
+  const raw = obj.harnesses;
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return {};
+  const out: Partial<Record<HarnessKey, boolean>> = {};
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (typeof value === 'boolean' && HARNESS_KEYS.includes(key as HarnessKey)) {
+      out[key as HarnessKey] = value;
+    }
+  }
+  return out;
+}
+
+/**
+ * Whether this machine counts a given harness: the player's explicit choice if
+ * they made one, otherwise whatever that harness ships as.
+ */
+export function isHarnessEnabled(prefs: Prefs, key: HarnessKey): boolean {
+  return prefs.harnesses?.[key] ?? HARNESSES[key].enabledByDefault;
+}
+
+/** The harnesses this machine counts, in registry order. */
+export function enabledHarnesses(prefs: Prefs): HarnessKey[] {
+  return HARNESS_KEYS.filter(key => isHarnessEnabled(prefs, key));
+}
+
+/**
+ * Record a choice about one harness. Reads the RAW object rather than the
+ * validated one, so a choice about an agent this version does not know is
+ * preserved. The choice is stored even when it matches the current default,
+ * so changing a default later cannot overturn what the player asked for.
+ */
+export async function setHarnessEnabled(key: HarnessKey, enabled: boolean): Promise<void> {
+  const raw = await loadRaw();
+  const stored = typeof raw.harnesses === 'object' && raw.harnesses !== null && !Array.isArray(raw.harnesses)
+    ? raw.harnesses as Record<string, unknown>
+    : {};
+  await savePrefs({ harnesses: { ...stored, [key]: enabled } as Partial<Record<HarnessKey, boolean>> });
 }
 
 /**

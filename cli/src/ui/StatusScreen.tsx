@@ -6,11 +6,12 @@ import { HorseSprite } from './HorseSprite.js';
 import { MINI_SPRITE } from './sprite.js';
 import { SILENT_THRESHOLD } from '../config.js';
 import type { DegradedSource } from '../tokens/race-tokens.js';
-import { HARNESSES, HARNESS_KEYS } from '../tokens/harnesses/registry.js';
+import { HARNESSES, HARNESS_KEYS, type HarnessKey } from '../tokens/harnesses/registry.js';
 
 
 
-export function ModelList() {
+export function ModelList(props: { disabled?: HarnessKey[] }) {
+  const off = new Set(props.disabled ?? []);
   return (
     <Box marginTop={1}>
       <Text>
@@ -18,7 +19,11 @@ export function ModelList() {
         {HARNESS_KEYS.map((key, i) => (
           <Text key={key}>
             {i > 0 ? ' · ' : ''}
-            {HARNESSES[key].label}
+            {/* A harness turned off is shown, not hidden: "why isn't my Codex
+                work counting?" should be answerable from this line alone. */}
+            {off.has(key)
+              ? <Text dimColor>{HARNESSES[key].label} (off)</Text>
+              : HARNESSES[key].label}
           </Text>
         ))}
         <Text dimColor>{'  (all count the same)'}</Text>
@@ -40,10 +45,11 @@ type Props = {
   sourcesSilent?: boolean;
   degraded?: DegradedSource[];
   notices?: string[];
+  disabledHarnesses?: HarnessKey[];
 };
 
 export function StatusScreen(props: Props) {
-  const { race, ownHorseId, ownHorseName, ownColors, ownUserName, lastHeartbeatAgoSec, lastHeartbeatOk, stalled, stallReason, sourcesSilent, degraded, notices } = props;
+  const { race, ownHorseId, ownHorseName, ownColors, ownUserName, lastHeartbeatAgoSec, lastHeartbeatOk, stalled, stallReason, sourcesSilent, degraded, notices, disabledHarnesses } = props;
 
   if (!race) {
     return (
@@ -137,7 +143,7 @@ export function StatusScreen(props: Props) {
         )}
       </Box>
 
-      <ModelList />
+      <ModelList disabled={disabledHarnesses} />
 
       <Box marginTop={1}>
         <Text dimColor>Press Ctrl+C to crash out of the race.</Text>

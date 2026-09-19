@@ -1,6 +1,10 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { SourceRootMissing } from '../../src/tokens/source-root.js';
 import { ScanProgress } from '../../src/tokens/scan-progress.js';
+import * as fs from 'node:fs/promises';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import { setHarnessEnabled } from '../../src/stable/prefs.js';
 import type { HarnessKey } from '../../src/tokens/harnesses/harness.js';
 import type { CountResult } from '../../src/tokens/harnesses/engine.js';
 
@@ -35,7 +39,19 @@ function ok(r: AllSources | { stall: string }): AllSources {
   return r;
 }
 
-afterEach(() => vi.clearAllMocks());
+let home: string | undefined;
+
+beforeEach(async () => {
+  home = await fs.mkdtemp(path.join(os.tmpdir(), 'td-rt-'));
+  process.env.TOKEN_DERBY_HOME = home;
+});
+
+afterEach(async () => {
+  vi.clearAllMocks();
+  delete process.env.TOKEN_DERBY_HOME;
+  if (home) await fs.rm(home, { recursive: true, force: true });
+  home = undefined;
+});
 
 describe('scoreFor', () => {
   it('sums input and output', () => {
@@ -74,9 +90,12 @@ describe('readAllSources', () => {
     counts['codex-cli'].mockResolvedValue(result('openai', { 'codex-cli:r': 50 }));
 
     const pending = readAllSources();
-    await Promise.resolve();
-    expect(counts['codex-cli']).toHaveBeenCalled();
-    expect(counts['gemini-cli']).toHaveBeenCalled();
+    // waitFor rather than a microtask flush: the beat reads prefs before
+    // dispatching, so dispatch is a file read away, not a tick away.
+    await vi.waitFor(() => {
+      expect(counts['codex-cli']).toHaveBeenCalled();
+      expect(counts['gemini-cli']).toHaveBeenCalled();
+    });
 
     release(result('anthropic', { 'claude-code:a': 100 }));
     const res = ok(await pending);
@@ -126,6 +145,39 @@ describe('readAllSources', () => {
     const res = ok(await readAllSources());
     expect(res.degraded).toEqual([]);             // no warning for a tool you don't have
     expect(res.byFamily.google.size).toBe(0);
+  });
+
+  it('does not even scan a harness this machine has turned off', async () => {
+    allEmpty();
+    await setHarnessEnabled('codex-cli', false);
+    counts['claude-code'].mockResolvedValue(result('anthropic', { 'claude-code:a': 100 }));
+
+    const res = ok(await readAllSources());
+    expect(counts['codex-cli']).not.toHaveBeenCalled();   // skipped, not counted as zero
+    expect(counts['claude-code']).toHaveBeenCalled();
+    expect(res.degraded).toEqual([]);                     // off is not a failure
+    expect(Object.fromEntries(res.byFamily.anthropic)).toEqual({ 'claude-code:a': 100 });
+  });
+
+  it('picks up a toggle on the next beat, without a restart', async () => {
+    allEmpty();
+    counts['codex-cli'].mockResolvedValue(result('openai', { 'codex-cli:r': 10 }));
+    expect(ok(await readAllSources()).byFamily.openai.size).toBe(1);
+
+    await setHarnessEnabled('codex-cli', false);
+    expect(ok(await readAllSources()).byFamily.openai.size).toBe(0);
+
+    await setHarnessEnabled('codex-cli', true);
+    expect(ok(await readAllSources()).byFamily.openai.size).toBe(1);
+  });
+
+  it('scans nothing, and fails nothing, when every harness is off', async () => {
+    allEmpty();
+    for (const key of ['claude-code', 'codex-cli', 'gemini-cli'] as const) await setHarnessEnabled(key, false);
+    const res = ok(await readAllSources());
+    for (const fn of Object.values(counts)) expect(fn).not.toHaveBeenCalled();
+    expect(res.degraded).toEqual([]);
+    expect(isStall(res)).toBe(false);
   });
 
   it('never stalls on a harness failure, even when all of them fail', async () => {

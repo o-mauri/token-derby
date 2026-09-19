@@ -15,6 +15,7 @@ import { rollCommand } from './commands/roll.js';
 import { claimCommand } from './commands/claim.js';
 import { parseFlag } from './args.js';
 import { stableDefaultCommand } from './commands/stable-default.js';
+import { harnessListCommand, harnessToggleCommand } from './commands/harness.js';
 import { orgJoinCommand } from './commands/org-join.js';
 import { webCommand } from './commands/web.js';
 import { envCommand } from './commands/env.js';
@@ -53,6 +54,12 @@ Maintenance:
   token-derby update                      Check for and install the latest CLI version
   token-derby logs                        Show the path of the debug log
   token-derby logs --tail [n]             Print the last n log lines (default 50)
+
+Coding agents:
+  token-derby harness list                Show which agents this machine counts,
+                                          and whether they have anything to count
+  token-derby harness disable <id>        Stop counting one (takes effect next heartbeat)
+  token-derby harness enable <id>         Start counting it again
 
 Stable management:
   token-derby stable create               Make a new horse (interactive)
@@ -102,7 +109,7 @@ Environment:
 // logged — never a value.
 function describeInvocation(argv: string[]): Record<string, unknown> {
   const cmd = argv[0] ?? '(none)';
-  const container = cmd === 'stable' || cmd === 'organisation' || cmd === 'org';
+  const container = cmd === 'stable' || cmd === 'organisation' || cmd === 'org' || cmd === 'harness';
   return {
     cmd,
     sub: container ? argv[1] : undefined,
@@ -141,6 +148,18 @@ async function main(): Promise<number> {
   // `logs` runs before the identity gate too — a broken or unauthenticated
   // install is exactly when the log is worth reading.
   if (cmd === 'logs') return logsCommand(argv.slice(1));
+
+  // `harness` runs before the identity gate: which coding agents this machine
+  // counts is local configuration, unrelated to having an account.
+  if (cmd === 'harness') {
+    const sub = argv[1];
+    if (sub === undefined || sub === 'list') return harnessListCommand();
+    if (sub === 'enable') return harnessToggleCommand(argv[2], true);
+    if (sub === 'disable') return harnessToggleCommand(argv[2], false);
+    console.error(`Unknown harness subcommand: ${sub}`);
+    console.error('Try: harness list | harness enable <id> | harness disable <id>');
+    return 2;
+  }
 
   // Every other command requires an identity. `init`, `update`, and `env` are the only escape hatches.
   const identity = await loadIdentity();

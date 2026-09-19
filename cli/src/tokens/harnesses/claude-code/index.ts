@@ -81,6 +81,7 @@ function addNum(value: unknown): number {
 export const claudeCode: Harness = {
   id: 'claude-code',
   label: 'Claude Code',
+  enabledByDefault: true,   // counted since before harnesses were configurable
   overrideVar: 'TOKEN_DERBY_CLAUDE_DIR',
   hints: [
     `If CLAUDE_CONFIG_DIR relocated your config, Token Derby follows it —`,
