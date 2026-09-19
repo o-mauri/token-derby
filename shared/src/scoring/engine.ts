@@ -7,17 +7,6 @@
 
 import type { Modifier, ModifierContext, ModifierId, ModifierState } from './modifier.js';
 
-/**
- * Ceiling on the combined multiplier.
- *
- * Nothing else bounds scored distance: a modifier is free to return more than
- * 1, and there is no longer a per-beat rate cap behind it. A buggy mechanic or
- * a bad tuning could otherwise mint distance without limit, so the product is
- * clamped. Raising this is a deliberate act, not a side effect of adding a
- * modifier.
- */
-export const MAX_PIPELINE_MULTIPLIER = 2;
-
 /** One modifier a race is running, with its tuning and its own state. */
 export type ActiveModifier = {
   modifier: Modifier;
@@ -52,12 +41,10 @@ export function runModifiers(active: readonly ActiveModifier[], beat: BeatContex
     state[modifier.id] = outcome.state ?? previous;
   }
 
-  const clamped = Math.min(product, MAX_PIPELINE_MULTIPLIER);
-
   // Round only when a mechanic actually ran. With none active the delta must
   // pass through byte-for-byte: rounding an untouched value would quietly
   // change scores for every race that runs no modifiers at all.
-  const scored_delta = active.length === 0 ? beat.delta : Math.round(beat.delta * clamped);
+  const scored_delta = active.length === 0 ? beat.delta : Math.round(beat.delta * product);
 
   return { scored_delta, state, attribution };
 }

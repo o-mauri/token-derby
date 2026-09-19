@@ -2,7 +2,7 @@
 // behaviour no modifier should have to re-implement or be able to bypass.
 
 import { describe, it, expect, vi } from 'vitest';
-import { runModifiers, MAX_PIPELINE_MULTIPLIER, type ActiveModifier, type BeatContext } from '../../src/scoring/engine.js';
+import { runModifiers, type ActiveModifier, type BeatContext } from '../../src/scoring/engine.js';
 import type { Modifier } from '../../src/scoring/modifier.js';
 import { zeroPerFamily } from '../../src/models.js';
 
@@ -68,9 +68,10 @@ describe('runModifiers', () => {
     expect(seen).toEqual([1_000, 1_000]);
   });
 
-  it('caps the combined multiplier, so nothing can mint distance without limit', () => {
-    const result = runModifiers([fake(() => ({ multiplier: 100 }))], beat);
-    expect(result.scored_delta).toBe(beat.delta * MAX_PIPELINE_MULTIPLIER);
+  it('lets a modifier speed a horse up, by exactly what it returned', () => {
+    // Nothing bounds the product: a boosting mechanic picks its own ceiling.
+    expect(runModifiers([fake(() => ({ multiplier: 1.5 }))], beat).scored_delta).toBe(1_500);
+    expect(runModifiers([fake(() => ({ multiplier: 100 }))], beat).scored_delta).toBe(100_000);
   });
 
   it('treats a NaN or negative multiplier as 1 rather than poisoning the score', () => {
@@ -84,7 +85,7 @@ describe('runModifiers', () => {
     expect(result.attribution).toEqual([{ id: 'stamina', multiplier: 0.75 }]);
   });
 
-  it('records the clamped-away multiplier as returned, so the cap is visible', () => {
+  it('records what a modifier returned, whatever its size', () => {
     const result = runModifiers([fake(() => ({ multiplier: 100 }))], beat);
     expect(result.attribution[0]!.multiplier).toBe(100);
   });
