@@ -1,5 +1,4 @@
-import type { CollectedHat, HatId, HorseColors, HorseView, Race, RaceStatus, RaceSummary, RaceView, OrganisationSummary, OrgAccessSettings, StableHorse, RaceSchedule, League, DivisionConfig, ModelFamily, SeasonStandings, RaceSettings } from './types.js';
-import type { StaminaConfig } from './scoring.js';
+import type { CollectedHat, HatId, HorseColors, HorseView, Race, RaceStatus, RaceSummary, RaceView, OrganisationSummary, OrgAccessSettings, StableHorse, RaceSchedule, League, DivisionConfig, ModifierId, ModifierSettings, SeasonStandings, RaceSettings } from './types.js';
 
 export type CreateRaceRequest = {
   name: string;
@@ -8,7 +7,9 @@ export type CreateRaceRequest = {
   tz: string;
   max_participants?: number;
   organisation_name?: string;
-  stamina?: boolean;
+  // Mechanics a one-off race opts into. A race in an org takes the org's
+  // configuration instead, so this is only read when there is no org.
+  modifiers?: ModifierId[];
 };
 
 export type CreateRaceResponse = {
@@ -252,7 +253,6 @@ export type SetOrgScheduleRequest = {
   tz: string;
   race_name?: string;
   max_participants?: number;
-  stamina?: boolean;
 };
 export type SetOrgScheduleResponse = { schedule: RaceSchedule };
 export type GetOrgScheduleResponse = { schedule: RaceSchedule | null };
@@ -268,7 +268,6 @@ export type SetOrgLeagueRequest = {
   tz: string;
   race_name?: string;
   max_participants?: number;
-  stamina?: boolean;
 };
 export type SetOrgLeagueResponse = { league: League };
 export type GetOrgLeagueResponse = { league: League | null };
@@ -277,5 +276,5 @@ export type DeleteOrgLeagueResponse = { ok: true };
 export type GetLeagueStandingsResponse = { standings: SeasonStandings | null };
 
 export type GetOrgRaceSettingsResponse = { settings: RaceSettings | null };
-export type SetOrgRaceSettingsRequest = { stamina_config?: StaminaConfig };
+export type SetOrgRaceSettingsRequest = { modifiers?: ModifierSettings };
 export type SetOrgRaceSettingsResponse = { settings: RaceSettings };

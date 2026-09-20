@@ -150,12 +150,12 @@ describe('runModifiers', () => {
 
   it('collects returned state under the modifier id', () => {
     const result = runModifiers([fake(() => ({ multiplier: 1, state: { level: 42 } }))], beat);
-    expect(result.state.stamina).toEqual({ level: 42 });
+    expect(result.modifier_states.stamina).toEqual({ level: 42 });
   });
 
   it('keeps the previous state when a modifier returns none', () => {
     const active = { ...fake(() => ({ multiplier: 1 })), state: { level: 7 } };
-    expect(runModifiers([active], beat).state.stamina).toEqual({ level: 7 });
+    expect(runModifiers([active], beat).modifier_states.stamina).toEqual({ level: 7 });
   });
 
   it('gives each modifier only its own state bag', () => {

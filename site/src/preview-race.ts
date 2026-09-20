@@ -44,7 +44,7 @@ function horse(
     user_name,
     xp,
     ...(equipped_hat ? { equipped_hat } : {}),
-    ...(stamina !== undefined ? { stamina } : {}),
+    ...(stamina !== undefined ? { modifier_states: { stamina: { level: stamina } } } : {}),
   };
 }
 

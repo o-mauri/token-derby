@@ -6,8 +6,8 @@
 // not configurable, because there is nothing for it to mean.
 
 import { MODEL_FAMILIES } from '../models.js';
-import type { ModelFamily } from '../types.js';
-import type { Modifier, ModifierContext, ModifierId, ModifierMultiplier, ModifierState } from './modifier.js';
+import type { ModelFamily, ModifierId, ModifierStates } from '../types.js';
+import type { Modifier, ModifierContext, ModifierMultiplier, ModifierState } from './modifier.js';
 
 /** One modifier a race is running, with its tuning and its own state. */
 export type ActiveModifier = {
@@ -19,7 +19,7 @@ export type ActiveModifier = {
 export type PipelineResult = {
   scored_delta: number;
   /** Each modifier's state after the beat, keyed by modifier id. */
-  state: Partial<Record<ModifierId, ModifierState>>;
+  modifier_states: ModifierStates;
   /**
    * What each modifier contributed. The multiplier is the EFFECTIVE one for
    * this beat -- a per-family mechanic that touched none of the families in
@@ -32,7 +32,7 @@ export type PipelineResult = {
 export type BeatContext = Omit<ModifierContext, 'params' | 'state'>;
 
 export function runModifiers(active: readonly ActiveModifier[], beat: BeatContext): PipelineResult {
-  const state: Partial<Record<ModifierId, ModifierState>> = {};
+  const modifier_states: ModifierStates = {};
   const attribution: Array<{ id: ModifierId; multiplier: number }> = [];
 
   // One running product per family. A whole-beat multiplier multiplies all of
@@ -48,7 +48,7 @@ export function runModifiers(active: readonly ActiveModifier[], beat: BeatContex
     // Report what this modifier actually did to THIS beat, so a mechanic that
     // touched no family in play reads as 1 rather than as its nominal value.
     attribution.push({ id: modifier.id, multiplier: before === 0 ? 1 : after / before });
-    state[modifier.id] = outcome.state ?? previous;
+    modifier_states[modifier.id] = outcome.state ?? previous;
   }
 
   // Round only when a mechanic actually ran. With none active the delta must
@@ -56,7 +56,7 @@ export function runModifiers(active: readonly ActiveModifier[], beat: BeatContex
   // change scores for every race that runs no modifiers at all.
   const scored_delta = active.length === 0 ? beat.delta : Math.round(applied(beat, product));
 
-  return { scored_delta, state, attribution };
+  return { scored_delta, modifier_states, attribution };
 }
 
 /**

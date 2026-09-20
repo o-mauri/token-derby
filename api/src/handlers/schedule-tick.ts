@@ -55,7 +55,6 @@ export const handler = async (): Promise<void> => {
         end_time: new Date(endMs).toISOString(),
         tz: sched.tz,
         max_participants: sched.max_participants,
-        stamina: sched.stamina,
         creator_user_id: sched.creator_user_id,
         creator_user_name: await creatorName(sched.creator_user_id, sched.creator_user_name),
         org: {
@@ -139,7 +138,6 @@ export const handler = async (): Promise<void> => {
         end_time: new Date(endMs).toISOString(),
         tz: league.tz,
         max_participants: league.max_participants,
-        stamina: league.stamina,
         creator_user_id: league.creator_user_id,
         creator_user_name: await creatorName(league.creator_user_id, league.creator_user_name),
         org: {

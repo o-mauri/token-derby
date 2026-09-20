@@ -1,4 +1,3 @@
-import React from 'react';
 import { describe, it, expect } from 'vitest';
 import { render } from 'ink-testing-library';
 import { StatusScreen } from '../src/ui/StatusScreen.js';
@@ -27,7 +26,9 @@ function renderStatus(opts: {
     server_time: new Date().toISOString(),
     stamina: opts.raceStamina,
     stamina_config: opts.staminaConfig,
-    horses: [horse({ stamina: opts.stamina })],
+    horses: [horse(opts.stamina === undefined
+      ? {}
+      : { modifier_states: { stamina: { level: opts.stamina } } })],
   } as unknown as GetRaceResponse;
 
   const { lastFrame } = render(

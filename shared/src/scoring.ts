@@ -2,17 +2,16 @@
  * Scored distance: raw tokens in, distance out.
  *
  * The mechanics themselves live in scoring/modifiers/; this file is the entry
- * point the race calls, plus the small compatibility surface the settings UI
- * and the API still use. Stamina's own numbers are the modifier's -- nothing
- * here re-implements them.
+ * point the race calls, plus the generic configuration surface the settings UI
+ * and the API read. Nothing here names a mechanic except where a caller is
+ * genuinely about one -- see the stamina display surface at the bottom.
  */
 
-import type { ModelFamily } from './types.js';
-import { MODIFIERS } from './scoring/registry.js';
+import type { ModelFamily, ModifierId, ModifierSettings, ModifierStates } from './types.js';
+import { MODIFIERS, MODIFIER_IDS } from './scoring/registry.js';
 import {
   resolveParams,
   validateParams,
-  type ModifierId,
   type ScoringHorse,
   type ValidationResult,
 } from './scoring/modifier.js';
@@ -20,16 +19,13 @@ import { runModifiers, type ActiveModifier } from './scoring/engine.js';
 import {
   FULL_STAMINA,
   STATE_KEY,
-  staminaStep as staminaModifierStep,
   type StaminaParamKey,
   type StaminaParams,
 } from './scoring/modifiers/stamina.js';
 
-export type ScoringState = {
-  stamina?: number;
-};
-
 export type ScoringRace = {
+  modifiers?: ModifierSettings;
+  // Pre-`modifiers` spelling, read for races already running when it changed.
   stamina?: boolean;
   stamina_config?: StaminaConfig;
 };
@@ -38,7 +34,8 @@ export type ScoringTick = {
   delta: number;
   dt_ms: number;
   race: ScoringRace;
-  state: ScoringState;
+  /** Every modifier's state as of the previous beat. Empty on a horse's first. */
+  modifier_states: ModifierStates;
   /**
    * The delta split by the family that produced it. REQUIRED, and must sum to
    * `delta`: a per-family modifier scores from this, so a zeroed or partial
@@ -52,7 +49,8 @@ export type ScoringTick = {
 
 export type ScoringResult = {
   scored_delta: number;
-  state: ScoringState;
+  /** Each modifier's state after the beat. Store this back on the horse. */
+  modifier_states: ModifierStates;
   /** What each modifier contributed this beat, in registry order. */
   attribution: Array<{ id: ModifierId; multiplier: number }>;
 };
@@ -60,14 +58,13 @@ export type ScoringResult = {
 /**
  * Scored distance for one beat.
  *
- * A thin shim over the pipeline: it resolves which modifiers the race runs,
- * hands them the beat, and maps the result back onto the flat stamina field the
- * horse row still carries. Per-race modifier config and a generic state map come
- * next; keeping this signature meant the pipeline could be proven to produce
- * identical numbers first.
+ * Resolves which modifiers the race runs, hands them the beat, and returns
+ * their state for the caller to store back on the horse. A modifier the race is
+ * not running keeps whatever state it had, so turning one off mid-race and back
+ * on does not silently reset it.
  */
 export function scoreTick(tick: ScoringTick): ScoringResult {
-  const active = modifiersForRace(tick.race, tick.state);
+  const active = modifiersForRace(tick.race, tick.modifier_states);
   const result = runModifiers(active, {
     delta: tick.delta,
     components: tick.components,
@@ -77,25 +74,56 @@ export function scoreTick(tick: ScoringTick): ScoringResult {
     field: tick.field ?? [],
   });
 
-  const level = result.state.stamina?.[STATE_KEY];
   return {
     scored_delta: result.scored_delta,
-    state: level === undefined ? { ...tick.state } : { stamina: level },
+    modifier_states: { ...tick.modifier_states, ...result.modifier_states },
     attribution: result.attribution,
   };
 }
 
 /**
- * Which modifiers a race is running. Still reads the per-race stamina flag and
- * its config snapshot, so this step changes no stored shape.
+ * Which modifiers a race is running, and with what tuning. Reads the registry
+ * rather than any list of its own, so a newly registered mechanic is reachable
+ * the moment a race switches it on.
+ *
+ * A modifier starts from an empty bag; each one owns the numbers it falls back
+ * to, so nothing here needs to know a mechanic's initial state.
  */
-function modifiersForRace(race: ScoringRace, state: ScoringState): ActiveModifier[] {
-  if (!race.stamina) return [];
-  return [{
-    modifier: MODIFIERS.stamina,
-    params: resolveParams(MODIFIERS.stamina, race.stamina_config ?? {}),
-    state: { [STATE_KEY]: state.stamina ?? FULL_STAMINA },
-  }];
+function modifiersForRace(race: ScoringRace, states: ModifierStates): ActiveModifier[] {
+  const active: ActiveModifier[] = [];
+  for (const id of MODIFIER_IDS) {
+    const modifier = MODIFIERS[id];
+    const setting = settingFor(race, id);
+    if (!(setting?.enabled ?? modifier.enabledByDefault)) continue;
+    active.push({
+      modifier,
+      params: resolveParams(modifier, setting?.params ?? {}),
+      state: states[id] ?? {},
+    });
+  }
+  return active;
+}
+
+/**
+ * One modifier's configuration for a race.
+ *
+ * Races created before `modifiers` carry a stamina flag and a separate config
+ * snapshot instead. Reading those keeps a race that is mid-flight scoring the
+ * way it started -- without it, a deploy would switch the mechanic off under a
+ * running race.
+ */
+function settingFor(race: ScoringRace, id: ModifierId) {
+  if (race.modifiers) return race.modifiers[id];
+  if (id !== 'stamina') return undefined;
+  return race.stamina ? { enabled: true, params: race.stamina_config ?? {} } : { enabled: false };
+}
+
+/**
+ * A horse's stamina reserve, for display. A horse with no stamina state yet --
+ * a fresh joiner, or any horse in a race not running the mechanic -- reads full.
+ */
+export function staminaOf(horse: { modifier_states?: ModifierStates }): number {
+  return horse.modifier_states?.stamina?.[STATE_KEY] ?? FULL_STAMINA;
 }
 
 /** Scored distance for a horse, tolerating rows written before the feature. */
@@ -103,50 +131,62 @@ export function scoredOf(horse: { current_tokens: number; scored_tokens?: number
   return horse.scored_tokens ?? horse.current_tokens;
 }
 
-// ─── Stamina compatibility surface ───────────────────────────────────────────
-// The settings UI and the API still speak in stamina_config. These adapt to the
-// modifier rather than restating its numbers, so there is one source of truth.
+// ─── Modifier configuration ──────────────────────────────────────────────────
+
+/**
+ * A modifier's resolved tuning for a race: the race's overrides on top of the
+ * modifier's own defaults. Callers that render a mechanic's UI -- the stamina
+ * bar's bands, say -- read the numbers the server is actually scoring with.
+ */
+export function resolveModifierParams(race: ScoringRace, id: ModifierId): Record<string, number> {
+  return resolveParams(MODIFIERS[id], settingFor(race, id)?.params ?? {});
+}
+
+/**
+ * Check submitted configuration for every modifier it names. An unknown
+ * modifier id is rejected rather than stored and silently ignored, since a
+ * typo would otherwise read as a mechanic that is simply switched off.
+ */
+export function validateModifierSettings(input: Readonly<Record<string, unknown>>): ModifierSettingsValidation {
+  const out: ModifierSettings = {};
+  for (const [id, raw] of Object.entries(input)) {
+    if (!Object.hasOwn(MODIFIERS, id)) {
+      return { ok: false, message: `Unknown mechanic "${id}"` };
+    }
+    if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+      return { ok: false, message: `${id} must be an object` };
+    }
+    const setting = raw as { enabled?: unknown; params?: unknown };
+    if (typeof setting.enabled !== 'boolean') {
+      return { ok: false, message: `${id}.enabled must be true or false` };
+    }
+    if (setting.params !== undefined &&
+        (typeof setting.params !== 'object' || setting.params === null || Array.isArray(setting.params))) {
+      return { ok: false, message: `${id}.params must be an object` };
+    }
+    const params = validateParams(MODIFIERS[id as ModifierId], (setting.params ?? {}) as Record<string, unknown>);
+    if (!params.ok) return params;
+    out[id as ModifierId] = {
+      enabled: setting.enabled,
+      ...(Object.keys(params.value).length > 0 ? { params: params.value } : {}),
+    };
+  }
+  return { ok: true, value: out };
+}
+
+export type ModifierSettingsValidation =
+  | { ok: true; value: ModifierSettings }
+  | { ok: false; message: string };
+
+// ─── Stamina display surface ─────────────────────────────────────────────────
+// The stamina bar is stamina's own UI, so its callers name the mechanic. The
+// mechanism underneath is generic; only the id is spelled out.
 
 export type StaminaConfig = Partial<StaminaParams>;
 export type ResolvedStaminaConfig = StaminaParams;
 export type { StaminaParamKey, ValidationResult };
 
-export const STAMINA_PARAM_BOUNDS = MODIFIERS.stamina.params as Record<StaminaParamKey, {
-  min: number; max: number; step: number; default: number;
-}>;
-
-export const STAMINA = {
-  SUSTAINABLE_PACE: STAMINA_PARAM_BOUNDS.sustainable_pace.default,
-  DRAIN_PER_MIN: STAMINA_PARAM_BOUNDS.drain_per_min.default,
-  MAX_DRAIN_PER_MIN: STAMINA_PARAM_BOUNDS.max_drain_per_min.default,
-  RECOVER_PER_MIN: STAMINA_PARAM_BOUNDS.recover_per_min.default,
-  RECOVER_TICK_CAP_MS: 90_000,
-  TAPER_FLOOR: STAMINA_PARAM_BOUNDS.taper_floor.default,
-  TIRED_MULTIPLIER: STAMINA_PARAM_BOUNDS.tired_multiplier.default,
-} as const;
-
-export function resolveStaminaConfig(race: { stamina_config?: StaminaConfig }): ResolvedStaminaConfig {
-  return resolveParams(MODIFIERS.stamina, race.stamina_config ?? {}) as ResolvedStaminaConfig;
-}
-
-export function validateStaminaConfig(input: StaminaConfig): ValidationResult {
-  return validateParams(MODIFIERS.stamina, input as Record<string, unknown>);
-}
-
-export type StaminaStepInput = {
-  stamina: number;
-  pace: number;
-  minutes: number;
-  cfg: ResolvedStaminaConfig;
-};
-
-/** One tick of the stamina model, in the shape the settings preview expects. */
-export function staminaStep(input: StaminaStepInput): { multiplier: number; stamina: number } {
-  const step = staminaModifierStep({
-    level: input.stamina,
-    pace: input.pace,
-    minutes: input.minutes,
-    params: input.cfg,
-  });
-  return { multiplier: step.multiplier, stamina: step.level };
+/** The stamina tuning a race is scoring with, for the bar's bands. */
+export function resolveStaminaConfig(race: ScoringRace): ResolvedStaminaConfig {
+  return resolveModifierParams(race, 'stamina') as ResolvedStaminaConfig;
 }

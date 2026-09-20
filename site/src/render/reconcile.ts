@@ -1,5 +1,5 @@
 import type { GetRaceResponse, HorseView, ResolvedStaminaConfig } from '@token-derby/shared';
-import { levelFromXp, hatById, scoredOf, resolveStaminaConfig } from '@token-derby/shared';
+import { levelFromXp, hatById, scoredOf, resolveStaminaConfig, staminaOf } from '@token-derby/shared';
 import { elapsedPct, horseXPct } from '../position.js';
 import { buildHorseSvg } from '../sprite-svg.js';
 import { buildHatGroup } from '../hat-svg.js';
@@ -234,7 +234,7 @@ function updateLane(
   tokensEl.textContent = `${tokenFmt.format(displayTokens)} tok`;
 
   const staminaBar = wrap.querySelector<HTMLElement>('.stamina-bar');
-  if (staminaBar) updateStaminaBar(staminaBar, horse.stamina ?? 100, staminaCfg);
+  if (staminaBar) updateStaminaBar(staminaBar, staminaOf(horse), staminaCfg);
 
   const paceEl = lane.querySelector<HTMLElement>('.horse-pace')!;
   paceEl.textContent = pace === null ? '—' : `+${tokenFmt.format(pace)}/min`;

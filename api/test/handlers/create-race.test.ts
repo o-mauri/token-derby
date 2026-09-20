@@ -106,21 +106,21 @@ describe('createRace handler', () => {
     expect(race?.max_participants).toBe(5);
   });
 
-  it('persists the stamina flag from the create request', async () => {
+  it('persists a one-off race\'s opted-in mechanics', async () => {
     const user = await makeUser('CR_Stamina');
     const res: any = await handler(event({
       name: 'Stamina Derby',
       start_time: '2026-04-22T09:00:00Z',
       end_time: '2026-04-22T17:00:00Z',
       tz: 'Europe/London',
-      stamina: true,
+      modifiers: ['stamina'],
     }, user));
     expect(res.statusCode).toBe(200);
     const race = await getRaceByJoinCode(JSON.parse(res.body).join_code);
-    expect(race?.stamina).toBe(true);
+    expect(race?.modifiers).toEqual({ stamina: { enabled: true } });
   });
 
-  it('omits stamina when not requested', async () => {
+  it('omits the modifier map when nothing is requested', async () => {
     const user = await makeUser('CR_NoStamina');
     const res: any = await handler(event({
       name: 'No Stamina Derby',
@@ -130,7 +130,7 @@ describe('createRace handler', () => {
     }, user));
     expect(res.statusCode).toBe(200);
     const race = await getRaceByJoinCode(JSON.parse(res.body).join_code);
-    expect(race?.stamina).toBeUndefined();
+    expect(race?.modifiers).toBeUndefined();
   });
 
   it('rejects missing fields with BAD_REQUEST', async () => {
@@ -378,13 +378,13 @@ describe('createRace handler', () => {
     expect(res.statusCode).toBe(200);
   });
 
-  it('stamps the org stamina config onto a new org race', async () => {
+  it('stamps the org\'s modifier configuration onto a new org race', async () => {
     const user = await makeUser('CR_StampCfg');
     await createOrgHandler(orgEvent({ name: 'CRStampCfg' }, user));
     const org = await getOrganisationByName('CRStampCfg');
     await putRaceSettings({
       org_id: org!.org_id,
-      stamina_config: { drain_per_min: 7 },
+      modifiers: { stamina: { enabled: true, params: { drain_per_min: 7 } } },
       updated_at: new Date().toISOString(),
       updated_by_user_id: user.user_id,
     });
@@ -398,10 +398,10 @@ describe('createRace handler', () => {
     }, user));
     expect(res.statusCode).toBe(200);
     const race = await getRaceByJoinCode(JSON.parse(res.body).join_code);
-    expect(race?.stamina_config).toEqual({ drain_per_min: 7 });
+    expect(race?.modifiers).toEqual({ stamina: { enabled: true, params: { drain_per_min: 7 } } });
   });
 
-  it('leaves stamina_config absent for a race with no org', async () => {
+  it('leaves the modifier map absent for a race with no org', async () => {
     const user = await makeUser('CR_StampNoOrg');
     const res: any = await handler(event({
       name: 'Unstamped Derby',
@@ -411,7 +411,7 @@ describe('createRace handler', () => {
     }, user));
     expect(res.statusCode).toBe(200);
     const race = await getRaceByJoinCode(JSON.parse(res.body).join_code);
-    expect(race?.stamina_config).toBeUndefined();
+    expect(race?.modifiers).toBeUndefined();
   });
 
   it('does not retroactively change a race when the org config changes later', async () => {
@@ -430,13 +430,13 @@ describe('createRace handler', () => {
 
     await putRaceSettings({
       org_id: org!.org_id,
-      stamina_config: { drain_per_min: 12 },
+      modifiers: { stamina: { enabled: true, params: { drain_per_min: 12 } } },
       updated_at: new Date().toISOString(),
       updated_by_user_id: user.user_id,
     });
 
     const race = await getRaceByJoinCode(JSON.parse(res.body).join_code);
-    expect(race?.stamina_config).toBeUndefined();
+    expect(race?.modifiers).toBeUndefined();
   });
 
   it('fires the race.created webhook for org-linked races when configured', async () => {

@@ -79,7 +79,7 @@ export const handler: ApiHandler = async (event) => {
       dt_ms: elapsedMs,
       now_ms: now.getTime(),
       race,
-      state: { stamina: horse.stamina },
+      modifier_states: horse.modifier_states ?? {},
       // The field as it was BEFORE this beat: a modifier's view of the race
       // necessarily lags one beat, since rank depends on what it returns.
       horse: { ...horse, horse_id, joined_at: ownJoinedAt(allHorsesBefore, horse_id) },
@@ -101,7 +101,7 @@ export const handler: ApiHandler = async (event) => {
             ...h,
             current_tokens: newTokens,
             scored_tokens: newScored,
-            stamina: scoring.state.stamina,
+            modifier_states: scoring.modifier_states,
             model_tokens: newModelTokens,
           }
         : h,
@@ -143,7 +143,7 @@ export const handler: ApiHandler = async (event) => {
 
     const didApply = await applyHeartbeatDelta({
       race_id: race.race_id, horse_id, seq: body.seq, applied, scored_applied: scoredApplied,
-      stamina: scoring.state.stamina, last_heartbeat: now.toISOString(), state: evalResult.next,
+      modifier_states: scoring.modifier_states, last_heartbeat: now.toISOString(), state: evalResult.next,
       components: appliedComponents,
       needsSeed: horse.scored_tokens === undefined || !hasFamilyKeys(horse.model_tokens),
       ...(horse.model_tokens && !hasFamilyKeys(horse.model_tokens) ? { legacyModelTokens: horse.model_tokens } : {}),
@@ -160,7 +160,7 @@ export const handler: ApiHandler = async (event) => {
               ...h,
               current_tokens: newTokens,
               scored_tokens: newScored,
-              stamina: scoring.state.stamina,
+              modifier_states: scoring.modifier_states,
               last_seq: body.seq,
               live_xp: evalResult.next.live_xp,
               last_rank: evalResult.next.last_rank,

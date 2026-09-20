@@ -246,22 +246,13 @@ export function renderOrgManager(root: HTMLElement): () => void {
         }
         else if (tab === 'race-settings') {
           const settings = isOwner ? ((await api.getRaceSettings(name)).settings ?? null) : null;
-          const schedule = isOwner ? ((await api.getSchedule(name)).schedule ?? null) : null;
-          const league = isOwner ? ((await api.getLeague(name)).league ?? null) : null;
-          const staminaOn = Boolean(league?.stamina ?? schedule?.stamina);
           const guard = async (fn: () => Promise<unknown>) => {
             try { await fn(); void drawMain(); } catch (e) { alert(String((e as Error).message)); }
           };
           renderRaceSettings(contentEl, {
-            settings, staminaOn, isOwner,
+            settings, isOwner,
             onSave: (b) => void guard(() => api.setRaceSettings(name, b)),
             onReset: () => void guard(() => api.setRaceSettings(name, {})),
-            onToggleStamina: (on) => void guard(() => {
-              if (league) return api.setLeague(name, { ...league, stamina: on });
-              if (schedule) return api.setSchedule(name, { ...schedule, stamina: on });
-              alert('Set up scheduled races or a league on the Racing tab first.');
-              return Promise.resolve();
-            }),
           });
         }
         else if (tab === 'webhook') {

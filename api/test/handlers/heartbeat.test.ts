@@ -1,13 +1,14 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { handler as hbHandler } from '../../src/handlers/heartbeat.js';
 import { handler as createHandler } from '../../src/handlers/create-race.js';
 import { handler as joinHandler } from '../../src/handlers/join-race.js';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { listHorses } from '../../src/db/horses.js';
 import { ddb, TABLE } from '../../src/db/client.js';
-import { raceMetaKey } from '../../src/db/keys.js';
+import { raceMetaKey, horseKey } from '../../src/db/keys.js';
 import { UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { makeUser, makeHorse, type TestUser } from '../helpers/auth-helper.js';
+import { staminaOf } from '@token-derby/shared';
 import { CURRENT_CLI_VERSION, SAME_MINOR_CLI_VERSION, MISMATCHED_MINOR_CLI_VERSION, OUTDATED_CLI_VERSION } from '../helpers/cli-version.js';
 
 const COLORS = { body: '#8B4513', mane: '#000', tail: '#000', saddle: '#C0392B' };
@@ -48,17 +49,26 @@ async function setup(cliVersion = CURRENT_CLI_VERSION) {
   return { join_code, race_id, horse_id, heartbeat_token };
 }
 
-/** Like setup() but stamps race-level toggles (e.g. stamina) onto the race row. */
+/**
+ * Like setup() but switches mechanics on for the race.
+ *
+ * `legacy` writes the pre-`modifiers` flag instead, so the path a race created
+ * before the settings map takes is covered by the same tests.
+ */
 async function setupLiveRaceWithHorse(
-  opts: { stamina?: boolean } = {},
+  opts: { stamina?: boolean; legacy?: boolean } = {},
 ): Promise<{ join_code: string; race_id: string; horse_id: string; token: string }> {
   const { join_code, race_id, horse_id, heartbeat_token } = await setup();
   if (opts.stamina) {
     await ddb.send(new UpdateCommand({
       TableName: TABLE,
       Key: raceMetaKey(race_id),
-      UpdateExpression: 'SET stamina = :s',
-      ExpressionAttributeValues: { ':s': true },
+      ...(opts.legacy
+        ? { UpdateExpression: 'SET stamina = :s', ExpressionAttributeValues: { ':s': true } }
+        : {
+            UpdateExpression: 'SET modifiers = :m',
+            ExpressionAttributeValues: { ':m': { stamina: { enabled: true } } },
+          }),
     }));
   }
   return { join_code, race_id, horse_id, token: heartbeat_token };
@@ -565,10 +575,45 @@ describe('heartbeat handler', () => {
     }
 
     const [horse] = await listHorses(race_id);
-    expect(horse!.stamina!).toBeLessThan(25);
+    expect(staminaOf(horse!)).toBeLessThan(25);
     expect(horse!.scored_tokens!).toBeLessThan(horse!.current_tokens);
 
     const ownInResponse = body.horses.find((h: any) => h.horse_id === horse_id);
-    expect(ownInResponse.stamina).toBe(horse!.stamina);
+    expect(ownInResponse.modifier_states).toEqual(horse!.modifier_states);
+  });
+
+  it('keeps tiring a race created before the settings map', async () => {
+    const { join_code, horse_id, token, race_id } = await setupLiveRaceWithHorse({ stamina: true, legacy: true });
+
+    vi.useFakeTimers();
+    for (let seq = 1; seq <= 20; seq++) {
+      await heartbeat({ join_code, horse_id, token, seq, delta: 400_000, advanceMs: 60_000 });
+    }
+
+    const [horse] = await listHorses(race_id);
+    expect(staminaOf(horse!)).toBeLessThan(25);
+    expect(horse!.scored_tokens!).toBeLessThan(horse!.current_tokens);
+  });
+
+  it('resumes from a pre-map row\'s flat stamina rather than restarting at full', async () => {
+    const { join_code, horse_id, token, race_id } = await setupLiveRaceWithHorse({ stamina: true });
+    // A horse mid-race when this release deployed: tired, but only the flat
+    // attribute the previous release wrote. It must keep draining from there.
+    await ddb.send(new UpdateCommand({
+      TableName: TABLE,
+      Key: horseKey(race_id, horse_id),
+      UpdateExpression: 'SET stamina = :s',
+      ExpressionAttributeValues: { ':s': 30 },
+    }));
+
+    vi.useFakeTimers();
+    const body = await heartbeat({ join_code, horse_id, token, seq: 1, delta: 400_000, advanceMs: 60_000 });
+
+    const [horse] = await listHorses(race_id);
+    // Drain clamps at 6/min, so one flat-out minute from 30 lands at ~24 --
+    // reachable only by resuming from 30, never from a reset to 100.
+    expect(staminaOf(horse!)).toBeCloseTo(24, 1);
+    const own = body.horses.find((h: any) => h.horse_id === horse_id);
+    expect(staminaOf(own)).toBeCloseTo(24, 1);
   });
 });

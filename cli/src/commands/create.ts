@@ -1,6 +1,7 @@
 import * as readline from 'node:readline/promises';
 import { stdin, stdout } from 'node:process';
-import { ORG_NAME_PATTERN } from '@token-derby/shared';
+import { ORG_NAME_PATTERN, MODIFIERS, MODIFIER_IDS } from '@token-derby/shared';
+import type { ModifierId } from '@token-derby/shared';
 import { createRace } from '../api/endpoints.js';
 import { ApiError } from '../api/client.js';
 
@@ -40,14 +41,22 @@ export async function createRaceCommand(organisationName?: string): Promise<numb
       return 1;
     }
 
-    const staminaRaw = (await rl.question('Stamina — horses that run flat out tire and score less until they recover? [y/N]: ')).trim().toLowerCase();
-    const stamina = staminaRaw === 'y' || staminaRaw === 'yes';
+    // One prompt per registered mechanic. An org race takes the org's own
+    // configuration instead, so there is nothing to ask about.
+    const modifiers: ModifierId[] = [];
+    if (!org) {
+      for (const id of MODIFIER_IDS) {
+        const m = MODIFIERS[id];
+        const raw = (await rl.question(`${m.label} — ${m.description} [y/N]: `)).trim().toLowerCase();
+        if (raw === 'y' || raw === 'yes') modifiers.push(id);
+      }
+    }
 
     const resp = await createRace({
       name, start_time: start, end_time: end, tz,
       ...(max !== undefined ? { max_participants: max } : {}),
       ...(org ? { organisation_name: org } : {}),
-      ...(stamina ? { stamina: true } : {}),
+      ...(modifiers.length > 0 ? { modifiers } : {}),
     });
 
     console.log('');
@@ -61,8 +70,8 @@ export async function createRaceCommand(organisationName?: string): Promise<numb
     if (org) {
       console.log(`  Restricted to organisation: ${org}`);
     }
-    if (stamina) {
-      console.log('  Stamina on — horses running above a sustainable pace will tire.');
+    for (const id of modifiers) {
+      console.log(`  ${MODIFIERS[id].label} on — ${MODIFIERS[id].description}`);
     }
     console.log(`  Share with participants:  token-derby join ${resp.join_code}`);
     return 0;

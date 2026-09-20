@@ -5,6 +5,7 @@ import { handler as tick } from '../../src/handlers/schedule-tick.js';
 import { putLeague, getLeague } from '../../src/db/leagues.js';
 import { getLeagueSeason } from '../../src/db/league-seasons.js';
 import { listRacesByOrgId } from '../../src/db/races.js';
+import { putRaceSettings } from '../../src/db/race-settings.js';
 import { makeUser, type TestUser } from '../helpers/auth-helper.js';
 import { updateUserDisplayName } from '../../src/db/users.js';
 import { CURRENT_CLI_VERSION } from '../helpers/cli-version.js';
@@ -79,10 +80,18 @@ describe('league fixture materialisation (via schedule-tick)', () => {
     expect(races[0]!.creator_user_name).toBe('LgRenameAft');
   });
 
-  it('stamps stamina from the league config onto each fixture', async () => {
+  it("stamps the org's modifier configuration onto each fixture", async () => {
     const user = await makeUser('LgTickStamina');
     const org_id = await createOrg(user, 'LgTickOrgSt');
-    await putLeague(baseLeague(org_id, { stamina: true }));
+    await putLeague(baseLeague(org_id));
+    // A league carries no mechanics of its own — same single answer as a
+    // schedule, so the two can no longer disagree about what a race runs.
+    await putRaceSettings({
+      org_id,
+      modifiers: { stamina: { enabled: true } },
+      updated_at: new Date().toISOString(),
+      updated_by_user_id: user.user_id,
+    });
 
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-07-06T10:00:00Z')); // Monday, inside 09:00–17:30
@@ -90,7 +99,7 @@ describe('league fixture materialisation (via schedule-tick)', () => {
     await runTick();
     const races = await listRacesByOrgId(org_id);
     expect(races.length).toBe(1);
-    expect(races[0]!.stamina).toBe(true);
+    expect(races[0]!.modifiers).toEqual({ stamina: { enabled: true } });
   });
 
   it('does not create a fixture outside the weekday window', async () => {

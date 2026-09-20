@@ -4,8 +4,20 @@
 
 import { describe, it, expect } from 'vitest';
 import { MODIFIERS, MODIFIER_IDS } from '../../src/scoring/registry.js';
-import { resolveParams, validateParams, type ModifierContext } from '../../src/scoring/modifier.js';
-import { zeroPerFamily } from '../../src/models.js';
+import { resolveParams, validateParams, type ModifierContext, type ModifierMultiplier } from '../../src/scoring/modifier.js';
+import { zeroPerFamily, MODEL_FAMILIES } from '../../src/models.js';
+
+/**
+ * Whether an outcome is usable, for either shape a multiplier can take: a plain
+ * number applying to the whole beat, or a per-family map. Asserting
+ * Number.isFinite directly would reject every per-family mechanic.
+ */
+function usable(multiplier: ModifierMultiplier): boolean {
+  const values = typeof multiplier === 'number'
+    ? [multiplier]
+    : MODEL_FAMILIES.map(f => multiplier[f]).filter(v => v !== undefined);
+  return values.length > 0 && values.every(v => Number.isFinite(v) && v! >= 0);
+}
 
 function contextFor(id: keyof typeof MODIFIERS, over: Partial<ModifierContext> = {}): ModifierContext {
   const modifier = MODIFIERS[id];
@@ -35,6 +47,12 @@ describe.each(MODIFIER_IDS)('Modifier contract — %s', (id) => {
     expect(modifier.enabledByDefault).toBe(false);
   });
 
+  it('names every param, so no UI has to keep a copy of the labels', () => {
+    for (const [key, bound] of Object.entries(modifier.params)) {
+      expect(bound.label, key).toMatch(/\S/);
+    }
+  });
+
   it('declares bounds that contain its own default', () => {
     for (const [key, bound] of Object.entries(modifier.params)) {
       expect(bound.default, key).toBeGreaterThanOrEqual(bound.min);
@@ -44,28 +62,22 @@ describe.each(MODIFIER_IDS)('Modifier contract — %s', (id) => {
   });
 
   it('returns a finite, non-negative multiplier for an ordinary beat', () => {
-    const { multiplier } = modifier.apply(contextFor(id));
-    expect(Number.isFinite(multiplier)).toBe(true);
-    expect(multiplier).toBeGreaterThanOrEqual(0);
+    expect(usable(modifier.apply(contextFor(id)).multiplier)).toBe(true);
   });
 
   it('survives a zero-length beat without dividing by it', () => {
-    const { multiplier } = modifier.apply(contextFor(id, { dt_ms: 0 }));
-    expect(Number.isFinite(multiplier)).toBe(true);
+    expect(usable(modifier.apply(contextFor(id, { dt_ms: 0 })).multiplier)).toBe(true);
   });
 
   it('survives a zero delta and an enormous one', () => {
     for (const delta of [0, 1e12]) {
-      const { multiplier } = modifier.apply(contextFor(id, { delta }));
-      expect(Number.isFinite(multiplier), `delta ${delta}`).toBe(true);
-      expect(multiplier).toBeGreaterThanOrEqual(0);
+      expect(usable(modifier.apply(contextFor(id, { delta })).multiplier), `delta ${delta}`).toBe(true);
     }
   });
 
   it('starts from its own defaults when no state is stored', () => {
     // A horse's first beat has an empty bag; a modifier must not read undefined.
-    const outcome = modifier.apply(contextFor(id, { state: {} }));
-    expect(Number.isFinite(outcome.multiplier)).toBe(true);
+    expect(usable(modifier.apply(contextFor(id, { state: {} })).multiplier)).toBe(true);
   });
 
   it('returns only finite numbers in its state', () => {

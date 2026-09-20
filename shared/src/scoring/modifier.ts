@@ -9,24 +9,26 @@
 // Adding one is three steps and touches nothing else:
 //   1. write scoring/modifiers/<id>.ts exporting one Modifier
 //   2. add one line to scoring/registry.ts
-//   3. add its id to ModifierId
+//   3. add its id to ModifierId (types.ts -- it is a wire type, since a horse
+//      carries every modifier's state in one map)
 // The engine owns the fold, the guards, the rounding and the state merge, and
 // cannot be bypassed.
 
-import type { ModelFamily } from '../types.js';
+import type { ModelFamily, ModifierId, ModifierState } from '../types.js';
 
-export type ModifierId = 'stamina';
+// Re-exported so nothing under scoring/ has to know these live with the wire
+// types rather than with the contract that uses them.
+export type { ModifierId, ModifierState };
 
-/** A tunable number, with the bounds the admin UI renders it within. */
+/** A tunable number, with the bounds and the name the admin UI renders it by. */
 export type ParamBound = {
+  /** How the setting is named to an admin. The UI keeps no copy of its own. */
+  label: string;
   min: number;
   max: number;
   step: number;
   default: number;
 };
-
-/** A modifier's own persisted numbers, carried between beats. */
-export type ModifierState = Record<string, number>;
 
 /** Just enough of a horse for a modifier to reason about the field. */
 export type ScoringHorse = {

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import type { GetRaceResponse, HorseColors, HorseView } from '@token-derby/shared';
-import { levelInfo, resolveStaminaConfig, scoredOf } from '@token-derby/shared';
+import { levelInfo, resolveStaminaConfig, scoredOf, staminaOf } from '@token-derby/shared';
 import { HorseSprite } from './HorseSprite.js';
 import { MINI_SPRITE } from './sprite.js';
 import { SILENT_THRESHOLD } from '../config.js';
@@ -189,7 +189,7 @@ function bar(pct: number, width: number): string {
 // Bands match the race page exactly: green above 50, amber down to the org's
 // taper floor, red below it — where scoring actually starts costing.
 function staminaLine(own: HorseView | undefined, race: GetRaceResponse): StatRow {
-  const stamina = own?.stamina ?? 100;
+  const stamina = staminaOf(own ?? {});
   const cfg = resolveStaminaConfig(race);
   const floor = cfg.taper_floor;
   const band = stamina > 50 ? 'green' : stamina >= floor ? 'amber' : 'red';

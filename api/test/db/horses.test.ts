@@ -5,6 +5,9 @@ import {
 } from '../../src/db/horses.js';
 import type { Horse } from '@token-derby/shared';
 import type { AchievementState } from '../../src/lib/evaluate-achievements.js';
+import { ddb, TABLE } from '../../src/db/client.js';
+import { horseKey } from '../../src/db/keys.js';
+import { UpdateCommand } from '@aws-sdk/lib-dynamodb';
 
 const emptyState: AchievementState = {
   live_xp: 0, last_rank: undefined,
@@ -126,7 +129,7 @@ describe('horses db', () => {
     const now = new Date().toISOString();
     const applied = await applyHeartbeatDelta({
       race_id, horse_id: h.horse_id, seq: 1, applied: 50, scored_applied: 50,
-      stamina: undefined, last_heartbeat: now, state: emptyState, components: { anthropic: 0, openai: 0, google: 0 }, needsSeed: true,
+      modifier_states: {}, last_heartbeat: now, state: emptyState, components: { anthropic: 0, openai: 0, google: 0 }, needsSeed: true,
     });
     expect(applied).toBe(true);
     const [u] = await listHorses(race_id);
@@ -141,7 +144,7 @@ describe('horses db', () => {
     const now = new Date().toISOString();
     const call = (seq: number) => applyHeartbeatDelta({
       race_id, horse_id: h.horse_id, seq, applied: 50, scored_applied: 50,
-      stamina: undefined, last_heartbeat: now, state: emptyState, components: { anthropic: 0, openai: 0, google: 0 }, needsSeed: true,
+      modifier_states: {}, last_heartbeat: now, state: emptyState, components: { anthropic: 0, openai: 0, google: 0 }, needsSeed: true,
     });
     await call(2); // -> 150, last_seq 2
     const dup = await call(2);
@@ -162,7 +165,7 @@ describe('horses db', () => {
     const sendSpy = vi.spyOn(ddb, 'send');
     await applyHeartbeatDelta({
       race_id, horse_id: h.horse_id, seq: 1, applied: 50, scored_applied: 50,
-      stamina: undefined, last_heartbeat: now, state: emptyState, components: { anthropic: 0, openai: 0, google: 0 }, needsSeed: false,
+      modifier_states: {}, last_heartbeat: now, state: emptyState, components: { anthropic: 0, openai: 0, google: 0 }, needsSeed: false,
     });
     const seedAttempted = sendSpy.mock.calls.some(([cmd]: any) =>
       cmd?.input?.UpdateExpression === 'SET scored_tokens = current_tokens');
@@ -189,5 +192,68 @@ describe('horses db', () => {
     const got = await getHorseForHeartbeat(race_id, h.horse_id, 'new-tok');
     expect(got).not.toBeNull();
     expect(got!.current_tokens).toBe(42);
+  });
+});
+
+describe('horses db — modifier state', () => {
+  /** Writes the flat `stamina` attribute a row predating the state map carries. */
+  async function writeLegacyStamina(race_id: string, horse_id: string, level: number) {
+    await ddb.send(new UpdateCommand({
+      TableName: TABLE,
+      Key: horseKey(race_id, horse_id),
+      UpdateExpression: 'SET stamina = :s',
+      ExpressionAttributeValues: { ':s': level },
+    }));
+  }
+
+  it('hydrates a pre-map row\'s flat stamina into the state map', async () => {
+    const race_id = `r-${Math.random().toString(36).slice(2)}`;
+    const h = makeHorse();
+    await putHorse(race_id, h, 'tok');
+    await writeLegacyStamina(race_id, h.horse_id, 61);
+
+    const [listed] = await listHorses(race_id);
+    expect(listed?.modifier_states).toEqual({ stamina: { level: 61 } });
+    // The flat attribute never reaches a client: one shape on the wire, always.
+    expect((listed as Record<string, unknown>).stamina).toBeUndefined();
+
+    const rec = await getHorseForHeartbeat(race_id, h.horse_id, 'tok');
+    expect(rec?.modifier_states).toEqual({ stamina: { level: 61 } });
+  });
+
+  it('prefers the map over a stale flat attribute on a half-converted row', async () => {
+    const race_id = `r-${Math.random().toString(36).slice(2)}`;
+    const h = makeHorse();
+    await putHorse(race_id, h, 'tok');
+    await writeLegacyStamina(race_id, h.horse_id, 61);
+    await applyHeartbeatDelta({
+      race_id, horse_id: h.horse_id, seq: 1, applied: 10, scored_applied: 10,
+      modifier_states: { stamina: { level: 42 } }, last_heartbeat: new Date().toISOString(),
+      state: emptyState, components: { anthropic: 10, openai: 0, google: 0 }, needsSeed: true,
+    });
+    const [listed] = await listHorses(race_id);
+    expect(listed?.modifier_states).toEqual({ stamina: { level: 42 } });
+  });
+
+  it('reports no state at all for a horse that has never run a modifier', async () => {
+    const race_id = `r-${Math.random().toString(36).slice(2)}`;
+    const h = makeHorse();
+    await putHorse(race_id, h, 'tok');
+    const [listed] = await listHorses(race_id);
+    expect(listed?.modifier_states).toBeUndefined();
+  });
+
+  it('writes the whole state bag, so a second modifier needs no new attribute', async () => {
+    const race_id = `r-${Math.random().toString(36).slice(2)}`;
+    const h = makeHorse();
+    await putHorse(race_id, h, 'tok');
+    await applyHeartbeatDelta({
+      race_id, horse_id: h.horse_id, seq: 1, applied: 10, scored_applied: 10,
+      modifier_states: { stamina: { level: 80 }, ghost: { charge: 3 } } as never,
+      last_heartbeat: new Date().toISOString(), state: emptyState,
+      components: { anthropic: 10, openai: 0, google: 0 }, needsSeed: true,
+    });
+    const [listed] = await listHorses(race_id);
+    expect(listed?.modifier_states).toEqual({ stamina: { level: 80 }, ghost: { charge: 3 } });
   });
 });

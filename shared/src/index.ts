@@ -17,5 +17,7 @@ export * from './series-transform.js';
 export * from './web-sessions.js';
 export * from './sprite-grid.js';
 export * from './scoring.js';
+export * from './scoring/registry.js';
+export type { Modifier, ParamBound } from './scoring/modifier.js';
 export * from './claim-code.js';
 export * from './devices.js';

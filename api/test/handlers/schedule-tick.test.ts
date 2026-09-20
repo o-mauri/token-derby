@@ -3,6 +3,7 @@ import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { handler as createOrgHandler } from '../../src/handlers/create-organisation.js';
 import { handler as tick } from '../../src/handlers/schedule-tick.js';
 import { putSchedule } from '../../src/db/schedules.js';
+import { putRaceSettings } from '../../src/db/race-settings.js';
 import { listRacesByOrgId } from '../../src/db/races.js';
 import { setOrgSlack, getOrganisationByName } from '../../src/db/organisations.js';
 import { putStableHorse } from '../../src/db/stable.js';
@@ -126,10 +127,18 @@ describe('schedule-tick', () => {
     expect((await listRacesByOrgId(org_id)).length).toBe(0);
   });
 
-  it('stamps stamina from the schedule onto the created race', async () => {
+  it("stamps the org's modifier configuration onto the created race", async () => {
     const user = await makeUser('TickStamina');
     const org_id = await createOrg(user, 'TickStamOrg');
-    await putSchedule({ ...baseSchedule(org_id), stamina: true });
+    await putSchedule(baseSchedule(org_id));
+    // A schedule carries no mechanics of its own: the org's race settings are
+    // the single answer for every race it creates, scheduled or otherwise.
+    await putRaceSettings({
+      org_id,
+      modifiers: { stamina: { enabled: true, params: { drain_per_min: 7 } } },
+      updated_at: new Date().toISOString(),
+      updated_by_user_id: user.user_id,
+    });
 
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2024-07-01T10:00:00Z'));
@@ -137,13 +146,13 @@ describe('schedule-tick', () => {
 
     const races = await listRacesByOrgId(org_id);
     expect(races.length).toBe(1);
-    expect(races[0]!.stamina).toBe(true);
+    expect(races[0]!.modifiers).toEqual({ stamina: { enabled: true, params: { drain_per_min: 7 } } });
   });
 
-  it('legacy schedule without stamina → race defaults to off', async () => {
+  it('creates a race with no mechanics when the org has configured none', async () => {
     const user = await makeUser('TickNoStamina');
     const org_id = await createOrg(user, 'TickNoStamOr');
-    await putSchedule(baseSchedule(org_id)); // no stamina prop
+    await putSchedule(baseSchedule(org_id));
 
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2024-07-01T10:00:00Z'));
@@ -151,7 +160,7 @@ describe('schedule-tick', () => {
 
     const races = await listRacesByOrgId(org_id);
     expect(races.length).toBe(1);
-    expect(races[0]!.stamina).toBeUndefined();
+    expect(races[0]!.modifiers).toBeUndefined();
   });
 
   it('isolates failures: a bad schedule does not block a good one', async () => {

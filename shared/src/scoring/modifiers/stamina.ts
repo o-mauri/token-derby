@@ -18,12 +18,30 @@ export const RECOVER_TICK_CAP_MS = 90_000;
 export const STATE_KEY = 'level';
 
 const PARAMS = {
-  sustainable_pace:  { min: 10_000, max: 200_000, step: 2_500, default: 40_000 },
-  drain_per_min:     { min: 1,      max: 12,      step: 1,     default: 4 },
-  max_drain_per_min: { min: 2,      max: 20,      step: 1,     default: 6 },
-  recover_per_min:   { min: 1,      max: 8,       step: 1,     default: 2 },
-  taper_floor:       { min: 10,     max: 60,      step: 5,     default: 25 },
-  tired_multiplier:  { min: 0.2,    max: 0.9,     step: 0.05,  default: 0.5 },
+  sustainable_pace: {
+    label: 'Sustainable pace (tokens/min)',
+    min: 10_000, max: 200_000, step: 2_500, default: 40_000,
+  },
+  drain_per_min: {
+    label: 'Drain rate (stamina/min above pace)',
+    min: 1, max: 12, step: 1, default: 4,
+  },
+  max_drain_per_min: {
+    label: 'Max drain rate (stamina/min)',
+    min: 2, max: 20, step: 1, default: 6,
+  },
+  recover_per_min: {
+    label: 'Recovery rate (stamina/min at or below pace)',
+    min: 1, max: 8, step: 1, default: 2,
+  },
+  taper_floor: {
+    label: 'Taper floor (stamina %)',
+    min: 10, max: 60, step: 5, default: 25,
+  },
+  tired_multiplier: {
+    label: 'Tired multiplier',
+    min: 0.2, max: 0.9, step: 0.05, default: 0.5,
+  },
 } satisfies Record<string, ParamBound>;
 
 export type StaminaParamKey = keyof typeof PARAMS;
