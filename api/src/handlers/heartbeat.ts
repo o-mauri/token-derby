@@ -133,8 +133,8 @@ export const handler: ApiHandler = async (event) => {
       },
       now_ms: now.getTime(),
       last_heartbeat_at_ms: lastHeartbeatMs,
-      current_tokens: newScored,
-      prev_current_tokens: scoredOf(horse),
+      scored_tokens: newScored,
+      prev_scored_tokens: scoredOf(horse),
       new_rank: ownRanked.rank,
       total_horses: ranked.length,
       second_place_tokens: second ? scoredOf(second) : null,
@@ -151,7 +151,13 @@ export const handler: ApiHandler = async (event) => {
 
     if (didApply) {
       if (applied > 0) {
-        await appendSeriesPoint(race.race_id, horse_id, body.seq, { t: now.getTime(), d: applied });
+        // `s` only when a mechanic changed the beat: on a race running none it
+        // would repeat `d` on every point, for every horse, forever.
+        await appendSeriesPoint(race.race_id, horse_id, body.seq, {
+          t: now.getTime(),
+          d: applied,
+          ...(scoredApplied !== applied ? { s: scoredApplied } : {}),
+        });
       }
       effectiveLastSeq = body.seq;
       horses = updatedHorses.map(h =>

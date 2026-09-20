@@ -173,6 +173,43 @@ describe('heartbeat handler', () => {
     expect(pts[0]?.d).toBe(750);
   });
 
+  it('leaves the scored delta off a point no mechanic changed', async () => {
+    const { join_code, race_id, horse_id, heartbeat_token } = await setup();
+    await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { seq: 1, delta: 750 }));
+    const { listSeriesPoints } = await import('../../src/db/series.js');
+    const pts = await listSeriesPoints(race_id, horse_id);
+    // Repeating `d` on every point of every race that runs no mechanics would
+    // be pure storage; absent reads as "unmodified", which it is.
+    expect(pts[0]?.s).toBeUndefined();
+  });
+
+  it('records the scored delta on a point a mechanic changed', async () => {
+    const { join_code, race_id, horse_id, token } = await setupLiveRaceWithHorse({ stamina: true });
+
+    vi.useFakeTimers();
+    // Flat out until the horse is well past the taper floor, so later beats
+    // score below face value and the graph must show the difference.
+    for (let seq = 1; seq <= 20; seq++) {
+      await heartbeat({ join_code, horse_id, token, seq, delta: 400_000, advanceMs: 60_000 });
+    }
+
+    const { listSeriesPoints } = await import('../../src/db/series.js');
+    const pts = await listSeriesPoints(race_id, horse_id);
+    const tapered = pts.filter(p => p.s !== undefined);
+    expect(tapered.length).toBeGreaterThan(0);
+    for (const p of tapered) {
+      expect(p.s!).toBeLessThan(p.d);
+      expect(p.d).toBe(400_000);
+    }
+
+    // The cumulative graph is drawn from these; it must land on the horse's own
+    // scored total rather than the raw one it would otherwise plot.
+    const [horse] = await listHorses(race_id);
+    const graphed = pts.reduce((sum, p) => sum + (p.s ?? p.d), 0);
+    expect(graphed).toBe(horse!.scored_tokens);
+    expect(graphed).toBeLessThan(horse!.current_tokens);
+  });
+
   it('accumulates scored_tokens alongside current_tokens with no mechanics enabled', async () => {
     const { join_code, race_id, horse_id, heartbeat_token } = await setup();
     await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { seq: 1, delta: 5_000 }));

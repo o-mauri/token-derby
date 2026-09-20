@@ -46,7 +46,11 @@ export type HeartbeatResponse = {
 
 export type SeriesPoint = {
   t: number; // server epoch ms
-  d: number; // applied delta (tokens)
+  d: number; // raw tokens produced in this beat
+  // Scored distance for the same beat, when a modifier changed it. Omitted when
+  // it equals `d`, which is every beat of a race running no mechanics -- read it
+  // as `s ?? d`. Absent on points written before scored distance was recorded.
+  s?: number;
 };
 
 export type GetRaceSeriesResponse = {

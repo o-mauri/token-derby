@@ -27,8 +27,8 @@ function input(overrides: Partial<EvaluateInput>): EvaluateInput {
     prev: emptyState(),
     now_ms: 1_000_000,
     last_heartbeat_at_ms: 1_000_000 - 60_000,
-    current_tokens: 0,
-    prev_current_tokens: 0,
+    scored_tokens: 0,
+    prev_scored_tokens: 0,
     new_rank: 1,
     total_horses: 4,
     second_place_tokens: null,
@@ -234,12 +234,12 @@ describe('evaluateAchievements — Pacesetter!', () => {
 });
 
 describe('evaluateAchievements — Stampede!', () => {
-  it('fires when current_tokens grows by 70,000+ since prev tick', () => {
+  it('fires when scored_tokens grows by 70,000+ since prev tick', () => {
     const prev = emptyState();
     const result = evaluateAchievements(input({
       prev,
-      current_tokens: 100_000,
-      prev_current_tokens: 25_000,
+      scored_tokens: 100_000,
+      prev_scored_tokens: 25_000,
       now_ms: 1_000_000,
     }));
     expect(result.xp_delta).toBeGreaterThanOrEqual(2);
@@ -253,8 +253,8 @@ describe('evaluateAchievements — Stampede!', () => {
     const prev = emptyState();
     const result = evaluateAchievements(input({
       prev,
-      current_tokens: 79_999,
-      prev_current_tokens: 10_000,  // gain = 69,999
+      scored_tokens: 79_999,
+      prev_scored_tokens: 10_000,  // gain = 69,999
     }));
     expect(result.events_this_tick.find(e => e.name === 'Stampede!')).toBeUndefined();
   });
@@ -263,8 +263,8 @@ describe('evaluateAchievements — Stampede!', () => {
     const prev = emptyState();
     const result = evaluateAchievements(input({
       prev,
-      current_tokens: 80_000,
-      prev_current_tokens: 10_000,  // gain = 70,000 exactly
+      scored_tokens: 80_000,
+      prev_scored_tokens: 10_000,  // gain = 70,000 exactly
     }));
     expect(result.events_this_tick.find(e => e.name === 'Stampede!')).toBeDefined();
   });
@@ -275,8 +275,8 @@ describe('evaluateAchievements — Stampede!', () => {
     const result = evaluateAchievements(input({
       prev,
       now_ms: 1_000_000 + 60 * 60 * 1000,  // 1 hour later
-      current_tokens: 100_000,
-      prev_current_tokens: 10_000,
+      scored_tokens: 100_000,
+      prev_scored_tokens: 10_000,
     }));
     expect(result.events_this_tick.find(e => e.name === 'Stampede!')).toBeUndefined();
   });
@@ -287,8 +287,8 @@ describe('evaluateAchievements — Stampede!', () => {
     const result = evaluateAchievements(input({
       prev,
       now_ms: 1_000_000 + 2 * 60 * 60 * 1000 + 1,
-      current_tokens: 100_000,
-      prev_current_tokens: 10_000,
+      scored_tokens: 100_000,
+      prev_scored_tokens: 10_000,
     }));
     expect(result.events_this_tick.find(e => e.name === 'Stampede!')).toBeDefined();
   });
@@ -363,7 +363,7 @@ describe('evaluateAchievements — Pulled Away!', () => {
     const result = evaluateAchievements(input({
       prev,
       new_rank: 1,
-      current_tokens: 50_000,
+      scored_tokens: 50_000,
       second_place_tokens: 45_000,
     }));
     expect(result.next.last_gap_in_1st).toBe(5_000);
@@ -387,7 +387,7 @@ describe('evaluateAchievements — Pulled Away!', () => {
     const result = evaluateAchievements(input({
       prev,
       new_rank: 1,
-      current_tokens: 200_000,
+      scored_tokens: 200_000,
       second_place_tokens: 149_000,  // gap now 51_000, growth 50_000
       now_ms: 1_000_000,
     }));
@@ -405,7 +405,7 @@ describe('evaluateAchievements — Pulled Away!', () => {
     const result = evaluateAchievements(input({
       prev,
       new_rank: 1,
-      current_tokens: 200_000,
+      scored_tokens: 200_000,
       second_place_tokens: 149_001,  // gap 50_999, growth 49_999
     }));
     expect(result.events_this_tick.find(e => e.name === 'Pulled Away!')).toBeUndefined();
@@ -419,7 +419,7 @@ describe('evaluateAchievements — Pulled Away!', () => {
     const result = evaluateAchievements(input({
       prev,
       new_rank: 1,
-      current_tokens: 200_000,
+      scored_tokens: 200_000,
       second_place_tokens: 149_000,  // gap 51_000, growth 50_000
       now_ms: 1_000_000 + 60 * 60 * 1000,
     }));
@@ -433,7 +433,7 @@ describe('evaluateAchievements — Pulled Away!', () => {
     const result = evaluateAchievements(input({
       prev,
       new_rank: 1,
-      current_tokens: 100_000,
+      scored_tokens: 100_000,
       second_place_tokens: 50_000,
     }));
     expect(result.events_this_tick.find(e => e.name === 'Pulled Away!')).toBeUndefined();
