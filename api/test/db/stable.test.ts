@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { putStableHorse, getStableHorse, applyRollResult, equipHat } from '../../src/db/stable.js';
 import type { StableHorse } from '@token-derby/shared';
 
-function baseHorse(user_id: string, stable_horse_id: string, name = 'Test'): StableHorse {
+function baseHorse(stable_horse_id: string, name = 'Test'): StableHorse {
   return {
     stable_horse_id,
     name,
@@ -15,7 +15,7 @@ function baseHorse(user_id: string, stable_horse_id: string, name = 'Test'): Sta
 describe('applyRollResult', () => {
   it('appends to hats[] and increments last_rolled_level atomically', async () => {
     const user_id = `u-${Date.now()}`;
-    const horse = baseHorse(user_id, 'h-roll-1');
+    const horse = baseHorse('h-roll-1');
     await putStableHorse(user_id, horse);
 
     await applyRollResult(user_id, 'h-roll-1', {
@@ -31,7 +31,7 @@ describe('applyRollResult', () => {
 
   it('awards XP via xp_delta on no_hat / duplicate outcomes', async () => {
     const user_id = `u-${Date.now()}-x`;
-    const horse = baseHorse(user_id, 'h-roll-2');
+    const horse = baseHorse('h-roll-2');
     await putStableHorse(user_id, horse);
     await applyRollResult(user_id, 'h-roll-2', {
       expected_last_rolled_level: 0,
@@ -45,7 +45,7 @@ describe('applyRollResult', () => {
 
   it('refuses to apply when expected_last_rolled_level is stale (optimistic concurrency)', async () => {
     const user_id = `u-${Date.now()}-c`;
-    const horse = baseHorse(user_id, 'h-roll-3');
+    const horse = baseHorse('h-roll-3');
     await putStableHorse(user_id, horse);
     // First roll succeeds (expected_last_rolled_level=0)
     await applyRollResult(user_id, 'h-roll-3', {
@@ -63,7 +63,7 @@ describe('applyRollResult', () => {
 describe('equipHat', () => {
   it('sets equipped_hat to a given index', async () => {
     const user_id = `u-${Date.now()}-e1`;
-    const horse = baseHorse(user_id, 'h-eq-1');
+    const horse = baseHorse('h-eq-1');
     horse.hats = [{ id: 'flat_cap', variant: 0, obtained_at: new Date().toISOString() }];
     await putStableHorse(user_id, horse);
     await equipHat(user_id, 'h-eq-1', 0);
@@ -73,7 +73,7 @@ describe('equipHat', () => {
 
   it('clears equipped_hat when index is null', async () => {
     const user_id = `u-${Date.now()}-e2`;
-    const horse = baseHorse(user_id, 'h-eq-2');
+    const horse = baseHorse('h-eq-2');
     horse.hats = [{ id: 'flat_cap', variant: 0, obtained_at: new Date().toISOString() }];
     horse.equipped_hat = 0;
     await putStableHorse(user_id, horse);

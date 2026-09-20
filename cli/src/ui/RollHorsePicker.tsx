@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { HorseSprite } from './HorseSprite.js';
 import { MINI_SPRITE } from './sprite.js';

@@ -1,4 +1,4 @@
-import { MODEL_FAMILIES, familyForKey, totalFor, zeroPerFamily, type ModelFamily } from '@token-derby/shared';
+import { familyForKey, totalFor, zeroPerFamily, type ModelFamily } from '@token-derby/shared';
 
 function finiteNonNeg(v: unknown): number {
   return typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : 0;
@@ -40,5 +40,3 @@ export function resolveHeartbeatDelta(
   }
   return null;
 }
-
-export { MODEL_FAMILIES };

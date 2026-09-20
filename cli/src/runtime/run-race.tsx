@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Box, Text, useApp } from 'ink';
 import type { GetRaceResponse, HeartbeatResponse } from '@token-derby/shared';
 import { StatusScreen } from '../ui/StatusScreen.js';

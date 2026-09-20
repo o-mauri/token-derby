@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
-import { JOIN_CODE_ALPHABET, CLI_AUTH_TTL_SECONDS } from '@token-derby/shared';
+import { JOIN_CODE_ALPHABET } from '@token-derby/shared';
 import { handler as cliStart } from '../../src/handlers/auth-cli-start.js';
 import { putCliAuthRequest, getCliAuthRequest, getCliAuthRequestByUserCode } from '../../src/db/cli-auth-requests.js';
-import { recordAttempt, WINDOW_SECONDS, CLI_START_BUCKET, CLI_START_LIMIT } from '../../src/db/rate-limits.js';
+import { recordAttempt, CLI_START_BUCKET, CLI_START_LIMIT } from '../../src/db/rate-limits.js';
 import { makeUser, authHeaders } from '../helpers/auth-helper.js';
 
 function ev(over: Partial<APIGatewayProxyEventV2> = {}): APIGatewayProxyEventV2 {

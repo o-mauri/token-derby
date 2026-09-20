@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Box, Text } from 'ink';
 import type { Hat } from '@token-derby/shared';
 import { isAnimatedHat } from '@token-derby/shared';

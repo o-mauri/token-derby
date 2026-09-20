@@ -26,10 +26,6 @@ export type BeatSnapshot = {
 
 const STALL_THRESHOLD = 5;
 
-function emptyAnchors(): PerFamily<ConvAnchors> {
-  return { anthropic: {}, openai: {}, google: {} };
-}
-
 function cloneAnchors(a: PerFamily<ConvAnchors>): PerFamily<ConvAnchors> {
   return { anthropic: { ...a.anthropic }, openai: { ...a.openai }, google: { ...a.google } };
 }
