@@ -57,10 +57,28 @@ describe('org race settings handlers', () => {
     await createOrg(ownerAuth, orgName);
   });
 
-  it('round-trips a stamina config for the org owner', async () => {
-    await setOrgRaceSettings(orgName, { stamina_config: { drain_per_min: 7 } }, ownerAuth);
+  it('round-trips a mechanic and its tuning for the org owner', async () => {
+    await setOrgRaceSettings(orgName, { modifiers: { stamina: { enabled: true, params: { drain_per_min: 7 } } } }, ownerAuth);
     const res = await getOrgRaceSettings(orgName, ownerAuth);
-    expect(res.settings!.stamina_config).toEqual({ drain_per_min: 7 });
+    expect(res.settings!.modifiers).toEqual({ stamina: { enabled: true, params: { drain_per_min: 7 } } });
+  });
+
+  it('keeps tuning for a mechanic that is switched off', async () => {
+    // Turning a mechanic back on should restore what was set up for it, not
+    // hand back the defaults.
+    await setOrgRaceSettings(orgName, { modifiers: { stamina: { enabled: false, params: { drain_per_min: 7 } } } }, ownerAuth);
+    const res = await getOrgRaceSettings(orgName, ownerAuth);
+    expect(res.settings!.modifiers!.stamina).toEqual({ enabled: false, params: { drain_per_min: 7 } });
+  });
+
+  it('rejects an unknown mechanic rather than storing it', async () => {
+    const res = await setOrgRaceSettingsRaw(orgName, { modifiers: { stamna: { enabled: true } } } as any, ownerAuth);
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('rejects a mechanic with no enabled flag', async () => {
+    const res = await setOrgRaceSettingsRaw(orgName, { modifiers: { stamina: { params: {} } } } as any, ownerAuth);
+    expect(res.statusCode).toBe(400);
   });
 
   it('returns null before anything is configured', async () => {
@@ -74,34 +92,34 @@ describe('org race settings handlers', () => {
   });
 
   it('rejects a non-owner (set)', async () => {
-    const res = await setOrgRaceSettingsRaw(orgName, { stamina_config: { drain_per_min: 7 } }, otherAuth);
+    const res = await setOrgRaceSettingsRaw(orgName, { modifiers: { stamina: { enabled: true, params: { drain_per_min: 7 } } } }, otherAuth);
     expect(res.statusCode).toBe(403);
   });
 
   it('rejects an out-of-range value', async () => {
-    const res = await setOrgRaceSettingsRaw(orgName, { stamina_config: { drain_per_min: 999 } }, ownerAuth);
+    const res = await setOrgRaceSettingsRaw(orgName, { modifiers: { stamina: { enabled: true, params: { drain_per_min: 999 } } } }, ownerAuth);
     expect(res.statusCode).toBe(400);
   });
 
-  it('rejects a non-object stamina_config instead of silently clearing it', async () => {
-    const res = await setOrgRaceSettingsRaw(orgName, { stamina_config: 5 } as any, ownerAuth);
+  it('rejects a non-object modifiers map instead of silently clearing it', async () => {
+    const res = await setOrgRaceSettingsRaw(orgName, { modifiers: 5 } as any, ownerAuth);
     expect(res.statusCode).toBe(400);
   });
 
-  it('rejects an array stamina_config', async () => {
-    const res = await setOrgRaceSettingsRaw(orgName, { stamina_config: [] } as any, ownerAuth);
+  it('rejects an array modifiers map', async () => {
+    const res = await setOrgRaceSettingsRaw(orgName, { modifiers: [] } as any, ownerAuth);
     expect(res.statusCode).toBe(400);
   });
 
-  it('rejects a null stamina_config', async () => {
-    const res = await setOrgRaceSettingsRaw(orgName, { stamina_config: null } as any, ownerAuth);
+  it('rejects a null modifiers map', async () => {
+    const res = await setOrgRaceSettingsRaw(orgName, { modifiers: null } as any, ownerAuth);
     expect(res.statusCode).toBe(400);
   });
 
   it('clears the config when given an empty body', async () => {
-    await setOrgRaceSettings(orgName, { stamina_config: { drain_per_min: 7 } }, ownerAuth);
+    await setOrgRaceSettings(orgName, { modifiers: { stamina: { enabled: true, params: { drain_per_min: 7 } } } }, ownerAuth);
     await setOrgRaceSettings(orgName, {}, ownerAuth);
     const res = await getOrgRaceSettings(orgName, ownerAuth);
-    expect(res.settings!.stamina_config).toBeUndefined();
+    expect(res.settings!.modifiers).toBeUndefined();
   });
 });

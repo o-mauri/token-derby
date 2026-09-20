@@ -1,13 +1,14 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { handler as hbHandler } from '../../src/handlers/heartbeat.js';
 import { handler as createHandler } from '../../src/handlers/create-race.js';
 import { handler as joinHandler } from '../../src/handlers/join-race.js';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { listHorses } from '../../src/db/horses.js';
 import { ddb, TABLE } from '../../src/db/client.js';
-import { raceMetaKey } from '../../src/db/keys.js';
+import { raceMetaKey, horseKey } from '../../src/db/keys.js';
 import { UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { makeUser, makeHorse, type TestUser } from '../helpers/auth-helper.js';
+import { staminaOf } from '@token-derby/shared';
 import { CURRENT_CLI_VERSION, SAME_MINOR_CLI_VERSION, MISMATCHED_MINOR_CLI_VERSION, OUTDATED_CLI_VERSION } from '../helpers/cli-version.js';
 
 const COLORS = { body: '#8B4513', mane: '#000', tail: '#000', saddle: '#C0392B' };
@@ -48,17 +49,26 @@ async function setup(cliVersion = CURRENT_CLI_VERSION) {
   return { join_code, race_id, horse_id, heartbeat_token };
 }
 
-/** Like setup() but stamps race-level toggles (e.g. stamina) onto the race row. */
+/**
+ * Like setup() but switches mechanics on for the race.
+ *
+ * `legacy` writes the pre-`modifiers` flag instead, so the path a race created
+ * before the settings map takes is covered by the same tests.
+ */
 async function setupLiveRaceWithHorse(
-  opts: { stamina?: boolean } = {},
+  opts: { stamina?: boolean; legacy?: boolean } = {},
 ): Promise<{ join_code: string; race_id: string; horse_id: string; token: string }> {
   const { join_code, race_id, horse_id, heartbeat_token } = await setup();
   if (opts.stamina) {
     await ddb.send(new UpdateCommand({
       TableName: TABLE,
       Key: raceMetaKey(race_id),
-      UpdateExpression: 'SET stamina = :s',
-      ExpressionAttributeValues: { ':s': true },
+      ...(opts.legacy
+        ? { UpdateExpression: 'SET stamina = :s', ExpressionAttributeValues: { ':s': true } }
+        : {
+            UpdateExpression: 'SET modifiers = :m',
+            ExpressionAttributeValues: { ':m': { stamina: { enabled: true } } },
+          }),
     }));
   }
   return { join_code, race_id, horse_id, token: heartbeat_token };
@@ -132,8 +142,7 @@ function hbEvent(
 }
 
 describe('heartbeat handler', () => {
-  beforeEach(() => { process.env.TOKEN_DERBY_MAX_RATE = '1000000000'; });
-  afterEach(() => { delete process.env.TOKEN_DERBY_MAX_RATE; vi.useRealTimers(); });
+  afterEach(() => { vi.useRealTimers(); });
 
   it('accumulates applied deltas onto current_tokens and returns last_seq', async () => {
     const { join_code, race_id, horse_id, heartbeat_token } = await setup();
@@ -162,6 +171,43 @@ describe('heartbeat handler', () => {
     const pts = await listSeriesPoints(race_id, horse_id);
     expect(pts).toHaveLength(1);
     expect(pts[0]?.d).toBe(750);
+  });
+
+  it('leaves the scored delta off a point no mechanic changed', async () => {
+    const { join_code, race_id, horse_id, heartbeat_token } = await setup();
+    await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { seq: 1, delta: 750 }));
+    const { listSeriesPoints } = await import('../../src/db/series.js');
+    const pts = await listSeriesPoints(race_id, horse_id);
+    // Repeating `d` on every point of every race that runs no mechanics would
+    // be pure storage; absent reads as "unmodified", which it is.
+    expect(pts[0]?.s).toBeUndefined();
+  });
+
+  it('records the scored delta on a point a mechanic changed', async () => {
+    const { join_code, race_id, horse_id, token } = await setupLiveRaceWithHorse({ stamina: true });
+
+    vi.useFakeTimers();
+    // Flat out until the horse is well past the taper floor, so later beats
+    // score below face value and the graph must show the difference.
+    for (let seq = 1; seq <= 20; seq++) {
+      await heartbeat({ join_code, horse_id, token, seq, delta: 400_000, advanceMs: 60_000 });
+    }
+
+    const { listSeriesPoints } = await import('../../src/db/series.js');
+    const pts = await listSeriesPoints(race_id, horse_id);
+    const tapered = pts.filter(p => p.s !== undefined);
+    expect(tapered.length).toBeGreaterThan(0);
+    for (const p of tapered) {
+      expect(p.s!).toBeLessThan(p.d);
+      expect(p.d).toBe(400_000);
+    }
+
+    // The cumulative graph is drawn from these; it must land on the horse's own
+    // scored total rather than the raw one it would otherwise plot.
+    const [horse] = await listHorses(race_id);
+    const graphed = pts.reduce((sum, p) => sum + (p.s ?? p.d), 0);
+    expect(graphed).toBe(horse!.scored_tokens);
+    expect(graphed).toBeLessThan(horse!.current_tokens);
   });
 
   it('accumulates scored_tokens alongside current_tokens with no mechanics enabled', async () => {
@@ -453,6 +499,18 @@ describe('heartbeat handler', () => {
     expect(summed).toBe(own.current_tokens);
   });
 
+  it('scores from the per-family split, not a zeroed placeholder', async () => {
+    // components is load-bearing now: a per-family modifier scores from it, so
+    // a beat whose split never reached the pipeline would score nothing.
+    const { join_code, race_id, horse_id, heartbeat_token } = await setupWithCliVersion();
+    await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, {
+      seq: 1, components: { anthropic: 700, openai: 300, google: 0 },
+    }));
+    const own = (await listHorses(race_id)).find(h => h.horse_id === horse_id)!;
+    expect(own.current_tokens).toBe(1000);
+    expect(own.scored_tokens).toBe(1000);   // no modifier active: untouched
+  });
+
   it('accepts the component keys an un-upgraded CLI sends', async () => {
     const { join_code, race_id, horse_id, heartbeat_token } = await setupWithCliVersion();
     // Pre-rename CLIs key components by tool, not by model family.
@@ -490,27 +548,6 @@ describe('heartbeat handler', () => {
     expect(summed).toBe(own.current_tokens);
   });
 
-  it('trims the per-model split with the rate cap so it never outruns the total', async () => {
-    const prev = process.env.TOKEN_DERBY_MAX_RATE;
-    process.env.TOKEN_DERBY_MAX_RATE = '1';   // ceiling = 1 token/sec
-    try {
-      const { join_code, race_id, horse_id, heartbeat_token } = await setupWithCliVersion();
-      await new Promise(r => setTimeout(r, 20));
-      await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, {
-        seq: 1, components: { anthropic: 900_000, openai: 100_000, google: 0 },
-      }));
-      const horses = await listHorses(race_id);
-      const own = horses.find(h => h.horse_id === horse_id)!;
-      const summed = own.model_tokens!.anthropic + own.model_tokens!.openai + own.model_tokens!.google;
-      expect(own.current_tokens).toBeLessThan(1_000_000);   // the cap bit
-      expect(summed).toBeCloseTo(own.current_tokens, 6);
-      // and the split keeps its 9:1 shape through the trim
-      expect(own.model_tokens!.anthropic).toBeCloseTo(own.current_tokens * 0.9, 6);
-    } finally {
-      if (prev === undefined) delete process.env.TOKEN_DERBY_MAX_RATE;
-      else process.env.TOKEN_DERBY_MAX_RATE = prev;
-    }
-  });
 
   it('accepts a legacy bare delta, attributed to anthropic', async () => {
     const { join_code, race_id, horse_id, heartbeat_token } = await setupWithCliVersion();
@@ -575,10 +612,45 @@ describe('heartbeat handler', () => {
     }
 
     const [horse] = await listHorses(race_id);
-    expect(horse!.stamina!).toBeLessThan(25);
+    expect(staminaOf(horse!)).toBeLessThan(25);
     expect(horse!.scored_tokens!).toBeLessThan(horse!.current_tokens);
 
     const ownInResponse = body.horses.find((h: any) => h.horse_id === horse_id);
-    expect(ownInResponse.stamina).toBe(horse!.stamina);
+    expect(ownInResponse.modifier_states).toEqual(horse!.modifier_states);
+  });
+
+  it('keeps tiring a race created before the settings map', async () => {
+    const { join_code, horse_id, token, race_id } = await setupLiveRaceWithHorse({ stamina: true, legacy: true });
+
+    vi.useFakeTimers();
+    for (let seq = 1; seq <= 20; seq++) {
+      await heartbeat({ join_code, horse_id, token, seq, delta: 400_000, advanceMs: 60_000 });
+    }
+
+    const [horse] = await listHorses(race_id);
+    expect(staminaOf(horse!)).toBeLessThan(25);
+    expect(horse!.scored_tokens!).toBeLessThan(horse!.current_tokens);
+  });
+
+  it('resumes from a pre-map row\'s flat stamina rather than restarting at full', async () => {
+    const { join_code, horse_id, token, race_id } = await setupLiveRaceWithHorse({ stamina: true });
+    // A horse mid-race when this release deployed: tired, but only the flat
+    // attribute the previous release wrote. It must keep draining from there.
+    await ddb.send(new UpdateCommand({
+      TableName: TABLE,
+      Key: horseKey(race_id, horse_id),
+      UpdateExpression: 'SET stamina = :s',
+      ExpressionAttributeValues: { ':s': 30 },
+    }));
+
+    vi.useFakeTimers();
+    const body = await heartbeat({ join_code, horse_id, token, seq: 1, delta: 400_000, advanceMs: 60_000 });
+
+    const [horse] = await listHorses(race_id);
+    // Drain clamps at 6/min, so one flat-out minute from 30 lands at ~24 --
+    // reachable only by resuming from 30, never from a reset to 100.
+    expect(staminaOf(horse!)).toBeCloseTo(24, 1);
+    const own = body.horses.find((h: any) => h.horse_id === horse_id);
+    expect(staminaOf(own)).toBeCloseTo(24, 1);
   });
 });

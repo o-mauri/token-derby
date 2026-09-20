@@ -22,8 +22,10 @@ export type EvaluateInput = {
   prev: AchievementState;
   now_ms: number;
   last_heartbeat_at_ms: number;
-  current_tokens: number;
-  prev_current_tokens: number;
+  // Scored distance, not raw tokens: every threshold here is about race
+  // position, so it must move with what the horse is actually ranked by.
+  scored_tokens: number;
+  prev_scored_tokens: number;
   new_rank: number;
   total_horses: number;
   second_place_tokens: number | null;
@@ -113,7 +115,7 @@ export function evaluateAchievements(inp: EvaluateInput): EvaluateOutput {
   }
 
   // Stampede! — token gain >= 70,000 since previous tick + 2h cooldown.
-  const tokenGain = inp.current_tokens - inp.prev_current_tokens;
+  const tokenGain = inp.scored_tokens - inp.prev_scored_tokens;
   const stampedeOk =
     inp.prev.last_stampede_at === undefined ||
     inp.now_ms - inp.prev.last_stampede_at >= MIDRACE_THRESHOLDS.stampede_cooldown_ms;
@@ -140,8 +142,8 @@ export function evaluateAchievements(inp: EvaluateInput): EvaluateOutput {
 
   // Pulled Away! — gap-over-2nd growth >= 50,000 since previous tick in 1st + 2h cooldown.
   if (inp.new_rank === 1) {
-    const second = inp.second_place_tokens ?? inp.current_tokens;
-    const gap = inp.current_tokens - second;
+    const second = inp.second_place_tokens ?? inp.scored_tokens;
+    const gap = inp.scored_tokens - second;
     if (inp.prev.last_gap_in_1st !== undefined) {
       const growth = gap - inp.prev.last_gap_in_1st;
       const cooldownOk =

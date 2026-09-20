@@ -9,6 +9,11 @@ vi.mock('../src/api.js', async () => {
 
 import { renderRace } from '../src/render/race.js';
 
+/** A stamina reserve, in the state map the wire actually carries. */
+function reserve(level: number): Pick<HorseView, 'modifier_states'> {
+  return { modifier_states: { stamina: { level } } };
+}
+
 function horse(over: Partial<HorseView>): HorseView {
   return {
     horse_id: 'h1', stable_horse_id: 's1', name: 'Dobbin',
@@ -44,35 +49,35 @@ async function mount(v: RaceView): Promise<HTMLElement> {
 
 describe('race page stamina rendering', () => {
   it('bands the stamina bar green above 50', async () => {
-    const root = await mount(view({ stamina: 80 }));
+    const root = await mount(view(reserve(80)));
     expect(root.querySelector('.stamina-bar')!.getAttribute('data-band')).toBe('green');
   });
 
   it('bands amber between the taper floor and 50', async () => {
-    const root = await mount(view({ stamina: 30 }));
+    const root = await mount(view(reserve(30)));
     expect(root.querySelector('.stamina-bar')!.getAttribute('data-band')).toBe('amber');
   });
 
   it('bands red below the taper floor', async () => {
-    const root = await mount(view({ stamina: 12.5 }));
+    const root = await mount(view(reserve(12.5)));
     const bar = root.querySelector('.stamina-bar')!;
     expect(bar.getAttribute('data-band')).toBe('red');
   });
 
   it('mounts the bar inside the .horse element so it tracks the sprite', async () => {
-    const root = await mount(view({ stamina: 60 }));
+    const root = await mount(view(reserve(60)));
     const bar = root.querySelector('.stamina-bar')!;
     expect(bar.closest('.horse')).not.toBeNull();
   });
 
   it('displays the scored token count, not the raw one', async () => {
-    const root = await mount(view({ current_tokens: 10_000, scored_tokens: 8_000, stamina: 20 }));
+    const root = await mount(view({ current_tokens: 10_000, scored_tokens: 8_000, ...reserve(20) }));
     expect(root.querySelector('.horse-tokens')!.textContent).toContain('8,000');
     expect(root.querySelector('.horse-tokens')!.textContent).not.toContain('10,000');
   });
 
   it('renders no stamina bar when the race has stamina off', async () => {
-    const root = await mount(view({ stamina: undefined }, { stamina: false }));
+    const root = await mount(view({}, { stamina: false }));
     expect(root.querySelector('.stamina-bar')).toBeNull();
   });
 
@@ -80,7 +85,7 @@ describe('race page stamina rendering', () => {
     // Org tuned taper_floor to 40 for this race. Stamina 30 sits below that
     // floor (already tired, server-side), even though it's above the
     // default floor of 25 — the bar must agree with the server, not the default.
-    const root = await mount(view({ stamina: 30 }, { stamina_config: { taper_floor: 40 } }));
+    const root = await mount(view(reserve(30), { stamina_config: { taper_floor: 40 } }));
     expect(root.querySelector('.stamina-bar')!.getAttribute('data-band')).toBe('red');
   });
 });

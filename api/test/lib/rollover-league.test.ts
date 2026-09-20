@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { rolloverDueLeague } from '../../src/lib/rollover-league.js';
 import { putLeague, getLeague } from '../../src/db/leagues.js';
-import { ensureLeagueSeason, getLeagueSeason, stampFinalFixtureEnd } from '../../src/db/league-seasons.js';
+import { ensureLeagueSeason, stampFinalFixtureEnd } from '../../src/db/league-seasons.js';
 import { ensureStanding, listSeasonStandings, tryMarkPrizeAwarded, addStandingPointsForRound } from '../../src/db/league-standings.js';
 import { getSeasonResult } from '../../src/db/league-results.js';
 import { getStableHorse } from '../../src/db/stable.js';

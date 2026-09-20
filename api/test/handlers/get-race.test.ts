@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { handler as getRaceHandler } from '../../src/handlers/get-race.js';
 import { handler as createHandler } from '../../src/handlers/create-race.js';
 import { handler as joinHandler } from '../../src/handlers/join-race.js';
@@ -43,8 +43,6 @@ function evt(
 }
 
 describe('getRace handler', () => {
-  beforeEach(() => { process.env.TOKEN_DERBY_MAX_RATE = '1000000000'; });
-  afterEach(() => { delete process.env.TOKEN_DERBY_MAX_RATE; });
   async function setupRace(creator: TestUser, overrides: Record<string, any> = {}) {
     const createRes: any = await createHandler(evt({
       name: 'GetRace Test',

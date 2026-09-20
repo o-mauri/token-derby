@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { handler as endHandler } from '../../src/handlers/end-race.js';
 import { handler as createHandler } from '../../src/handlers/create-race.js';
 import { handler as joinHandler } from '../../src/handlers/join-race.js';
@@ -36,8 +36,6 @@ function evt(
 }
 
 describe('endRace handler', () => {
-  beforeEach(() => { process.env.TOKEN_DERBY_MAX_RATE = '1000000000'; });
-  afterEach(() => { delete process.env.TOKEN_DERBY_MAX_RATE; });
 
   it('ends the race and freezes final_tokens', async () => {
     const creator = await makeUser('End_Creator');

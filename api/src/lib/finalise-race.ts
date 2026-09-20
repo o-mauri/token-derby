@@ -87,7 +87,7 @@ export async function finaliseRace(race: Race, now: Date): Promise<FinaliseResul
       await Promise.all([
         awardHorseXp(h.user_id, h.stable_horse_id, xp),
         recordHorseRaceResult(h.user_id, h.stable_horse_id, {
-          final_tokens: h.final_scored_tokens,
+          final_scored_tokens: h.final_scored_tokens,
           rank,
         }),
       ]);

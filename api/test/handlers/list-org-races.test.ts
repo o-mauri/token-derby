@@ -87,7 +87,7 @@ async function makeMember(name: string, join_token: string): Promise<TestUser> {
 }
 
 // Directly set current_tokens (and optionally joined_at) on a race horse,
-// avoiding rate-cap / achievement plumbing in the heartbeat path.
+// avoiding the achievement plumbing in the heartbeat path.
 async function setHorseTokens(race_id: string, horse_id: string, current_tokens: number, joined_at?: string) {
   await ddb.send(new UpdateCommand({
     TableName: TABLE,

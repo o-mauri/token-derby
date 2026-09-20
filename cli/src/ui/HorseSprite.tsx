@@ -1,4 +1,3 @@
-import React from 'react';
 import { Box, Text } from 'ink';
 import type { HorseColors, Hat } from '@token-derby/shared';
 import { renderSprite, type Cell } from './sprite-render.js';

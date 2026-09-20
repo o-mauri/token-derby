@@ -2,7 +2,7 @@ import { PutCommand, QueryCommand, UpdateCommand, GetCommand } from '@aws-sdk/li
 import { ddb, TABLE } from './client.js';
 import { horseKey, parseHorseId, RACE_PK_PREFIX, HORSE_SK_PREFIX } from './keys.js';
 import { MODEL_FAMILIES, LEGACY_FAMILY_KEYS, zeroPerFamily } from '@token-derby/shared';
-import type { Horse, RecentEvent, ModelFamily } from '@token-derby/shared';
+import type { Horse, RecentEvent, ModelFamily, ModifierStates } from '@token-derby/shared';
 import type { AchievementState } from '../lib/evaluate-achievements.js';
 
 export async function putHorse(race_id: string, horse: Horse, heartbeat_token: string): Promise<void> {
@@ -135,7 +135,7 @@ export async function setHorseXpAwarded(
 export type HorseHeartbeatRecord = {
   current_tokens: number;
   scored_tokens?: number;
-  stamina?: number;
+  modifier_states?: ModifierStates;
   last_heartbeat: string;
   last_seq: number;
   model_tokens?: Record<ModelFamily, number>;
@@ -168,7 +168,7 @@ export async function getHorseForHeartbeat(
   return {
     current_tokens: Number(Item.current_tokens ?? 0),
     scored_tokens: Item.scored_tokens === undefined ? undefined : Number(Item.scored_tokens),
-    stamina: Item.stamina === undefined ? undefined : Number(Item.stamina),
+    modifier_states: readModifierStates(Item),
     last_heartbeat: String(Item.last_heartbeat ?? ''),
     last_seq: Number(Item.last_seq ?? 0),
     model_tokens: Item.model_tokens as Record<ModelFamily, number> | undefined,
@@ -274,7 +274,8 @@ export type ApplyHeartbeatDeltaInput = {
   seq: number;
   applied: number;
   scored_applied: number;
-  stamina: number | undefined;
+  /** Every modifier's state after this beat. Written whole, never incremented. */
+  modifier_states: ModifierStates;
   last_heartbeat: string;
   state: AchievementState;
   // This beat's applied delta split by source. Sums to `applied`, and is written
@@ -291,7 +292,7 @@ export type ApplyHeartbeatDeltaInput = {
 // advances last_seq ONLY when the incoming seq is newer. Returns false (no
 // mutation) for a duplicate/out-of-order seq.
 export async function applyHeartbeatDelta(input: ApplyHeartbeatDeltaInput): Promise<boolean> {
-  const { race_id, horse_id, seq, applied, scored_applied, stamina, last_heartbeat, state, components, needsSeed, legacyModelTokens } = input;
+  const { race_id, horse_id, seq, applied, scored_applied, modifier_states, last_heartbeat, state, components, needsSeed, legacyModelTokens } = input;
   if (needsSeed) await Promise.all([seedScoredTokens(race_id, horse_id), seedModelTokens(race_id, horse_id, legacyModelTokens)]);
 
   const eav: Record<string, unknown> = {
@@ -347,9 +348,11 @@ export async function applyHeartbeatDelta(input: ApplyHeartbeatDeltaInput): Prom
   } else {
     removeParts.push('last_gap_in_1st');
   }
-  if (stamina !== undefined) {
-    setParts.push('stamina = :stam');
-    eav[':stam'] = stamina;
+  // Written whole rather than per-member: a modifier owns its whole bag, so
+  // there is no counter to increment and no parent map to seed first.
+  if (Object.keys(modifier_states).length > 0) {
+    setParts.push('modifier_states = :ms');
+    eav[':ms'] = modifier_states;
   }
 
   const updateExpression =
@@ -377,6 +380,19 @@ export async function applyHeartbeatDelta(input: ApplyHeartbeatDeltaInput): Prom
 function pickHorse(item: Record<string, any>): Horse {
   const horse_id = parseHorseId(item.sk);
   if (!horse_id) throw new Error(`not a horse item: ${item.sk}`);
-  const { pk: _pk, sk: _sk, heartbeat_token: _hb, ...rest } = item;
-  return { ...rest, horse_id } as Horse;
+  const { pk: _pk, sk: _sk, heartbeat_token: _hb, stamina: _stam, ...rest } = item;
+  const modifier_states = readModifierStates(item);
+  return { ...rest, horse_id, ...(modifier_states ? { modifier_states } : {}) } as Horse;
+}
+
+/**
+ * A row's modifier state, hydrating the flat `stamina` attribute that rows
+ * written before the map still carry. The map wins where both exist, so a row
+ * mid-conversion never reads back the older of its two values.
+ */
+function readModifierStates(item: Record<string, any>): ModifierStates | undefined {
+  const stored = item.modifier_states as ModifierStates | undefined;
+  if (stored && Object.keys(stored).length > 0) return stored;
+  const level = item.stamina;
+  return typeof level === 'number' ? { stamina: { level } } : undefined;
 }

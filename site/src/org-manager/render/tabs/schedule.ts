@@ -45,7 +45,6 @@ export function renderSchedule(root: HTMLElement, deps: ScheduleDeps): void {
         end_local: (root.querySelector('input[name="end"]') as HTMLInputElement).value.trim(),
         tz: (root.querySelector('input[name="tz"]') as HTMLInputElement).value.trim(),
         ...(maxRaw ? { max_participants: Number(maxRaw) } : {}),
-        ...(s?.stamina ? { stamina: true } : {}),
       };
       deps.onSave(body);
     });

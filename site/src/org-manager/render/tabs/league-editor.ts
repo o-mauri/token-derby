@@ -166,7 +166,6 @@ export function renderLeagueEditor(root: HTMLElement, deps: LeagueEditorDeps): v
         tz: root.querySelector<HTMLInputElement>('input[name="tz"]')!.value.trim(),
         ...(raceName ? { race_name: raceName } : {}),
         ...(maxRaw ? { max_participants: Number(maxRaw) } : {}),
-        ...(src?.stamina ? { stamina: true } : {}),
       };
       // Reuse the shared validator so client rules never drift from the server's.
       const msg = validateLeagueConfig(body);

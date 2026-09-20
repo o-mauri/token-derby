@@ -1,4 +1,4 @@
-import type { RaceCreatedEvent } from '@token-derby/shared';
+import type { RaceCreatedEvent, ModifierId, ModifierSettings } from '@token-derby/shared';
 import { DEFAULT_MAX_PARTICIPANTS } from '@token-derby/shared';
 import { randomUUID } from 'node:crypto';
 import { generateRaceId, generateJoinCode, generateAdminCode } from './codes.js';
@@ -22,7 +22,7 @@ export type CreateRaceInput = {
   end_time: string;     // ISO 8601
   tz: string;
   max_participants?: number;
-  stamina?: boolean;
+  modifiers?: ModifierId[];
   creator_user_id: string;
   creator_user_name: string;
   cli_version?: string;
@@ -63,11 +63,11 @@ export async function createRace(input: CreateRaceInput): Promise<CreateRaceResu
   const created_at = new Date().toISOString();
   const max_participants = input.max_participants ?? DEFAULT_MAX_PARTICIPANTS;
 
-  // Snapshot the org's stamina config at creation time, not a live read —
-  // scored_tokens accumulates under whatever values were stamped here, so a
-  // later org config change must never rescore or alter an in-flight race.
+  // Snapshot the org's modifier configuration at creation time, not a live
+  // read — scored_tokens accumulates under whatever values were stamped here,
+  // so a later org change must never rescore or alter an in-flight race.
   const settings = input.org ? await getRaceSettings(input.org.org_id) : null;
-  const stamina_config = settings?.stamina_config;
+  const modifiers = settings?.modifiers ?? adHocModifiers(input.modifiers);
 
   await putRace(
     {
@@ -83,8 +83,7 @@ export async function createRace(input: CreateRaceInput): Promise<CreateRaceResu
       creator_user_name: input.creator_user_name,
       ...(input.cli_version ? { cli_version: input.cli_version } : {}),
       ...(input.org ? { org_id: input.org.org_id, organisation_name: input.org.org_name } : {}),
-      ...(input.stamina ? { stamina: true } : {}),
-      ...(stamina_config ? { stamina_config } : {}),
+      ...(modifiers && Object.keys(modifiers).length > 0 ? { modifiers } : {}),
       ...(input.league
         ? { league_id: input.league.league_id, league_season: input.league.season, league_round: input.league.round }
         : {}),
@@ -125,4 +124,10 @@ async function findUniqueJoinCode(): Promise<string> {
     if (!existing) return code;
   }
   throw new Error('Could not generate unique join code after 10 attempts');
+}
+
+/** A one-off race's opted-in mechanics, as the settings map the race stores. */
+function adHocModifiers(ids: ModifierId[] | undefined): ModifierSettings | undefined {
+  if (!ids || ids.length === 0) return undefined;
+  return Object.fromEntries(ids.map(id => [id, { enabled: true }])) as ModifierSettings;
 }

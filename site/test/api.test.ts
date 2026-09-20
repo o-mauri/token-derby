@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { fetchRace, fetchOrgRaces, fetchRaceSeries, ApiError } from '../src/api.js';
+import { fetchRace, fetchOrgRaces, fetchRaceSeries } from '../src/api.js';
 
 function fakeFetch(status: number, body: unknown) {
   return vi.fn().mockResolvedValue({

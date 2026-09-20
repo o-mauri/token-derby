@@ -176,7 +176,7 @@ export async function awardHorseXp(
 export async function recordHorseRaceResult(
   user_id: string,
   stable_horse_id: string,
-  result: { final_tokens: number; rank: number },
+  result: { final_scored_tokens: number; rank: number },
 ): Promise<void> {
   try {
     await ddb.send(new UpdateCommand({
@@ -190,7 +190,7 @@ export async function recordHorseRaceResult(
         ':one': 1,
         ':w': result.rank === 1 ? 1 : 0,
         ':p': result.rank <= 3 ? 1 : 0,
-        ':t': Math.max(0, result.final_tokens),
+        ':t': Math.max(0, result.final_scored_tokens),
         ':r': result.rank,
       },
     }));

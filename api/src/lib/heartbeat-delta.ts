@@ -1,4 +1,4 @@
-import { MODEL_FAMILIES, familyForKey, totalFor, zeroPerFamily, type ModelFamily } from '@token-derby/shared';
+import { familyForKey, totalFor, zeroPerFamily, type ModelFamily } from '@token-derby/shared';
 
 function finiteNonNeg(v: unknown): number {
   return typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : 0;
@@ -11,7 +11,7 @@ export type ResolvedDelta = {
 };
 
 /**
- * The raw (pre-rate-cap) delta for a heartbeat. Every family counts the same, so
+ * The delta for a heartbeat. Every family counts the same, so
  * the total is a plain sum; the split is carried alongside it for the per-family
  * counters.
  *
@@ -40,5 +40,3 @@ export function resolveHeartbeatDelta(
   }
   return null;
 }
-
-export { MODEL_FAMILIES };

@@ -1,12 +1,11 @@
 import type { ApiHandler } from '../lib/http.js';
 import type { HeartbeatRequest, HeartbeatResponse } from '@token-derby/shared';
-import { minorMatches, MIDRACE_THRESHOLDS, MODEL_FAMILIES, isModelFamily, scoreTick, scoredOf, zeroPerFamily, type ModelFamily } from '@token-derby/shared';
+import { minorMatches, MIDRACE_THRESHOLDS, MODEL_FAMILIES, scoreTick, scoredOf, zeroPerFamily, type ModelFamily } from '@token-derby/shared';
 import { getRaceByJoinCode } from '../db/races.js';
 import { getHorseForHeartbeat, applyHeartbeatDelta, listHorses } from '../db/horses.js';
 import { appendSeriesPoint } from '../db/series.js';
 import { evaluateAchievements } from '../lib/evaluate-achievements.js';
 import { computeStatus, timeLeftSeconds } from '../lib/status.js';
-import { clampDelta } from '../lib/rate-cap.js';
 import { resolveHeartbeatDelta } from '../lib/heartbeat-delta.js';
 import { rankHorses } from '../lib/rank-horses.js';
 import { finaliseRace } from '../lib/finalise-race.js';
@@ -69,24 +68,27 @@ export const handler: ApiHandler = async (event) => {
       const prevMs = Date.parse(horse.last_heartbeat);
       return Number.isFinite(prevMs) ? now.getTime() - prevMs : 0;
     })();
-    const applied = clampDelta({ delta: resolved.total, elapsedMs });
-    // The rate cap trims the total, so the per-model split is trimmed with it —
-    // otherwise the counters would outrun current_tokens on a capped beat.
-    const capScale = resolved.total > 0 ? applied / resolved.total : 0;
-    const appliedComponents = Object.fromEntries(
-      MODEL_FAMILIES.map(k => [k, resolved.components[k] * capScale]),
-    ) as Record<ModelFamily, number>;
+    // Nothing trims the claimed delta: the per-beat rate cap was removed, so
+    // what the client reports is what counts.
+    const applied = resolved.total;
+    const appliedComponents = resolved.components;
+    const allHorsesBefore = await listHorses(race.race_id);
     const scoring = scoreTick({
       delta: applied,
+      components: appliedComponents,
       dt_ms: elapsedMs,
+      now_ms: now.getTime(),
       race,
-      state: { stamina: horse.stamina },
+      modifier_states: horse.modifier_states ?? {},
+      // The field as it was BEFORE this beat: a modifier's view of the race
+      // necessarily lags one beat, since rank depends on what it returns.
+      horse: { ...horse, horse_id, joined_at: ownJoinedAt(allHorsesBefore, horse_id) },
+      field: allHorsesBefore,
     });
     const scoredApplied = scoring.scored_delta;
     const newTokens = prevTokens + applied;
     const newScored = scoredOf(horse) + scoredApplied;
 
-    const allHorsesBefore = await listHorses(race.race_id);
     // Project the per-model split forward too, or the response would report the
     // split one beat behind the total it is supposed to add up to.
     const prevModelTokens = horse.model_tokens ?? zeroPerFamily();
@@ -99,7 +101,7 @@ export const handler: ApiHandler = async (event) => {
             ...h,
             current_tokens: newTokens,
             scored_tokens: newScored,
-            stamina: scoring.state.stamina,
+            modifier_states: scoring.modifier_states,
             model_tokens: newModelTokens,
           }
         : h,
@@ -131,8 +133,8 @@ export const handler: ApiHandler = async (event) => {
       },
       now_ms: now.getTime(),
       last_heartbeat_at_ms: lastHeartbeatMs,
-      current_tokens: newScored,
-      prev_current_tokens: scoredOf(horse),
+      scored_tokens: newScored,
+      prev_scored_tokens: scoredOf(horse),
       new_rank: ownRanked.rank,
       total_horses: ranked.length,
       second_place_tokens: second ? scoredOf(second) : null,
@@ -141,7 +143,7 @@ export const handler: ApiHandler = async (event) => {
 
     const didApply = await applyHeartbeatDelta({
       race_id: race.race_id, horse_id, seq: body.seq, applied, scored_applied: scoredApplied,
-      stamina: scoring.state.stamina, last_heartbeat: now.toISOString(), state: evalResult.next,
+      modifier_states: scoring.modifier_states, last_heartbeat: now.toISOString(), state: evalResult.next,
       components: appliedComponents,
       needsSeed: horse.scored_tokens === undefined || !hasFamilyKeys(horse.model_tokens),
       ...(horse.model_tokens && !hasFamilyKeys(horse.model_tokens) ? { legacyModelTokens: horse.model_tokens } : {}),
@@ -149,7 +151,13 @@ export const handler: ApiHandler = async (event) => {
 
     if (didApply) {
       if (applied > 0) {
-        await appendSeriesPoint(race.race_id, horse_id, body.seq, { t: now.getTime(), d: applied });
+        // `s` only when a mechanic changed the beat: on a race running none it
+        // would repeat `d` on every point, for every horse, forever.
+        await appendSeriesPoint(race.race_id, horse_id, body.seq, {
+          t: now.getTime(),
+          d: applied,
+          ...(scoredApplied !== applied ? { s: scoredApplied } : {}),
+        });
       }
       effectiveLastSeq = body.seq;
       horses = updatedHorses.map(h =>
@@ -158,7 +166,7 @@ export const handler: ApiHandler = async (event) => {
               ...h,
               current_tokens: newTokens,
               scored_tokens: newScored,
-              stamina: scoring.state.stamina,
+              modifier_states: scoring.modifier_states,
               last_seq: body.seq,
               live_xp: evalResult.next.live_xp,
               last_rank: evalResult.next.last_rank,
@@ -200,4 +208,9 @@ export const handler: ApiHandler = async (event) => {
 /** Whether a stored map already uses family keys rather than the old harness ones. */
 function hasFamilyKeys(map: Record<string, number> | undefined): boolean {
   return map !== undefined && MODEL_FAMILIES.every(f => typeof map[f] === 'number');
+}
+
+/** A horse's join time, the tie-break every rank comparison falls back to. */
+function ownJoinedAt(field: Array<{ horse_id: string; joined_at: string }>, horse_id: string): string {
+  return field.find(h => h.horse_id === horse_id)?.joined_at ?? '';
 }

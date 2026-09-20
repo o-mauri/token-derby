@@ -16,7 +16,7 @@ import type { ScanCache } from '../../scan-cache.js';
 import { readRoot } from '../../source-root.js';
 import { mapWithConcurrency, SCAN_CONCURRENCY } from '../../pool.js';
 import { custom, type CustomReading, type FamilyTotals, type Harness } from '../harness.js';
-import { PI_FOLD, type PiFileState } from './entries.js';
+import { PI_FOLD } from './entries.js';
 import { describeUncounted, resolveProvider, type Resolution } from './providers.js';
 
 const SESSION_EXT = '.jsonl';

@@ -282,11 +282,6 @@ export async function listOrgMembers(org_id: string): Promise<OrgMember[]> {
   return rows.map(r => ({ user_id: r.user_id, user_name: names.get(r.user_id) ?? '', joined_at: r.joined_at }));
 }
 
-// Stable for tests. Not used in handler paths.
-export async function listMembersForOrg(org_id: string): Promise<string[]> {
-  return listOrgMemberIds(org_id);
-}
-
 export async function setOrgWebhook(
   org_id: string,
   webhook_url: string,

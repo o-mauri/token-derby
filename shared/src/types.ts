@@ -8,6 +8,35 @@ import type { StaminaConfig } from './scoring.js';
  */
 export type ModelFamily = 'anthropic' | 'openai' | 'google';
 
+/**
+ * A scoring mechanic. Adding one means adding its id here, writing
+ * scoring/modifiers/<id>.ts and registering it -- nothing else.
+ */
+export type ModifierId = 'stamina';
+
+/** One modifier's own persisted numbers, carried between beats. */
+export type ModifierState = Record<string, number>;
+
+/**
+ * Every modifier's state on a horse, keyed by modifier id. On the wire as well
+ * as in storage: a client showing a mechanic needs the same numbers the server
+ * scored with, and a generic map means a new mechanic needs no new field.
+ */
+export type ModifierStates = Partial<Record<ModifierId, ModifierState>>;
+
+/**
+ * One modifier's configuration: whether a race runs it, and its tuning. Tuning
+ * is kept while switched off, so turning a mechanic back on does not discard
+ * what was set up for it.
+ */
+export type ModifierSetting = {
+  enabled: boolean;
+  params?: Record<string, number>;
+};
+
+/** Every modifier's configuration, keyed by modifier id. */
+export type ModifierSettings = Partial<Record<ModifierId, ModifierSetting>>;
+
 export type HorseColors = {
   body: string;
   mane: string;
@@ -52,7 +81,9 @@ export type Horse = {
   // Absent on rows written before the feature; read via scoredOf().
   scored_tokens?: number;
   final_scored_tokens?: number;
-  stamina?: number;
+  // Per-modifier state, e.g. { stamina: { level: 73 } }. Absent until the first
+  // beat of a race running a modifier; read via a modifier's own accessor.
+  modifier_states?: ModifierStates;
 };
 
 export type RaceStatus = 'pending' | 'live' | 'finished';
@@ -82,10 +113,12 @@ export type Race = {
   // (top flight). Lets clients label the division-grouped order without a
   // separate config fetch. Absent for non-league races.
   league_division_names?: string[];
-  // Stamina: a horse above a sustainable pace tires and scores less until it
-  // recovers. Locked at race creation.
+  // Which mechanics this race runs and how they are tuned, snapshotted at
+  // creation so a later org change never rescores a race in flight.
+  modifiers?: ModifierSettings;
+  // Pre-`modifiers` spelling of the same thing, still read for races that were
+  // already running when the map replaced it. Never written.
   stamina?: boolean;
-  // Per-org stamina tuning, snapshotted at race creation.
   stamina_config?: StaminaConfig;
 };
 
@@ -259,6 +292,10 @@ export type StableHorse = {
 // SCHEDULE or LEAGUE, because it applies to both and is exclusive with neither.
 export type RaceSettings = {
   org_id: string;
+  // Which mechanics the org's races run and how they are tuned. Tuning is kept
+  // while a mechanic is switched off, so turning it back on restores the setup.
+  modifiers?: ModifierSettings;
+  // Pre-`modifiers` spelling, kept only so an old row still parses. Never written.
   stamina_config?: StaminaConfig;
   updated_at: string;
   updated_by_user_id: string;
@@ -273,7 +310,6 @@ export type RaceSchedule = {
   tz: string;                // IANA, e.g. "Europe/London"
   race_name?: string;        // optional name for created races
   max_participants?: number;
-  stamina?: boolean;         // stamped onto each scheduled race (see Race.stamina)
   created_at: string;
   creator_user_id: string;   // stamped onto each scheduled race
   creator_user_name: string; // stamped onto each scheduled race
@@ -308,7 +344,6 @@ export type League = {
   tz: string;                     // IANA
   race_name?: string;
   max_participants?: number;
-  stamina?: boolean;         // stamped onto each fixture (see Race.stamina)
   current_season: number;         // 1-based; the season fixtures accrue into
   status: LeagueStatus;           // 'complete' is transient during rollover
   pending_structural?: PendingStructural; // shape edits staged mid-season, applied at rollover

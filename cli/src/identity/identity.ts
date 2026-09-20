@@ -1,5 +1,4 @@
 import { promises as fs } from 'node:fs';
-import * as path from 'node:path';
 import { USER_NAME_MAX_LENGTH } from '@token-derby/shared';
 import { identityFile, homeDir } from '../paths.js';
 
@@ -86,12 +85,4 @@ export function validateDisplayName(name: string): { ok: true; name: string } | 
     return { ok: false, error: `Name must be ${USER_NAME_MAX_LENGTH} characters or fewer.` };
   }
   return { ok: true, name: trimmed };
-}
-
-export function identityFilePath(): string {
-  return identityFile();
-}
-
-export function identityFileDir(): string {
-  return path.dirname(identityFile());
 }
