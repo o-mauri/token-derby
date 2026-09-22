@@ -81,6 +81,24 @@ describe('race page stamina rendering', () => {
     expect(root.querySelector('.stamina-bar')).toBeNull();
   });
 
+  it('renders the bar for a race configured through the modifiers map', async () => {
+    const root = await mount(view(reserve(80), { stamina: undefined, modifiers: { stamina: { enabled: true } } }));
+    expect(root.querySelector('.stamina-bar')!.getAttribute('data-band')).toBe('green');
+  });
+
+  it('renders no bar when the modifiers map has stamina off', async () => {
+    const root = await mount(view(reserve(80), { stamina: undefined, modifiers: { stamina: { enabled: false } } }));
+    expect(root.querySelector('.stamina-bar')).toBeNull();
+  });
+
+  it('bands by the taper floor the modifiers map snapshotted', async () => {
+    const root = await mount(view(reserve(30), {
+      stamina: undefined,
+      modifiers: { stamina: { enabled: true, params: { taper_floor: 40 } } },
+    }));
+    expect(root.querySelector('.stamina-bar')!.getAttribute('data-band')).toBe('red');
+  });
+
   it('uses the race\'s own snapshotted taper floor, not the STAMINA default', async () => {
     // Org tuned taper_floor to 40 for this race. Stamina 30 sits below that
     // floor (already tired, server-side), even though it's above the

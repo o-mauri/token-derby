@@ -94,7 +94,7 @@ function modifiersForRace(race: ScoringRace, states: ModifierStates): ActiveModi
   for (const id of MODIFIER_IDS) {
     const modifier = MODIFIERS[id];
     const setting = settingFor(race, id);
-    if (!(setting?.enabled ?? modifier.enabledByDefault)) continue;
+    if (!runsModifier(race, id)) continue;
     active.push({
       modifier,
       params: resolveParams(modifier, setting?.params ?? {}),
@@ -132,6 +132,16 @@ export function scoredOf(horse: { current_tokens: number; scored_tokens?: number
 }
 
 // ─── Modifier configuration ──────────────────────────────────────────────────
+
+/**
+ * Whether a race runs a mechanic. The UI surfaces that draw a mechanic ask this
+ * rather than testing a configuration field themselves -- a race configured
+ * through the settings map and one carrying the pre-map flag must both answer
+ * the same, and only `settingFor` knows how to read either.
+ */
+export function runsModifier(race: ScoringRace, id: ModifierId): boolean {
+  return settingFor(race, id)?.enabled ?? MODIFIERS[id].enabledByDefault;
+}
 
 /**
  * A modifier's resolved tuning for a race: the race's overrides on top of the

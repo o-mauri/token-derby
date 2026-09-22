@@ -1,5 +1,5 @@
 import type { GetRaceResponse, HorseView, ResolvedStaminaConfig } from '@token-derby/shared';
-import { levelFromXp, hatById, scoredOf, resolveStaminaConfig, staminaOf } from '@token-derby/shared';
+import { levelFromXp, hatById, scoredOf, resolveStaminaConfig, runsModifier, staminaOf } from '@token-derby/shared';
 import { elapsedPct, horseXPct } from '../position.js';
 import { buildHorseSvg } from '../sprite-svg.js';
 import { buildHatGroup } from '../hat-svg.js';
@@ -39,7 +39,7 @@ export function reconcileHorses(
   for (const horse of visible) {
     let lane = existing.get(horse.horse_id);
     if (!lane) {
-      lane = createLane(track.ownerDocument, horse, race.league_id != null, race.stamina === true);
+      lane = createLane(track.ownerDocument, horse, race.league_id != null, runsModifier(race, 'stamina'));
     }
     track.appendChild(lane);
     updateLane(

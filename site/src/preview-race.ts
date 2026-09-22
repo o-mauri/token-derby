@@ -92,10 +92,10 @@ function snapshot(now: number): GetRaceResponse {
     status: 'live',
     server_time: new Date(now).toISOString(),
     time_left_seconds: Math.max(0, Math.floor((RACE_END_MS - now) / 1000)),
-    stamina: true,
-    // Org tuned the taper floor up from the 25 default — demonstrates the bar
-    // reading the race's own snapshotted config, not the STAMINA constant.
-    stamina_config: { taper_floor: 40 },
+    // The shape a race created today actually carries. Org tuned the taper
+    // floor up from the 25 default, so the bar is demonstrably reading the
+    // race's own snapshotted config rather than the modifier's.
+    modifiers: { stamina: { enabled: true, params: { taper_floor: 40 } } },
     horses: ranked,
   };
 }

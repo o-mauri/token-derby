@@ -1,7 +1,7 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import type { GetRaceResponse, HorseColors, HorseView } from '@token-derby/shared';
-import { levelInfo, resolveStaminaConfig, scoredOf, staminaOf } from '@token-derby/shared';
+import { levelInfo, resolveStaminaConfig, runsModifier, scoredOf, staminaOf } from '@token-derby/shared';
 import { HorseSprite } from './HorseSprite.js';
 import { MINI_SPRITE } from './sprite.js';
 import { SILENT_THRESHOLD } from '../config.js';
@@ -73,7 +73,7 @@ export function StatusScreen(props: Props) {
   const divisionRank = own ? divisionField.indexOf(own) + 1 : 0;
   const showDivision = (race.league_division_names?.length ?? 0) > 0 && divisionRank > 0;
 
-  const staminaRow = race.stamina === true ? staminaLine(own, race) : null;
+  const staminaRow = runsModifier(race, 'stamina') ? staminaLine(own, race) : null;
 
   const rows: StatRow[] = [
     { label: 'Tokens (race):', value: String(own?.final_scored_tokens ?? (own ? scoredOf(own) : 0)) },

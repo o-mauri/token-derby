@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { scoreTick, scoredOf, staminaOf, resolveModifierParams, validateModifierSettings, resolveStaminaConfig } from '../src/scoring.js';
+import { scoreTick, scoredOf, staminaOf, resolveModifierParams, runsModifier, validateModifierSettings, resolveStaminaConfig } from '../src/scoring.js';
 import { MODIFIERS } from '../src/scoring/registry.js';
 
 describe('scoreTick — no toggles', () => {
@@ -282,5 +282,32 @@ describe('validateModifierSettings', () => {
 
   it('accepts an empty submission', () => {
     expect(validateModifierSettings({})).toEqual({ ok: true, value: {} });
+  });
+});
+
+describe('runsModifier — the one answer every surface reads', () => {
+  it('reads the settings map', () => {
+    expect(runsModifier({ modifiers: { stamina: { enabled: true } } }, 'stamina')).toBe(true);
+    expect(runsModifier({ modifiers: { stamina: { enabled: false } } }, 'stamina')).toBe(false);
+  });
+
+  it('reads the pre-settings-map stamina flag', () => {
+    expect(runsModifier({ stamina: true }, 'stamina')).toBe(true);
+    expect(runsModifier({ stamina: false }, 'stamina')).toBe(false);
+  });
+
+  it('falls back to the modifier own default when a race configures nothing', () => {
+    expect(runsModifier({}, 'stamina')).toBe(MODIFIERS.stamina.enabledByDefault);
+  });
+
+  it('agrees with what the engine actually scores, in both shapes', () => {
+    for (const race of [{ modifiers: { stamina: { enabled: true } } }, { stamina: true }]) {
+      const r = scoreTick({
+        delta: 1_000_000, components: { anthropic: 1_000_000, openai: 0, google: 0 },
+        dt_ms: 60_000, race, modifier_states: { stamina: { level: 10 } },
+      });
+      expect(runsModifier(race, 'stamina')).toBe(true);
+      expect(r.scored_delta).toBeLessThan(1_000_000);
+    }
   });
 });

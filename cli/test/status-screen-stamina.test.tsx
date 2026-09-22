@@ -16,7 +16,8 @@ function horse(over: Partial<HorseView> = {}): HorseView {
 
 function renderStatus(opts: {
   stamina: number | undefined;
-  raceStamina: boolean;
+  raceStamina?: boolean;
+  modifiers?: unknown;
   staminaConfig?: { taper_floor?: number; tired_multiplier?: number };
 }): string {
   const race = {
@@ -26,6 +27,7 @@ function renderStatus(opts: {
     server_time: new Date().toISOString(),
     stamina: opts.raceStamina,
     stamina_config: opts.staminaConfig,
+    modifiers: opts.modifiers,
     horses: [horse(opts.stamina === undefined
       ? {}
       : { modifier_states: { stamina: { level: opts.stamina } } })],
@@ -58,6 +60,24 @@ describe('StatusScreen stamina line', () => {
 
   it('omits the stamina line when the race has stamina off', () => {
     expect(renderStatus({ stamina: undefined, raceStamina: false })).not.toMatch(/Stamina/);
+  });
+
+  it('shows the stamina line for a race configured through the modifiers map', () => {
+    const out = renderStatus({ stamina: 80, modifiers: { stamina: { enabled: true } } });
+    expect(out).toMatch(/Stamina/);
+  });
+
+  it('omits the line when the modifiers map has stamina off', () => {
+    const out = renderStatus({ stamina: 80, modifiers: { stamina: { enabled: false } } });
+    expect(out).not.toMatch(/Stamina/);
+  });
+
+  it('reads the taper floor the modifiers map snapshotted', () => {
+    const out = renderStatus({
+      stamina: 35,
+      modifiers: { stamina: { enabled: true, params: { taper_floor: 40 } } },
+    });
+    expect(out).toContain('\u00d70.94');
   });
 
   it("bands red at the race's own snapshotted taper floor, not the STAMINA default", () => {
