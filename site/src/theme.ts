@@ -31,8 +31,10 @@ export type EventTheme = { id: ThemeId; tag: string };
 /** Runs a themed event: on the first load after `tag` changes, every browser is
  *  flipped to `id` once, whatever it had saved, and the picker works normally
  *  from then on. Set to null to end the event; bump the tag to run one again.
+ *  Pointing it at DEFAULT_THEME ends an event properly — null alone would leave
+ *  the last event's id saved in every browser it flipped.
  *  Mirrored by the pre-paint script in public/index.html — keep in sync. */
-export const EVENT_THEME: EventTheme | null = { id: 'london', tag: '2026-09-london' };
+export const EVENT_THEME: EventTheme | null = { id: 'derby', tag: '2026-09-derby-reset' };
 
 /** Also read by the pre-paint inline script in public/index.html — keep in sync. */
 export const THEME_STORAGE_KEY = 'td_theme';
