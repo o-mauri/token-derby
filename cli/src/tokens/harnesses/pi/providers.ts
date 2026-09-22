@@ -10,11 +10,13 @@ import type { ModelFamily } from '@token-derby/shared';
 /**
  * Providers that serve exactly one vendor, so the provider id alone settles it.
  * Azure is OpenAI-only by definition, which is what makes it safe here even
- * though its model ids are arbitrary deployment names.
+ * though its model ids are arbitrary deployment names. Pi's OpenAI subscription
+ * provider is named `openai-codex`, but it is equally single-vendor.
  */
 const DIRECT: Record<string, ModelFamily> = {
   anthropic: 'anthropic',
   openai: 'openai',
+  'openai-codex': 'openai',
   'azure-openai-responses': 'openai',
   google: 'google',
 };

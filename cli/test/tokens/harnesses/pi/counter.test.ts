@@ -65,6 +65,11 @@ describe('Pi harness — family attribution', () => {
     expect(await familyTotals()).toEqual({ anthropic: { input: 100, output: 200 } });
   });
 
+  it('counts Pi OpenAI subscription usage as OpenAI', async () => {
+    await writeSession('s1.jsonl', [assistant({ id: 'a', provider: 'openai-codex', model: 'gpt-5.3-codex', input: 100, output: 200 })]);
+    expect(await familyTotals()).toEqual({ openai: { input: 100, output: 200 } });
+  });
+
   it('splits ONE session across families when the model changes mid-session', async () => {
     // The whole reason harness and family are separate concepts.
     await writeSession('s1.jsonl', [

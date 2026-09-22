@@ -8,9 +8,10 @@ describe('resolveProvider', () => {
     expect(resolveProvider('google')).toEqual({ kind: 'family', family: 'google' });
   });
 
-  it('maps Azure to OpenAI, which it serves by definition', () => {
-    // Its model ids are arbitrary deployment names, so the provider is the only
-    // thing that can settle it — and it is enough.
+  it('maps single-vendor OpenAI provider aliases to OpenAI', () => {
+    expect(resolveProvider('openai-codex')).toEqual({ kind: 'family', family: 'openai' });
+    // Azure model ids are arbitrary deployment names, so the provider is the
+    // only thing that can settle it — and it is enough.
     expect(resolveProvider('azure-openai-responses')).toEqual({ kind: 'family', family: 'openai' });
   });
 

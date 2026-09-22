@@ -99,8 +99,9 @@ Overrides: `TOKEN_DERBY_CODEX_DIR`, `TOKEN_DERBY_GEMINI_DIR`.
 
   Pi is the one agent that can run models from several vendors, so its tokens
   are attributed to whichever vendor actually produced them — a Pi session that
-  starts on Claude and switches to GPT counts as both. Fresh input is uncached
-  input plus cache writes; cache reads are excluded, as everywhere else.
+  starts on Claude and switches to GPT counts as both. OpenAI subscription usage
+  reported by Pi's `openai-codex` provider counts as OpenAI. Fresh input is
+  uncached input plus cache writes; cache reads are excluded, as everywhere else.
 
   Usage on a provider outside those three is not counted, and the race view says
   so rather than leaving you to wonder. That includes gateways such as Bedrock,
