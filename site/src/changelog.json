@@ -1,5 +1,13 @@
 [
   {
+    "version": "0.16.1",
+    "date": "2026-09-22",
+    "component": "site",
+    "changes": [
+      "fixed bug where stamina was hidden from the race screen"
+    ]
+  },
+  {
     "version": "0.16.0",
     "date": "2026-09-20",
     "component": "site",
