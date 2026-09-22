@@ -18,12 +18,10 @@ import { stableDefaultCommand } from './commands/stable-default.js';
 import { harnessListCommand, harnessToggleCommand } from './commands/harness.js';
 import { orgJoinCommand } from './commands/org-join.js';
 import { webCommand } from './commands/web.js';
-import { envCommand } from './commands/env.js';
 import { logsCommand } from './commands/logs.js';
 import { CLI_VERSION } from './version.js';
 import { loadIdentity } from './identity/identity.js';
 import { logInfo, logError } from './log/logger.js';
-import { selectedEnv } from './env/env.js';
 
 const HELP = `token-derby v${CLI_VERSION}
 
@@ -96,11 +94,7 @@ Cosmetics:
                                           awarded to you by an admin.
 
 Environment:
-  token-derby env                         Show the active environment (prod|staging)
-  token-derby env <prod|staging>          Switch environment. Each env has its own
-                                          identity/stable dir, so switching never
-                                          touches the other env's account.
-  TOKEN_DERBY_API_BASE                    Hard-override API base URL (wins over env)
+  TOKEN_DERBY_API_BASE                    Hard-override API base URL
   TOKEN_DERBY_HOME                        Hard-override identity/stable directory
 `;
 
@@ -126,7 +120,6 @@ async function main(): Promise<number> {
     version: CLI_VERSION,
     node: process.version,
     pid: process.pid,
-    env: selectedEnv(),
   });
 
   if (!cmd || cmd === '--help' || cmd === '-h') { console.log(HELP); return 0; }
@@ -142,9 +135,6 @@ async function main(): Promise<number> {
   if (cmd === 'login') return loginCommand(argv.slice(1));
   // `update` runs before the identity gate so a broken or stale install can fix itself.
   if (cmd === 'update') return updateCommand();
-  // `env` runs before the identity gate: switching to a fresh env is exactly
-  // when no identity exists there yet.
-  if (cmd === 'env') return envCommand(argv[1]);
   // `logs` runs before the identity gate too — a broken or unauthenticated
   // install is exactly when the log is worth reading.
   if (cmd === 'logs') return logsCommand(argv.slice(1));
@@ -161,7 +151,7 @@ async function main(): Promise<number> {
     return 2;
   }
 
-  // Every other command requires an identity. `init`, `update`, and `env` are the only escape hatches.
+  // Every other command requires an identity. `init` and `update` are the only escape hatches.
   const identity = await loadIdentity();
   if (!identity) {
     console.error('Run `token-derby login` to set up your identity before using any other command.');

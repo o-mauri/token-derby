@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import * as cdk from 'aws-cdk-lib';
 import { Template } from 'aws-cdk-lib/assertions';
 import { TokenDerbyStack } from '../lib/token-derby-stack';
-import { ENV_CONFIGS } from '../lib/env-config';
+import { CONFIG } from '../lib/env-config';
 
 // A synthetic account: cdk.context.json is gitignored, so the cached hosted-zone
 // answer cannot be relied on. Priming the same key keeps synthesis offline.
@@ -17,9 +17,9 @@ const HOSTED_ZONE_CONTEXT = {
   'aws:cdk:bundling-stacks': [],
 };
 
-const synth = (env: 'prod' | 'staging') => {
+const synth = () => {
   const app = new cdk.App({ context: HOSTED_ZONE_CONTEXT });
-  const config = ENV_CONFIGS[env];
+  const config = CONFIG;
   return Template.fromStack(new TokenDerbyStack(app, config.stackId, {
     env: { account: ACCOUNT, region: REGION },
     crossRegionReferences: true,
@@ -37,7 +37,7 @@ function appFunctions(template: Template) {
 
 describe('the synthesised prod stack', () => {
   let prod: Template;
-  beforeAll(() => { prod = synth('prod'); });
+  beforeAll(() => { prod = synth(); });
 
   it('provisions the handlers that need a table', () => {
     // Guards the filter itself: an empty list would make every check below vacuous.
@@ -57,7 +57,7 @@ describe('the synthesised prod stack', () => {
 
   it('never points SITE_ORIGIN at the admin domain', () => {
     for (const fn of appFunctions(prod)) {
-      expect(String(fn.env.SITE_ORIGIN)).not.toContain(ENV_CONFIGS.prod.adminDomain);
+      expect(String(fn.env.SITE_ORIGIN)).not.toContain(CONFIG.adminDomain);
       expect(String(fn.env.SITE_ORIGIN)).not.toContain('admin.');
     }
   });
@@ -72,16 +72,6 @@ describe('the synthesised prod stack', () => {
   });
 });
 
-describe('the synthesised staging stack', () => {
-  it('gives every handler SITE_ORIGIN pointing at its own site domain', () => {
-    const fns = appFunctions(synth('staging'));
-    expect(fns.length).toBeGreaterThan(40);
-    for (const fn of fns) {
-      expect(fn.env.SITE_ORIGIN, `${fn.id} is missing SITE_ORIGIN`)
-        .toBe('https://token-derby-staging.mauricode.co.uk');
-    }
-  });
-});
 
 /** Resolves `METHOD /path` to the logical id of the Lambda its integration
  *  targets, walking Route -> (Fn::Join ref) -> Integration -> (Fn::GetAtt)
@@ -101,7 +91,7 @@ function routeTargetFunctionLogicalId(template: Template, routeKey: string): str
 
 describe('CLI login routes', () => {
   let prod: Template;
-  beforeAll(() => { prod = synth('prod'); });
+  beforeAll(() => { prod = synth(); });
 
   // Every CLI-login handler wired via makeFn/addRoutes. Checked by
   // function-logical-id prefix (not just "a route with this key exists") so a
@@ -163,7 +153,7 @@ describe('CLI login routes', () => {
 
 describe('org access control routes', () => {
   let prod: Template;
-  beforeAll(() => { prod = synth('prod'); });
+  beforeAll(() => { prod = synth(); });
 
   // Every Phase 3 handler wired via makeFn/addRoutes. Checked by
   // function-logical-id prefix (not just "a route with this key exists") so a
@@ -220,7 +210,7 @@ describe('org access control routes', () => {
 
 describe('admin claim redemptions route', () => {
   let prod: Template;
-  beforeAll(() => { prod = synth('prod'); });
+  beforeAll(() => { prod = synth(); });
 
   it('wires GET /api/admin/claims/{code}/redemptions to its own handler', () => {
     const fnLogicalId = routeTargetFunctionLogicalId(prod, 'GET /api/admin/claims/{code}/redemptions');
@@ -234,34 +224,32 @@ describe('CloudFront must not swallow API errors', () => {
   // included. A CLAIM_NOT_FOUND (404) reached the CLI as `200 text/html`, so it
   // saw the site shell where it expected JSON. SPA routing now happens in a
   // viewer-request function on the site behaviour only, leaving /api/* alone.
-  for (const env of ['prod', 'staging'] as const) {
-    it(`rewrites no error status on any ${env} distribution`, () => {
-      const distributions = synth(env).findResources('AWS::CloudFront::Distribution');
+  it('rewrites no error status on any distribution', () => {
+    const distributions = synth().findResources('AWS::CloudFront::Distribution');
 
-      expect(Object.keys(distributions).length).toBeGreaterThan(0);
-      for (const [id, resource] of Object.entries(distributions)) {
-        const rewrites = resource.Properties?.DistributionConfig?.CustomErrorResponses ?? [];
-        expect(rewrites, `${id} still rewrites an error status`).toEqual([]);
-      }
-    });
+    expect(Object.keys(distributions).length).toBeGreaterThan(0);
+    for (const [id, resource] of Object.entries(distributions)) {
+      const rewrites = resource.Properties?.DistributionConfig?.CustomErrorResponses ?? [];
+      expect(rewrites, `${id} still rewrites an error status`).toEqual([]);
+    }
+  });
 
-    it(`attaches the SPA rewrite to the site behaviour but not to /api/* on ${env}`, () => {
-      const distributions = synth(env).findResources('AWS::CloudFront::Distribution');
+  it('attaches the SPA rewrite to the site behaviour but not to /api/*', () => {
+    const distributions = synth().findResources('AWS::CloudFront::Distribution');
 
-      for (const [id, resource] of Object.entries(distributions)) {
-        const config = resource.Properties.DistributionConfig;
-        expect(
-          config.DefaultCacheBehavior.FunctionAssociations,
-          `${id} default behaviour has no SPA rewrite`,
-        ).toBeDefined();
+    for (const [id, resource] of Object.entries(distributions)) {
+      const config = resource.Properties.DistributionConfig;
+      expect(
+        config.DefaultCacheBehavior.FunctionAssociations,
+        `${id} default behaviour has no SPA rewrite`,
+      ).toBeDefined();
 
-        const apiBehaviour = (config.CacheBehaviors ?? []).find((b: any) => b.PathPattern === '/api/*');
-        expect(apiBehaviour, `${id} has no /api/* behaviour`).toBeDefined();
-        expect(
-          apiBehaviour.FunctionAssociations,
-          `${id} rewrites /api/* requests`,
-        ).toBeUndefined();
-      }
-    });
-  }
+      const apiBehaviour = (config.CacheBehaviors ?? []).find((b: any) => b.PathPattern === '/api/*');
+      expect(apiBehaviour, `${id} has no /api/* behaviour`).toBeDefined();
+      expect(
+        apiBehaviour.FunctionAssociations,
+        `${id} rewrites /api/* requests`,
+      ).toBeUndefined();
+    }
+  });
 });

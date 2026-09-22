@@ -2,11 +2,7 @@ import * as fs from 'node:fs/promises';
 import { prefsFile, homeDir } from '../paths.js';
 import { HARNESSES, HARNESS_KEYS, type HarnessKey } from '../tokens/harnesses/registry.js';
 
-/**
- * Local, per-environment preferences. Lives beside identity.json, so prod and
- * staging keep their own — a default horse id from one env is meaningless in
- * the other.
- */
+/** Local preferences. Lives beside identity.json, under the same home dir. */
 export type Prefs = {
   /**
    * Stored by id, not name: renaming a horse in the web UI should not silently

@@ -1,12 +1,16 @@
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { baseDir, selectedEnv } from './env/env.js';
+
+// Base directory everything hangs off. Overridable via TOKEN_DERBY_BASE for
+// tests and advanced setups; defaults to the user's home directory.
+export function baseDir(): string {
+  return process.env.TOKEN_DERBY_BASE ?? os.homedir();
+}
 
 export function homeDir(): string {
   const override = process.env.TOKEN_DERBY_HOME;
   if (override) return override;
-  const dir = selectedEnv() === 'staging' ? '.token-derby-staging' : '.token-derby';
-  return path.join(baseDir(), dir);
+  return path.join(baseDir(), '.token-derby');
 }
 
 export function identityFile(): string {

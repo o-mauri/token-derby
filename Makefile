@@ -1,4 +1,4 @@
-.PHONY: install build build-site build-admin test dynamodb-up dynamodb-down local-api bootstrap deploy _deploy-site deploy-staging destroy destroy-staging publish-cli announce-release
+.PHONY: install build build-site build-admin test dynamodb-up dynamodb-down local-api bootstrap deploy _deploy-site destroy publish-cli announce-release
 
 # AWS profile for all deployment targets. Override with: make deploy AWS_PROFILE=other
 AWS_PROFILE ?= personal
@@ -45,13 +45,6 @@ _deploy-site: build-site build-admin
 
 destroy:
 	cd infra && AWS_PROFILE=$(AWS_PROFILE) npx cdk destroy
-
-# Deploy the staging stack (token-derby-staging.mauricode.co.uk). Builds site first.
-deploy-staging: build-site build-admin
-	cd infra && AWS_PROFILE=$(AWS_PROFILE) npx cdk deploy -c env=staging --require-approval never
-
-destroy-staging:
-	cd infra && AWS_PROFILE=$(AWS_PROFILE) npx cdk destroy -c env=staging
 
 # Bump the CLI version, record a changelog entry, then publish to npm.
 publish-cli:

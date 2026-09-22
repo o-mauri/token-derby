@@ -57,7 +57,7 @@ export class TokenDerbyStack extends cdk.Stack {
       partitionKey: { name: 'pk', type: dynamodb.AttributeType.STRING },
       sortKey: { name: 'sk', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-      removalPolicy: config.disposable ? cdk.RemovalPolicy.DESTROY : cdk.RemovalPolicy.RETAIN,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
       timeToLiveAttribute: 'ttl',
     });
 
@@ -121,8 +121,7 @@ export class TokenDerbyStack extends cdk.Stack {
         blockPublicPolicy: false,
         restrictPublicBuckets: false,
       }),
-      removalPolicy: config.disposable ? cdk.RemovalPolicy.DESTROY : cdk.RemovalPolicy.RETAIN,
-      autoDeleteObjects: config.disposable,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
     });
 
     spriteBucket.addToResourcePolicy(new iam.PolicyStatement({
