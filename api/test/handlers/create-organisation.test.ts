@@ -31,6 +31,15 @@ function event(
 }
 
 describe('createOrganisation handler', () => {
+  it('rejects a name that differs from an existing one only by case', async () => {
+    const user = await makeUser('OrgCaseBob');
+    const first: any = await handler(event({ name: 'CaseClash1' }, user));
+    expect(first.statusCode).toBe(200);
+    const second: any = await handler(event({ name: 'caseclash1' }, user));
+    expect(second.statusCode).toBe(409);
+    expect(JSON.parse(second.body).code).toBe('ORG_NAME_TAKEN');
+  });
+
   it('creates an org and auto-joins the creator', async () => {
     const user = await makeUser('OrgAlice');
     const res: any = await handler(event({ name: 'Acme1' }, user));
@@ -52,15 +61,6 @@ describe('createOrganisation handler', () => {
     const res: any = await handler(event({ name: 'Dup1' }, user));
     expect(res.statusCode).toBe(409);
     expect(JSON.parse(res.body).code).toBe('ORG_NAME_TAKEN');
-  });
-
-  it('treats different cases as distinct orgs', async () => {
-    const user = await makeUser('OrgCase');
-    const a: any = await handler(event({ name: 'Case' }, user));
-    const b: any = await handler(event({ name: 'case' }, user));
-    expect(a.statusCode).toBe(200);
-    expect(b.statusCode).toBe(200);
-    expect(JSON.parse(a.body).org_id).not.toBe(JSON.parse(b.body).org_id);
   });
 
   it('rejects names with spaces', async () => {

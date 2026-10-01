@@ -156,6 +156,22 @@ describe('heartbeat handler', () => {
     expect(horses[0]?.current_tokens).toBe(1200);
   });
 
+  it('throws away whatever one beat claims above 5,000,000 raw tokens, and logs it', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { join_code, race_id, horse_id, heartbeat_token } = await setup();
+    const res: any = await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, {
+      seq: 1, components: { anthropic: 0, openai: 30_405_384, google: 0 },
+    }));
+    expect(res.statusCode).toBe(200);
+    const horse = (await listHorses(race_id))[0]!;
+    expect(horse.current_tokens).toBe(5_000_000);
+    expect(horse.model_tokens?.openai).toBe(5_000_000);
+    expect(warn).toHaveBeenCalledWith('heartbeat over per-beat cap', expect.objectContaining({
+      race_id, horse_id, claimed: 30_405_384, applied: 5_000_000, discarded: 25_405_384,
+    }));
+    warn.mockRestore();
+  });
+
   it('dedups a resent seq (no double-apply)', async () => {
     const { join_code, race_id, horse_id, heartbeat_token } = await setup();
     await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { seq: 1, delta: 500 }));

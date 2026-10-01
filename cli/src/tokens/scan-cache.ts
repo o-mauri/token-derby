@@ -10,6 +10,16 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { homeDir } from '../paths.js';
+import { logWarn } from '../log/logger.js';
+
+// Unread bytes are read in windows of this size: a single read of a huge
+// transcript would exceed the longest string V8 can build (~512 MB).
+const DEFAULT_READ_CHUNK_BYTES = 64 * 1024 * 1024;
+let readChunkBytes = DEFAULT_READ_CHUNK_BYTES;
+
+export function setReadChunkBytesForTests(bytes: number | null): void {
+  readChunkBytes = bytes ?? DEFAULT_READ_CHUNK_BYTES;
+}
 
 // Bump whenever the meaning of a folded value changes (e.g. which usage fields
 // count), so entries written by older logic are discarded rather than trusted.
@@ -75,12 +85,24 @@ export class ScanCache {
     // Only growth is safe to treat as an append; anything else was rewritten,
     // truncated or rotated and must be read from scratch.
     const grew = prev !== undefined && st.size > prev.size;
-    const start = grew ? prev.offset : 0;
-    const acc = grew ? (prev.value as T) : fold.empty();
+    let pos = grew ? prev.offset : 0;
+    let committed = grew ? (prev.value as T) : fold.empty();
+    let tail: string | null = null;
 
-    const { lines, tail, consumedTo } = await readCompleteLines(file, start, st.size);
-    const committed = lines.length > 0 ? fold.append(acc, lines) : acc;
-    this.entries.set(file, { mtimeMs: st.mtimeMs, size: st.size, offset: consumedTo, value: committed });
+    while (pos < st.size) {
+      const end = Math.min(st.size, pos + readChunkBytes);
+      const window = await readCompleteLines(file, pos, end);
+      if (window.lines.length > 0) committed = fold.append(committed, window.lines);
+      if (end === st.size) { pos = window.consumedTo; tail = window.tail; break; }
+      if (window.consumedTo > pos) { pos = window.consumedTo; continue; }
+      // One line fills the whole window: skip it rather than fail the file.
+      const next = await nextLineStart(file, end, st.size);
+      logWarn('scan.line.skipped', { file, at: pos, bytes: (next ?? st.size) - pos });
+      if (next === null) break;   // still being written; skipped again once complete
+      pos = next;
+    }
+
+    this.entries.set(file, { mtimeMs: st.mtimeMs, size: st.size, offset: pos, value: committed });
     this.dirty = true;
     return tail === null ? committed : fold.append(committed, [tail]);
   }
@@ -146,6 +168,23 @@ async function loadEntries(source: string): Promise<Map<string, Entry>> {
     if (isEntry(entry)) out.set(file, entry);
   }
   return out;
+}
+
+/** The byte after the next newline at or beyond `from`, or null if none before `end`. */
+async function nextLineStart(file: string, from: number, end: number): Promise<number | null> {
+  const fh = await fs.open(file, 'r');
+  try {
+    const buf = Buffer.allocUnsafe(Math.min(readChunkBytes, end - from));
+    for (let pos = from; pos < end; pos += buf.length) {
+      const { bytesRead } = await fh.read(buf, 0, Math.min(buf.length, end - pos), pos);
+      const nl = buf.subarray(0, bytesRead).indexOf(0x0a);
+      if (nl !== -1) return pos + nl + 1;
+      if (bytesRead === 0) break;
+    }
+    return null;
+  } finally {
+    await fh.close();
+  }
 }
 
 /**

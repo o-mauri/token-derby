@@ -6,7 +6,7 @@ import { getHorseForHeartbeat, applyHeartbeatDelta, listHorses } from '../db/hor
 import { appendSeriesPoint } from '../db/series.js';
 import { evaluateAchievements } from '../lib/evaluate-achievements.js';
 import { computeStatus, timeLeftSeconds } from '../lib/status.js';
-import { resolveHeartbeatDelta } from '../lib/heartbeat-delta.js';
+import { resolveHeartbeatDelta, capBeat } from '../lib/heartbeat-delta.js';
 import { rankHorses } from '../lib/rank-horses.js';
 import { finaliseRace } from '../lib/finalise-race.js';
 import { ok, err, parseJson } from '../lib/http.js';
@@ -68,10 +68,16 @@ export const handler: ApiHandler = async (event) => {
       const prevMs = Date.parse(horse.last_heartbeat);
       return Number.isFinite(prevMs) ? now.getTime() - prevMs : 0;
     })();
-    // Nothing trims the claimed delta: the per-beat rate cap was removed, so
-    // what the client reports is what counts.
-    const applied = resolved.total;
-    const appliedComponents = resolved.components;
+    // A sanity cap only: anything one beat claims above it is thrown away and logged.
+    const capped = capBeat(resolved);
+    if (capped.discarded > 0) {
+      console.warn('heartbeat over per-beat cap', {
+        race_id: race.race_id, horse_id, seq: body.seq,
+        claimed: resolved.total, applied: capped.total, discarded: capped.discarded,
+      });
+    }
+    const applied = capped.total;
+    const appliedComponents = capped.components;
     const allHorsesBefore = await listHorses(race.race_id);
     const scoring = scoreTick({
       delta: applied,

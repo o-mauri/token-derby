@@ -541,7 +541,8 @@ html, body {
 /* Soft ground shadow under each horse — body + head ovals rendered as a single
    SVG group with one opacity so overlap doesn't darken (the group composites
    into a private buffer first, then applies the group opacity). */
-.horse::after {
+.horse::after,
+.loader-horse::after {
   content: "";
   position: absolute;
   left: -5px;
@@ -576,9 +577,12 @@ html, body {
   background: inherit;
   border-radius: inherit;
 }
-.horse.live .horse-dust          { animation: dust-puff 0.7s ease-out infinite; }
-.horse.live .horse-dust::before  { animation: dust-puff 0.7s ease-out infinite; animation-delay: 0.23s; }
-.horse.live .horse-dust::after   { animation: dust-puff 0.7s ease-out infinite; animation-delay: 0.46s; }
+.horse.live .horse-dust,
+.loader-horse .horse-dust         { animation: dust-puff 0.7s ease-out infinite; }
+.horse.live .horse-dust::before,
+.loader-horse .horse-dust::before { animation: dust-puff 0.7s ease-out infinite; animation-delay: 0.23s; }
+.horse.live .horse-dust::after,
+.loader-horse .horse-dust::after  { animation: dust-puff 0.7s ease-out infinite; animation-delay: 0.46s; }
 @keyframes dust-puff {
   0%   { opacity: 0;    transform: translate(0, 0)        scale(0.4); }
   20%  { opacity: 0.75;                                              }
@@ -926,23 +930,123 @@ html, body {
 
 /* ── Apply to live / pending horses ── */
 .horse.live .leg-back,
-.horse.pending .leg-back {
+.horse.pending .leg-back,
+.loader-horse .leg-back {
   animation: hip-back 0.4s ease-in-out infinite;
 }
 .horse.live .leg-back-lower,
-.horse.pending .leg-back-lower {
+.horse.pending .leg-back-lower,
+.loader-horse .leg-back-lower {
   animation: knee-back 0.4s ease-in-out infinite;
 }
 .horse.live .leg-front,
-.horse.pending .leg-front {
+.horse.pending .leg-front,
+.loader-horse .leg-front {
   animation: hip-front 0.4s ease-in-out infinite;
 }
 .horse.live .leg-front-lower,
-.horse.pending .leg-front-lower {
+.horse.pending .leg-front-lower,
+.loader-horse .leg-front-lower {
   animation: knee-front 0.4s ease-in-out infinite;
 }
 .horse.live, .horse.pending {
   animation: body-bob 0.4s ease-in-out infinite;
+}
+
+/* ── Loader ───────────────────────────────────────── */
+
+/* Porthole onto a scrolling track, ringed by a spinner arc. Hidden for the first
+   250ms so fast loads never flash it. margin:auto centres it in any flex column. */
+.loader {
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  animation: loader-appear 150ms ease-out 250ms both;
+}
+@keyframes loader-appear { from { opacity: 0; } to { opacity: 1; } }
+.org-body:has(> .loader) { flex: 1; }
+.loader-ring {
+  position: relative;
+  isolation: isolate;
+  width: 250px;
+  height: 250px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.loader-ring::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(var(--ticker-accent) 0 25%, transparent 25%);
+  -webkit-mask: radial-gradient(circle, transparent 113px, #000 114px);
+  mask: radial-gradient(circle, transparent 113px, #000 114px);
+  animation: loader-spin 1.1s linear infinite;
+}
+.loader-ring::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 11px solid var(--border);
+  z-index: -1;
+}
+@keyframes loader-spin { to { transform: rotate(360deg); } }
+.loader-porthole {
+  width: 214px;
+  height: 214px;
+  border-radius: 50%;
+  overflow: hidden;
+  position: relative;
+}
+/* Same layers as .lane-track so every theme's wash applies here too. */
+.loader-track {
+  position: relative;
+  width: 100%;
+  height: 214px;
+  background:
+    var(--track-wash),
+    var(--lane) url('img/track-1.png') repeat-x 0 center / auto 100%;
+  background-blend-mode: var(--wash-blend), var(--track-blend);
+  image-rendering: pixelated;
+  animation: loader-track-run 1s linear infinite;
+}
+@keyframes loader-track-run { to { background-position-x: 0, -214px; } }
+.loader-horse {
+  position: absolute;
+  aspect-ratio: 32 / 24;
+  transform: translate(-50%, 0);
+}
+.loader-horse.far {
+  height: 62px;
+  top: 24px;
+  left: 58%;
+  z-index: 1;
+  animation: body-bob 0.4s ease-in-out infinite, loader-lead-a 3.2s ease-in-out infinite alternate;
+}
+.loader-horse.near {
+  height: 70px;
+  top: 66px;
+  left: 44%;
+  z-index: 2;
+  animation: body-bob 0.4s ease-in-out -0.17s infinite, loader-lead-b 3.2s ease-in-out infinite alternate;
+}
+/* Offset the near horse's gait so the two don't stride in unison. */
+.loader-horse.near :is(.leg-back, .leg-back-lower, .leg-front, .leg-front-lower) { animation-delay: -0.17s; }
+@keyframes loader-lead-a { from { left: 58%; } to { left: 44%; } }
+@keyframes loader-lead-b { from { left: 44%; } to { left: 58%; } }
+.loader-caption {
+  font-family: var(--pixel-font);
+  color: var(--muted);
+  font-size: 1.3rem;
+  letter-spacing: 0.05em;
+}
+@media (prefers-reduced-motion: reduce) {
+  /* !important: the gait rules above out-rank a plain .loader * selector. */
+  .loader, .loader *, .loader *::before, .loader *::after { animation: none !important; }
 }
 
 /* ── Catalog view ─────────────────────────────────── */

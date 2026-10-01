@@ -8,11 +8,14 @@ import { mapWithConcurrency, SCAN_CONCURRENCY } from '../pool.js';
 import { ScanCache } from '../scan-cache.js';
 import { SourceRootMissing } from '../source-root.js';
 import type { FamilyTotals, FileReading, Harness, TokenTotals } from './harness.js';
+import { logWarn } from '../../log/logger.js';
 
 /** What a harness contributed for one beat. */
 export type CountResult = {
   byFamily: Map<ModelFamily, Map<string, TokenTotals>>;
   notices: string[];
+  /** Conversations (prefixed ids) whose files failed to read, so nothing was counted for them. */
+  unreadable?: string[];
 };
 
 /** What a join-time probe found, without parsing a byte of token data. */
@@ -74,14 +77,28 @@ export async function count(harness: Harness): Promise<CountResult> {
     return { byFamily, notices: [...notices] };
   }
 
-  const readings = await mapWithConcurrency(files, SCAN_CONCURRENCY, f => readFile(harness, cache, f));
-  await cache.save(); // only after a clean scan — a throw above must not commit
+  // One unreadable file is skipped and named, never counted as zero and never
+  // allowed to stop the rest of this harness counting. A failed file is not cached.
+  const readings = await mapWithConcurrency(files, SCAN_CONCURRENCY, f =>
+    readFile(harness, cache, f).catch((err: unknown) => ({ failed: err })));
+  await cache.save();
+  const unreadable = new Set<string>();
   files.forEach((file, i) => {
     const reading = readings[i]!;
+    const id = harness.conversationId(file, root);
+    if ('failed' in reading) {
+      unreadable.add(`${harness.id}:${id}`);
+      logWarn('scan.file.err', { harness: harness.id, file, message: (reading.failed as Error)?.message ?? String(reading.failed) });
+      return;
+    }
     for (const notice of reading.notices ?? []) notices.add(notice);
-    add(harness.conversationId(file, root), reading.families);
+    add(id, reading.families);
   });
-  return { byFamily, notices: [...notices] };
+  if (unreadable.size > 0) {
+    const n = unreadable.size;
+    notices.add(`${n} ${harness.label} conversation${n === 1 ? '' : 's'} couldn't be read and ${n === 1 ? "isn't" : "aren't"} counted for now`);
+  }
+  return { byFamily, notices: [...notices], unreadable: [...unreadable] };
 }
 
 /**

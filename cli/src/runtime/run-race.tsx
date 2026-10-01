@@ -6,8 +6,7 @@ import { describeAchievement, type RecentEvent } from '@token-derby/shared';
 import { runHeartbeatLoop } from './heartbeat-loop.js';
 import { readAllSources, isStall, scanWithTimeout, type BeatReading, type DegradedSource } from '../tokens/race-tokens.js';
 import { ScanProgress, diagnoseScanTimeout } from '../tokens/scan-progress.js';
-import { MODEL_FAMILIES, zeroPerFamily, type ModelFamily } from '@token-derby/shared';
-import { RaceScoreTracker, type RaceScoreState } from '../tokens/race-score.js';
+import { RaceScoreTracker, joinState, type RaceScoreState } from '../tokens/race-score.js';
 import * as endpoints from '../api/endpoints.js';
 import { ApiError } from '../api/client.js';
 import { saveActiveRace, type ActiveRace } from '../stable/active-race.js';
@@ -206,24 +205,13 @@ export async function buildInitialState(args: {
   active: ActiveRace;
   raceStatus: 'pending' | 'live';
   serverLastSeq: number;
-}): Promise<{ initialState: RaceScoreState; pendingMode: boolean }> {
+}): Promise<{ initialState: RaceScoreState; pendingMode: boolean; degraded: DegradedSource[] }> {
   // Anchors always come from a fresh scan, never from the persisted state — that
   // is what stops a rejoin counting the player's whole transcript history.
-  const convAcked: Record<ModelFamily, Record<string, number>> = { anthropic: {}, openai: {}, google: {} };
-  try {
-    const now = await readAllSources();
-    if (!isStall(now)) {
-      for (const family of MODEL_FAMILIES) {
-        for (const [id, value] of now.byFamily[family]) convAcked[family][id] = value;
-      }
-    }
-  } catch { /* leave empty */ }
+  const now = await readAllSources().catch(() => null);
   return {
-    initialState: {
-      convAcked,
-      counted: zeroPerFamily(),
-      seq: args.serverLastSeq,
-    },
+    initialState: joinState(now, args.serverLastSeq),
     pendingMode: args.raceStatus === 'pending',
+    degraded: now && !isStall(now) ? now.degraded : [],
   };
 }

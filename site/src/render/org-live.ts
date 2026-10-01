@@ -1,6 +1,7 @@
 import type { RaceSummary } from '@token-derby/shared';
 import { fetchOrgRaces, ApiError } from '../api.js';
 import { renderRace } from './race.js';
+import { createLoader } from './loader.js';
 
 // How often we re-resolve which race the TV should be showing. The embedded
 // race view does its own data polling; this loop only watches for the *pick*
@@ -11,7 +12,7 @@ const RESOLVE_INTERVAL_MS = 60_000;
 // failing that the most recently run one, swapping automatically as races
 // start. Meant to be left open on an office TV.
 export function renderOrgLive(root: HTMLElement, orgName: string): () => void {
-  root.innerHTML = `<p class="org-status">Loading…</p>`;
+  root.replaceChildren(createLoader(root.ownerDocument));
 
   let disposed = false;
   let innerCleanup: (() => void) | null = null;

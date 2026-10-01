@@ -5,6 +5,7 @@ import { horseFaceSvg } from '../horse-face.js';
 import { buildHorseSvg } from '../sprite-svg.js';
 import { buildHatGroup } from '../hat-svg.js';
 import { renderLeagueStandings } from './league-standings.js';
+import { createLoader } from './loader.js';
 import {
   formatDuration,
   predictTimeLeftSeconds,
@@ -19,16 +20,18 @@ export function renderOrg(root: HTMLElement, orgName: string): () => void {
   const doc = root.ownerDocument;
   const section = doc.createElement('section');
   section.className = 'org';
+  // The name stays blank until the API returns its canonical casing.
   section.innerHTML = `
     <header class="org-header">
-      <h1>${horseFaceSvg()} <span class="org-name">${escapeHtml(orgName)}</span></h1>
+      <h1>${horseFaceSvg()} <span class="org-name"></span></h1>
       <div class="meta"><button type="button" class="btn home-btn">← Home</button></div>
     </header>
-    <div class="org-body"><p class="org-status">Loading…</p></div>
+    <div class="org-body"></div>
   `;
   root.appendChild(section);
 
   const body = section.querySelector<HTMLElement>('.org-body')!;
+  body.appendChild(createLoader(doc));
   const homeBtn = section.querySelector<HTMLButtonElement>('.home-btn')!;
   homeBtn.addEventListener('click', () => {
     window.history.pushState({}, '', '/');

@@ -164,6 +164,9 @@ export async function joinCommand(joinCode: string | undefined, argv: string[] =
   await saveActiveRace(active);
 
   const initial = await buildInitialState({ active, raceStatus: status, serverLastSeq: ownHorse?.last_seq ?? 0 });
+  for (const d of initial.degraded) {
+    console.warn(`⚠ ${d.label} couldn't be read (${d.message}). Nothing from it counts until it can be read, and from then on only new usage counts.`);
+  }
   const app = render(React.createElement(RunRace, { active, initialState: initial.initialState, pendingMode: initial.pendingMode, ownUserName: identity.display_name }));
   await app.waitUntilExit();
   return 0;

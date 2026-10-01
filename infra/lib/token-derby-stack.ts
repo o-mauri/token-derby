@@ -83,9 +83,10 @@ export class TokenDerbyStack extends cdk.Stack {
       partitionKey: { name: 'admin_code', type: dynamodb.AttributeType.STRING },
     });
 
+    // Org names are looked up case-insensitively, by their lower-cased key.
     table.addGlobalSecondaryIndex({
-      indexName: 'OrgNameIndex',
-      partitionKey: { name: 'org_name', type: dynamodb.AttributeType.STRING },
+      indexName: 'OrgNameKeyIndex',
+      partitionKey: { name: 'org_name_key', type: dynamodb.AttributeType.STRING },
     });
 
     table.addGlobalSecondaryIndex({

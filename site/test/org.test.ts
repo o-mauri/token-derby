@@ -11,6 +11,7 @@ vi.mock('../src/api.js', async () => {
 });
 
 import { renderOrg } from '../src/render/org.js';
+import { ApiError } from '../src/api.js';
 
 const PALETTE = { body: '#8B4513', mane: '#1F1108', tail: '#1F1108', saddle: '#C0392B' };
 
@@ -196,6 +197,30 @@ describe('renderOrg', () => {
     await flush();
     vi.advanceTimersByTime(30_000);
     expect(fetchOrgRaces).toHaveBeenCalledTimes(1);
+    cleanup();
+  });
+
+  it('shows the loader and a blank org name until the races load', async () => {
+    let resolve!: (r: ListOrgRacesResponse) => void;
+    fetchOrgRaces.mockReturnValue(new Promise((r) => { resolve = r; }));
+    const cleanup = renderOrg(root, 'acme');
+    await flush();
+    expect(root.querySelector('.org-body > .loader')).not.toBeNull();
+    expect(root.querySelector('.org-name')?.textContent).toBe('');
+
+    resolve(resp([]));
+    await flush();
+    expect(root.querySelector('.loader')).toBeNull();
+    expect(root.querySelector('.org-name')?.textContent).toBe('Acme');
+    cleanup();
+  });
+
+  it('replaces the loader with the not-found message, naming what was typed', async () => {
+    fetchOrgRaces.mockRejectedValue(new ApiError('ORG_NOT_FOUND', 'nope', 404));
+    const cleanup = renderOrg(root, 'acme');
+    await flush();
+    expect(root.querySelector('.loader')).toBeNull();
+    expect(root.querySelector('.org-status')?.textContent).toContain('No organisation named acme');
     cleanup();
   });
 

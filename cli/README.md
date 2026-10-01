@@ -55,6 +55,9 @@ the schedule or webhook — is done on the web:
 token-derby web
 ```
 
+Organisation names aren't case-sensitive: `StackOne`, `stackone` and `STACKONE` all
+refer to the same organisation, which keeps the casing it was created with.
+
 This opens `app.tokenderby.co.uk/org-manager` with a one-time login
 link, signed in as your CLI identity.
 
@@ -69,6 +72,8 @@ counts before they've joined. Signed-in members can show those not-joined player
 ## What's tracked
 
 The CLI sums `message.usage.output_tokens` across every `*.jsonl` under `~/.claude/projects/`. This includes **subagents and dynamic workflows** — their transcripts nest under `<project>/<session>/subagents/…` (and `…/subagents/workflows/wf_<id>/…`), and the scanner recurses into all of them, so a Plan/Workflow that fans out across many agents counts all of that real output. Your "race tokens" are everything generated since the moment you joined. Tokens generated while disconnected are skipped — that window is your crash penalty.
+
+If a tool's history can't be read when you join (or you turn a tool on mid-race), nothing from it counts until it can be read, and from then on only new usage counts, so a recovered tool never adds its past history in one go. A single unreadable transcript is skipped and named in the status view; the rest of that tool still counts. One heartbeat can add at most 5,000,000 tokens; the server throws away anything above that.
 
 Races can optionally also count *fresh input tokens* — i.e. `input_tokens + cache_creation_input_tokens` (your new context this turn) in addition to output. `cache_read_input_tokens` is never counted, since those reflect passive context size rather than work. The race creator opts in at `token-derby create` time; thresholds for Stampede!, Pulled Away!, and the heartbeat rate cap scale 10× in these races so the achievement cadence stays comparable.
 
