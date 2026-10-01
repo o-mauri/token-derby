@@ -165,3 +165,37 @@ describe('not-joined runners', () => {
     expect(sections[0]!.rows[0]!.meta).toBe('1 runners');
   });
 });
+
+describe('brand and next race', () => {
+  const minimal = (extra: Partial<BoardData>): BoardData => ({
+    raceName: 'League Race 9/10', runnerCount: 0, timeLeftSeconds: null, finished: true,
+    horses: [], prices: [], showNotJoined: false, ...extra,
+  });
+
+  it('shows the org name beside the brand', () => {
+    const root = document.createElement('div');
+    renderBoard(root, minimal({ orgName: 'StackOne' }));
+    expect(root.querySelector('.dm-brand')!.textContent).toContain('StackOne');
+  });
+
+  it('shows the next race and a countdown on a finished board', () => {
+    const root = document.createElement('div');
+    const startsAt = new Date(Date.now() + (13 * 60 + 42) * 60_000).toISOString();
+    renderBoard(root, minimal({ nextRace: { name: 'League Race 10/10', startsAt } }));
+    const banner = root.querySelector('.dm-next')!;
+    expect(banner.textContent).toContain('League Race 10/10');
+    expect(banner.querySelector('.dm-next-count')!.textContent).toMatch(/^13:4[12]:\d\d$/);
+  });
+
+  it('says when nothing is scheduled', () => {
+    const root = document.createElement('div');
+    renderBoard(root, minimal({ nextRace: null }));
+    expect(root.querySelector('.dm-next')!.textContent).toContain('No race scheduled');
+  });
+
+  it('shows no banner on a live board', () => {
+    const root = document.createElement('div');
+    renderBoard(root, minimal({ finished: false, timeLeftSeconds: 600, nextRace: null }));
+    expect(root.querySelector('.dm-next')).toBeNull();
+  });
+});

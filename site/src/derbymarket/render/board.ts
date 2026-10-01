@@ -31,6 +31,9 @@ export type BoardData = {
   horses: BoardHorse[];
   prices: MarketPrice[];
   showNotJoined: boolean;
+  orgName?: string;
+  // Finished boards only: the next race, or null when none is scheduled.
+  nextRace?: { name: string; startsAt: string } | null;
   onToggleNotJoined?: (show: boolean) => void;
 };
 
@@ -171,6 +174,20 @@ function fitChips(container: HTMLElement): void {
   });
 }
 
+function startsLabel(iso: string): string {
+  return new Date(iso).toLocaleString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+}
+
+function renderNext(next: { name: string; startsAt: string } | null): string {
+  if (next === null) return '<div class="dm-next"><span class="dm-next-label">No race scheduled</span></div>';
+  const left = Math.max(0, Math.round((Date.parse(next.startsAt) - Date.now()) / 1000));
+  return `
+    <div class="dm-next">
+      <div><div class="dm-next-label">Next race</div><div class="dm-next-name">${esc(next.name)} · ${esc(startsLabel(next.startsAt))}</div></div>
+      <div class="dm-next-right"><div class="dm-next-label">starts in</div><div class="dm-next-count">${formatDuration(left)}</div></div>
+    </div>`;
+}
+
 function statusText(data: BoardData, anchor: CountdownAnchor | null): string {
   if (data.finished) return `${data.runnerCount} runners · final prices — race finished`;
   const left = anchor ? predictTimeLeftSeconds(anchor, Date.now()) : 0;
@@ -195,6 +212,8 @@ export function renderBoard(root: HTMLElement, data: BoardData, onOpenRow?: (row
 
   root.innerHTML = `
     <div class="dm">
+      <div class="dm-brand">DERBYMARKET${data.orgName ? ` <span class="dm-brand-org">· ${esc(data.orgName)}</span>` : ''}</div>
+      ${data.finished && data.nextRace !== undefined ? renderNext(data.nextRace) : ''}
       <div class="dm-status">
         ${data.finished ? '' : '<span class="dm-dot" aria-hidden="true"></span>'}
         <strong class="dm-race-name">${esc(data.raceName)}</strong>
@@ -220,6 +239,12 @@ export function renderBoard(root: HTMLElement, data: BoardData, onOpenRow?: (row
     tickTimer = setInterval(() => { textEl.textContent = statusText(data, anchor); }, 1000);
   }
 
+  const countEl = root.querySelector<HTMLElement>('.dm-next-count');
+  const nextAt = data.finished && data.nextRace ? Date.parse(data.nextRace.startsAt) : NaN;
+  const nextTimer = countEl && Number.isFinite(nextAt)
+    ? setInterval(() => { countEl.textContent = formatDuration(Math.max(0, Math.round((nextAt - Date.now()) / 1000))); }, 1000)
+    : null;
+
   const chipsContainers = Array.from(root.querySelectorAll<HTMLElement>('.dm-chips'));
   chipsContainers.forEach(fitChips);
   const ro = new ResizeObserver((entries) => {
@@ -229,6 +254,7 @@ export function renderBoard(root: HTMLElement, data: BoardData, onOpenRow?: (row
 
   return () => {
     if (tickTimer) clearInterval(tickTimer);
+    if (nextTimer) clearInterval(nextTimer);
     ro.disconnect();
   };
 }
