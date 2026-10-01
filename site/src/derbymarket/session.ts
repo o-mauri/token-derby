@@ -1,6 +1,16 @@
 const SESSION_KEY = 'td_market_session';
 const UID_KEY = 'td_market_uid';
 
+const SHOW_NOT_JOINED_KEY = 'td_market_show_not_joined';
+
+export function getShowNotJoined(): boolean {
+  try { return localStorage.getItem(SHOW_NOT_JOINED_KEY) === '1'; } catch { return false; }
+}
+
+export function setShowNotJoined(show: boolean): void {
+  try { localStorage.setItem(SHOW_NOT_JOINED_KEY, show ? '1' : '0'); } catch { /* storage blocked */ }
+}
+
 export function getSession(): string | null {
   return localStorage.getItem(SESSION_KEY);
 }

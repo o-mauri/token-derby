@@ -286,13 +286,15 @@ export type ApplyHeartbeatDeltaInput = {
   needsSeed: boolean;
   // A pre-rename model_tokens map, carried into the renamed one when seeding.
   legacyModelTokens?: Record<string, number>;
+  // Set only when this beat produced something; stamps the presence span.
+  scored_at?: string;
 };
 
 // Atomic, idempotent heartbeat apply. Adds `applied` to current_tokens and
 // advances last_seq ONLY when the incoming seq is newer. Returns false (no
 // mutation) for a duplicate/out-of-order seq.
 export async function applyHeartbeatDelta(input: ApplyHeartbeatDeltaInput): Promise<boolean> {
-  const { race_id, horse_id, seq, applied, scored_applied, modifier_states, last_heartbeat, state, components, needsSeed, legacyModelTokens } = input;
+  const { race_id, horse_id, seq, applied, scored_applied, modifier_states, last_heartbeat, state, components, needsSeed, legacyModelTokens, scored_at } = input;
   if (needsSeed) await Promise.all([seedScoredTokens(race_id, horse_id), seedModelTokens(race_id, horse_id, legacyModelTokens)]);
 
   const eav: Record<string, unknown> = {
@@ -353,6 +355,10 @@ export async function applyHeartbeatDelta(input: ApplyHeartbeatDeltaInput): Prom
   if (Object.keys(modifier_states).length > 0) {
     setParts.push('modifier_states = :ms');
     eav[':ms'] = modifier_states;
+  }
+  if (scored_at !== undefined) {
+    setParts.push('first_scored_at = if_not_exists(first_scored_at, :sat)', 'last_scored_at = :sat');
+    eav[':sat'] = scored_at;
   }
 
   const updateExpression =

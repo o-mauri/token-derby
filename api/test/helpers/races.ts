@@ -1,6 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import { putRace } from '../../src/db/races.js';
 import { putHorse } from '../../src/db/horses.js';
+import { UpdateCommand } from '@aws-sdk/lib-dynamodb';
+import { ddb, TABLE } from '../../src/db/client.js';
+import { horseKey } from '../../src/db/keys.js';
 import { makeUser, makeHorse } from './auth-helper.js';
 import type { Horse, Race } from '@token-derby/shared';
 import { FIELD_MEDIAN_PACE } from '@token-derby/shared';
@@ -18,6 +21,7 @@ export type SeedRaceOptions = {
   distinct_jockeys: number;
   duration_hours: number;
   tokens: number[];
+  scored?: number[];
   jockey?: SeedRaceJockey;
   // Anchor instant. All horses join at (now - duration_hours) and the race
   // is finalised (by the caller) at `now` — pass it through to finaliseRace
@@ -75,6 +79,7 @@ export async function seedRace(opts: SeedRaceOptions): Promise<SeedRaceResult> {
       name: label,
       colors: { body: '#fff', mane: '#000', tail: '#000', saddle: '#f00' },
       current_tokens: opts.tokens[i]!,
+      ...(opts.scored ? { scored_tokens: opts.scored[i]! } : {}),
       last_heartbeat: now.toISOString(),
       joined_at: start_time,
       user_id,
@@ -88,6 +93,15 @@ export async function seedRace(opts: SeedRaceOptions): Promise<SeedRaceResult> {
   return { race, horses, now };
 }
 
+export async function setHorseSpanForTest(race_id: string, horse_id: string, first: string, last: string): Promise<void> {
+  await ddb.send(new UpdateCommand({
+    TableName: TABLE,
+    Key: horseKey(race_id, horse_id),
+    UpdateExpression: 'SET first_scored_at = :f, last_scored_at = :l',
+    ExpressionAttributeValues: { ':f': first, ':l': last },
+  }));
+}
+
 // For market-pricing tests: a race anchored `elapsedMin` minutes into its
 // run, with horses joined at the off. Bypasses the jockey/stable-horse
 // handlers (pricing never reads them) so seeding stays fast.
@@ -97,7 +111,10 @@ export type SeedLiveRaceOptions = {
   durationHours?: number;   // total race length; default keeps it live well past elapsedMin
   tokens?: number[];        // per-horse current_tokens; default a plausible banked amount
   priorPace?: number[];     // per-horse prior_pace; default FIELD_MEDIAN_PACE
-  expectedField?: number;
+  orgId?: string;
+  // Minutes after the off of each horse's first and last scoring beat.
+  firstScoredMin?: number[];
+  lastScoredMin?: number[];
   league?: { league_id: string; season: number };
 };
 
@@ -123,7 +140,7 @@ export async function seedLiveRace(opts: SeedLiveRaceOptions): Promise<SeedLiveR
     max_participants: 30,
     join_code: `J${randomUUID().slice(0, 6).toUpperCase()}`,
     created_at: start_time,
-    ...(opts.expectedField !== undefined ? { expected_field: opts.expectedField } : {}),
+    ...(opts.orgId ? { org_id: opts.orgId } : {}),
     ...(opts.league ? { league_id: opts.league.league_id, league_season: opts.league.season } : {}),
   };
   await putRace(race, `admin-${race_id}`);
@@ -142,6 +159,10 @@ export async function seedLiveRace(opts: SeedLiveRaceOptions): Promise<SeedLiveR
       user_name: `Runner${i}`,
       xp: 0,
       prior_pace: opts.priorPace?.[i] ?? FIELD_MEDIAN_PACE,
+      ...(opts.firstScoredMin?.[i] !== undefined
+        ? { first_scored_at: new Date(startMs + opts.firstScoredMin[i]! * 60_000).toISOString() } : {}),
+      ...(opts.lastScoredMin?.[i] !== undefined
+        ? { last_scored_at: new Date(startMs + opts.lastScoredMin[i]! * 60_000).toISOString() } : {}),
     };
     await putHorse(race_id, horse, `tok-${horse.horse_id}`);
     horses.push(horse);

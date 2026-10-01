@@ -50,6 +50,18 @@ export function parseStableHorseId(sk: string): string | null {
   return sk.startsWith(STABLE_HORSE_SK_PREFIX) ? sk.slice(STABLE_HORSE_SK_PREFIX.length) : null;
 }
 
+export const HABIT_SK_PREFIX = 'HABITS#';
+
+export function habitKey(org_id: string, user_id: string) {
+  return { pk: `${ORG_PK_PREFIX}${org_id}`, sk: `${HABIT_SK_PREFIX}${user_id}` };
+}
+
+export const HABIT_MATRIX_SK_PREFIX = 'HABITM#';
+
+export function habitMatrixKey(org_id: string, user_id: string) {
+  return { pk: `${ORG_PK_PREFIX}${org_id}`, sk: `${HABIT_MATRIX_SK_PREFIX}${user_id}` };
+}
+
 export const SCHEDULE_SK = 'SCHEDULE';
 
 export function orgScheduleKey(org_id: string) {

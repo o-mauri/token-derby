@@ -287,6 +287,7 @@ export type MarketHorse = {
   horse_id: string;
   name: string;
   colors: HorseColors;
+  joined: boolean;
   division?: number;
   scored_tokens: number;
 };

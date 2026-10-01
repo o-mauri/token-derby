@@ -85,7 +85,10 @@ export type Horse = {
   // Per-modifier state, e.g. { stamina: { level: 73 } }. Absent until the first
   // beat of a race running a modifier; read via a modifier's own accessor.
   modifier_states?: ModifierStates;
-  prior_pace?: number;       // stamped at join, scored tokens/min
+  // First and last beat that produced anything; the horse's presence span.
+  first_scored_at?: string;
+  last_scored_at?: string;
+  prior_pace?: number;       // stamped at join, raw tokens/min over the scoring span
   // League fixtures only: computed per-request from season standings (see
   // HorseView). Absent for non-league races and outside that enrichment step.
   division?: number;
@@ -172,13 +175,21 @@ export type RaceView = Race & {
   time_left_seconds: number;
 };
 
+// A runner priced on a snapshot who hasn't joined the race yet.
+export type NotJoinedRunner = {
+  horse_id: string;
+  name: string;
+  colors: HorseColors;
+  division?: number;
+};
+
 // A race's prices for every horse at one bucket, as stored in the snapshot.
 export type MarketSnapshot = {
   race_id: string;
   bucket: number;                 // floor(computed_at_ms / 60_000)
   computed_at: string;
-  phantoms: number;
   prices: MarketPrice[];
+  not_joined: NotJoinedRunner[];  // members-only; stripped for anonymous readers
 };
 
 export type Organisation = {
@@ -305,7 +316,7 @@ export type StableHorse = {
   hats?: CollectedHat[];
   equipped_hat?: number | null;   // number = equipped index into hats[]; null = explicitly unequipped; undefined = pre-feature stable horses
   last_rolled_level?: number;         // high-water mark for pending rolls
-  recent_paces?: number[];   // scored tokens/min, oldest first
+  recent_paces?: number[];   // raw tokens/min over the scoring span, oldest first
 };
 
 // Per-org tuning for the scoring mechanics. Its own row rather than living on

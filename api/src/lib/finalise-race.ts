@@ -89,12 +89,11 @@ export async function finaliseRace(race: Race, now: Date): Promise<FinaliseResul
     const xp = Math.round(xpForRaceFinish(rank, h.final_scored_tokens, winner_tokens, h.live_xp) * xp_multiplier);
     const isFirstAward = await setHorseXpAwarded(race.race_id, h.horse_id, xp);
     if (isFirstAward && h.user_id && h.stable_horse_id) {
-      // Scored pace over the whole enrolled window, idle time included — the
-      // span a market predicts over. Too brief a window records no pace.
-      const enrolledMin = Math.max(1, (finishMs - new Date(h.joined_at).getTime()) / 60_000);
-      const pace = enrolledMin >= MIN_PACE_RACE_MINUTES
-        ? h.final_scored_tokens / enrolledMin
-        : null;
+      // Raw output per present minute; join-to-finish for rows that predate span tracking.
+      const windowMin = h.first_scored_at && h.last_scored_at
+        ? (Date.parse(h.last_scored_at) - Date.parse(h.first_scored_at)) / 60_000
+        : (finishMs - new Date(h.joined_at).getTime()) / 60_000;
+      const pace = windowMin >= MIN_PACE_RACE_MINUTES ? h.final_tokens / windowMin : null;
       await Promise.all([
         awardHorseXp(h.user_id, h.stable_horse_id, xp),
         recordHorseRaceResult(h.user_id, h.stable_horse_id, {

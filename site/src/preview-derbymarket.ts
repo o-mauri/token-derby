@@ -2,6 +2,7 @@
 // fixture — no network calls. Loaded by /preview-derbymarket.html, not part
 // of the main app bundle. Mirrors preview-org-manager.ts's approach.
 import type { HorseColors, MarketPrice, MarketSnapshot } from '@token-derby/shared';
+import { getShowNotJoined, setShowNotJoined } from './derbymarket/session.js';
 import { renderLogin } from './derbymarket/render/login.js';
 import {
   renderBoard, renderNoLiveRace, renderMarketNotOpen, renderNoMarketData, renderLoadError,
@@ -25,6 +26,7 @@ const horses: BoardHorse[] = [
   { horse_id: 'h6', name: 'Sunny J', colors: color('#C05621'), division: 2, jockey: 'Joe', banked: 8_600_000, rank: 6 },
   { horse_id: 'h7', name: 'Glue Factory', colors: color('#5F8D4E'), division: 2, jockey: 'Gordon', banked: 7_500_000, rank: 7 },
   { horse_id: 'h8', name: 'Sanic', colors: color('#8E7CC3'), division: 3, jockey: 'JM', banked: 3_100_000, rank: 8 },
+  { horse_id: 'nj-demo', name: 'Late Arrival', colors: color('#6A4C93'), joined: false },
 ];
 
 // Synthetic 30-snapshot history for the Premier "To Win" market. `oh, claude!`
@@ -47,11 +49,11 @@ function buildWinHistory(): MarketSnapshot[] {
     }
     const total = Object.values(raw).reduce((a, b) => a + b, 0) || 1;
     const snapshotPrices: MarketPrice[] = Object.entries(raw).map(([horse_id, v]) => ({
-      horse_id, win: v / total, podium: 0.5, division: null, divisionPodium: null,
+      horse_id, joined: true, win: v / total, podium: 0.5, division: null, divisionPodium: null,
     }));
     history.push({
       race_id: 'preview', bucket, computed_at: new Date(bucket * 60_000).toISOString(),
-      phantoms: 0, prices: snapshotPrices,
+      not_joined: [], prices: snapshotPrices,
     });
   }
   return history;
@@ -62,14 +64,15 @@ const winHistory = buildWinHistory();
 // race-wide podium — top-3-of-4 is a much easier bar than top-3-of-8. A
 // division of 3 or fewer trivially prices everyone at 1.00.
 const prices: MarketPrice[] = [
-  { horse_id: 'h1', win: 0.40, podium: 0.85, division: 0.55, divisionPodium: 0.98 },
-  { horse_id: 'h2', win: 0.20, podium: 0.65, division: 0.25, divisionPodium: 0.92 },
-  { horse_id: 'h3', win: 0.10, podium: 0.45, division: 0.12, divisionPodium: 0.78 },
-  { horse_id: 'h4', win: 0.05, podium: 0.25, division: 0.08, divisionPodium: 0.55 },
-  { horse_id: 'h5', win: 0.12, podium: 0.40, division: 0.55, divisionPodium: 1.00 },
-  { horse_id: 'h6', win: 0.08, podium: 0.25, division: 0.35, divisionPodium: 1.00 },
-  { horse_id: 'h7', win: 0.03, podium: 0.10, division: 0.10, divisionPodium: 1.00 },
-  { horse_id: 'h8', win: 0.02, podium: 0.05, division: 1.00, divisionPodium: 1.00 },
+  { horse_id: 'h1', joined: true, win: 0.40, podium: 0.85, division: 0.55, divisionPodium: 0.98 },
+  { horse_id: 'h2', joined: true, win: 0.20, podium: 0.65, division: 0.25, divisionPodium: 0.92 },
+  { horse_id: 'h3', joined: true, win: 0.10, podium: 0.45, division: 0.12, divisionPodium: 0.78 },
+  { horse_id: 'h4', joined: true, win: 0.05, podium: 0.25, division: 0.08, divisionPodium: 0.55 },
+  { horse_id: 'h5', joined: true, win: 0.12, podium: 0.40, division: 0.55, divisionPodium: 1.00 },
+  { horse_id: 'h6', joined: true, win: 0.08, podium: 0.25, division: 0.35, divisionPodium: 1.00 },
+  { horse_id: 'h7', joined: true, win: 0.03, podium: 0.10, division: 0.10, divisionPodium: 1.00 },
+  { horse_id: 'h8', joined: true, win: 0.02, podium: 0.05, division: 1.00, divisionPodium: 1.00 },
+  { horse_id: 'nj-demo', win: 0.07, podium: 0.30, division: null, divisionPodium: null, joined: false },
 ];
 
 const divisionNames = ['Premier', 'Contenders', 'Rookies'];
@@ -96,32 +99,39 @@ renderLoadError(section('Empty — load error'));
 const liveBoardRoot = section('Live board — click a row to open its price chart');
 const liveBoardData = {
   raceName: 'Acme League Round 5',
-  runnerCount: horses.length,
+  runnerCount: horses.filter((h) => h.joined !== false).length,
   timeLeftSeconds: 7_380,
   finished: false,
   divisionNames,
   horses,
   prices,
+  showNotJoined: getShowNotJoined(),
+  onToggleNotJoined: (show: boolean) => { setShowNotJoined(show); liveBoardData.showNotJoined = show; showLiveBoard(); },
 };
-function showLiveBoard(): void {
-  renderBoard(liveBoardRoot, liveBoardData, (row: OpenRow) => {
-    renderPriceChart(liveBoardRoot, {
-      history: winHistory, runners: row.runners, market: row.market, name: row.name,
-      meta: row.meta, sectionHeading: row.heading, divisionNames, onBack: showLiveBoard,
-    });
+function showLiveChart(row: OpenRow): void {
+  renderPriceChart(liveBoardRoot, {
+    history: winHistory, runners: row.runners, market: row.market, name: row.name,
+    meta: row.meta, sectionHeading: row.heading, divisionNames, onBack: showLiveBoard,
+    showNotJoined: getShowNotJoined(),
+    onToggleNotJoined: (show) => { setShowNotJoined(show); showLiveChart(row); },
   });
+}
+function showLiveBoard(): void {
+  liveBoardData.showNotJoined = getShowNotJoined();
+  renderBoard(liveBoardRoot, liveBoardData, showLiveChart);
 }
 showLiveBoard();
 
 // Section 4: finished — same board, final prices, no clock.
 renderBoard(section('Finished board — final prices'), {
   raceName: 'Acme League Round 4',
-  runnerCount: horses.length,
+  runnerCount: horses.filter((h) => h.joined !== false).length,
   timeLeftSeconds: null,
   finished: true,
   divisionNames,
   horses,
   prices,
+  showNotJoined: false,
 });
 
 // Section 5: the price chart on its own, always open — so it shows up in a

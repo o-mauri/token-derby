@@ -75,9 +75,10 @@ describe('renderBoard row activation', () => {
       { horse_id: 'h2', name: 'Beta', colors },
     ],
     prices: [
-      { horse_id: 'h1', win: 0.6, podium: 0.8, division: null, divisionPodium: null },
-      { horse_id: 'h2', win: 0.4, podium: 0.5, division: null, divisionPodium: null },
+      { horse_id: 'h1', joined: true, win: 0.6, podium: 0.8, division: null, divisionPodium: null },
+      { horse_id: 'h2', joined: true, win: 0.4, podium: 0.5, division: null, divisionPodium: null },
     ],
+    showNotJoined: false,
   };
 
   it('is a real button, reachable by keyboard, that reports its own row and market on click', () => {
@@ -98,5 +99,69 @@ describe('renderBoard row activation', () => {
     expect(opened!.runners.map((r) => r.horse.horse_id)).toEqual(['h1', 'h2']); // sorted by podium price
 
     dispose();
+  });
+});
+
+describe('not-joined runners', () => {
+  const joinedA = { horse_id: 'a', name: 'Alpha', colors: { body: '#111', mane: '#000', tail: '#000', saddle: '#000' } };
+  const joinedB = { horse_id: 'b', name: 'Bravo', colors: { body: '#222', mane: '#000', tail: '#000', saddle: '#000' } };
+  const late = { horse_id: 'nj-1', name: 'Late Arrival', joined: false, colors: { body: '#333', mane: '#000', tail: '#000', saddle: '#000' } };
+  const prices = [
+    { horse_id: 'a', joined: true, win: 0.5, podium: 1, division: null, divisionPodium: null },
+    { horse_id: 'b', joined: true, win: 0.3, podium: 1, division: null, divisionPodium: null },
+    { horse_id: 'nj-1', joined: false, win: 0.2, podium: 0.9, division: null, divisionPodium: null },
+  ];
+  const data = (showNotJoined: boolean, onToggleNotJoined?: (s: boolean) => void) => ({
+    raceName: 'R', runnerCount: 2, timeLeftSeconds: 600, finished: false,
+    horses: [joinedA, joinedB, late], prices, showNotJoined, onToggleNotJoined,
+  });
+
+  it('hands the chart every runner, not-joined included, even with the toggle off', () => {
+    const root = document.createElement('div');
+    const opened: OpenRow[] = [];
+    renderBoard(root, data(false), (row) => opened.push(row));
+    root.querySelector<HTMLButtonElement>('.dm-row')!.click();
+    expect(opened[0]!.runners.map((r) => r.horse.horse_id)).toContain('nj-1');
+  });
+
+  it('hides not-joined chips by default', () => {
+    const root = document.createElement('div');
+    renderBoard(root, data(false));
+    expect(root.textContent).not.toContain('Late Arrival');
+  });
+
+  it('shows them muted and labelled when toggled on', () => {
+    const root = document.createElement('div');
+    renderBoard(root, data(true));
+    const chip = Array.from(root.querySelectorAll('.dm-chip')).find((c) => c.textContent!.includes('Late Arrival'))!;
+    expect(chip.classList.contains('dm-chip--not-joined')).toBe(true);
+    expect(chip.textContent).toContain('not joined');
+  });
+
+  it('renders the toggle only when there are not-joined runners', () => {
+    const root = document.createElement('div');
+    renderBoard(root, { ...data(false), horses: [joinedA, joinedB], prices: prices.slice(0, 2) });
+    expect(root.querySelector('.dm-toggle-not-joined')).toBeNull();
+    renderBoard(root, data(false));
+    expect(root.querySelector('.dm-toggle-not-joined')).not.toBeNull();
+  });
+
+  it('reports the new state when the toggle is clicked', () => {
+    const root = document.createElement('div');
+    const seen: boolean[] = [];
+    renderBoard(root, data(false, (s) => seen.push(s)));
+    root.querySelector<HTMLButtonElement>('.dm-toggle-not-joined')!.click();
+    expect(seen).toEqual([true]);
+  });
+
+  it('counts only joined runners for market thresholds and meta', () => {
+    const sections = buildSections(
+      [{ ...joinedA, division: 1, win: .5, podium: 1, divisionPrice: .6, divisionPodiumPrice: 1 },
+       { ...late, division: 1, win: .2, podium: .9, divisionPrice: .4, divisionPodiumPrice: 1 }],
+      ['Premier'], true,
+    );
+    // One joined runner in the division: no division win market even with a not-joined rival shown.
+    expect(sections.find((s) => s.heading.startsWith('Premier'))).toBeUndefined();
+    expect(sections[0]!.rows[0]!.meta).toBe('1 runners');
   });
 });

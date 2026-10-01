@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
-  shape, blendedPace, joinedFractionByNow, phantomCount, recentPacePrior,
-  PACE_PRIOR_CROSSOVER_MIN, PHANTOM_SCALE, MARGIN, SIMULATIONS, MARKET_OPEN_MIN,
+  shape, blendedPace, recentPacePrior,
+  PACE_PRIOR_CROSSOVER_MIN, MARGIN, SIMULATIONS, MARKET_OPEN_MIN,
   RECENT_PACES_WINDOW, FIELD_MEDIAN_PACE,
 } from '../src/markets.js';
 
@@ -38,55 +38,9 @@ describe('blendedPace', () => {
   });
 });
 
-describe('joinedFractionByNow', () => {
-  it('says nobody has joined at the off', () => {
-    expect(joinedFractionByNow(0, 9)).toBe(0);
-  });
-  it('fills small fields much faster than large ones', () => {
-    // Measured: at 10% elapsed a 3-6 field is 83% present, an 11+ field is 27%.
-    expect(joinedFractionByNow(0.10, 5)).toBeCloseTo(0.83, 2);
-    expect(joinedFractionByNow(0.10, 9)).toBeCloseTo(0.75, 2);
-    expect(joinedFractionByNow(0.10, 15)).toBeCloseTo(0.27, 2);
-  });
-  it('reaches a full field by the time the curve tops out', () => {
-    expect(joinedFractionByNow(0.60, 15)).toBe(1);
-    expect(joinedFractionByNow(1.0, 15)).toBe(1);
-  });
-  it('never decreases', () => {
-    for (const n of [5, 9, 15]) {
-      for (let f = 0; f < 1; f += 0.05) {
-        expect(joinedFractionByNow(f + 0.05, n)).toBeGreaterThanOrEqual(joinedFractionByNow(f, n));
-      }
-    }
-  });
-});
-
-describe('phantomCount', () => {
-  it('expects a whole field before anyone has arrived', () => {
-    expect(phantomCount({ elapsedFraction: 0, expectedField: 12 }))
-      .toBe(Math.round(12 * PHANTOM_SCALE));
-  });
-  it('drains to zero once the field is complete', () => {
-    expect(phantomCount({ elapsedFraction: 0.60, expectedField: 12 })).toBe(0);
-    expect(phantomCount({ elapsedFraction: 0.95, expectedField: 12 })).toBe(0);
-  });
-  it('never goes negative', () => {
-    expect(phantomCount({ elapsedFraction: 2, expectedField: 12 })).toBe(0);
-  });
-  it('is monotonically non-increasing through the race', () => {
-    let prev = Infinity;
-    for (let f = 0; f <= 1; f += 0.05) {
-      const n = phantomCount({ elapsedFraction: f, expectedField: 15 });
-      expect(n).toBeLessThanOrEqual(prev);
-      prev = n;
-    }
-  });
-});
-
 describe('constants match the spec', () => {
   it('pins the tuned values', () => {
     expect(PACE_PRIOR_CROSSOVER_MIN).toBe(120);
-    expect(PHANTOM_SCALE).toBe(0.70);
     expect(MARGIN).toBe(0.01);
     expect(SIMULATIONS).toBe(10_000);
     expect(MARKET_OPEN_MIN).toBe(20);

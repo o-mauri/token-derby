@@ -2076,6 +2076,13 @@ label.label input:disabled, label.label select:disabled, label.label textarea:di
 .dm-chip-price { color: var(--text); font-size: 0.85rem; font-weight: bold; }
 .dm-chip--lead { border-color: var(--accent); }
 .dm-chip--rest { opacity: 0.45; }
+.dm-chip--not-joined { border-style: dashed; opacity: 0.6; }
+.dm-chip-tag { color: var(--muted); font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.06em; }
+.dm-toggle-not-joined {
+  margin-left: auto; background: none; border: 1px solid var(--muted); border-radius: 3px;
+  color: var(--text); font: inherit; font-size: 0.72rem; padding: 2px 8px; cursor: pointer;
+}
+.dm-toggle-not-joined[aria-pressed="true"] { border-color: var(--accent); }
 .dm-silk { display: inline-block; width: 4px; height: 12px; border-radius: 1px; flex-shrink: 0; }
 
 .dm-chev { flex: 0 0 auto; color: var(--muted); font-size: 1.1rem; }
@@ -2103,7 +2110,7 @@ label.label input:disabled, label.label select:disabled, label.label textarea:di
 
 /* ── Derbymarket price chart (derbymarket/render/chart.ts) ───────────── */
 
-.dm-pc-crumb { margin-bottom: 2px; }
+.dm-pc-crumb { margin-bottom: 2px; display: flex; align-items: center; gap: 12px; }
 .dm-pc-back {
   background: none;
   border: none;

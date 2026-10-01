@@ -6,6 +6,7 @@ import { listHorses } from '../db/horses.js';
 import { computeStatus } from '../lib/status.js';
 import { ensureSnapshot } from '../lib/price-race.js';
 import { stampDivisions } from '../lib/divisions.js';
+import { canSeeNotJoined, visibleSnapshot } from '../lib/market-access.js';
 import { ok, err } from '../lib/http.js';
 
 export const handler: ApiHandler = async (event) => {
@@ -43,16 +44,21 @@ export const handler: ApiHandler = async (event) => {
     return ok<GetMarketsResponse>({ open: false, opens_in_seconds: 0 });
   }
 
+  const showAll = await canSeeNotJoined(event, race);
+  const visible = visibleSnapshot(snapshot, showAll);
   const response: GetMarketsResponse = {
     open: true,
-    snapshot,
-    horses: horses.map((h) => ({
-      horse_id: h.horse_id,
-      name: h.name,
-      colors: h.colors,
-      division: h.division,
-      scored_tokens: scoredOf(h),
-    })),
+    snapshot: visible,
+    horses: [
+      ...horses.map((h) => ({
+        horse_id: h.horse_id, name: h.name, colors: h.colors, division: h.division,
+        joined: true, scored_tokens: scoredOf(h),
+      })),
+      ...visible.not_joined.map((r) => ({
+        horse_id: r.horse_id, name: r.name, colors: r.colors, division: r.division,
+        joined: false, scored_tokens: 0,
+      })),
+    ],
   };
   return ok(response);
 };

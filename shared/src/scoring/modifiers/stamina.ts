@@ -65,6 +65,25 @@ export const stamina: Modifier = {
     return { multiplier: step.multiplier, state: { [STATE_KEY]: step.level } };
   },
 
+  project({ state, params, pace, stepMinutes, steps }) {
+    const p = params as unknown as StaminaParams;
+    let level = state[STATE_KEY] ?? FULL_STAMINA;
+    const out: number[] = [staminaStep({ level, pace, minutes: 1, params: p }).multiplier];
+    let total = 0, walked = 0;
+    for (let i = 1; i < steps; i++) {
+      const target = i * stepMinutes;
+      while (walked < target) {
+        const minutes = Math.min(1, target - walked);
+        const step = staminaStep({ level, pace, minutes, params: p });
+        total += step.multiplier * minutes;
+        level = step.level;
+        walked += minutes;
+      }
+      out.push(total / walked);
+    }
+    return out;
+  },
+
   preview(params) {
     const p = params as unknown as StaminaParams;
     // Probing at exactly 2x sustainable_pace makes the uncapped drain term equal

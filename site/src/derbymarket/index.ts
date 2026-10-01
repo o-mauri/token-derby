@@ -1,8 +1,8 @@
-import type { OrganisationSummary } from '@token-derby/shared';
+import type { HorseColors, OrganisationSummary } from '@token-derby/shared';
 import { scoredOf } from '@token-derby/shared';
 import * as api from './api.js';
 import { ApiError } from './api.js';
-import { getSession, setUid, clearSession, readCodeFromHash } from './session.js';
+import { getSession, getShowNotJoined, setShowNotJoined, setUid, clearSession, readCodeFromHash } from './session.js';
 import { renderLogin } from './render/login.js';
 import {
   renderBoard, renderNoLiveRace, renderMarketNotOpen, renderNoMarketData, renderLoadError,
@@ -46,6 +46,11 @@ export function renderDerbyMarket(root: HTMLElement): () => void {
       jockey: h.user_name, banked: scoredOf(h), rank: h.rank,
     }));
 
+    const withNotJoined = (snap: { not_joined?: Array<{ horse_id: string; name: string; colors: HorseColors; division?: number }> }) => [
+      ...horses,
+      ...(snap.not_joined ?? []).map((r) => ({ ...r, joined: false, banked: 0 })),
+    ];
+
     // Opens a market row's detail chart in place of the board; `showBoard`
     // (set by whichever branch below renders the board) puts it back.
     let showBoard: (() => void) | null = null;
@@ -54,13 +59,19 @@ export function renderDerbyMarket(root: HTMLElement): () => void {
       try { historyRes = await api.getMarketHistory(pick.join_code); }
       catch { clearInner(); renderLoadError(root); return; }
       if (disposed) return;
-      clearInner();
+      const history = historyRes.history;
       detailOpen = true;
-      innerDispose = renderPriceChart(root, {
-        history: historyRes.history, runners: row.runners, market: row.market, name: row.name,
-        meta: row.meta, sectionHeading: row.heading, divisionNames: race.league_division_names,
-        onBack: () => { detailOpen = false; showBoard?.(); },
-      });
+      const showChart = (): void => {
+        clearInner();
+        innerDispose = renderPriceChart(root, {
+          history, runners: row.runners, market: row.market, name: row.name,
+          meta: row.meta, sectionHeading: row.heading, divisionNames: race.league_division_names,
+          showNotJoined: getShowNotJoined(),
+          onToggleNotJoined: (show) => { setShowNotJoined(show); showChart(); },
+          onBack: () => { detailOpen = false; showBoard?.(); },
+        });
+      };
+      showChart();
     };
 
     if (race.status === 'live') {
@@ -78,10 +89,16 @@ export function renderDerbyMarket(root: HTMLElement): () => void {
       }
       const data: BoardData = {
         raceName: race.name, runnerCount: horses.length, timeLeftSeconds: race.time_left_seconds,
-        finished: false, divisionNames: race.league_division_names, horses,
+        finished: false, divisionNames: race.league_division_names,
+        horses: withNotJoined(marketsRes.snapshot),
         prices: marketsRes.snapshot.prices,
+        showNotJoined: getShowNotJoined(),
+        onToggleNotJoined: (show) => { setShowNotJoined(show); data.showNotJoined = show; showBoard?.(); },
       };
-      showBoard = () => { clearInner(); innerDispose = renderBoard(root, data, (row) => void openDetail(row)); };
+      showBoard = () => {
+        data.showNotJoined = getShowNotJoined();
+        clearInner(); innerDispose = renderBoard(root, data, (row) => void openDetail(row));
+      };
       showBoard();
       return;
     }
@@ -97,10 +114,16 @@ export function renderDerbyMarket(root: HTMLElement): () => void {
       if (!last) { renderNoMarketData(root, { raceName: race.name }); return; }
       const data: BoardData = {
         raceName: race.name, runnerCount: horses.length, timeLeftSeconds: null,
-        finished: true, divisionNames: race.league_division_names, horses,
+        finished: true, divisionNames: race.league_division_names,
+        horses: withNotJoined(last),
         prices: last.prices,
+        showNotJoined: getShowNotJoined(),
+        onToggleNotJoined: (show) => { setShowNotJoined(show); data.showNotJoined = show; showBoard?.(); },
       };
-      showBoard = () => { clearInner(); innerDispose = renderBoard(root, data, (row) => void openDetail(row)); };
+      showBoard = () => {
+        data.showNotJoined = getShowNotJoined();
+        clearInner(); innerDispose = renderBoard(root, data, (row) => void openDetail(row));
+      };
       showBoard();
       return;
     }

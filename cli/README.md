@@ -58,6 +58,14 @@ token-derby web
 This opens `app.tokenderby.co.uk/org-manager` with a one-time login
 link, signed in as your CLI identity.
 
+### `token-derby derbymarket`
+
+Opens the Derbymarket board for your organisation's live race, signed in. Prices come from
+10,000 simulated finishes. Each one draws who turns up, when they arrive and when they leave
+from the last two weeks of the org's races, so a regular who usually starts after lunch still
+counts before they've joined. Signed-in members can show those not-joined players with
+"Show not-joined"; they are priced alongside everyone else.
+
 ## What's tracked
 
 The CLI sums `message.usage.output_tokens` across every `*.jsonl` under `~/.claude/projects/`. This includes **subagents and dynamic workflows** — their transcripts nest under `<project>/<session>/subagents/…` (and `…/subagents/workflows/wf_<id>/…`), and the scanner recurses into all of them, so a Plan/Workflow that fans out across many agents counts all of that real output. Your "race tokens" are everything generated since the moment you joined. Tokens generated while disconnected are skipped — that window is your crash penalty.

@@ -145,6 +145,7 @@ export const handler: ApiHandler = async (event) => {
       race_id: race.race_id, horse_id, seq: body.seq, applied, scored_applied: scoredApplied,
       modifier_states: scoring.modifier_states, last_heartbeat: now.toISOString(), state: evalResult.next,
       components: appliedComponents,
+      ...(applied > 0 ? { scored_at: now.toISOString() } : {}),
       needsSeed: horse.scored_tokens === undefined || !hasFamilyKeys(horse.model_tokens),
       ...(horse.model_tokens && !hasFamilyKeys(horse.model_tokens) ? { legacyModelTokens: horse.model_tokens } : {}),
     });

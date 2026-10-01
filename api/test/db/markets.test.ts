@@ -12,8 +12,8 @@ import type { MarketSnapshot } from '@token-derby/shared';
 const snap = (race_id: string, bucket: number, win: number): MarketSnapshot => ({
   race_id, bucket,
   computed_at: new Date(bucket * 60_000).toISOString(),
-  phantoms: 2,
-  prices: [{ horse_id: 'h1', win, podium: 0.9, division: 0.5, divisionPodium: 0.8 }],
+  not_joined: [{ horse_id: 'nj1', name: 'Eve', colors: { body: '#fff', mane: '#000', tail: '#000', saddle: '#f00' } }],
+  prices: [{ horse_id: 'h1', joined: true, win, podium: 0.9, division: 0.5, divisionPodium: 0.8 }],
 });
 
 describe('market snapshots', () => {
@@ -27,7 +27,7 @@ describe('market snapshots', () => {
     const got = await getSnapshot(id);
     expect(got!.bucket).toBe(100);
     expect(got!.prices[0]!.win).toBeCloseTo(0.42, 6);
-    expect(got!.phantoms).toBe(2);
+    expect(got!.not_joined).toHaveLength(1);
   });
 
   it('overwrites rather than accumulating', async () => {

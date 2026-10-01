@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { chartPoints, nearestPoint, assignLineColors } from '../src/derbymarket/render/chart.js';
 
 const snap = (bucket: number, win: number) => ({
-  race_id: 'r', bucket, computed_at: '', phantoms: 0,
-  prices: [{ horse_id: 'h1', win, podium: 0.5, division: null, divisionPodium: null }],
+  race_id: 'r', bucket, computed_at: '', not_joined: [],
+  prices: [{ horse_id: 'h1', joined: true, win, podium: 0.5, division: null, divisionPodium: null }],
 });
 
 describe('chartPoints', () => {
@@ -30,9 +30,9 @@ describe('chartPoints', () => {
     + 'joiner starts partway across rather than snapping back to x=0', () => {
     // h1 has no price until bucket 150, halfway through a 100..200 window.
     const history = [
-      { race_id: 'r', bucket: 100, computed_at: '', phantoms: 0, prices: [] },
-      { race_id: 'r', bucket: 150, computed_at: '', phantoms: 0, prices: [{ horse_id: 'h1', win: 0.5, podium: 0.5, division: null, divisionPodium: null }] },
-      { race_id: 'r', bucket: 200, computed_at: '', phantoms: 0, prices: [{ horse_id: 'h1', win: 0.6, podium: 0.5, division: null, divisionPodium: null }] },
+      { race_id: 'r', bucket: 100, computed_at: '', not_joined: [], prices: [] },
+      { race_id: 'r', bucket: 150, computed_at: '', not_joined: [], prices: [{ horse_id: 'h1', joined: true, win: 0.5, podium: 0.5, division: null, divisionPodium: null }] },
+      { race_id: 'r', bucket: 200, computed_at: '', not_joined: [], prices: [{ horse_id: 'h1', joined: true, win: 0.6, podium: 0.5, division: null, divisionPodium: null }] },
     ];
     const pts = chartPoints(history, 'h1', 'win', 100, 50);
     expect(pts).toHaveLength(2);

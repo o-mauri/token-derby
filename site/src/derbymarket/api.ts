@@ -44,6 +44,15 @@ async function authed<T>(path: string, fetchImpl: FetchFn): Promise<T> {
   return parse<T>(res);
 }
 
+// Sends the session when there is one; the API widens the response for org members.
+async function maybeAuthed<T>(path: string, fetchImpl: FetchFn): Promise<T> {
+  const token = getSession();
+  let res: Response;
+  try { res = await fetchImpl(path, token ? { headers: { authorization: `Bearer ${token}` } } : undefined); }
+  catch (e: any) { throw new ApiError('NETWORK_ERROR', e?.message ?? 'fetch failed', 0); }
+  return parse<T>(res);
+}
+
 export async function exchangeCode(code: string, fetchImpl: FetchFn = fetch): Promise<WebSessionExchangeResponse> {
   let res: Response;
   try {
@@ -60,7 +69,7 @@ export const listOrganisations = (f: FetchFn = fetch) =>
   authed<ListOrganisationsResponse>('/api/organisations', f);
 
 export const getMarkets = (joinCode: string, f: FetchFn = fetch) =>
-  get<GetMarketsResponse>(`/api/races/${u(joinCode)}/markets`, f);
+  maybeAuthed<GetMarketsResponse>(`/api/races/${u(joinCode)}/markets`, f);
 
 export const getMarketHistory = (joinCode: string, f: FetchFn = fetch) =>
-  get<GetMarketHistoryResponse>(`/api/races/${u(joinCode)}/markets/history`, f);
+  maybeAuthed<GetMarketHistoryResponse>(`/api/races/${u(joinCode)}/markets/history`, f);

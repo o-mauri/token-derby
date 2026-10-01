@@ -146,15 +146,25 @@ export type PriceChartInput = {
   sectionHeading: string;    // e.g. "The race" or "Premier · 4 runners"
   divisionNames?: string[];
   onBack: () => void;
+  // Absent means show everyone; the toggle renders only when there are not-joined runners.
+  showNotJoined?: boolean;
+  onToggleNotJoined?: (show: boolean) => void;
 };
 
 /** Renders the full-field price history chart plus one row per runner.
  *  Returns a dispose function (no timers/observers to tear down today, but
  *  kept for symmetry with renderBoard). */
 export function renderPriceChart(root: HTMLElement, input: PriceChartInput): () => void {
-  const { history, runners, market, name, meta, sectionHeading, divisionNames, onBack } = input;
+  const { history, market, name, meta, sectionHeading, divisionNames, onBack, onToggleNotJoined } = input;
+  const showNotJoined = input.showNotJoined ?? true;
+  const hasNotJoined = input.runners.some((r) => r.horse.joined === false);
+  const runners = showNotJoined ? input.runners : input.runners.filter((r) => r.horse.joined !== false);
+  const toggle = hasNotJoined && onToggleNotJoined
+    ? `<button type="button" class="dm-toggle-not-joined" aria-pressed="${showNotJoined}">${showNotJoined ? 'Hide' : 'Show'} not-joined</button>`
+    : '';
 
-  const colorOf = assignLineColors(runners.map((r) => ({ horse_id: r.horse.horse_id, silk: r.horse.colors.body })));
+  // Colours come from the full field so a runner keeps its colour when the toggle flips.
+  const colorOf = assignLineColors(input.runners.map((r) => ({ horse_id: r.horse.horse_id, silk: r.horse.colors.body })));
   const seriesByHorse = new Map(runners.map((r) => [r.horse.horse_id, chartPoints(history, r.horse.horse_id, market, PLOT_W, PLOT_H)]));
 
   const buckets = history.map((h) => h.bucket);
@@ -167,7 +177,7 @@ export function renderPriceChart(root: HTMLElement, input: PriceChartInput): () 
 
   root.innerHTML = `
     <div class="dm dm-pc">
-      <div class="dm-pc-crumb"><button type="button" class="dm-pc-back">&larr; All markets</button></div>
+      <div class="dm-pc-crumb"><button type="button" class="dm-pc-back">&larr; All markets</button>${toggle}</div>
       <div class="dm-pc-title">${esc(name)}</div>
       <div class="dm-pc-meta">${esc(metaLine)}</div>
       <div class="dm-pc-wrap">
@@ -177,6 +187,8 @@ export function renderPriceChart(root: HTMLElement, input: PriceChartInput): () 
     </div>`;
 
   root.querySelector<HTMLButtonElement>('.dm-pc-back')!.addEventListener('click', onBack);
+  root.querySelector<HTMLButtonElement>('.dm-toggle-not-joined')
+    ?.addEventListener('click', () => onToggleNotJoined?.(!showNotJoined));
 
   const svg = root.querySelector<SVGSVGElement>('svg.dm-pc-svg')!;
   const rowsEl = root.querySelector<HTMLElement>('.dm-pc-rows')!;
@@ -300,7 +312,10 @@ export function renderPriceChart(root: HTMLElement, input: PriceChartInput): () 
     const color = colorOf.get(r.horse.horse_id)!;
     const pointsAttr = points.map((p) => `${(X0 + p.x).toFixed(1)},${(Y0 + p.y).toFixed(1)}`).join(' ');
 
-    const trace = svgEl('polyline', { class: 'dm-pc-trace', points: pointsAttr, stroke: color });
+    const trace = svgEl('polyline', {
+      class: 'dm-pc-trace', points: pointsAttr, stroke: color,
+      ...(r.horse.joined === false ? { 'stroke-dasharray': '4 3' } : {}),
+    });
     linesGroup.appendChild(trace);
     traces.push(trace);
 
@@ -368,7 +383,9 @@ function buildRow(
   who.appendChild(nm);
   const sub = document.createElement('div');
   sub.className = 'dm-pc-sub';
-  const bits = [h.jockey, h.rank != null ? `currently ${ordinal(h.rank)}` : null].filter((v): v is string => !!v);
+  const bits = h.joined === false
+    ? ['not joined']
+    : [h.jockey, h.rank != null ? `currently ${ordinal(h.rank)}` : null].filter((v): v is string => !!v);
   sub.textContent = bits.join(' · ');
   who.appendChild(sub);
   row.appendChild(who);

@@ -43,7 +43,7 @@ export function runModifiers(active: readonly ActiveModifier[], beat: BeatContex
   for (const { modifier, params, state: previous } of active) {
     const outcome = modifier.apply({ ...beat, params, state: previous });
     const before = applied(beat, product);
-    for (const family of MODEL_FAMILIES) product[family] *= safe(outcome.multiplier, family);
+    for (const family of MODEL_FAMILIES) product[family] *= safeMultiplier(outcome.multiplier, family);
     const after = applied(beat, product);
     // Report what this modifier actually did to THIS beat, so a mechanic that
     // touched no family in play reads as 1 rather than as its nominal value.
@@ -76,7 +76,7 @@ function applied(beat: BeatContext, product: Record<ModelFamily, number>): numbe
  * One family's multiplier from an outcome. A NaN, infinite or negative value is
  * a broken modifier rather than a deliberate one, and must not poison a score.
  */
-function safe(multiplier: ModifierMultiplier, family: ModelFamily): number {
+export function safeMultiplier(multiplier: ModifierMultiplier, family: ModelFamily): number {
   const raw = typeof multiplier === 'number' ? multiplier : multiplier[family] ?? 1;
   return Number.isFinite(raw) && raw >= 0 ? raw : 1;
 }

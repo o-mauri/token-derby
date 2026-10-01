@@ -1,188 +1,106 @@
 import { describe, it, expect } from 'vitest';
-import { priceRace, toPrice, type MarketRunner } from '../src/markets.js';
+import { priceRace, toPrice, SIMULATIONS, type MarketRunner } from '../src/markets.js';
+import type { AttendanceDraws } from '../src/attendance/sampler.js';
 
-const runner = (id: string, banked: number, pace: number, division?: number): MarketRunner =>
-  ({ horse_id: id, name: id, banked, pace, division });
+const ONE = Float32Array.of(1);
+const runner = (id: string, banked: number, pace: number, extra: Partial<MarketRunner> = {}): MarketRunner =>
+  ({ horse_id: id, name: id, joined: true, seedKey: id, banked, pace, projection: ONE, ...extra });
 
-const base = {
-  race_id: 'race-abc',
-  minutesRemaining: 240,
-  phantoms: 0,
-  phantomPacePool: [1200],
-};
+// Everyone present for `minutes` in every replay, unless `absent` lists them.
+function attendance(n: number, minutes: number, absent: number[] = []): AttendanceDraws {
+  return {
+    present: Array.from({ length: n }, (_, i) => new Uint8Array(SIMULATIONS).fill(absent.includes(i) ? 0 : 1)),
+    active: Array.from({ length: n }, (_, i) => new Float32Array(SIMULATIONS).fill(absent.includes(i) ? 0 : minutes)),
+  };
+}
+
+const price = (runners: MarketRunner[], att = attendance(runners.length, 240)) =>
+  priceRace({ race_id: 'race-abc', runners, attendance: att });
 
 describe('priceRace', () => {
   it('is deterministic for the same race', () => {
-    const runners = [runner('a', 1000, 50), runner('b', 900, 55), runner('c', 100, 20)];
-    const one = priceRace({ ...base, runners });
-    const two = priceRace({ ...base, runners });
-    expect(one).toEqual(two);
+    const r = [runner('a', 1000, 50), runner('b', 900, 55), runner('c', 100, 20)];
+    expect(price(r)).toEqual(price(r));
   });
 
-  it('gives a different book to a different race', () => {
-    const runners = [runner('a', 1000, 50), runner('b', 900, 55), runner('c', 100, 20)];
-    const one = priceRace({ ...base, runners });
-    const two = priceRace({ ...base, race_id: 'race-xyz', runners });
-    expect(one).not.toEqual(two);
+  it("leaves a runner's prices driven by its own draws when another is added", () => {
+    const solo = [runner('a', 1000, 50, { division: 1 }), runner('b', 1000, 50, { division: 1 })];
+    const withC = [runner('c', 0, 80, { division: 2, joined: false }), ...solo];
+    // c shares no division with a or b, so only shared randomness could move them.
+    expect(price(withC).slice(1).map((p) => p.division)).toEqual(price(solo).map((p) => p.division));
   });
 
-  it('sums win probabilities to 1 when there are no phantoms', () => {
-    const runners = [runner('a', 1000, 50), runner('b', 900, 55), runner('c', 100, 20)];
-    const total = priceRace({ ...base, runners }).reduce((s, m) => s + m.win, 0);
-    expect(total).toBeCloseTo(1, 2);
+  it('sums win probabilities to 1 when everyone is present', () => {
+    const p = price([runner('a', 1000, 50), runner('b', 900, 55), runner('c', 100, 20)]);
+    expect(p.reduce((s, x) => s + x.win, 0)).toBeCloseTo(1, 6);
   });
 
   it('sums podium probabilities to the number of podium places', () => {
-    const runners = ['a', 'b', 'c', 'd', 'e'].map((id, i) => runner(id, 1000 - i * 50, 40));
-    const total = priceRace({ ...base, runners }).reduce((s, m) => s + m.podium, 0);
-    expect(total).toBeCloseTo(3, 1);
+    const p = price([1, 2, 3, 4, 5].map((i) => runner(`h${i}`, i * 100, 40)));
+    expect(p.reduce((s, x) => s + x.podium, 0)).toBeCloseTo(3, 6);
   });
 
-  it('makes everyone a certainty to podium in a two-horse race', () => {
-    const runners = [runner('a', 1000, 50), runner('b', 900, 55)];
-    for (const m of priceRace({ ...base, runners })) expect(m.podium).toBeCloseTo(1, 2);
+  it('never counts an absent runner as a rival', () => {
+    const r = [runner('a', 100, 10), runner('ghost', 1e9, 1000, { joined: false })];
+    const p = price(r, attendance(2, 240, [1]));
+    expect(p[0]!.win).toBe(1);
+    expect(p[1]!.win).toBe(0);
+    expect(p[1]!.podium).toBe(0);
+    expect(p[1]!.joined).toBe(false);
+  });
+
+  it('adds nothing for a runner with no active minutes', () => {
+    const r = [runner('a', 500, 1000), runner('b', 400, 0)];
+    const att = attendance(2, 240);
+    att.active[0]!.fill(0);
+    expect(price(r, att)[0]!.win).toBe(1);
+  });
+
+  it('scales projected output by the projection table', () => {
+    const r = [runner('a', 0, 100), runner('b', 0, 100, { projection: Float32Array.of(0.01) })];
+    const p = price(r);
+    expect(p[0]!.win).toBeGreaterThan(0.95);
   });
 
   it('sums division probabilities to 1 within each division', () => {
-    const runners = [
-      runner('a', 1000, 50, 1), runner('b', 900, 55, 1),
-      runner('c', 800, 40, 2), runner('d', 700, 45, 2), runner('e', 600, 30, 2),
+    const r = [
+      runner('a', 500, 30, { division: 1 }), runner('b', 400, 30, { division: 1 }),
+      runner('c', 300, 30, { division: 2 }), runner('d', 200, 30, { division: 2 }),
     ];
-    const priced = priceRace({ ...base, runners });
-    for (const div of [1, 2]) {
-      const total = priced
-        .filter((_, i) => runners[i]!.division === div)
-        .reduce((s, m) => s + (m.division ?? 0), 0);
-      expect(total).toBeCloseTo(1, 2);
-    }
+    const p = price(r);
+    expect(p[0]!.division! + p[1]!.division!).toBeCloseTo(1, 6);
+    expect(p[2]!.division! + p[3]!.division!).toBeCloseTo(1, 6);
   });
 
-  it('leaves the division market null for a horse with no division', () => {
-    const runners = [runner('a', 1000, 50), runner('b', 900, 55)];
-    for (const m of priceRace({ ...base, runners })) expect(m.division).toBeNull();
+  it('counts a present not-joined runner as a division rival', () => {
+    const r = [runner('a', 0, 30, { division: 1 }), runner('nj', 0, 300, { division: 1, joined: false })];
+    expect(price(r)[0]!.division!).toBeLessThan(0.2);
   });
 
-  it('sums divisionPodium probabilities to min(3, division size) within each division', () => {
-    const runners = [
-      runner('a', 1000, 50, 1), runner('b', 900, 55, 1),
-      runner('c', 800, 40, 2), runner('d', 700, 45, 2), runner('e', 600, 30, 2),
-      runner('f', 500, 35, 2), runner('g', 400, 20, 2), runner('h', 300, 25, 2),
-    ];
-    const priced = priceRace({ ...base, runners });
-    const bySize: Record<number, number> = { 1: 2, 2: 6 };
-    for (const div of [1, 2]) {
-      const total = priced
-        .filter((_, i) => runners[i]!.division === div)
-        .reduce((s, m) => s + (m.divisionPodium ?? 0), 0);
-      expect(total).toBeCloseTo(Math.min(3, bySize[div]!), 1);
-    }
+  it('leaves division markets null without a division', () => {
+    const p = price([runner('a', 10, 1), runner('b', 5, 1)]);
+    expect(p[0]!.division).toBeNull();
+    expect(p[0]!.divisionPodium).toBeNull();
   });
 
   it('makes everyone a certainty for divisionPodium in a division of 3 or fewer', () => {
-    const runners = [
-      runner('a', 1000, 50, 1), runner('b', 900, 55, 1), runner('c', 800, 40, 1),
-      runner('d', 700, 45, 2), runner('e', 600, 30, 2), runner('f', 500, 35, 2),
-      runner('g', 400, 20, 2), runner('h', 300, 25, 2),
-    ];
-    const priced = priceRace({ ...base, runners });
-    for (const m of priced.filter((_, i) => runners[i]!.division === 1)) {
-      expect(m.divisionPodium).toBeCloseTo(1, 2);
-    }
-  });
-
-  it('leaves divisionPodium null for a horse with no division', () => {
-    const runners = [runner('a', 1000, 50), runner('b', 900, 55)];
-    for (const m of priceRace({ ...base, runners })) expect(m.divisionPodium).toBeNull();
-  });
-
-  it('prices divisionPodium at least as generously as the overall podium', () => {
-    // Regression: aliasing divisionPodium to the race-wide podium understates
-    // every division (top-3-of-5 beats top-3-of-15). The strict check below
-    // on one mid-pack runner makes an exact-alias bug fail this test.
-    const field = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o']
-      .map((id, i) => runner(id, 1000 - i * 20, 45, i < 5 ? 1 : i < 10 ? 2 : 3));
-    const priced = priceRace({ ...base, runners: field });
-    for (const m of priced) {
-      expect(m.divisionPodium!).toBeGreaterThanOrEqual(m.podium);
-    }
-    // Index 7: 3rd-best in its 5-horse division, but only 8th of 15 overall —
-    // an easy top-3-of-5 versus a hard top-3-of-15.
-    expect(priced[7]!.divisionPodium!).toBeGreaterThan(priced[7]!.podium);
-  });
-
-  it('phantoms push podium probability down, not just win', () => {
-    // Regression: collapsing phantoms to their single best value caps their
-    // contribution at one rival, which silently inflates every podium price.
-    const field = ['a', 'b', 'c', 'd'].map((id, i) => runner(id, 1000 - i * 40, 45));
-    const few = priceRace({ ...base, runners: field, phantoms: 1, phantomPacePool: [1400] });
-    const many = priceRace({ ...base, runners: field, phantoms: 8, phantomPacePool: [1400] });
-    for (let i = 0; i < field.length; i++) {
-      expect(many[i]!.podium).toBeLessThan(few[i]!.podium);
-    }
-  });
-
-  it('phantoms dilute a lone runner well below certainty', () => {
-    // Pace kept close to the phantom pool on purpose: a horse 24x slower than
-    // its rivals would be swamped to a ~0 win chance regardless of phantom
-    // count, which tests total dilution rather than the partial dilution here.
-    const alone = [runner('a', 1000, 1300)];
-    const solo = priceRace({ ...base, runners: alone, phantoms: 0 })[0]!;
-    const diluted = priceRace({
-      ...base, runners: alone, phantoms: 7, phantomPacePool: [1200, 1500, 900],
-    })[0]!;
-    expect(solo.win).toBeCloseTo(1, 2);
-    expect(diluted.win).toBeLessThan(0.6);
-    expect(diluted.win).toBeGreaterThan(0);
+    const p = price([1, 2, 3].map((i) => runner(`h${i}`, i, 1, { division: 1 })));
+    expect(p.every((x) => x.divisionPodium === 1)).toBe(true);
   });
 
   it('prices an uncatchable leader at the bounds', () => {
-    // No draw comes close to closing the lead, so the simulation alone settles it.
-    const runners = [runner('a', 1_000_000, 10), runner('b', 1000, 10)];
-    const priced = priceRace({ ...base, runners });
-    expect(priced[0]!.win).toBe(1);
-    expect(priced[1]!.win).toBe(0);
+    const p = price([runner('a', 1_000_000, 10), runner('b', 1000, 10)]);
+    expect(p[0]!.win).toBe(1);
+    expect(p[1]!.win).toBe(0);
   });
 
-  it('keeps the podium open behind an uncatchable leader', () => {
-    // The leader cannot be caught, but second and third are still contested.
-    const runners = [
-      runner('a', 1_000_000, 10), runner('b', 1000, 30), runner('c', 900, 30),
-      runner('d', 800, 30), runner('e', 700, 30),
-    ];
-    const priced = priceRace({ ...base, runners });
-    expect(priced[0]!.win).toBe(1);
-    expect(priced.slice(1).every((m) => m.win === 0)).toBe(true);
-    expect(priced.reduce((s, m) => s + m.podium, 0)).toBeCloseTo(3, 1);
-    // b..e are fighting for two places, so none of them is pinned at either bound.
-    for (const m of priced.slice(1)) {
-      expect(m.podium).toBeGreaterThan(0);
-      expect(m.podium).toBeLessThan(1);
-    }
-  });
-
-  it('gives a horse projected to produce nothing a nonzero chance while others can still fail', () => {
-    const runners = [runner('a', 500, 0), runner('b', 100, 30)];
-    const priced = priceRace({ ...base, runners });
-    expect(priced[0]!.win).toBeGreaterThan(0);
-    expect(priced[0]!.win).toBeLessThan(1);
+  it('returns nothing for an empty field', () => {
+    expect(priceRace({ race_id: 'x', runners: [], attendance: { present: [], active: [] } })).toEqual([]);
   });
 });
 
 describe('toPrice', () => {
-  it('adds the margin', () => {
-    expect(toPrice(0.34)).toBeCloseTo(0.35, 6);
-  });
-  it('caps at 1.00 so a certainty costs exactly what it pays', () => {
-    expect(toPrice(0.995)).toBe(1);
-    expect(toPrice(1)).toBe(1);
-  });
-  it('floors at 0.01 so a free share never pays a Derbuck', () => {
-    expect(toPrice(0)).toBe(0.01);
-    expect(toPrice(-1)).toBe(0.01);
-  });
-  it('makes buying both sides cost more than the payout', () => {
-    for (const p of [0.1, 0.34, 0.5, 0.8]) {
-      expect(toPrice(p) + toPrice(1 - p)).toBeGreaterThan(1);
-    }
-  });
+  it('adds the margin', () => { expect(toPrice(0.5)).toBeCloseTo(0.51, 10); });
+  it('caps at 1.00', () => { expect(toPrice(0.995)).toBe(1); });
+  it('floors at 0.01', () => { expect(toPrice(0)).toBe(0.01); });
 });

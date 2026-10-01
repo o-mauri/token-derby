@@ -2,8 +2,11 @@
 // isn't seeded. Every constant here was fitted against real races; see the
 // design doc before changing any of them.
 
+import { hashSeed, mulberry32, gammaSampler } from './random.js';
+import type { AttendanceDraws } from './attendance/sampler.js';
+import { projectedMultiplier } from './scoring/projection.js';
+
 export const PACE_PRIOR_CROSSOVER_MIN = 120;
-export const PHANTOM_SCALE = 0.70;
 export const MARGIN = 0.01;
 export const SIMULATIONS = 10_000;
 export const MARKET_OPEN_MIN = 20;
@@ -17,8 +20,8 @@ export const RECENT_PACES_WINDOW = 10;
 // so live recording and the backfill script can never disagree on the floor.
 export const MIN_PACE_RACE_MINUTES = 30;
 
-// Measured field median, in scored tokens/min (input counted). A debutant with
-// no race history prices as a phantom that turned up.
+// Measured field median, in raw tokens/min per present minute (input counted).
+// A debutant with no race history prices at this median.
 export const FIELD_MEDIAN_PACE = 12_140;
 
 // Mean of a horse's trailing paces, or `fallback` (typically FIELD_MEDIAN_PACE)
@@ -29,11 +32,10 @@ export function recentPacePrior(paces: number[] | undefined, fallback: number): 
   return recent.reduce((a, b) => a + b, 0) / recent.length;
 }
 
-// Gamma shape for remaining production, fitted out to 600 minutes. Rises with
-// time left because a longer run-in averages the burstiness out.
-export function shape(minutesRemaining: number): number {
-  if (!(minutesRemaining > 0)) return 0.2;
-  return Math.max(0.2, 0.032 * Math.pow(minutesRemaining, 0.722));
+// Gamma shape for a runner's remaining output, fitted out to 600 minutes.
+export function shape(activeMinutes: number): number {
+  if (!(activeMinutes > 0)) return 0.2;
+  return Math.max(0.2, 0.032 * Math.pow(activeMinutes, 0.722));
 }
 
 // History predicts remaining output better than in-race pace does, so the race
@@ -44,49 +46,21 @@ export function blendedPace(input: { observed: number; prior: number; elapsedMin
   return Math.max(0, w * input.observed + (1 - w) * input.prior);
 }
 
-// Fraction of the final field expected to have joined by now. Larger fields
-// fill markedly slower, so the curve is picked by expected field size.
-const JOIN_CURVES: Record<'small' | 'mid' | 'large', Array<[number, number]>> = {
-  small: [[0, 0], [0.05, 0.60], [0.10, 0.83], [0.15, 1.0], [1, 1]],
-  mid:   [[0, 0], [0.05, 0.56], [0.10, 0.75], [0.15, 0.75], [0.20, 0.88], [0.30, 0.90], [0.40, 1.0], [1, 1]],
-  large: [[0, 0], [0.05, 0.15], [0.10, 0.27], [0.15, 0.38], [0.20, 0.46], [0.30, 0.80], [0.40, 0.92], [0.50, 1.0], [1, 1]],
-};
-
-export function joinedFractionByNow(elapsedFraction: number, expectedField: number): number {
-  if (!(elapsedFraction > 0)) return 0;
-  if (elapsedFraction >= 1) return 1;
-  const curve = expectedField <= 6 ? JOIN_CURVES.small
-    : expectedField <= 10 ? JOIN_CURVES.mid
-    : JOIN_CURVES.large;
-  for (let i = 0; i < curve.length - 1; i++) {
-    const [a, fa] = curve[i]!;
-    const [b, fb] = curve[i + 1]!;
-    if (elapsedFraction >= a && elapsedFraction <= b) {
-      return b > a ? fa + (fb - fa) * ((elapsedFraction - a) / (b - a)) : fb;
-    }
-  }
-  return 1;
-}
-
-// Runners who have not joined yet. They compete in the simulation but have no
-// market: without them an early leader prices as a certainty and every share
-// sold is free money once the field fills.
-export function phantomCount(input: { elapsedFraction: number; expectedField: number }): number {
-  const missing = 1 - joinedFractionByNow(input.elapsedFraction, input.expectedField);
-  return Math.max(0, Math.round(missing * input.expectedField * PHANTOM_SCALE));
-}
-
 export type MarketRunner = {
   horse_id: string;
   name: string;
   division?: number;
-  banked: number;          // scored tokens already in the bank — a fact, not a forecast
-  pace: number;            // blended pace, in scored tokens per minute
+  joined: boolean;
+  seedKey: string;             // user_id where known, so each runner's draws are its own
+  banked: number;              // scored distance already in the bank
+  pace: number;                // blended raw output per minute
+  projection: Float32Array;    // projectionTable for this runner
 };
 
 // One horse's win/podium prices on a race.
 export type MarketPrice = {
   horse_id: string;
+  joined: boolean;
   win: number;
   podium: number;
   division: number | null;         // win within your division; null when the race has no divisions
@@ -96,133 +70,80 @@ export type MarketPrice = {
 export type PriceRaceInput = {
   race_id: string;
   runners: MarketRunner[];
-  minutesRemaining: number;
-  phantoms: number;
-  phantomPacePool: number[];   // empirical priors, scored tokens per minute
+  attendance: AttendanceDraws;   // aligned with runners
 };
-
-// Seeded from the race id alone. Consecutive recomputes share their draws, so
-// prices move only when the race moves rather than twitching on fresh noise.
-function seedFrom(text: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < text.length; i++) {
-    h ^= text.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return h >>> 0;
-}
-
-function mulberry32(seed: number): () => number {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6D2B79F5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-// Marsaglia-Tsang. Gamma rather than normal because production is
-// non-negative and right-skewed.
-function gammaSampler(rnd: () => number): (k: number) => number {
-  const normal = (): number => {
-    let u = 0, v = 0;
-    while (u === 0) u = rnd();
-    while (v === 0) v = rnd();
-    return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
-  };
-  const draw = (k: number): number => {
-    if (k < 1) return draw(1 + k) * Math.pow(rnd(), 1 / k);
-    const d = k - 1 / 3;
-    const c = 1 / Math.sqrt(9 * d);
-    for (;;) {
-      let x = 0, v = 0;
-      do { x = normal(); v = 1 + c * x; } while (v <= 0);
-      v = v * v * v;
-      const u = rnd();
-      if (u < 1 - 0.0331 * x * x * x * x) return d * v;
-      if (Math.log(u) < 0.5 * x * x + d * (1 - v + Math.log(v))) return d * v;
-    }
-  };
-  return draw;
-}
 
 export function toPrice(probability: number): number {
   return Math.min(1, Math.max(0.01, probability + MARGIN));
 }
 
 export function priceRace(input: PriceRaceInput): MarketPrice[] {
-  const { runners, minutesRemaining, phantoms, phantomPacePool } = input;
+  const { race_id, runners, attendance } = input;
   const n = runners.length;
   if (n === 0) return [];
+  const replays = attendance.present[0]?.length ?? 0;
 
-  const rnd = mulberry32(seedFrom(input.race_id));
-  const gamma = gammaSampler(rnd);
-  const k = shape(minutesRemaining);
-  const theta = runners.map((r) => Math.max(0, r.pace) * minutesRemaining / k);
-  const pool = phantomPacePool.length ? phantomPacePool : [0];
-
+  // Score streams are seeded per runner from the race id and runner key, so
+  // prices move only when the race does and adding a runner reshuffles no one.
+  const gammas = runners.map((r) => gammaSampler(mulberry32(hashSeed(race_id, r.seedKey, 'score'))));
   const wins = new Array<number>(n).fill(0);
   const podiums = new Array<number>(n).fill(0);
   const divWins = new Array<number>(n).fill(0);
   const divPodiums = new Array<number>(n).fill(0);
   const value = new Array<number>(n).fill(0);
-  const phantomVals: number[] = [];
+  const here = new Array<boolean>(n).fill(false);
 
   const divisions = [...new Set(runners.map((r) => r.division).filter((d): d is number => d != null))];
-  // Precomputed once — division membership doesn't change between draws.
   const divisionMembers = new Map<number, number[]>(
     divisions.map((d) => [d, runners.flatMap((r, i) => (r.division === d ? [i] : []))]),
   );
 
-  for (let s = 0; s < SIMULATIONS; s++) {
+  for (let s = 0; s < replays; s++) {
     for (let i = 0; i < n; i++) {
-      value[i] = runners[i]!.banked + (theta[i]! > 0 ? gamma(k) * theta[i]! : 0);
-    }
-    // Phantoms compete but hold no market and belong to no division. Keep
-    // every draw rather than only the best — several can finish ahead of a
-    // runner at once, and collapsing them to a max would overstate podium.
-    phantomVals.length = 0;
-    for (let p = 0; p < phantoms; p++) {
-      const pace = pool[Math.floor(rnd() * pool.length)] ?? 0;
-      phantomVals.push(pace > 0 ? gamma(k) * (pace * minutesRemaining / k) : 0);
+      here[i] = attendance.present[i]![s] === 1;
+      if (!here[i]) continue;
+      const r = runners[i]!;
+      const active = attendance.active[i]![s]!;
+      let raw = 0;
+      if (active > 0 && r.pace > 0) {
+        const k = shape(active);
+        raw = gammas[i]!(k) * (r.pace * active / k);
+      }
+      value[i] = r.banked + raw * projectedMultiplier(r.projection, active);
     }
 
-    let winner = -1, winnerVal = -Infinity;
-    for (const v of phantomVals) if (v > winnerVal) winnerVal = v;
-    for (let i = 0; i < n; i++) if (value[i]! > winnerVal) { winnerVal = value[i]!; winner = i; }
-    if (winner >= 0) wins[winner]!++;   // stays -1 when a phantom wins
+    let winner = -1, best = -Infinity;
+    for (let i = 0; i < n; i++) if (here[i] && value[i]! > best) { best = value[i]!; winner = i; }
+    if (winner >= 0) wins[winner]!++;
 
-    // A runner places if fewer than three rivals beat it, phantoms included.
     for (let i = 0; i < n; i++) {
+      if (!here[i]) continue;
       let above = 0;
-      for (const v of phantomVals) if (v > value[i]!) above++;
-      for (let j = 0; j < n; j++) if (j !== i && value[j]! > value[i]!) above++;
+      for (let j = 0; j < n; j++) if (j !== i && here[j] && value[j]! > value[i]!) above++;
       if (above < 3) podiums[i]!++;
     }
 
-    // Division markets ignore phantoms and every other division — only your
-    // own division-mates are rivals, so a division of 3 or fewer always
-    // places everyone (at most 2 rivals can ever be "above").
     for (const d of divisions) {
       const idxs = divisionMembers.get(d)!;
       let bi = -1, bv = -Infinity;
-      for (const i of idxs) if (value[i]! > bv) { bv = value[i]!; bi = i; }
+      for (const i of idxs) if (here[i] && value[i]! > bv) { bv = value[i]!; bi = i; }
       if (bi >= 0) divWins[bi]!++;
-
       for (const i of idxs) {
+        if (!here[i]) continue;
         let above = 0;
-        for (const j of idxs) if (j !== i && value[j]! > value[i]!) above++;
+        for (const j of idxs) if (j !== i && here[j] && value[j]! > value[i]!) above++;
         if (above < 3) divPodiums[i]!++;
       }
     }
   }
 
+  const share = (count: number) => (replays > 0 ? count / replays : 0);
   return runners.map((r, i) => ({
     horse_id: r.horse_id,
-    win: wins[i]! / SIMULATIONS,
-    podium: podiums[i]! / SIMULATIONS,
-    division: r.division == null ? null : divWins[i]! / SIMULATIONS,
-    divisionPodium: r.division == null ? null : divPodiums[i]! / SIMULATIONS,
+    joined: r.joined,
+    win: share(wins[i]!),
+    podium: share(podiums[i]!),
+    division: r.division == null ? null : share(divWins[i]!),
+    divisionPodium: r.division == null ? null : share(divPodiums[i]!),
   }));
 }

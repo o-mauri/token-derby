@@ -75,6 +75,16 @@ export type ModifierOutcome = {
   state?: ModifierState;
 };
 
+/** What a modifier is told when the odds engine projects future output. */
+export type ProjectInput = {
+  state: Readonly<ModifierState>;
+  params: Readonly<Record<string, number>>;
+  /** Projected raw output per minute, held steady. */
+  pace: number;
+  stepMinutes: number;
+  steps: number;
+};
+
 export interface Modifier {
   readonly id: ModifierId;
   /** How the mechanic is named to players and admins. */
@@ -90,6 +100,12 @@ export interface Modifier {
   readonly params: Record<string, ParamBound>;
 
   apply(ctx: ModifierContext): ModifierOutcome;
+
+  /**
+   * Optional: average multiplier over the first i × stepMinutes minutes of
+   * steady output, for i = 0..steps-1 (element 0 is the multiplier right now).
+   */
+  project?(input: ProjectInput): ModifierMultiplier[];
 
   /**
    * Optional plain-language consequences of a given tuning, for the settings

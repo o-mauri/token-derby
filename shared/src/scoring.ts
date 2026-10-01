@@ -64,7 +64,7 @@ export type ScoringResult = {
  * on does not silently reset it.
  */
 export function scoreTick(tick: ScoringTick): ScoringResult {
-  const active = modifiersForRace(tick.race, tick.modifier_states);
+  const active = activeModifiersFor(tick.race, tick.modifier_states);
   const result = runModifiers(active, {
     delta: tick.delta,
     components: tick.components,
@@ -89,7 +89,7 @@ export function scoreTick(tick: ScoringTick): ScoringResult {
  * A modifier starts from an empty bag; each one owns the numbers it falls back
  * to, so nothing here needs to know a mechanic's initial state.
  */
-function modifiersForRace(race: ScoringRace, states: ModifierStates): ActiveModifier[] {
+export function activeModifiersFor(race: ScoringRace, states: ModifierStates): ActiveModifier[] {
   const active: ActiveModifier[] = [];
   for (const id of MODIFIER_IDS) {
     const modifier = MODIFIERS[id];

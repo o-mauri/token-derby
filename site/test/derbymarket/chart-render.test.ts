@@ -10,17 +10,17 @@ function horse(id: string, name: string, opts: Partial<BoardHorse> = {}): BoardH
 }
 
 const history: MarketSnapshot[] = [
-  { race_id: 'r', bucket: 100, computed_at: '', phantoms: 0, prices: [
-    { horse_id: 'h1', win: 0.3, podium: 0.5, division: null, divisionPodium: null },
-    { horse_id: 'h2', win: 0.7, podium: 0.5, division: null, divisionPodium: null },
+  { race_id: 'r', bucket: 100, computed_at: '', not_joined: [], prices: [
+    { horse_id: 'h1', joined: true, win: 0.3, podium: 0.5, division: null, divisionPodium: null },
+    { horse_id: 'h2', joined: true, win: 0.7, podium: 0.5, division: null, divisionPodium: null },
   ] },
-  { race_id: 'r', bucket: 105, computed_at: '', phantoms: 0, prices: [
-    { horse_id: 'h1', win: 0.35, podium: 0.5, division: null, divisionPodium: null },
-    { horse_id: 'h2', win: 0.65, podium: 0.5, division: null, divisionPodium: null },
+  { race_id: 'r', bucket: 105, computed_at: '', not_joined: [], prices: [
+    { horse_id: 'h1', joined: true, win: 0.35, podium: 0.5, division: null, divisionPodium: null },
+    { horse_id: 'h2', joined: true, win: 0.65, podium: 0.5, division: null, divisionPodium: null },
   ] },
-  { race_id: 'r', bucket: 110, computed_at: '', phantoms: 0, prices: [
-    { horse_id: 'h1', win: 0.4, podium: 0.5, division: null, divisionPodium: null },
-    { horse_id: 'h2', win: 0.6, podium: 0.5, division: null, divisionPodium: null },
+  { race_id: 'r', bucket: 110, computed_at: '', not_joined: [], prices: [
+    { horse_id: 'h1', joined: true, win: 0.4, podium: 0.5, division: null, divisionPodium: null },
+    { horse_id: 'h2', joined: true, win: 0.6, podium: 0.5, division: null, divisionPodium: null },
   ] },
 ];
 
@@ -154,5 +154,63 @@ describe('renderPriceChart hover / focus readout', () => {
 
     expect(svg.classList.contains('dm-pc-focused')).toBe(false);
     expect(root.querySelector('.dm-pc-marker')!.classList.contains('on')).toBe(false);
+  });
+});
+
+describe('not-joined runners', () => {
+  it('draws a not-joined runner with a dashed trace', () => {
+    const root = document.createElement('div');
+    renderPriceChart(root, {
+      history, market: 'win', name: 'To Win', meta: '2 runners', sectionHeading: 'The race', onBack: () => {},
+      runners: [
+        { horse: horse('h2', 'Beta'), price: 0.6 },
+        { horse: horse('h1', 'Alpha', { joined: false }), price: 0.4 },
+      ],
+    });
+    const traces = root.querySelectorAll('.dm-pc-trace');
+    expect(traces[0]!.getAttribute('stroke-dasharray')).toBeNull();
+    expect(traces[1]!.getAttribute('stroke-dasharray')).toBe('4 3');
+  });
+
+  const mixed = () => [
+    { horse: horse('h2', 'Beta'), price: 0.6 },
+    { horse: horse('h1', 'Alpha', { joined: false }), price: 0.4 },
+  ];
+  const base = { history, market: 'win' as const, name: 'To Win', meta: '2 runners', sectionHeading: 'The race', onBack: () => {} };
+
+  it('drops not-joined lines and rows when the toggle is off', () => {
+    const root = document.createElement('div');
+    renderPriceChart(root, { ...base, runners: mixed(), showNotJoined: false, onToggleNotJoined: () => {} });
+    expect(root.querySelectorAll('.dm-pc-trace')).toHaveLength(1);
+    expect(root.textContent).not.toContain('Alpha');
+    expect(root.querySelector('.dm-toggle-not-joined')!.textContent).toBe('Show not-joined');
+  });
+
+  it('reports the flipped state when its toggle is clicked', () => {
+    const root = document.createElement('div');
+    const seen: boolean[] = [];
+    renderPriceChart(root, { ...base, runners: mixed(), showNotJoined: true, onToggleNotJoined: (s) => seen.push(s) });
+    expect(root.querySelectorAll('.dm-pc-trace')).toHaveLength(2);
+    root.querySelector<HTMLButtonElement>('.dm-toggle-not-joined')!.click();
+    expect(seen).toEqual([false]);
+  });
+
+  it('keeps each runner\'s line colour when the toggle flips', () => {
+    const on = document.createElement('div'), off = document.createElement('div');
+    renderPriceChart(on, { ...base, runners: mixed(), showNotJoined: true, onToggleNotJoined: () => {} });
+    renderPriceChart(off, { ...base, runners: mixed(), showNotJoined: false, onToggleNotJoined: () => {} });
+    expect(off.querySelector('.dm-pc-trace')!.getAttribute('stroke')).toBe(on.querySelector('.dm-pc-trace')!.getAttribute('stroke'));
+  });
+
+  it('labels a not-joined runner in the runner list', () => {
+    const root = document.createElement('div');
+    renderPriceChart(root, { ...base, runners: mixed(), showNotJoined: true, onToggleNotJoined: () => {} });
+    expect(root.querySelector('.dm-pc-rows')!.textContent).toContain('not joined');
+  });
+
+  it('renders no toggle when every runner has joined', () => {
+    const root = document.createElement('div');
+    renderPriceChart(root, { ...base, runners: [{ horse: horse('h2', 'Beta'), price: 0.6 }], onToggleNotJoined: () => {} });
+    expect(root.querySelector('.dm-toggle-not-joined')).toBeNull();
   });
 });

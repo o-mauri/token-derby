@@ -5,8 +5,9 @@
 import type { MarketPrice, MarketSnapshot } from '@token-derby/shared';
 import { renderBoard, renderLoadError, type BoardData, type OpenRow } from './derbymarket/render/board.js';
 import { renderPriceChart } from './derbymarket/render/chart.js';
+import { getShowNotJoined, setShowNotJoined } from './derbymarket/session.js';
 
-type LiveData = Omit<BoardData, 'horses'> & {
+type LiveData = Omit<BoardData, 'horses' | 'showNotJoined' | 'onToggleNotJoined'> & {
   generated_at: string;
   joinCode: string;
   horses: Array<BoardData['horses'][number] & { prior_pace: number }>;
@@ -42,6 +43,8 @@ async function load(): Promise<void> {
     divisionNames: data.divisionNames,
     horses: data.horses,
     prices: data.prices,
+    showNotJoined: getShowNotJoined(),
+    onToggleNotJoined: (show) => { setShowNotJoined(show); board.showNotJoined = show; showBoard(); },
   };
 
   const openChart = (row: OpenRow): void => {
@@ -49,15 +52,18 @@ async function load(): Promise<void> {
     dispose = renderPriceChart(app, {
       history: data.history, runners: row.runners, market: row.market, name: row.name,
       meta: row.meta, sectionHeading: row.heading, divisionNames: data.divisionNames,
-      onBack: show,
+      showNotJoined: getShowNotJoined(),
+      onToggleNotJoined: (show) => { setShowNotJoined(show); openChart(row); },
+      onBack: showBoard,
     });
   };
 
-  function show(): void {
+  function showBoard(): void {
+    board.showNotJoined = getShowNotJoined();
     dispose?.();
     dispose = renderBoard(app, board, openChart);
   }
-  show();
+  showBoard();
 
   // ?row=N opens the Nth market's chart on load, so a screenshot doesn't need
   // a click first. 0 = To Win overall.

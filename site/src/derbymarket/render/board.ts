@@ -17,6 +17,7 @@ export type BoardHorse = {
   jockey?: string;
   banked?: number;
   rank?: number;
+  joined?: boolean;   // absent means joined
 };
 
 export type BoardData = {
@@ -29,6 +30,8 @@ export type BoardData = {
   divisionNames?: string[];
   horses: BoardHorse[];
   prices: MarketPrice[];
+  showNotJoined: boolean;
+  onToggleNotJoined?: (show: boolean) => void;
 };
 
 export type Priced = BoardHorse & {
@@ -62,30 +65,34 @@ function joinPrices(horses: BoardHorse[], prices: MarketPrice[]): Priced[] {
 
 // To Win / To Podium overall, then Win/Podium per division. A division's Win
 // market needs >=2 runners to mean anything, Podium needs >=4.
-export function buildSections(priced: Priced[], divisionNames: string[] | undefined): Section[] {
+export function buildSections(priced: Priced[], divisionNames: string[] | undefined, showNotJoined = false): Section[] {
   const sections: Section[] = [];
+  const isJoined = (h: Priced) => h.joined !== false;
+  const shown = showNotJoined ? priced : priced.filter(isJoined);
+  const joinedCount = priced.filter(isJoined).length;
 
-  const byWin = [...priced].sort((a, b) => b.win - a.win).map((h) => ({ horse: h, price: h.win }));
-  const byPodium = [...priced].sort((a, b) => b.podium - a.podium).map((h) => ({ horse: h, price: h.podium }));
+  const byWin = [...shown].sort((a, b) => b.win - a.win).map((h) => ({ horse: h, price: h.win }));
+  const byPodium = [...shown].sort((a, b) => b.podium - a.podium).map((h) => ({ horse: h, price: h.podium }));
   sections.push({
     heading: 'The race',
     rows: [
-      { name: 'To Win', meta: `${priced.length} runners`, market: 'win', runners: byWin },
-      { name: 'To Podium', meta: `${priced.length} runners`, market: 'podium', runners: byPodium },
+      { name: 'To Win', meta: `${joinedCount} runners`, market: 'win', runners: byWin },
+      { name: 'To Podium', meta: `${joinedCount} runners`, market: 'podium', runners: byPodium },
     ],
   });
 
-  const divisions = [...new Set(priced.map((h) => h.division).filter((d): d is number => d != null))]
+  const divisions = [...new Set(priced.filter(isJoined).map((h) => h.division).filter((d): d is number => d != null))]
     .sort((a, b) => a - b);
 
   for (const d of divisions) {
-    const members = priced.filter((h) => h.division === d);
+    const members = shown.filter((h) => h.division === d);
+    const joinedMembers = members.filter(isJoined).length;
     const label = divisionNames?.[d - 1] ?? `Division ${d}`;
     const rows: MarketRow[] = [];
-    if (members.length >= 2) {
+    if (joinedMembers >= 2) {
       rows.push({
         name: `Win ${label}`,
-        meta: `${members.length} runners`,
+        meta: `${joinedMembers} runners`,
         market: 'division',
         runners: [...members]
           .sort((a, b) => (b.divisionPrice ?? 0) - (a.divisionPrice ?? 0))
@@ -94,18 +101,18 @@ export function buildSections(priced: Priced[], divisionNames: string[] | undefi
     }
     // A member with no divisionPodiumPrice means this snapshot predates the
     // field (staging may hold some) — suppress rather than fake a 0.00 price.
-    const hasDivisionPodium = members.every((h) => h.divisionPodiumPrice != null);
-    if (members.length >= 4 && hasDivisionPodium) {
+    const hasDivisionPodium = members.filter(isJoined).every((h) => h.divisionPodiumPrice != null);
+    if (joinedMembers >= 4 && hasDivisionPodium) {
       rows.push({
         name: `Podium ${label}`,
-        meta: `${members.length} runners`,
+        meta: `${joinedMembers} runners`,
         market: 'divisionPodium',
         runners: [...members]
           .sort((a, b) => (b.divisionPodiumPrice ?? 0) - (a.divisionPodiumPrice ?? 0))
           .map((h) => ({ horse: h, price: h.divisionPodiumPrice ?? 0 })),
       });
     }
-    if (rows.length) sections.push({ heading: `${label} · ${members.length} runners`, rows });
+    if (rows.length) sections.push({ heading: `${label} · ${joinedMembers} runners`, rows });
   }
 
   return sections;
@@ -114,10 +121,12 @@ export function buildSections(priced: Priced[], divisionNames: string[] | undefi
 function renderChip(r: { horse: BoardHorse; price: number }, threshold: number): string {
   const price = toPrice(r.price);
   const lead = price >= threshold;
+  const notJoined = r.horse.joined === false;
   return `
-    <span class="dm-chip ${lead ? 'dm-chip--lead' : 'dm-chip--rest'}">
+    <span class="dm-chip ${lead ? 'dm-chip--lead' : 'dm-chip--rest'}${notJoined ? ' dm-chip--not-joined' : ''}">
       <i class="dm-silk" style="background:${esc(r.horse.colors.body)}" aria-hidden="true"></i>
       <span class="dm-chip-name">${esc(r.horse.name)}</span>
+      ${notJoined ? '<span class="dm-chip-tag">not joined</span>' : ''}
       <span class="dm-chip-price">${price.toFixed(2)}</span>
     </span>`;
 }
@@ -175,7 +184,11 @@ function statusText(data: BoardData, anchor: CountdownAnchor | null): string {
  *  that stops the clock tick and disconnects the chip-fit observer. */
 export function renderBoard(root: HTMLElement, data: BoardData, onOpenRow?: (row: OpenRow) => void): () => void {
   const priced = joinPrices(data.horses, data.prices);
-  const sections = buildSections(priced, data.divisionNames);
+  const sections = buildSections(priced, data.divisionNames, data.showNotJoined);
+  const hasNotJoined = data.horses.some((h) => h.joined === false);
+  const toggle = hasNotJoined
+    ? `<button type="button" class="dm-toggle-not-joined" aria-pressed="${data.showNotJoined}">${data.showNotJoined ? 'Hide' : 'Show'} not-joined</button>`
+    : '';
   const anchor: CountdownAnchor | null = data.timeLeftSeconds != null
     ? { atMs: Date.now(), timeLeftSeconds: data.timeLeftSeconds }
     : null;
@@ -186,14 +199,20 @@ export function renderBoard(root: HTMLElement, data: BoardData, onOpenRow?: (row
         ${data.finished ? '' : '<span class="dm-dot" aria-hidden="true"></span>'}
         <strong class="dm-race-name">${esc(data.raceName)}</strong>
         <span class="dm-status-meta">· <span class="dm-status-text">${esc(statusText(data, anchor))}</span></span>
+        ${toggle}
       </div>
       ${sections.map(renderSection).join('')}
     </div>`;
 
-  const flatRows = flattenRows(sections);
+  // Which rows exist depends only on joined runners, so the full set lines up row for
+  // row with what's shown; the chart gets every runner and applies the toggle itself.
+  const flatRows = flattenRows(data.showNotJoined ? sections : buildSections(priced, data.divisionNames, true));
   root.querySelectorAll<HTMLButtonElement>('.dm-row').forEach((btn, i) => {
     btn.addEventListener('click', () => onOpenRow?.(flatRows[i]!));
   });
+
+  root.querySelector<HTMLButtonElement>('.dm-toggle-not-joined')
+    ?.addEventListener('click', () => data.onToggleNotJoined?.(!data.showNotJoined));
 
   let tickTimer: ReturnType<typeof setInterval> | null = null;
   if (anchor) {
