@@ -1,7 +1,7 @@
 // Live-API demo server.
 //
 // Serves the built `dist/` exactly like `npx serve dist`, but proxies every
-// `/api/*` request to the live deployment. Because the browser only ever talks
+// `/api/*` request to the live API host. Because the browser only ever talks
 // to this local origin, the frontend's relative `/api/...` fetches hit the real
 // API with no CORS dance and no rebuild — real-time polling works against a real
 // race. Edit the frontend, `npm run build`, refresh, and you're watching live
@@ -22,7 +22,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const DIST = join(__dirname, '..', 'dist');
 
 const PORT = Number(process.env.PORT) || 5173;
-const API_ORIGIN = (process.env.API_ORIGIN || 'https://token-derby.mauricode.co.uk').replace(/\/$/, '');
+const API_ORIGIN = (process.env.API_ORIGIN || 'https://api.tokenderby.co.uk').replace(/\/$/, '');
 
 // Client-side routes that must fall back to index.html (mirrors dist/serve.json).
 const SPA_ROUTES = [
@@ -47,7 +47,8 @@ const MIME = {
 };
 
 async function proxyApi(req, res) {
-  const target = API_ORIGIN + req.url;
+  // The API host serves the routes without the /api prefix.
+  const target = API_ORIGIN + req.url.replace(/^\/api/, '');
   const headers = { ...req.headers };
   // Let fetch/the upstream set these; forwarding the local host header confuses CloudFront.
   delete headers.host;

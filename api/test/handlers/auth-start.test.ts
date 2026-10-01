@@ -19,8 +19,8 @@ import { randomUUID } from 'node:crypto';
 function ev(over: Partial<APIGatewayProxyEventV2> = {}): APIGatewayProxyEventV2 {
   return {
     version: '2.0', routeKey: 'GET /api/auth/google/start', rawPath: '/api/auth/google/start',
-    rawQueryString: '', headers: { host: 'token-derby.mauricode.co.uk' },
-    requestContext: { domainName: 'token-derby.mauricode.co.uk' } as any,
+    rawQueryString: '', headers: { host: 'app.tokenderby.co.uk' },
+    requestContext: { domainName: 'app.tokenderby.co.uk' } as any,
     isBase64Encoded: false, ...over,
   } as APIGatewayProxyEventV2;
 }
@@ -38,7 +38,7 @@ describe('auth-google-start', () => {
     const url = new URL(loc);
     expect(url.searchParams.get('code_challenge_method')).toBe('S256');
     expect(url.searchParams.get('redirect_uri'))
-      .toBe('https://token-derby.mauricode.co.uk/api/auth/google/callback');
+      .toBe('https://app.tokenderby.co.uk/api/auth/google/callback');
 
     const state = verifyState('a'.repeat(64), stateFromUrl(loc));
     expect(state).not.toBeNull();
@@ -56,7 +56,7 @@ describe('auth-google-start', () => {
 
   it('builds the redirect_uri from SITE_ORIGIN, not the Host CloudFront rewrites', async () => {
     const before = process.env.SITE_ORIGIN;
-    process.env.SITE_ORIGIN = 'https://token-derby.mauricode.co.uk';
+    process.env.SITE_ORIGIN = 'https://app.tokenderby.co.uk';
     try {
       const res: any = await googleStart(ev({
         headers: { host: 'abc123.execute-api.eu-west-2.amazonaws.com' },
@@ -64,11 +64,11 @@ describe('auth-google-start', () => {
       }));
       const loc = res.headers.location as string;
       expect(new URL(loc).searchParams.get('redirect_uri'))
-        .toBe('https://token-derby.mauricode.co.uk/api/auth/google/callback');
+        .toBe('https://app.tokenderby.co.uk/api/auth/google/callback');
 
       const state = verifyState('a'.repeat(64), stateFromUrl(loc))!;
       const pending = await consumeAuthRequest(state);
-      expect(pending!.redirect_uri).toBe('https://token-derby.mauricode.co.uk/api/auth/google/callback');
+      expect(pending!.redirect_uri).toBe('https://app.tokenderby.co.uk/api/auth/google/callback');
     } finally {
       if (before === undefined) delete process.env.SITE_ORIGIN;
       else process.env.SITE_ORIGIN = before;
@@ -121,7 +121,7 @@ describe('auth-link-start', () => {
 
     const res: any = await linkStart(ev({
       routeKey: 'POST /api/auth/link/start',
-      headers: { host: 'token-derby.mauricode.co.uk', authorization: `Bearer ${token}` },
+      headers: { host: 'app.tokenderby.co.uk', authorization: `Bearer ${token}` },
     }));
     expect(res.statusCode).toBe(200);
     const { authorize_url } = JSON.parse(res.body);
@@ -143,7 +143,7 @@ describe('auth-link-start', () => {
 
     const res: any = await linkStart(ev({
       routeKey: 'POST /api/auth/link/start',
-      headers: { host: 'token-derby.mauricode.co.uk', authorization: `Bearer ${token}` },
+      headers: { host: 'app.tokenderby.co.uk', authorization: `Bearer ${token}` },
       body: JSON.stringify({ link_to_user_id: victim }),
       queryStringParameters: { link_to_user_id: victim },
     }));

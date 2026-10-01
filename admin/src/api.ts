@@ -8,6 +8,7 @@ import type {
   AdminClaimsResponse,
   AdminClaimRedemptionsResponse,
 } from '@token-derby/shared';
+import { apiUrl } from '@token-derby/shared';
 import { getToken } from './auth.js';
 
 export type ApiErrorCode = 'BAD_REQUEST' | 'UNAUTHENTICATED' | 'NETWORK_ERROR';
@@ -46,7 +47,7 @@ export async function login(
 ): Promise<AdminLoginResponse> {
   let res: Response;
   try {
-    res = await fetchImpl('/api/admin/login', {
+    res = await fetchImpl(apiUrl('/api/admin/login'), {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ username, password }),
@@ -62,7 +63,7 @@ async function authedGet<T>(url: string, fetchImpl: FetchFn): Promise<T> {
   if (!token) throw new ApiError('UNAUTHENTICATED', 'Not signed in', 401);
   let res: Response;
   try {
-    res = await fetchImpl(url, {
+    res = await fetchImpl(apiUrl(url), {
       headers: { authorization: `Bearer ${token}` },
     });
   } catch (e: any) {
@@ -95,7 +96,7 @@ async function authedSend<T>(
   }
   let res: Response;
   try {
-    res = await fetchImpl(url, init);
+    res = await fetchImpl(apiUrl(url), init);
   } catch (e: any) {
     throw new ApiError('NETWORK_ERROR', e?.message ?? 'fetch failed', 0);
   }

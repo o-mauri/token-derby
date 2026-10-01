@@ -19,7 +19,7 @@ import { putUser, getUserById } from '../../src/db/users.js';
 import { hashSecretToken } from '../../src/lib/auth.js';
 import { getUserIdByEmail } from '../../src/db/identities.js';
 
-const REDIRECT = 'https://token-derby.mauricode.co.uk/api/auth/google/callback';
+const REDIRECT = 'https://app.tokenderby.co.uk/api/auth/google/callback';
 const SECRET = 'a'.repeat(64);
 
 // Exactly what /start puts in Set-Cookie, minus the attributes a browser strips.
@@ -39,9 +39,9 @@ function ev(
     version: '2.0', routeKey: 'GET /api/auth/google/callback',
     rawPath: '/api/auth/google/callback', rawQueryString: '',
     queryStringParameters: { code, state: signedState },
-    headers: { host: 'token-derby.mauricode.co.uk' },
+    headers: { host: 'app.tokenderby.co.uk' },
     cookies: jar ?? (state === null ? [] : [cookiePair(state)]),
-    requestContext: { domainName: 'token-derby.mauricode.co.uk' } as any,
+    requestContext: { domainName: 'app.tokenderby.co.uk' } as any,
     isBase64Encoded: false,
   } as APIGatewayProxyEventV2;
 }
@@ -95,7 +95,7 @@ describe('auth-google-callback', () => {
 
     expect(res.statusCode).toBe(302);
     const loc = res.headers.location as string;
-    expect(loc.startsWith('https://token-derby.mauricode.co.uk/org-manager#code=')).toBe(true);
+    expect(loc.startsWith('https://app.tokenderby.co.uk/org-manager#code=')).toBe(true);
 
     const grant = hashOf(loc).replace('#code=', '');
     const consumed = await consumeWebGrant(grant);
@@ -302,8 +302,8 @@ describe('auth-google-callback', () => {
   it('lets EITHER of two concurrently started tabs complete the flow', async () => {
     const startEv = () => ({
       version: '2.0', routeKey: 'GET /api/auth/google/start', rawPath: '/api/auth/google/start',
-      rawQueryString: '', headers: { host: 'token-derby.mauricode.co.uk' },
-      requestContext: { domainName: 'token-derby.mauricode.co.uk' } as any,
+      rawQueryString: '', headers: { host: 'app.tokenderby.co.uk' },
+      requestContext: { domainName: 'app.tokenderby.co.uk' } as any,
       isBase64Encoded: false,
     } as unknown as APIGatewayProxyEventV2);
 

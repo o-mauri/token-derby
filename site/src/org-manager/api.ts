@@ -14,6 +14,7 @@ import type {
   RotateOrgJoinTokenResponse,
   RemoveOrgMemberResponse,
 } from '@token-derby/shared';
+import { apiUrl } from '@token-derby/shared';
 import { getSession, setSession, clearSession } from './session.js';
 
 export class ApiError extends Error {
@@ -47,7 +48,7 @@ async function authed<T>(method: string, path: string, body: unknown, fetchImpl:
   const init: RequestInit = { method, headers };
   if (body !== undefined) { headers['content-type'] = 'application/json'; init.body = JSON.stringify(body); }
   let res: Response;
-  try { res = await fetchImpl(path, init); }
+  try { res = await fetchImpl(apiUrl(path), init); }
   catch (e: any) { throw new ApiError('NETWORK_ERROR', e?.message ?? 'fetch failed', 0); }
   return parse<T>(res);
 }
@@ -55,7 +56,7 @@ async function authed<T>(method: string, path: string, body: unknown, fetchImpl:
 export async function exchangeCode(code: string, fetchImpl: FetchFn = fetch): Promise<WebSessionExchangeResponse> {
   let res: Response;
   try {
-    res = await fetchImpl('/api/web-sessions/exchange', {
+    res = await fetchImpl(apiUrl('/api/web-sessions/exchange'), {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code }),
     });
   } catch (e: any) { throw new ApiError('NETWORK_ERROR', e?.message ?? 'fetch failed', 0); }
@@ -67,7 +68,7 @@ export async function exchangeCode(code: string, fetchImpl: FetchFn = fetch): Pr
 export async function logout(fetchImpl: FetchFn = fetch): Promise<void> {
   const token = getSession();
   if (token) {
-    try { await fetchImpl('/api/web-sessions', { method: 'DELETE', headers: { authorization: `Bearer ${token}` } }); }
+    try { await fetchImpl(apiUrl('/api/web-sessions'), { method: 'DELETE', headers: { authorization: `Bearer ${token}` } }); }
     catch { /* best-effort */ }
   }
   clearSession();

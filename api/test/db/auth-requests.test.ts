@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 
 const base = (state: string) => ({
   state, code_verifier: 'verifier-'.padEnd(50, 'x'), nonce: 'nonce-1',
-  redirect_uri: 'https://token-derby.mauricode.co.uk/api/auth/google/callback',
+  redirect_uri: 'https://app.tokenderby.co.uk/api/auth/google/callback',
   ttlSeconds: 600,
 });
 

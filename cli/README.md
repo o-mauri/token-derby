@@ -55,7 +55,7 @@ the schedule or webhook — is done on the web:
 token-derby web
 ```
 
-This opens `token-derby.mauricode.co.uk/org-manager` with a one-time login
+This opens `app.tokenderby.co.uk/org-manager` with a one-time login
 link, signed in as your CLI identity.
 
 ## What's tracked
@@ -163,7 +163,7 @@ URLs they travel in.
 
 ## Environment
 
-- `TOKEN_DERBY_API_BASE` — override the API base URL (default: `https://token-derby.mauricode.co.uk/api`)
+- `TOKEN_DERBY_API_BASE` — override the API base URL (default: `https://api.tokenderby.co.uk`)
 - `TOKEN_DERBY_HOME` — override the data directory (default: `~/.token-derby`)
 - `TOKEN_DERBY_CLAUDE_DIR` — override the transcripts directory (default: `~/.claude/projects`)
 - `CLAUDE_CONFIG_DIR` — Claude Code's own config override. When set, transcripts are read from `$CLAUDE_CONFIG_DIR/projects`. `TOKEN_DERBY_CLAUDE_DIR` still wins.

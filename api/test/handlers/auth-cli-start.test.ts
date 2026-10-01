@@ -13,8 +13,8 @@ function ev(over: Partial<APIGatewayProxyEventV2> = {}): APIGatewayProxyEventV2 
     routeKey: 'POST /api/auth/cli/start',
     rawPath: '/api/auth/cli/start',
     rawQueryString: '',
-    headers: { host: 'token-derby.mauricode.co.uk', 'content-type': 'application/json' },
-    requestContext: { domainName: 'token-derby.mauricode.co.uk' } as any,
+    headers: { host: 'app.tokenderby.co.uk', 'content-type': 'application/json' },
+    requestContext: { domainName: 'app.tokenderby.co.uk' } as any,
     body: JSON.stringify({ label: 'omars-laptop' }),
     isBase64Encoded: false,
     ...over,
@@ -23,7 +23,7 @@ function ev(over: Partial<APIGatewayProxyEventV2> = {}): APIGatewayProxyEventV2 
 
 const originalSiteOrigin = process.env.SITE_ORIGIN;
 beforeEach(() => {
-  process.env.SITE_ORIGIN = 'https://token-derby.mauricode.co.uk';
+  process.env.SITE_ORIGIN = 'https://app.tokenderby.co.uk';
 });
 afterEach(() => {
   if (originalSiteOrigin === undefined) delete process.env.SITE_ORIGIN;
@@ -76,7 +76,7 @@ describe('auth-cli-start', () => {
       }));
       expect(res.statusCode).toBe(200);
       const body = JSON.parse(res.body);
-      expect(body.verification_uri).toBe('https://token-derby.mauricode.co.uk/cli');
+      expect(body.verification_uri).toBe('https://app.tokenderby.co.uk/cli');
     });
 
     it('is built from SITE_ORIGIN, ignoring the execute-api host CloudFront actually sends', async () => {
@@ -86,7 +86,7 @@ describe('auth-cli-start', () => {
       }));
       expect(res.statusCode).toBe(200);
       const body = JSON.parse(res.body);
-      expect(body.verification_uri).toBe('https://token-derby.mauricode.co.uk/cli');
+      expect(body.verification_uri).toBe('https://app.tokenderby.co.uk/cli');
       expect(body.verification_uri).not.toContain('execute-api');
     });
 
@@ -286,7 +286,7 @@ describe('auth-cli-start', () => {
     function ipEvent(ip: string, over: Partial<APIGatewayProxyEventV2> = {}): APIGatewayProxyEventV2 {
       return ev({
         ...over,
-        requestContext: { domainName: 'token-derby.mauricode.co.uk', http: { sourceIp: ip } } as any,
+        requestContext: { domainName: 'app.tokenderby.co.uk', http: { sourceIp: ip } } as any,
       });
     }
 
@@ -332,7 +332,7 @@ describe('auth-cli-start', () => {
       // does not get to set, and never from x-forwarded-for.
       const spoofed: any = await cliStart(ipEvent('203.0.113.3', {
         headers: {
-          host: 'token-derby.mauricode.co.uk',
+          host: 'app.tokenderby.co.uk',
           'content-type': 'application/json',
           'x-forwarded-for': '198.51.100.9',
         },
@@ -351,7 +351,7 @@ describe('auth-cli-start', () => {
       const res: any = await cliStart(ipEvent('203.0.113.5', {
         headers: {
           ...authHeaders(user),
-          host: 'token-derby.mauricode.co.uk',
+          host: 'app.tokenderby.co.uk',
           'content-type': 'application/json',
         },
       }));
@@ -369,7 +369,7 @@ describe('auth-cli-start', () => {
       const res: any = await cliStart(ipEvent('203.0.113.6', {
         headers: {
           ...authHeaders(user),
-          host: 'token-derby.mauricode.co.uk',
+          host: 'app.tokenderby.co.uk',
           'content-type': 'application/json',
         },
       }));

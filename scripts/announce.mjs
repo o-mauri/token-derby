@@ -5,7 +5,7 @@ import { dirname, resolve } from 'node:path';
 import { findChangelogEntry } from './release-lib.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const DEFAULT_API_BASE = 'https://token-derby.mauricode.co.uk/api';
+const DEFAULT_API_BASE = 'https://api.tokenderby.co.uk';
 
 function loadDotEnv() {
   const p = resolve(ROOT, '.env');

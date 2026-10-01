@@ -3,6 +3,7 @@ import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { apiBase, API_BASE } from '../src/config.js';
+import { webOrigin } from '../src/commands/web.js';
 
 let tmp: string;
 
@@ -25,10 +26,21 @@ describe('apiBase precedence', () => {
   });
 
   it('falls back to the production API base', () => {
-    expect(apiBase()).toBe('https://token-derby.mauricode.co.uk/api');
+    expect(apiBase()).toBe('https://api.tokenderby.co.uk');
   });
 
   it('API_BASE is the production API', () => {
-    expect(API_BASE).toBe('https://token-derby.mauricode.co.uk/api');
+    expect(API_BASE).toBe('https://api.tokenderby.co.uk');
+  });
+});
+
+describe('webOrigin', () => {
+  it('opens the production app by default', () => {
+    expect(webOrigin()).toBe('https://app.tokenderby.co.uk');
+  });
+
+  it('follows an API override to its own site', () => {
+    process.env.TOKEN_DERBY_API_BASE = 'http://localhost:3000/api';
+    expect(webOrigin()).toBe('http://localhost:3000');
   });
 });

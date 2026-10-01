@@ -17,7 +17,7 @@ function formatRaceTime(iso: string, tz: string): string {
   }).format(d);
 }
 
-const SITE_URL = 'token-derby.mauricode.co.uk';
+const SITE_URL = 'app.tokenderby.co.uk';
 
 /** Slack renders a link only in <url|label> form, so the scheme is required —
  *  a bare hostname posts as plain text. */

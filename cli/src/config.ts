@@ -1,4 +1,5 @@
-export const API_BASE = 'https://token-derby.mauricode.co.uk/api';
+export const API_BASE = 'https://api.tokenderby.co.uk';
+export const SITE_ORIGIN = 'https://app.tokenderby.co.uk';
 
 /** TOKEN_DERBY_API_BASE points the CLI at a local or alternate API. */
 export function apiBase(): string {

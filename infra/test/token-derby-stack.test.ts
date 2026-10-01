@@ -9,8 +9,12 @@ import { CONFIG } from '../lib/env-config';
 const ACCOUNT = '123456789012';
 const REGION = 'eu-west-2';
 const HOSTED_ZONE_CONTEXT = {
-  [`hosted-zone:account=${ACCOUNT}:domainName=mauricode.co.uk:region=${REGION}`]: {
+  [`hosted-zone:account=${ACCOUNT}:domainName=tokenderby.co.uk:region=${REGION}`]: {
     Id: '/hostedzone/ZTESTTESTTESTTEST',
+    Name: 'tokenderby.co.uk.',
+  },
+  [`hosted-zone:account=${ACCOUNT}:domainName=mauricode.co.uk:region=${REGION}`]: {
+    Id: '/hostedzone/ZLEGACYTESTTESTTE',
     Name: 'mauricode.co.uk.',
   },
   // Skip the esbuild bundle of every handler; env vars are unaffected by it.
@@ -46,13 +50,13 @@ describe('the synthesised prod stack', () => {
 
   // Without this env var Google sign-in derives redirect_uri from the Host
   // CloudFront rewrites, which is the account-takeover path this branch closed.
-  it('gives every handler SITE_ORIGIN pointing at the SITE domain', () => {
+  it('gives every handler SITE_ORIGIN pointing at the APP domain', () => {
     const fns = appFunctions(prod);
     for (const fn of fns) {
       expect(fn.env.SITE_ORIGIN, `${fn.id} is missing SITE_ORIGIN`)
-        .toBe('https://token-derby.mauricode.co.uk');
+        .toBe('https://app.tokenderby.co.uk');
     }
-    expect(fns.every((f) => f.env.SITE_ORIGIN === 'https://token-derby.mauricode.co.uk')).toBe(true);
+    expect(fns.every((f) => f.env.SITE_ORIGIN === 'https://app.tokenderby.co.uk')).toBe(true);
   });
 
   it('never points SITE_ORIGIN at the admin domain', () => {
@@ -67,7 +71,7 @@ describe('the synthesised prod stack', () => {
     for (const prefix of ['AuthGoogleStartFn', 'AuthLinkStartFn', 'AuthGoogleCallbackFn']) {
       const matched = byPrefix(prefix);
       expect(matched, `no ${prefix} in the template`).toHaveLength(1);
-      expect(matched[0]!.env.SITE_ORIGIN).toBe('https://token-derby.mauricode.co.uk');
+      expect(matched[0]!.env.SITE_ORIGIN).toBe('https://app.tokenderby.co.uk');
     }
   });
 });
@@ -146,7 +150,7 @@ describe('CLI login routes', () => {
     for (const prefix of prefixes) {
       const matched = fns.filter((f) => f.id.startsWith(prefix));
       expect(matched, `no ${prefix} in the template`).toHaveLength(1);
-      expect(matched[0]!.env.SITE_ORIGIN).toBe('https://token-derby.mauricode.co.uk');
+      expect(matched[0]!.env.SITE_ORIGIN).toBe('https://app.tokenderby.co.uk');
     }
   });
 });
@@ -203,7 +207,7 @@ describe('org access control routes', () => {
     for (const prefix of prefixes) {
       const matched = fns.filter((f) => f.id.startsWith(prefix));
       expect(matched, `no ${prefix} in the template`).toHaveLength(1);
-      expect(matched[0]!.env.SITE_ORIGIN).toBe('https://token-derby.mauricode.co.uk');
+      expect(matched[0]!.env.SITE_ORIGIN).toBe('https://app.tokenderby.co.uk');
     }
   });
 });
@@ -234,22 +238,63 @@ describe('CloudFront must not swallow API errors', () => {
     }
   });
 
-  it('attaches the SPA rewrite to the site behaviour but not to /api/*', () => {
+  it('attaches the SPA rewrite to the app and admin behaviours but not to /api/auth/*', () => {
     const distributions = synth().findResources('AWS::CloudFront::Distribution');
+    const byDomain = (domain: string) => {
+      const found = Object.values(distributions).find(
+        (r: any) => r.Properties.DistributionConfig.Aliases?.includes(domain),
+      ) as any;
+      expect(found, `no distribution for ${domain}`).toBeDefined();
+      return found.Properties.DistributionConfig;
+    };
 
-    for (const [id, resource] of Object.entries(distributions)) {
-      const config = resource.Properties.DistributionConfig;
-      expect(
-        config.DefaultCacheBehavior.FunctionAssociations,
-        `${id} default behaviour has no SPA rewrite`,
-      ).toBeDefined();
-
-      const apiBehaviour = (config.CacheBehaviors ?? []).find((b: any) => b.PathPattern === '/api/*');
-      expect(apiBehaviour, `${id} has no /api/* behaviour`).toBeDefined();
-      expect(
-        apiBehaviour.FunctionAssociations,
-        `${id} rewrites /api/* requests`,
-      ).toBeUndefined();
+    for (const domain of [CONFIG.appDomain, CONFIG.adminDomain]) {
+      expect(byDomain(domain).DefaultCacheBehavior.FunctionAssociations, `${domain} has no SPA rewrite`).toBeDefined();
     }
+
+    const authBehaviour = (byDomain(CONFIG.appDomain).CacheBehaviors ?? [])
+      .find((b: any) => b.PathPattern === '/api/auth/*');
+    expect(authBehaviour, 'app has no /api/auth/* behaviour').toBeDefined();
+    expect(authBehaviour.FunctionAssociations, 'app rewrites /api/auth/* requests').toBeUndefined();
+  });
+});
+
+describe('domains', () => {
+  let distributions: Record<string, any>;
+  beforeAll(() => { distributions = synth().findResources('AWS::CloudFront::Distribution'); });
+
+  const configFor = (domain: string) => {
+    const found = Object.values(distributions).find(
+      (r: any) => r.Properties.DistributionConfig.Aliases?.includes(domain),
+    ) as any;
+    expect(found, `no distribution for ${domain}`).toBeDefined();
+    return found.Properties.DistributionConfig;
+  };
+
+  it('serves every host from exactly one distribution', () => {
+    const aliases = Object.values(distributions).flatMap((r: any) => r.Properties.DistributionConfig.Aliases ?? []);
+    const expected = [
+      CONFIG.appDomain, CONFIG.apiDomain, CONFIG.adminDomain, ...CONFIG.apexDomains,
+      CONFIG.legacySiteDomain, CONFIG.legacyAdminDomain,
+    ];
+    expect([...aliases].sort()).toEqual([...expected].sort());
+  });
+
+  it('proxies the api host to the gateway with nothing else on it', () => {
+    const api = configFor(CONFIG.apiDomain);
+    expect(api.DefaultCacheBehavior.FunctionAssociations).toHaveLength(1);
+    expect(api.CacheBehaviors ?? []).toEqual([]);
+  });
+
+  // Published CLIs hardcode token-derby.mauricode.co.uk/api.
+  it('keeps /api/* on the legacy site host for older CLIs', () => {
+    const legacy = configFor(CONFIG.legacySiteDomain);
+    const api = (legacy.CacheBehaviors ?? []).find((b: any) => b.PathPattern === '/api/*');
+    expect(api, 'legacy site lost its /api/* behaviour').toBeDefined();
+    expect(api.FunctionAssociations).toBeUndefined();
+  });
+
+  it('does not proxy the API from the admin host', () => {
+    expect(configFor(CONFIG.adminDomain).CacheBehaviors ?? []).toEqual([]);
   });
 });

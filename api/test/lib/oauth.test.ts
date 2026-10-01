@@ -98,35 +98,35 @@ describe('originOf', () => {
   });
 
   it('prefers SITE_ORIGIN over the Host header CloudFront rewrites', () => {
-    process.env.SITE_ORIGIN = 'https://token-derby.mauricode.co.uk';
+    process.env.SITE_ORIGIN = 'https://app.tokenderby.co.uk';
     expect(originOf(ev('abc123.execute-api.eu-west-2.amazonaws.com')))
-      .toBe('https://token-derby.mauricode.co.uk');
+      .toBe('https://app.tokenderby.co.uk');
   });
 
   it('prefers SITE_ORIGIN over a host an attacker controls', () => {
-    process.env.SITE_ORIGIN = 'https://token-derby.mauricode.co.uk';
+    process.env.SITE_ORIGIN = 'https://app.tokenderby.co.uk';
     expect(originOf(ev('evil.example.com', 'evil.example.com')))
-      .toBe('https://token-derby.mauricode.co.uk');
+      .toBe('https://app.tokenderby.co.uk');
   });
 
   it('strips a trailing slash from SITE_ORIGIN so the callback path stays well formed', () => {
-    process.env.SITE_ORIGIN = 'https://token-derby.mauricode.co.uk/';
-    expect(originOf(ev('anything'))).toBe('https://token-derby.mauricode.co.uk');
+    process.env.SITE_ORIGIN = 'https://app.tokenderby.co.uk/';
+    expect(originOf(ev('anything'))).toBe('https://app.tokenderby.co.uk');
   });
 
   it('ignores a blank SITE_ORIGIN and falls back to the host', () => {
     process.env.SITE_ORIGIN = '   ';
-    expect(originOf(ev('token-derby.mauricode.co.uk'))).toBe('https://token-derby.mauricode.co.uk');
+    expect(originOf(ev('app.tokenderby.co.uk'))).toBe('https://app.tokenderby.co.uk');
   });
 
   it('falls back to the Host header when SITE_ORIGIN is unset', () => {
     delete process.env.SITE_ORIGIN;
-    expect(originOf(ev('token-derby.mauricode.co.uk'))).toBe('https://token-derby.mauricode.co.uk');
+    expect(originOf(ev('app.tokenderby.co.uk'))).toBe('https://app.tokenderby.co.uk');
   });
 
   it('falls back to requestContext.domainName when there is no Host header', () => {
     delete process.env.SITE_ORIGIN;
-    expect(originOf(ev(undefined, 'token-derby.mauricode.co.uk'))).toBe('https://token-derby.mauricode.co.uk');
+    expect(originOf(ev(undefined, 'app.tokenderby.co.uk'))).toBe('https://app.tokenderby.co.uk');
   });
 
   it('uses http for the local harness', () => {

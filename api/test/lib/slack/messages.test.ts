@@ -74,7 +74,7 @@ describe('the live race link on a starting race', () => {
     const flat = JSON.stringify(msg.blocks);
     // Slack only renders <url|label>; a bare hostname posts as plain text, which
     // is what the changelog line elsewhere in this file still does.
-    expect(flat).toContain('<https://token-derby.mauricode.co.uk/race/AB7XQ2|');
+    expect(flat).toContain('<https://app.tokenderby.co.uk/race/AB7XQ2|');
   });
 
   it('points at the join code of this race, not a fixed URL', () => {

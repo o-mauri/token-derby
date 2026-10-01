@@ -17,7 +17,7 @@ function startResponse(overrides: Partial<CliAuthStartResponse> = {}): CliAuthSt
   return {
     device_code: 'dc-1',
     user_code: 'ABCD-EFGH',
-    verification_uri: 'https://token-derby.mauricode.co.uk/cli',
+    verification_uri: 'https://app.tokenderby.co.uk/cli',
     interval: 5,
     expires_in: 600,
     ...overrides,
@@ -320,7 +320,7 @@ describe('loginCommand', () => {
 
   it('prints the user_code and the bare verification_uri, never a URL with the code baked in', async () => {
     const apiStart = vi.fn().mockResolvedValue(startResponse({
-      verification_uri: 'https://token-derby.mauricode.co.uk/cli',
+      verification_uri: 'https://app.tokenderby.co.uk/cli',
       user_code: 'WXYZ-1234',
     }));
     const apiPoll = vi.fn().mockResolvedValue(approvedResponse());
@@ -338,15 +338,15 @@ describe('loginCommand', () => {
     }
 
     const out = con.logs.join('\n');
-    expect(out).toContain('https://token-derby.mauricode.co.uk/cli');
+    expect(out).toContain('https://app.tokenderby.co.uk/cli');
     expect(out).toContain('WXYZ-1234');
-    expect(out).not.toContain('https://token-derby.mauricode.co.uk/cli?');
-    expect(out).not.toContain('https://token-derby.mauricode.co.uk/cliWXYZ-1234');
+    expect(out).not.toContain('https://app.tokenderby.co.uk/cli?');
+    expect(out).not.toContain('https://app.tokenderby.co.uk/cliWXYZ-1234');
     expect(out).not.toMatch(/cli\/WXYZ-1234/);
   });
 
   it('prints the bare URL and never mints a grant when there is no local identity', async () => {
-    const apiStart = vi.fn().mockResolvedValue(startResponse({ verification_uri: 'https://token-derby.mauricode.co.uk/cli' }));
+    const apiStart = vi.fn().mockResolvedValue(startResponse({ verification_uri: 'https://app.tokenderby.co.uk/cli' }));
     const apiPoll = vi.fn().mockResolvedValue(approvedResponse());
     const promptYesNo = vi.fn().mockResolvedValue(true);
     const apiCreateWebSession = vi.fn();
@@ -369,7 +369,7 @@ describe('loginCommand', () => {
     // must never happen for an account with nothing to mint a credential from.
     expect(apiCreateWebSession).not.toHaveBeenCalled();
     const out = con.logs.join('\n');
-    expect(out).toContain('https://token-derby.mauricode.co.uk/cli');
+    expect(out).toContain('https://app.tokenderby.co.uk/cli');
     expect(out).not.toContain('#code=');
   });
 
@@ -588,7 +588,7 @@ describe('loginCommand', () => {
     });
 
     it('carries a minted grant in the printed URL, since a local identity exists to mint it from', async () => {
-      const apiStart = vi.fn().mockResolvedValue(startResponse({ verification_uri: 'https://token-derby.mauricode.co.uk/cli' }));
+      const apiStart = vi.fn().mockResolvedValue(startResponse({ verification_uri: 'https://app.tokenderby.co.uk/cli' }));
       const apiPoll = vi.fn().mockResolvedValue(approvedResponse());
       const promptYesNo = vi.fn().mockResolvedValue(true);
       const apiCreateWebSession = vi.fn().mockResolvedValue(webSession({ code: 'GRANT-XYZ' }));
@@ -610,7 +610,7 @@ describe('loginCommand', () => {
       expect(apiCreateWebSession).toHaveBeenCalledTimes(1);
       // The exact URL a browser would be sent to, fragment and all — not just
       // that a code appears somewhere in the log.
-      expect(con.logs.join('\n')).toContain('https://token-derby.mauricode.co.uk/cli#code=GRANT-XYZ');
+      expect(con.logs.join('\n')).toContain('https://app.tokenderby.co.uk/cli#code=GRANT-XYZ');
     });
 
     it('says the grant link is short-lived, matching what `web` and `link` already say', async () => {
@@ -657,7 +657,7 @@ describe('loginCommand', () => {
 
     describe('a credential the server no longer accepts', () => {
       it('falls back to the bare URL and completes the login instead of dead-ending', async () => {
-        const apiStart = vi.fn().mockResolvedValue(startResponse({ verification_uri: 'https://token-derby.mauricode.co.uk/cli' }));
+        const apiStart = vi.fn().mockResolvedValue(startResponse({ verification_uri: 'https://app.tokenderby.co.uk/cli' }));
         const apiPoll = vi.fn().mockResolvedValue(approvedResponse());
         // Exactly what `create-web-session` returns once this machine has been
         // revoked from the Account view, or the account has been wiped.
@@ -684,7 +684,7 @@ describe('loginCommand', () => {
         expect(rc).toBe(0);
         // The URL is the whole point: this is the only machine `login` can be
         // run from to recover a credential that was revoked on this machine.
-        expect(logged).toContain('https://token-derby.mauricode.co.uk/cli');
+        expect(logged).toContain('https://app.tokenderby.co.uk/cli');
         expect(logged).not.toContain('#code=');
         expect(apiPoll).toHaveBeenCalled();
         expect(saveIdentity).toHaveBeenCalledTimes(1);
@@ -714,7 +714,7 @@ describe('loginCommand', () => {
       });
 
       it('still aborts on a transient mint failure, before printing any URL', async () => {
-        const apiStart = vi.fn().mockResolvedValue(startResponse({ verification_uri: 'https://token-derby.mauricode.co.uk/cli' }));
+        const apiStart = vi.fn().mockResolvedValue(startResponse({ verification_uri: 'https://app.tokenderby.co.uk/cli' }));
         const apiPoll = vi.fn();
         const saveIdentity = vi.fn();
         // Not UNAUTHENTICATED: nothing has been said about this credential, so
@@ -739,7 +739,7 @@ describe('loginCommand', () => {
         expect(rc).toBe(1);
         expect(apiPoll).not.toHaveBeenCalled();
         expect(saveIdentity).not.toHaveBeenCalled();
-        expect(con.logs.join('\n')).not.toContain('https://token-derby.mauricode.co.uk/cli');
+        expect(con.logs.join('\n')).not.toContain('https://app.tokenderby.co.uk/cli');
         expect(con.errors.join('\n')).toContain('NETWORK_ERROR');
       });
     });

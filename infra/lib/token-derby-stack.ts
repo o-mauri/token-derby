@@ -19,8 +19,7 @@ import * as eventsTargets from 'aws-cdk-lib/aws-events-targets';
 import * as path from 'path';
 import type { EnvConfig } from './env-config';
 import { SPA_REWRITE_CODE } from './spa-rewrite';
-
-const HOSTED_ZONE_DOMAIN = 'mauricode.co.uk';
+import { API_PREFIX_CODE, redirectCode } from './edge-functions';
 
 interface TokenDerbyStackProps extends cdk.StackProps {
   config: EnvConfig;
@@ -30,24 +29,37 @@ export class TokenDerbyStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: TokenDerbyStackProps) {
     super(scope, id, props);
     const { config } = props;
-    const DOMAIN_NAME = config.siteDomain;
-    const ADMIN_DOMAIN_NAME = config.adminDomain;
+    const APP_DOMAIN = config.appDomain;
+    const API_DOMAIN = config.apiDomain;
+    const ADMIN_DOMAIN = config.adminDomain;
     const TABLE_NAME = config.tableName;
 
-    // ── Route 53 + ACM (cert must live in us-east-1 for CloudFront) ────
-    const hostedZone = route53.HostedZone.fromLookup(this, 'HostedZone', {
-      domainName: HOSTED_ZONE_DOMAIN,
+    // ── Route 53 + ACM (certs must live in us-east-1 for CloudFront) ───
+    const zone = route53.HostedZone.fromLookup(this, 'Zone', {
+      domainName: config.zoneDomain,
+    });
+
+    const domainCertificate = new acm.DnsValidatedCertificate(this, 'DomainCertificate', {
+      domainName: APP_DOMAIN,
+      subjectAlternativeNames: [API_DOMAIN, ADMIN_DOMAIN, ...config.apexDomains],
+      hostedZone: zone,
+      region: 'us-east-1',
+    }) as unknown as acm.ICertificate;
+
+    // Legacy mauricode.co.uk hosts, kept alive as redirects.
+    const legacyZone = route53.HostedZone.fromLookup(this, 'HostedZone', {
+      domainName: config.legacyZoneDomain,
     });
 
     const certificate = new acm.DnsValidatedCertificate(this, 'Certificate', {
-      domainName: DOMAIN_NAME,
-      hostedZone,
+      domainName: config.legacySiteDomain,
+      hostedZone: legacyZone,
       region: 'us-east-1',
     });
 
     const adminCertificate = new acm.DnsValidatedCertificate(this, 'AdminCertificate', {
-      domainName: ADMIN_DOMAIN_NAME,
-      hostedZone,
+      domainName: config.legacyAdminDomain,
+      hostedZone: legacyZone,
       region: 'us-east-1',
     });
 
@@ -133,17 +145,14 @@ export class TokenDerbyStack extends cdk.Stack {
     // ── Lambda factory ─────────────────────────────────────────────────
     const apiDir = path.resolve(__dirname, '..', '..', 'api', 'src', 'handlers');
     // CloudFront replaces the viewer Host with the API Gateway domain, so the
-    // OAuth redirect_uri cannot be derived from the request. Site domain, not
-    // admin: the org manager is served there.
-    // The admin distribution also forwards /api/*, so a future sign-in entry
-    // point on admin. would set its state cookie there and be redirected here,
-    // where that cookie is absent — it would need its own SITE_ORIGIN.
+    // OAuth redirect_uri cannot be derived from the request. App domain: the
+    // org manager and its /api/auth/* proxy (which holds the state cookie) live there.
     const commonEnv = {
       TABLE_NAME,
       NODE_OPTIONS: '--enable-source-maps',
       ADMIN_SSM_PREFIX: config.ssmPrefix,
       AUTH_SSM_PREFIX: config.authSsmPrefix,
-      SITE_ORIGIN: `https://${DOMAIN_NAME}`,
+      SITE_ORIGIN: `https://${APP_DOMAIN}`,
     };
 
     const makeFn = (name: string, fileBase: string, opts?: { timeout?: cdk.Duration }) => {
@@ -439,51 +448,57 @@ export class TokenDerbyStack extends cdk.Stack {
       autoDeleteObjects: true,
     });
 
-    // ── CloudFront with /api/* proxy to API Gateway ───────────────────
+    // ── CloudFront ─────────────────────────────────────────────────────
     const apiUrl = cdk.Fn.select(1, cdk.Fn.split('://', httpApi.url!));
-    const apiDomain = cdk.Fn.select(0, cdk.Fn.split('/', apiUrl));
-    const apiOrigin = new origins.HttpOrigin(apiDomain, {
+    const apiGatewayDomain = cdk.Fn.select(0, cdk.Fn.split('/', apiUrl));
+    const apiOrigin = new origins.HttpOrigin(apiGatewayDomain, {
       protocolPolicy: cloudfront.OriginProtocolPolicy.HTTPS_ONLY,
     });
+
+    const apiBehaviour = (functionAssociations?: cloudfront.FunctionAssociation[]): cloudfront.BehaviorOptions => ({
+      origin: apiOrigin,
+      viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+      allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
+      cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
+      originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
+      functionAssociations,
+    });
+
+    const viewerRequest = (id: string, code: string): cloudfront.FunctionAssociation[] => [{
+      function: new cloudfront.Function(this, id, {
+        code: cloudfront.FunctionCode.fromInline(code),
+        runtime: cloudfront.FunctionRuntime.JS_2_0,
+      }),
+      eventType: cloudfront.FunctionEventType.VIEWER_REQUEST,
+    }];
 
     // Rewrites SPA deep links to the shell. See spa-rewrite.ts for why this
     // replaces a distribution-wide errorResponses block, and spa-rewrite.test.ts
     // for the guard on the rule it uses.
-    const spaRewrite = new cloudfront.Function(this, 'SpaRewriteFn', {
-      code: cloudfront.FunctionCode.fromInline(SPA_REWRITE_CODE),
-      runtime: cloudfront.FunctionRuntime.JS_2_0,
-    });
+    const spaRewriteAssociation = viewerRequest('SpaRewriteFn', SPA_REWRITE_CODE);
 
-    const spaRewriteAssociation = [{
-      function: spaRewrite,
-      eventType: cloudfront.FunctionEventType.VIEWER_REQUEST,
-    }];
+    // Redirect-only distributions answer at the edge; this origin is never reached.
+    const redirectOrigin = new origins.HttpOrigin(APP_DOMAIN);
 
-    const distribution = new cloudfront.Distribution(this, 'Distribution', {
+    // app.: the site, plus /api/auth/* so the Google flow's state cookie is
+    // set and read on the same origin as the org manager.
+    const appDistribution = new cloudfront.Distribution(this, 'AppDistribution', {
       defaultBehavior: {
         origin: origins.S3BucketOrigin.withOriginAccessControl(siteBucket),
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
         cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
         functionAssociations: spaRewriteAssociation,
       },
-      additionalBehaviors: {
-        '/api/*': {
-          origin: apiOrigin,
-          viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-          allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
-          cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
-          originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
-        },
-      },
-      domainNames: [DOMAIN_NAME],
-      certificate: certificate as unknown as acm.ICertificate,
+      additionalBehaviors: { '/api/auth/*': apiBehaviour() },
+      domainNames: [APP_DOMAIN],
+      certificate: domainCertificate,
       defaultRootObject: 'index.html',
     });
 
     new s3deploy.BucketDeployment(this, 'DeploySite', {
       sources: [s3deploy.Source.asset(path.resolve(__dirname, '..', '..', 'site', 'dist'))],
       destinationBucket: siteBucket,
-      distribution,
+      distribution: appDistribution,
       distributionPaths: ['/*'],
       cacheControl: [
         s3deploy.CacheControl.setPublic(),
@@ -492,44 +507,48 @@ export class TokenDerbyStack extends cdk.Stack {
       ],
     });
 
-    new route53.ARecord(this, 'AliasRecord', {
-      zone: hostedZone,
-      recordName: DOMAIN_NAME,
-      target: route53.RecordTarget.fromAlias(new targets.CloudFrontTarget(distribution)),
+    const appRecord = new route53.ARecord(this, 'AppAliasRecord', {
+      zone,
+      recordName: APP_DOMAIN,
+      target: route53.RecordTarget.fromAlias(new targets.CloudFrontTarget(appDistribution)),
     });
 
-    // ── Admin subdomain: its own bucket + CloudFront, /api/* → same API ──
+    // api.: the gateway without the /api prefix.
+    const apiDistribution = new cloudfront.Distribution(this, 'ApiDistribution', {
+      defaultBehavior: apiBehaviour(viewerRequest('ApiPrefixFn', API_PREFIX_CODE)),
+      domainNames: [API_DOMAIN],
+      certificate: domainCertificate,
+    });
+
+    new route53.ARecord(this, 'ApiAliasRecord', {
+      zone,
+      recordName: API_DOMAIN,
+      target: route53.RecordTarget.fromAlias(new targets.CloudFrontTarget(apiDistribution)),
+    });
+
+    // admin.: static only, it calls api. directly.
     const adminBucket = new s3.Bucket(this, 'AdminSiteBucket', {
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
       autoDeleteObjects: true,
     });
 
-    const adminDistribution = new cloudfront.Distribution(this, 'AdminDistribution', {
+    const adminAppDistribution = new cloudfront.Distribution(this, 'AdminAppDistribution', {
       defaultBehavior: {
         origin: origins.S3BucketOrigin.withOriginAccessControl(adminBucket),
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
         cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
         functionAssociations: spaRewriteAssociation,
       },
-      additionalBehaviors: {
-        '/api/*': {
-          origin: apiOrigin,
-          viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-          allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
-          cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
-          originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
-        },
-      },
-      domainNames: [ADMIN_DOMAIN_NAME],
-      certificate: adminCertificate as unknown as acm.ICertificate,
+      domainNames: [ADMIN_DOMAIN],
+      certificate: domainCertificate,
       defaultRootObject: 'index.html',
     });
 
     new s3deploy.BucketDeployment(this, 'DeployAdminSite', {
       sources: [s3deploy.Source.asset(path.resolve(__dirname, '..', '..', 'admin', 'dist'))],
       destinationBucket: adminBucket,
-      distribution: adminDistribution,
+      distribution: adminAppDistribution,
       distributionPaths: ['/*'],
       cacheControl: [
         s3deploy.CacheControl.setPublic(),
@@ -538,19 +557,80 @@ export class TokenDerbyStack extends cdk.Stack {
       ],
     });
 
-    new route53.ARecord(this, 'AdminAliasRecord', {
-      zone: hostedZone,
-      recordName: ADMIN_DOMAIN_NAME,
-      target: route53.RecordTarget.fromAlias(new targets.CloudFrontTarget(adminDistribution)),
+    const adminRecord = new route53.ARecord(this, 'AdminAppAliasRecord', {
+      zone,
+      recordName: ADMIN_DOMAIN,
+      target: route53.RecordTarget.fromAlias(new targets.CloudFrontTarget(adminAppDistribution)),
     });
 
-    new cdk.CfnOutput(this, 'AdminSiteUrl', { value: `https://${ADMIN_DOMAIN_NAME}` });
-    new cdk.CfnOutput(this, 'AdminDistributionId', { value: adminDistribution.distributionId });
+    // Bare and www hosts → app.
+    const apexDistribution = new cloudfront.Distribution(this, 'ApexRedirectDistribution', {
+      defaultBehavior: {
+        origin: redirectOrigin,
+        viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+        cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
+        functionAssociations: viewerRequest('ApexRedirectFn', redirectCode(APP_DOMAIN)),
+      },
+      domainNames: config.apexDomains,
+      certificate: domainCertificate,
+    });
+
+    config.apexDomains.forEach((domain, i) => {
+      new route53.ARecord(this, i === 0 ? 'ApexAliasRecord' : 'WwwAliasRecord', {
+        zone,
+        recordName: domain,
+        target: route53.RecordTarget.fromAlias(new targets.CloudFrontTarget(apexDistribution)),
+      });
+    });
+
+    // ── Legacy mauricode.co.uk hosts ───────────────────────────────────
+    // Pages 301 to the new hosts; /api/* stays because published CLIs
+    // hardcode token-derby.mauricode.co.uk/api. Each waits for its new
+    // host's record so the redirect never points at a name that isn't live.
+    const legacyDistribution = new cloudfront.Distribution(this, 'Distribution', {
+      defaultBehavior: {
+        origin: redirectOrigin,
+        viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+        cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
+        functionAssociations: viewerRequest('LegacySiteRedirectFn', redirectCode(APP_DOMAIN)),
+      },
+      additionalBehaviors: { '/api/*': apiBehaviour() },
+      domainNames: [config.legacySiteDomain],
+      certificate: certificate as unknown as acm.ICertificate,
+    });
+    legacyDistribution.node.addDependency(appRecord);
+
+    new route53.ARecord(this, 'AliasRecord', {
+      zone: legacyZone,
+      recordName: config.legacySiteDomain,
+      target: route53.RecordTarget.fromAlias(new targets.CloudFrontTarget(legacyDistribution)),
+    });
+
+    const legacyAdminDistribution = new cloudfront.Distribution(this, 'AdminDistribution', {
+      defaultBehavior: {
+        origin: redirectOrigin,
+        viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+        cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
+        functionAssociations: viewerRequest('LegacyAdminRedirectFn', redirectCode(ADMIN_DOMAIN)),
+      },
+      domainNames: [config.legacyAdminDomain],
+      certificate: adminCertificate as unknown as acm.ICertificate,
+    });
+    legacyAdminDistribution.node.addDependency(adminRecord);
+
+    new route53.ARecord(this, 'AdminAliasRecord', {
+      zone: legacyZone,
+      recordName: config.legacyAdminDomain,
+      target: route53.RecordTarget.fromAlias(new targets.CloudFrontTarget(legacyAdminDistribution)),
+    });
 
     // ── Outputs ────────────────────────────────────────────────────────
-    new cdk.CfnOutput(this, 'SiteUrl', { value: `https://${DOMAIN_NAME}` });
+    new cdk.CfnOutput(this, 'SiteUrl', { value: `https://${APP_DOMAIN}` });
+    new cdk.CfnOutput(this, 'ApiUrl', { value: `https://${API_DOMAIN}` });
+    new cdk.CfnOutput(this, 'AdminSiteUrl', { value: `https://${ADMIN_DOMAIN}` });
     new cdk.CfnOutput(this, 'ApiGatewayUrl', { value: httpApi.url! });
     new cdk.CfnOutput(this, 'TableName', { value: table.tableName });
-    new cdk.CfnOutput(this, 'DistributionId', { value: distribution.distributionId });
+    new cdk.CfnOutput(this, 'DistributionId', { value: appDistribution.distributionId });
+    new cdk.CfnOutput(this, 'AdminDistributionId', { value: adminAppDistribution.distributionId });
   }
 }
