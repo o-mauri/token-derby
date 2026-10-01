@@ -29,7 +29,7 @@ describe('renderPickerSignedIn', () => {
       { org_name: 'StackOne', live: race({ name: 'League Race 9/10' }), next: null },
       { org_name: 'Quiet', live: null, next: null },
     ], href);
-    const links = [...root.querySelectorAll<HTMLAnchorElement>('a.dm-org-open')].map((a) => a.getAttribute('href'));
+    const links = Array.from(root.querySelectorAll<HTMLAnchorElement>('a.dm-org-open')).map((a) => a.getAttribute('href'));
     expect(links).toEqual(['/StackOne', '/Quiet']);
     expect(root.textContent).toContain('LIVE');
     expect(root.textContent).toContain('League Race 9/10');
