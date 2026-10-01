@@ -12,6 +12,7 @@ export default defineConfig({
     'preview-race': 'src/preview-race.ts',
     'preview-league': 'src/preview-league.ts',
     'preview-toasts': 'src/preview-toasts.ts',
+    'preview-loader': 'src/preview-loader.ts',
   },
   format: ['esm'],
   target: 'es2022',

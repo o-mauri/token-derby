@@ -11,6 +11,7 @@ import { createTicker, collectFreshItems, leagueOrderCells, leagueStandingsCells
 import { applyCheerJitter, crowdColumns, syncSpectators } from './crowd.js';
 import { createRaceGraphs } from './race-graphs.js';
 import { createThemePicker } from './theme-picker.js';
+import { createLoader } from './loader.js';
 
 const POLL_INTERVAL_MS = 60_000;
 const TIMER_TICK_MS = 1_000;
@@ -32,7 +33,7 @@ export function renderRace(root: HTMLElement, joinCode: string, opts: RenderRace
   frame.className = 'race';
   frame.innerHTML = `
     <header class="race-header">
-      <h1>${horseFaceSvg()} <span class="race-name-row"><span class="row-scroll race-name-scroll"><span class="race-name">Loading…</span></span></span></h1>
+      <h1>${horseFaceSvg()} <span class="race-name-row"><span class="row-scroll race-name-scroll"><span class="race-name"></span></span></span></h1>
       <div class="meta">
         <span class="status-item"><span class="meta-label">Status: </span><b class="race-status">—</b></span>
         <span><span class="meta-label">Time left: </span><b class="race-time-left">—</b></span>
@@ -56,6 +57,7 @@ export function renderRace(root: HTMLElement, joinCode: string, opts: RenderRace
   meta.insertBefore(createThemePicker(root.ownerDocument), meta.querySelector('.org-btn'));
 
   const track = frame.querySelector<HTMLElement>('.track')!;
+  track.appendChild(createLoader(root.ownerDocument));
   const ticker = createTicker(root.ownerDocument);
   frame.appendChild(ticker.el);
   // Watermark per horse_id — only surface events with at > last shown.
@@ -197,6 +199,7 @@ export function renderRace(root: HTMLElement, joinCode: string, opts: RenderRace
       paceByHorseId.set(horse.horse_id, horse.pace_15m ?? null);
     }
 
+    track.querySelector('.loader')?.remove();
     reconcileHorses(track, race, now, paceByHorseId);
 
     // Live races: the order is the steady-state loop; for a league fixture the

@@ -27,6 +27,19 @@ had saved; the picker works normally afterwards, so people can still switch away
 Set both to `null` to end the event — everyone keeps whatever they last had, which
 for most will be the event theme. Bump the tag to run the same theme again later.
 
+## Loading state
+
+Full-page loads (the org page, `/org/<name>/live`, and a race's first poll) show
+`createLoader` from `src/render/loader.ts`. It's a porthole of two horses trading
+the lead on a scrolling track, with a spinner arc round it. Its styles live in
+`public/styles.css` and reuse the race view's gait, shadow and dust rules, so it
+follows the theme. It fades in after 250ms so fast loads never flash it, and it
+holds still under `prefers-reduced-motion`. While it shows, the org and race
+titles stay blank until the API returns the real name.
+
+To see it without an API, build and open `/preview-loader` (org page) or
+`/preview-loader?page=race`. Both keep every request pending.
+
 ## Local dev
 
 ```bash

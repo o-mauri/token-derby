@@ -138,6 +138,22 @@ describe('renderOrgLive', () => {
     cleanup();
   });
 
+  it('shows the loader until the races load', async () => {
+    fetchOrgRaces.mockReturnValue(new Promise(() => {}));
+    const cleanup = renderOrgLive(root, 'Acme');
+    await flush();
+    expect(root.querySelector('.loader')).not.toBeNull();
+    cleanup();
+  });
+
+  it('replaces the loader with the message when the org has no races', async () => {
+    fetchOrgRaces.mockResolvedValue(resp([]));
+    const cleanup = renderOrgLive(root, 'Acme');
+    await flush();
+    expect(root.querySelector('.loader')).toBeNull();
+    cleanup();
+  });
+
   it('shows a message when the org has no races', async () => {
     fetchOrgRaces.mockResolvedValue(resp([]));
     const cleanup = renderOrgLive(root, 'Acme');
