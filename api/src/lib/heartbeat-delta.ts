@@ -40,3 +40,25 @@ export function resolveHeartbeatDelta(
   }
   return null;
 }
+
+/** A sanity bound on one beat's raw tokens; real work never comes close. */
+export const MAX_RAW_TOKENS_PER_BEAT = 5_000_000;
+
+/**
+ * Throw away whatever a beat claims above the cap, keeping each family's share.
+ * `components` still sums exactly to `total`, which the counters rely on.
+ */
+export function capBeat(beat: ResolvedDelta, cap = MAX_RAW_TOKENS_PER_BEAT): ResolvedDelta & { discarded: number } {
+  if (beat.total <= cap) return { ...beat, discarded: 0 };
+  const scale = cap / beat.total;
+  const components = zeroPerFamily();
+  let assigned = 0;
+  let largest: ModelFamily = 'anthropic';
+  for (const family of Object.keys(components) as ModelFamily[]) {
+    components[family] = Math.floor(beat.components[family] * scale);
+    assigned += components[family];
+    if (beat.components[family] > beat.components[largest]) largest = family;
+  }
+  components[largest] += cap - assigned;   // rounding remainder, so the parts sum to the cap
+  return { total: cap, components, discarded: beat.total - cap };
+}

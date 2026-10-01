@@ -4,6 +4,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { claudeCode } from '../../../src/tokens/harnesses/claude-code/index.js';
 import { totalOf, conversationsOf } from './helpers.js';
+import { count } from '../../../src/tokens/harnesses/engine.js';
 
 const FAMILY = 'anthropic';
 
@@ -46,13 +47,16 @@ describe('sumTokens (fail-loud)', () => {
     await expect(totalOf(claudeCode)).rejects.toThrow();
   });
 
-  it('throws when a transcript file cannot be read (not a partial sum)', async () => {
+  it('reports a transcript file it cannot read instead of counting it', async () => {
     const root = await tmpProjects();
     const proj = path.join(root, 'proj1');
     await fs.mkdir(proj, { recursive: true });
     // A directory named like a .jsonl file makes readFile fail with EISDIR.
     await fs.mkdir(path.join(proj, 'broken.jsonl'));
-    await expect(totalOf(claudeCode)).rejects.toThrow();
+    await fs.writeFile(path.join(proj, 'ok.jsonl'), line(5) + '\n');
+    const result = await count(claudeCode);
+    expect(result.unreadable).toHaveLength(1);
+    expect((await totalOf(claudeCode)).output).toBe(5);   // the readable file still counts
   });
 
   it('counts subagent and dynamic-workflow agent transcripts nested under the session', async () => {

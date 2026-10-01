@@ -8,7 +8,6 @@ export function tableSchema(TableName: string): CreateTableCommandInput {
       { AttributeName: 'sk', AttributeType: 'S' },
       { AttributeName: 'join_code', AttributeType: 'S' },
       { AttributeName: 'admin_code', AttributeType: 'S' },
-      { AttributeName: 'org_name', AttributeType: 'S' },
       { AttributeName: 'org_name_key', AttributeType: 'S' },
       { AttributeName: 'org_join_token', AttributeType: 'S' },
       { AttributeName: 'member_user_id', AttributeType: 'S' },
@@ -31,11 +30,6 @@ export function tableSchema(TableName: string): CreateTableCommandInput {
       {
         IndexName: 'AdminCodeIndex',
         KeySchema: [{ AttributeName: 'admin_code', KeyType: 'HASH' }],
-        Projection: { ProjectionType: 'ALL' },
-      },
-      {
-        IndexName: 'OrgNameIndex',
-        KeySchema: [{ AttributeName: 'org_name', KeyType: 'HASH' }],
         Projection: { ProjectionType: 'ALL' },
       },
       {

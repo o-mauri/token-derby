@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { ScanCache, type FileFold } from '../../src/tokens/scan-cache.js';
+import { ScanCache, setReadChunkBytesForTests, type FileFold } from '../../src/tokens/scan-cache.js';
 
 let home: string;
 let work: string;
@@ -242,5 +242,47 @@ describe('ScanCache persistence', () => {
     await fs.writeFile(file, JSON.stringify({ ...raw, version: raw.version + 1 }));
 
     expect((await ScanCache.open('claude')).has(f)).toBe(false);
+  });
+});
+
+describe('ScanCache.readIncremental — files larger than one read', () => {
+  afterEach(() => setReadChunkBytesForTests(null));
+
+  it('folds a file spread over many reads exactly as one read would', async () => {
+    setReadChunkBytesForTests(8);
+    const f = path.join(work, 'big.jsonl');
+    const lines = Array.from({ length: 20 }, (_, i) => `line-${i}`);
+    await fs.writeFile(f, lines.join('\n') + '\n');
+    const cache = await ScanCache.open('codex');
+    expect(await cache.readIncremental(f, collector())).toEqual(lines);
+  });
+
+  it('skips a single line longer than one read and keeps folding after it', async () => {
+    setReadChunkBytesForTests(8);
+    const f = path.join(work, 'giant-line.jsonl');
+    await fs.writeFile(f, `before\n${'x'.repeat(50)}\nafter\n`);
+    const cache = await ScanCache.open('codex');
+    expect(await cache.readIncremental(f, collector())).toEqual(['before', 'after']);
+  });
+
+  it('picks up appended lines after a chunked first read without re-reading', async () => {
+    setReadChunkBytesForTests(8);
+    const f = path.join(work, 'grow.jsonl');
+    await fs.writeFile(f, 'aaaa\nbbbb\ncccc\n');
+    const cache = await ScanCache.open('codex');
+    await cache.readIncremental(f, collector());
+    await fs.appendFile(f, 'dddd\n');
+    const seen: string[][] = [];
+    const spy: FileFold<string[]> = { empty: () => [], append: (acc, l) => { seen.push(l); return [...acc, ...l]; } };
+    expect(await cache.readIncremental(f, spy)).toEqual(['aaaa', 'bbbb', 'cccc', 'dddd']);
+    expect(seen.flat()).toEqual(['dddd']);
+  });
+
+  it('still returns a trailing line without a newline, uncommitted', async () => {
+    setReadChunkBytesForTests(8);
+    const f = path.join(work, 'tail.jsonl');
+    await fs.writeFile(f, 'aaaa\nbb');
+    const cache = await ScanCache.open('codex');
+    expect(await cache.readIncremental(f, collector())).toEqual(['aaaa', 'bb']);
   });
 });

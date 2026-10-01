@@ -72,26 +72,15 @@ export async function getOrganisationById(
 }
 
 export async function getOrganisationByName(org_name: string): Promise<OrgRecord | null> {
-  const byKey = await queryOne('OrgNameKeyIndex', 'org_name_key', orgNameKey(org_name)).catch((e) => {
-    // The index may not exist yet mid-deploy; the exact-name query below still works.
-    if (e?.name === 'ValidationException') return undefined;
-    throw e;
-  });
-  // Orgs written before org_name_key existed only match by their exact name.
-  const item = byKey ?? await queryOne('OrgNameIndex', 'org_name', org_name);
-  return item ? pickOrgRecord(item) : null;
-}
-
-async function queryOne(IndexName: string, attribute: string, value: string): Promise<Record<string, any> | undefined> {
   const { Items = [] } = await ddb.send(new QueryCommand({
     TableName: TABLE,
-    IndexName,
-    KeyConditionExpression: '#a = :v',
-    ExpressionAttributeNames: { '#a': attribute },
-    ExpressionAttributeValues: { ':v': value },
+    IndexName: 'OrgNameKeyIndex',
+    KeyConditionExpression: 'org_name_key = :k',
+    ExpressionAttributeValues: { ':k': orgNameKey(org_name) },
     Limit: 1,
   }));
-  return Items[0];
+  const item = Items[0];
+  return item ? pickOrgRecord(item) : null;
 }
 
 export async function getOrganisationByJoinToken(join_token: string): Promise<OrgRecord | null> {

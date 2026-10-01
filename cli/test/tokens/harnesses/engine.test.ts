@@ -103,12 +103,29 @@ describe('engine.count', () => {
     await expect(count(absent)).rejects.toBeInstanceOf(SourceRootMissing);
   });
 
-  it('propagates a read error rather than counting the file as zero', async () => {
+  it('reports an unreadable file rather than counting it as zero', async () => {
     await write('a.txt', '1\n');
     const broken = fake({
       counting: wholeFile(() => { throw new Error('EACCES'); }),
     });
-    await expect(count(broken)).rejects.toThrow('EACCES');
+    const result = await count(broken);
+    expect(result.byFamily.get('anthropic')?.has('claude-code:a.txt')).toBeFalsy();
+    expect(result.unreadable).toEqual(['claude-code:a.txt']);
+    expect(result.notices).toEqual(["1 Fake conversation couldn't be read and isn't counted for now"]);
+  });
+
+  it('keeps counting the other files when one cannot be read', async () => {
+    await write('good.txt', '10\n');
+    await write('bad.txt', '20\n');
+    const harness = fake({
+      counting: wholeFile((raw, file) => {
+        if (file.endsWith('bad.txt')) throw new Error('EIO');
+        return { families: { anthropic: { input: 0, output: Number(raw.trim()) } } };
+      }),
+    });
+    const result = await count(harness);
+    expect(result.byFamily.get('anthropic')?.get('claude-code:good.txt')).toEqual({ input: 0, output: 10 });
+    expect(result.unreadable).toEqual(['claude-code:bad.txt']);
   });
 
   it('caches: an unchanged file is not re-parsed on the next scan', async () => {
@@ -120,13 +137,13 @@ describe('engine.count', () => {
     expect(parse).toHaveBeenCalledTimes(1);   // second scan was a stat, not a read
   });
 
-  it('does not commit the cache when a scan throws partway', async () => {
+  it('does not cache a file that failed to read', async () => {
     await write('a.txt', '10\n');
     const parse = vi.fn(() => ({ families: { anthropic: { input: 0, output: 10 } } }));
     const ok = fake({ counting: wholeFile(parse) });
     const boom = fake({ counting: wholeFile(() => { throw new Error('boom'); }) });
 
-    await expect(count(boom)).rejects.toThrow('boom');
+    expect((await count(boom)).unreadable).toEqual(['claude-code:a.txt']);
     await count(ok);
     expect(parse).toHaveBeenCalledTimes(1);   // the failed scan left nothing behind
   });
