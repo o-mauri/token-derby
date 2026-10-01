@@ -30,6 +30,8 @@ export function renderMarket(root: HTMLElement, route: MarketRoute, deps: Market
   const replacePath = deps.replacePath ?? ((path: string) => history.replaceState(null, '', href(path)));
 
   let disposed = false;
+  let stopped = false;
+  let moved = false;
   let innerDispose: (() => void) | null = null;
   let timer: ReturnType<typeof setTimeout> | null = null;
   // Polling pauses while a chart is open, so a refresh can't pull it away mid-hover.
@@ -37,7 +39,10 @@ export function renderMarket(root: HTMLElement, route: MarketRoute, deps: Market
 
   const clearInner = () => { innerDispose?.(); innerDispose = null; };
   const showLoader = () => { clearInner(); root.replaceChildren(createLoader(root.ownerDocument)); };
-  const stopPolling = () => { if (timer) clearTimeout(timer); timer = null; disposed = true; };
+  const stopPolling = () => { if (timer) clearTimeout(timer); timer = null; stopped = true; };
+  const gone = () => disposed || stopped;
+  // A poll that was in flight when a chart opened must not draw over it.
+  const stale = () => gone() || detailOpen;
 
   // Which org and race this board shows, resolved once and reused by every poll.
   let orgKey = route.type === 'org' || route.type === 'race' ? route.orgName : '';
@@ -49,7 +54,7 @@ export function renderMarket(root: HTMLElement, route: MarketRoute, deps: Market
     try {
       ({ org_name: orgName, races } = await fetchOrgRaces(orgKey));
     } catch (e) {
-      if (disposed) return;
+      if (stale()) return;
       clearInner();
       if (e instanceof SiteApiError && e.status === 404) {
         if (joinCode) { await moveRaceToItsOrg(); return; }
@@ -60,7 +65,7 @@ export function renderMarket(root: HTMLElement, route: MarketRoute, deps: Market
       renderLoadError(root);
       return;
     }
-    if (disposed) return;
+    if (stale()) return;
 
     if (joinCode && !races.some((r) => r.join_code === joinCode)) { await moveRaceToItsOrg(); return; }
     const next = nextPendingRace(races, Date.now());
@@ -71,8 +76,8 @@ export function renderMarket(root: HTMLElement, route: MarketRoute, deps: Market
 
     let race;
     try { race = await fetchRace(pick.join_code); }
-    catch { if (!disposed) { clearInner(); renderLoadError(root); } return; }
-    if (disposed) return;
+    catch { if (!stale()) { clearInner(); renderLoadError(root); } return; }
+    if (stale()) return;
 
     // Scored, not raw: the prices beside them are priced on scored tokens too.
     const horses = race.horses.map((h) => ({
@@ -89,8 +94,8 @@ export function renderMarket(root: HTMLElement, route: MarketRoute, deps: Market
       showLoader();
       let history;
       try { ({ history } = await api.getMarketHistory(pick.join_code)); }
-      catch { if (!disposed) { clearInner(); renderLoadError(root); } return; }
-      if (disposed) return;
+      catch { detailOpen = false; if (!gone()) { clearInner(); renderLoadError(root); } return; }
+      if (gone()) return;
       const showChart = (): void => {
         clearInner();
         innerDispose = renderPriceChart(root, {
@@ -121,8 +126,8 @@ export function renderMarket(root: HTMLElement, route: MarketRoute, deps: Market
     if (race.status === 'live') {
       let markets;
       try { markets = await api.getMarkets(pick.join_code); }
-      catch { if (!disposed) { clearInner(); renderLoadError(root); } return; }
-      if (disposed) return;
+      catch { if (!stale()) { clearInner(); renderLoadError(root); } return; }
+      if (stale()) return;
       if (!markets.open) {
         clearInner();
         innerDispose = renderMarketNotOpen(root, { raceName: race.name, opensInSeconds: markets.opens_in_seconds ?? 0 });
@@ -140,8 +145,8 @@ export function renderMarket(root: HTMLElement, route: MarketRoute, deps: Market
     if (race.status === 'finished') {
       let history;
       try { ({ history } = await api.getMarketHistory(pick.join_code)); }
-      catch { if (!disposed) { clearInner(); renderLoadError(root); } return; }
-      if (disposed) return;
+      catch { if (!stale()) { clearInner(); renderLoadError(root); } return; }
+      if (stale()) return;
       const last = history[history.length - 1];
       clearInner();
       if (!last) { renderNoMarketData(root, { raceName: race.name }); return; }
@@ -163,10 +168,20 @@ export function renderMarket(root: HTMLElement, route: MarketRoute, deps: Market
 
   // A join code under the wrong org: follow the race to the org it belongs to.
   const moveRaceToItsOrg = async (): Promise<void> => {
+    const notFound = () => { clearInner(); renderMarketNotFound(root, null, href); stopPolling(); };
+    if (moved) { notFound(); return; }
     let race;
-    try { race = await fetchRace(joinCode!); } catch { race = null; }
-    if (disposed) return;
-    if (!race?.organisation_name) { clearInner(); renderMarketNotFound(root, null, href); stopPolling(); return; }
+    try { race = await fetchRace(joinCode!); }
+    catch (e) {
+      if (stale()) return;
+      if (e instanceof SiteApiError && e.status === 404) { notFound(); return; }
+      clearInner();
+      renderLoadError(root);
+      return;
+    }
+    if (stale()) return;
+    if (!race.organisation_name) { notFound(); return; }
+    moved = true;
     orgKey = race.organisation_name;
     orgName = orgKey;
     replacePath(`/${encodeURIComponent(orgName)}/${joinCode}`);
@@ -174,9 +189,9 @@ export function renderMarket(root: HTMLElement, route: MarketRoute, deps: Market
   };
 
   const poll = async (): Promise<void> => {
-    if (disposed) return;
+    if (gone()) return;
     if (!detailOpen) await loadBoard();
-    if (!disposed) timer = setTimeout(() => void poll(), POLL_INTERVAL_MS);
+    if (!gone()) timer = setTimeout(() => void poll(), POLL_INTERVAL_MS);
   };
 
   const showPicker = async (): Promise<void> => {

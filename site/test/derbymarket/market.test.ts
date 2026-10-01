@@ -119,6 +119,117 @@ describe('renderMarket — one race', () => {
   });
 });
 
+describe('renderMarket — wrong-org and recovery', () => {
+  const home = () => ({
+    '/api/organisations/acme/races': () => json({ org_name: 'Acme', races: [] }),
+    '/api/races/Q79KSH': () => json(raceView('live')),
+  });
+
+  it('moves once, then shows not-found if the real org still lacks the code', async () => {
+    const replacePath = vi.fn();
+    stubFetch({ ...home(), '/api/organisations/StackOne/races': () => json({ org_name: 'StackOne', races: [] }) });
+    const root = document.createElement('div');
+    const dispose = renderMarket(root, { type: 'race', orgName: 'acme', joinCode: 'Q79KSH' },
+      { replacePath, hostname: 'market.tokenderby.co.uk' });
+    await vi.advanceTimersByTimeAsync(0);
+    const calls = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls.length;
+    await vi.advanceTimersByTimeAsync(120_000);
+    expect(replacePath).toHaveBeenCalledTimes(1);
+    expect(calls).toBeLessThanOrEqual(5);
+    expect((fetch as unknown as ReturnType<typeof vi.fn>).mock.calls.length).toBe(calls);
+    expect(root.textContent).toContain('There is nothing here.');
+    dispose();
+  });
+
+  it('shows not-found when the race names no organisation', async () => {
+    stubFetch({ ...home(), '/api/races/Q79KSH': () => json({ ...raceView('live'), organisation_name: undefined }) });
+    const root = document.createElement('div');
+    const dispose = renderMarket(root, { type: 'race', orgName: 'acme', joinCode: 'Q79KSH' },
+      { replacePath: vi.fn(), hostname: 'market.tokenderby.co.uk' });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(root.querySelector('.dm-empty')).not.toBeNull();
+    expect(root.querySelector('.loader')).toBeNull();
+    dispose();
+  });
+
+  it('keeps polling after a transient failure looking up the race', async () => {
+    let fail = true;
+    stubFetch({
+      ...home(),
+      '/api/races/Q79KSH': () => (fail ? json({ code: 'X', message: 'boom' }, 500) : json(raceView('live'))),
+      '/api/organisations/StackOne/races': () => json({ org_name: 'StackOne', races: [live] }),
+      '/api/races/Q79KSH/markets': () => json({ open: true, snapshot, horses: [] }),
+    });
+    const root = document.createElement('div');
+    const dispose = renderMarket(root, { type: 'race', orgName: 'acme', joinCode: 'Q79KSH' },
+      { replacePath: vi.fn(), hostname: 'market.tokenderby.co.uk' });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(root.querySelector('.dm-row')).toBeNull();
+    fail = false;
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(root.querySelector('.dm-row')).not.toBeNull();
+    dispose();
+  });
+});
+
+describe('renderMarket — chart and polling', () => {
+  const board = (extra: Routes = {}) => ({
+    '/api/organisations/stackone/races': () => json({ org_name: 'StackOne', races: [live] }),
+    '/api/races/Q79KSH': () => json(raceView('live')),
+    '/api/races/Q79KSH/markets': () => json({ open: true, snapshot, horses: [] }),
+    ...extra,
+  });
+  const fetchCount = () => (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls.length;
+
+  it('brings the board back after a failed history load', async () => {
+    stubFetch(board({ '/api/races/Q79KSH/markets/history': () => json({ code: 'X', message: 'no' }, 500) }));
+    const root = document.createElement('div');
+    const dispose = renderMarket(root, { type: 'org', orgName: 'stackone' });
+    await vi.advanceTimersByTimeAsync(0);
+    root.querySelector<HTMLButtonElement>('.dm-row')!.click();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(root.querySelector('.dm-row')).toBeNull();
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(root.querySelector('.dm-row')).not.toBeNull();
+    dispose();
+  });
+
+  it('pauses polling while a chart is open and resumes after Back', async () => {
+    stubFetch(board({ '/api/races/Q79KSH/markets/history': () => json({ history: [snapshot] }) }));
+    const root = document.createElement('div');
+    const dispose = renderMarket(root, { type: 'org', orgName: 'stackone' });
+    await vi.advanceTimersByTimeAsync(0);
+    root.querySelector<HTMLButtonElement>('.dm-row')!.click();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(root.querySelector('.dm-pc')).not.toBeNull();
+    const before = fetchCount();
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(fetchCount()).toBe(before);
+    expect(root.querySelector('.dm-pc')).not.toBeNull();
+    root.querySelector<HTMLButtonElement>('.dm-pc-back')!.click();
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(fetchCount()).toBeGreaterThan(before);
+    expect(root.querySelector('.dm-row')).not.toBeNull();
+    dispose();
+  });
+
+  it('renders nothing after dispose when a pending fetch resolves', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => { release = r; });
+    stubFetch(board({
+      '/api/organisations/stackone/races': async () => { await gate; return json({ org_name: 'StackOne', races: [live] }); },
+    }));
+    const root = document.createElement('div');
+    const dispose = renderMarket(root, { type: 'org', orgName: 'stackone' });
+    await vi.advanceTimersByTimeAsync(0);
+    const html = root.innerHTML;
+    dispose();
+    release();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(root.innerHTML).toBe(html);
+  });
+});
+
 describe('renderMarket — picker', () => {
   it('shows the signed-out picker without a session', async () => {
     stubFetch({});
