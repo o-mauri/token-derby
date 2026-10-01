@@ -14,6 +14,7 @@ const renderRace = vi.fn((_root: HTMLElement, _joinCode: string) => raceCleanup)
 vi.mock('../src/render/race.js', () => ({ renderRace: (root: HTMLElement, code: string) => renderRace(root, code) }));
 
 import { renderOrgLive, pickLiveOrLastRace } from '../src/render/org-live.js';
+import { ApiError } from '../src/api.js';
 
 function race(over: Partial<RaceSummary>): RaceSummary {
   return {
@@ -143,6 +144,16 @@ describe('renderOrgLive', () => {
     const cleanup = renderOrgLive(root, 'Acme');
     await flush();
     expect(root.querySelector('.loader')).not.toBeNull();
+    cleanup();
+  });
+
+  it('shows the not-found page for an unknown org', async () => {
+    fetchOrgRaces.mockRejectedValue(new ApiError('ORG_NOT_FOUND', 'nope', 404));
+    const cleanup = renderOrgLive(root, 'acme');
+    await flush();
+    expect(root.querySelector('.loader')).toBeNull();
+    expect(root.querySelector('.not-found h2')?.textContent).toBe('Organisation not found');
+    expect(root.querySelector('.not-found p')?.textContent).toBe('No organisation named acme.');
     cleanup();
   });
 

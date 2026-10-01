@@ -41,3 +41,19 @@ Any new site page or view that waits on data before it can render must show
   and respects `prefers-reduced-motion`.
 - Add a test that the loader shows before the data resolves and is gone after,
   like `site/test/race-loader.test.ts`. Check the result at `/preview-loader`.
+
+## Missing resources use `createNotFound` — never a bare message
+
+When a site page can't find what it was asked for (an unknown race, org, or any
+other resource, or an unknown route), render `createNotFound(doc, { title,
+message, back })` from `site/src/render/not-found.ts`. Don't hand-write a
+"not found" paragraph or a one-off error section.
+
+- Pass the typed value as `{ strong: value }` in `message`. It's rendered as
+  text, so don't escape it yourself and never build the message as HTML.
+- Always give it a `back` link. It navigates in-app the same way the header Home
+  buttons do.
+- Place it in the page's main flex column, the same way as the loader. It centres
+  itself.
+- Add a test that the not-found error renders it, like
+  `site/test/race-not-found.test.ts`. Check the result at `/preview-not-found`.

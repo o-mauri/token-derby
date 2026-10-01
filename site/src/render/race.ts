@@ -12,6 +12,7 @@ import { applyCheerJitter, crowdColumns, syncSpectators } from './crowd.js';
 import { createRaceGraphs } from './race-graphs.js';
 import { createThemePicker } from './theme-picker.js';
 import { createLoader } from './loader.js';
+import { createNotFound } from './not-found.js';
 
 const POLL_INTERVAL_MS = 60_000;
 const TIMER_TICK_MS = 1_000;
@@ -240,12 +241,11 @@ export function renderRace(root: HTMLElement, joinCode: string, opts: RenderRace
 
   const onError = (err: unknown) => {
     if (err instanceof ApiError && err.code === 'RACE_NOT_FOUND') {
-      root.innerHTML = `
-        <section class="error">
-          <h2>Race not found</h2>
-          <p>No race with code <b>${joinCode}</b>. <a href="/">Try another code.</a></p>
-        </section>
-      `;
+      root.replaceChildren(createNotFound(root.ownerDocument, {
+        title: 'Race not found',
+        message: ['No race with code ', { strong: joinCode }, '.'],
+        back: { label: '← Home', href: '/' },
+      }));
       ctrl.abort();
     }
   };

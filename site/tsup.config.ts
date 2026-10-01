@@ -13,6 +13,7 @@ export default defineConfig({
     'preview-league': 'src/preview-league.ts',
     'preview-toasts': 'src/preview-toasts.ts',
     'preview-loader': 'src/preview-loader.ts',
+    'preview-not-found': 'src/preview-not-found.ts',
   },
   format: ['esm'],
   target: 'es2022',

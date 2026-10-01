@@ -10,6 +10,7 @@ import { renderOrgManager } from './org-manager/index.js';
 import { renderCliApprove } from './render/cli-approve.js';
 import { renderLinkGoogle } from './render/link-google.js';
 import { initTheme } from './theme.js';
+import { createNotFound } from './render/not-found.js';
 
 // Legendary hat keyframes are installed lazily on the first buildHatGroup
 // call (see hat-svg.ts), so every entry point — main.ts, preview-race.ts,
@@ -48,12 +49,11 @@ function route() {
   } else if (r.type === 'link') {
     activeCleanup = renderLinkGoogle(root);
   } else {
-    root.innerHTML = `
-      <section class="error">
-        <h2>Page not found</h2>
-        <p><a href="/">Back to home</a></p>
-      </section>
-    `;
+    root.replaceChildren(createNotFound(document, {
+      title: 'Page not found',
+      message: ["There's nothing at this address."],
+      back: { label: '← Home', href: '/' },
+    }));
   }
 }
 
