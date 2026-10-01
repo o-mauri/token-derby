@@ -7,7 +7,7 @@ import { renderCatalog } from './render/catalog.js';
 import { renderAbout } from './render/about.js';
 import { renderPrivacy } from './render/privacy.js';
 import { renderOrgManager } from './org-manager/index.js';
-import { renderDerbyMarket } from './derbymarket/index.js';
+import { derbymarketRedirect } from './market/host.js';
 import { renderCliApprove } from './render/cli-approve.js';
 import { renderLinkGoogle } from './render/link-google.js';
 import { initTheme } from './theme.js';
@@ -27,7 +27,7 @@ function route() {
 
   if (activeCleanup) { activeCleanup(); activeCleanup = null; }
 
-  const r = parseRoute(window.location.pathname);
+  const r = parseRoute(window.location.pathname, window.location.hostname, window.location.search);
   if (r.type === 'home') {
     renderHome(root);
   } else if (r.type === 'race') {
@@ -45,7 +45,8 @@ function route() {
   } else if (r.type === 'org-manager') {
     activeCleanup = renderOrgManager(root);
   } else if (r.type === 'derbymarket') {
-    activeCleanup = renderDerbyMarket(root);
+    // Older CLIs open app…/derbymarket#code=…; the market lives on its own host now.
+    window.location.replace(derbymarketRedirect(window.location.hostname, window.location.hash));
   } else if (r.type === 'cli') {
     activeCleanup = renderCliApprove(root);
   } else if (r.type === 'link') {

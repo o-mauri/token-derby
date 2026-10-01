@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { parseRoute } from '../src/route.js';
+import { parseRoute, parseMarketRoute } from '../src/route.js';
+import { derbymarketRedirect } from '../src/market/host.js';
 
 describe('parseRoute', () => {
   it('maps "/" to home', () => {
@@ -82,5 +83,29 @@ describe('parseRoute', () => {
 
   it('strips a trailing slash from /privacy', () => {
     expect(parseRoute('/privacy/')).toEqual({ type: 'privacy' });
+  });
+});
+
+describe('parseRoute on the market host', () => {
+  const m = (path: string) => parseRoute(path, 'market.tokenderby.co.uk', '');
+  it('routes the root to the picker', () => {
+    expect(m('/')).toEqual({ type: 'market', market: { type: 'picker' } });
+  });
+  it('routes an org name', () => {
+    expect(m('/stackone')).toEqual({ type: 'market', market: { type: 'org', orgName: 'stackone' } });
+  });
+  it('routes an org and join code, upper-casing the code', () => {
+    expect(m('/StackOne/q79ksh')).toEqual({ type: 'market', market: { type: 'race', orgName: 'StackOne', joinCode: 'Q79KSH' } });
+  });
+  it('treats anything else as not found', () => {
+    expect(m('/a/b/c')).toEqual({ type: 'market', market: { type: 'not-found' } });
+    expect(parseMarketRoute('/way-too-long-org-name')).toEqual({ type: 'not-found' });
+  });
+  it('leaves app routing alone off the market host', () => {
+    expect(parseRoute('/org/stackone')).toEqual({ type: 'org', orgName: 'stackone' });
+    expect(parseRoute('/derbymarket', 'app.tokenderby.co.uk', '')).toEqual({ type: 'derbymarket' });
+  });
+  it('carries the sign-in code to the market host', () => {
+    expect(derbymarketRedirect('app.tokenderby.co.uk', '#code=ABC')).toBe('https://market.tokenderby.co.uk/#code=ABC');
   });
 });

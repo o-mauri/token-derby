@@ -1,3 +1,5 @@
+import { isMarketHost } from './market/host.js';
+
 export type Route =
   | { type: 'home' }
   | { type: 'race'; joinCode: string }
@@ -8,11 +10,29 @@ export type Route =
   | { type: 'privacy' }
   | { type: 'org-manager' }
   | { type: 'derbymarket' }
+  | { type: 'market'; market: MarketRoute }
   | { type: 'cli' }
   | { type: 'link' }
   | { type: 'not-found' };
 
-export function parseRoute(pathname: string): Route {
+export type MarketRoute =
+  | { type: 'picker' }
+  | { type: 'org'; orgName: string }
+  | { type: 'race'; orgName: string; joinCode: string }
+  | { type: 'not-found' };
+
+export function parseMarketRoute(pathname: string): MarketRoute {
+  const trimmed = pathname.replace(/\/+$/, '');
+  if (trimmed === '') return { type: 'picker' };
+  const m = trimmed.match(/^\/([A-Za-z0-9]{1,12})(?:\/([A-Za-z0-9]+))?$/);
+  if (!m) return { type: 'not-found' };
+  return m[2]
+    ? { type: 'race', orgName: m[1]!, joinCode: m[2].toUpperCase() }
+    : { type: 'org', orgName: m[1]! };
+}
+
+export function parseRoute(pathname: string, hostname = '', search = ''): Route {
+  if (isMarketHost(hostname, search)) return { type: 'market', market: parseMarketRoute(pathname) };
   const trimmed = pathname.replace(/\/+$/, '');
   if (trimmed === '' || trimmed === '/') return { type: 'home' };
 
