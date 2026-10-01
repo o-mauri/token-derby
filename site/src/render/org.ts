@@ -6,6 +6,7 @@ import { buildHorseSvg } from '../sprite-svg.js';
 import { buildHatGroup } from '../hat-svg.js';
 import { renderLeagueStandings } from './league-standings.js';
 import { createLoader } from './loader.js';
+import { createNotFound, type NotFoundOptions } from './not-found.js';
 import {
   formatDuration,
   predictTimeLeftSeconds,
@@ -14,6 +15,15 @@ import {
 } from '../time.js';
 
 const TIMER_TICK_MS = 1000;
+
+// Shared by the org page and the org live view, which both look orgs up by name.
+export function orgNotFound(orgName: string): NotFoundOptions {
+  return {
+    title: 'Organisation not found',
+    message: ['No organisation named ', { strong: orgName }, '.'],
+    back: { label: '← Home', href: '/' },
+  };
+}
 
 export function renderOrg(root: HTMLElement, orgName: string): () => void {
   root.innerHTML = '';
@@ -67,7 +77,7 @@ export function renderOrg(root: HTMLElement, orgName: string): () => void {
   }).catch((err: unknown) => {
     if (ctrl.signal.aborted) return;
     if (err instanceof ApiError && err.code === 'ORG_NOT_FOUND') {
-      body.innerHTML = `<p class="org-status">No organisation named <b>${escapeHtml(orgName)}</b>.</p>`;
+      body.replaceChildren(createNotFound(doc, orgNotFound(orgName)));
       return;
     }
     body.innerHTML = `<p class="org-status">Couldn't load races. Try again later.</p>`;
@@ -274,10 +284,4 @@ function formatStart(r: RaceSummary): string {
   return d.toLocaleString(undefined, {
     month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
   });
-}
-
-function escapeHtml(s: string): string {
-  return s.replace(/[&<>"']/g, (c) => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
-  }[c]!));
 }

@@ -2,6 +2,8 @@ import type { RaceSummary } from '@token-derby/shared';
 import { fetchOrgRaces, ApiError } from '../api.js';
 import { renderRace } from './race.js';
 import { createLoader } from './loader.js';
+import { createNotFound } from './not-found.js';
+import { orgNotFound } from './org.js';
 
 // How often we re-resolve which race the TV should be showing. The embedded
 // race view does its own data polling; this loop only watches for the *pick*
@@ -25,7 +27,7 @@ export function renderOrgLive(root: HTMLElement, orgName: string): () => void {
     } catch (err: unknown) {
       if (disposed || shownJoinCode) return; // keep the current race on transient errors
       if (err instanceof ApiError && err.code === 'ORG_NOT_FOUND') {
-        root.innerHTML = `<p class="org-status">No organisation named <b>${escapeHtml(orgName)}</b>.</p>`;
+        root.replaceChildren(createNotFound(root.ownerDocument, orgNotFound(orgName)));
       } else {
         root.innerHTML = `<p class="org-status">Couldn't load races. Retrying…</p>`;
       }

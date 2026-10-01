@@ -215,12 +215,15 @@ describe('renderOrg', () => {
     cleanup();
   });
 
-  it('replaces the loader with the not-found message, naming what was typed', async () => {
+  it('replaces the loader with the not-found page, naming what was typed', async () => {
     fetchOrgRaces.mockRejectedValue(new ApiError('ORG_NOT_FOUND', 'nope', 404));
     const cleanup = renderOrg(root, 'acme');
     await flush();
     expect(root.querySelector('.loader')).toBeNull();
-    expect(root.querySelector('.org-status')?.textContent).toContain('No organisation named acme');
+    const nf = root.querySelector('.org-body > .not-found')!;
+    expect(nf.querySelector('h2')?.textContent).toBe('Organisation not found');
+    expect(nf.querySelector('p')?.textContent).toBe('No organisation named acme.');
+    expect(nf.querySelector('a.btn')?.getAttribute('href')).toBe('/');
     cleanup();
   });
 

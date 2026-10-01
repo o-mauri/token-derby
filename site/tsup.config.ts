@@ -15,6 +15,7 @@ export default defineConfig({
     'preview-toasts': 'src/preview-toasts.ts',
     'preview-loader': 'src/preview-loader.ts',
     'preview-market': 'src/preview-market.ts',
+    'preview-not-found': 'src/preview-not-found.ts',
   },
   format: ['esm'],
   target: 'es2022',

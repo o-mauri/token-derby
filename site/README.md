@@ -46,6 +46,19 @@ The market is served on `market.tokenderby.co.uk` by host. Locally, add
 `?host=market` to any path to get market routing. `/preview-market` shows every
 market view with fixtures.
 
+## Not-found state
+
+A missing race (`RACE_NOT_FOUND`), a missing org (`ORG_NOT_FOUND`, on both org
+views) and any unknown route show `createNotFound` from `src/render/not-found.ts`.
+It's the loader's porthole, frozen: a lost horse with a "?" thought bubble, ringed
+in the theme's `--accent`, with a title, a message and a back button. The message
+takes text parts, where `{ strong }` marks the typed value. Parts are always
+rendered as text, never as markup. It centres itself in whatever flex column it's
+placed in.
+
+Preview it without an API at `/preview-not-found?page=race`, `?page=org`, or with
+no query for the unknown-route page.
+
 ## Local dev
 
 ```bash
