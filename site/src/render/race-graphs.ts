@@ -1,5 +1,6 @@
 import type { GetRaceResponse, GetRaceSeriesResponse, HorseView } from '@token-derby/shared';
 import { fetchRaceSeries } from '../api.js';
+import { createLoader } from './loader.js';
 import { buildChartFaces, LINE_PALETTE, type Mode } from './race-chart.js';
 
 const TAB_LABELS: ReadonlyArray<{ mode: Mode; label: string }> = [
@@ -130,7 +131,12 @@ export function createRaceGraphs(opts: Opts): RaceGraphs {
   function render(): void {
     if (!dialog) return;
     if (failed) { showMessage("Couldn't load the graphs — retrying shortly."); return; }
-    if (!snapshot || !cached) { showMessage('Loading…'); return; }
+    if (!snapshot || !cached) {
+      // Kept across re-renders so a poll mid-load doesn't restart its fade-in.
+      const body = dialog.querySelector<HTMLElement>('.race-graphs-body')!;
+      if (!body.firstElementChild?.classList.contains('loader')) body.replaceChildren(createLoader(doc));
+      return;
+    }
     const horses = visibleHorses();
     if (horses.length === 0) { showMessage('No data for this division yet.'); return; }
     const colours = colourMap(snapshot.horses);   // colours stay stable across filters
@@ -202,6 +208,7 @@ export function createRaceGraphs(opts: Opts): RaceGraphs {
     (button.parentElement?.closest('.race') ?? doc.body).appendChild(dialog);
     renderTabs();
     renderDivisions();
+    render(); // loader until the first series arrives
     void load();
   }
 

@@ -233,11 +233,29 @@ describe('race graphs popup', () => {
     g.destroy();
   });
 
-  it('shows a loading message when opened before the first snapshot', async () => {
-    const { g } = setup();
+  it('shows the loader when opened before the first snapshot', async () => {
+    const { g, fetchSeries } = setup();
     g.button.click();                    // no onSnapshot yet — snapshot stays null
-    await vi.waitFor(() => expect(document.querySelector('.race-graphs-empty')).toBeTruthy());
-    expect(document.querySelector('.race-graphs-empty')!.textContent).toContain('Loading…');
+    await vi.waitFor(() => expect(fetchSeries).toHaveBeenCalled());
+    expect(document.querySelector('.race-graphs-body > .loader')).toBeTruthy();
+    expect(document.querySelector('.race-graphs-empty')).toBeNull();
+    g.destroy();
+  });
+
+  it('shows the loader while the series loads, then swaps in the charts', async () => {
+    let resolve!: (s: GetRaceSeriesResponse) => void;
+    const { g } = setup({ fetchSeries: vi.fn(() => new Promise<GetRaceSeriesResponse>((r) => { resolve = r; })) });
+    g.onSnapshot(race());
+    g.button.click();
+    const loader = document.querySelector('.race-graphs-body > .loader');
+    expect(loader).toBeTruthy();
+    // Switching tab mid-load re-renders, but keeps the same loader (no restarted fade).
+    document.querySelector<HTMLButtonElement>('.race-graphs-tab[aria-selected="false"]')!.click();
+    expect(document.querySelector('.race-graphs-body > .loader')).toBe(loader);
+
+    resolve(series);
+    await vi.waitFor(() => expect(document.querySelector('.race-graphs-body .chart-face')).toBeTruthy());
+    expect(document.querySelector('.race-graphs-body .loader')).toBeNull();
     g.destroy();
   });
 
