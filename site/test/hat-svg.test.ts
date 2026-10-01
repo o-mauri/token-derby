@@ -1,14 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import { Window } from 'happy-dom';
-import { buildHatGroup, buildLegendaryKeyframes } from '../src/hat-svg.js';
-import { hatById, HATS } from '@token-derby/shared';
+import { buildHatGroup, buildAnimatedKeyframes } from '../src/hat-svg.js';
+import { hatById, HATS, isAnimatedHat } from '@token-derby/shared';
 
 describe('buildHatGroup', () => {
   it('produces a <g class="horse-hat horse-hat-{id}"> with the right number of rects', () => {
     const window = new Window();
     const doc = window.document as unknown as Document;
     const hat = hatById('flat_cap')!;
-    if (hat.rarity === 'legendary') throw new Error('test misconfigured');
+    if (isAnimatedHat(hat)) throw new Error('test misconfigured');
     const g = buildHatGroup(doc, hat, 0);
     expect(g.tagName.toLowerCase()).toBe('g');
     expect(g.getAttribute('class')).toBe('horse-hat horse-hat-flat_cap');
@@ -21,7 +21,7 @@ describe('buildHatGroup', () => {
     const window = new Window();
     const doc = window.document as unknown as Document;
     const hat = hatById('flat_cap')!;
-    if (hat.rarity === 'legendary') throw new Error('test misconfigured');
+    if (isAnimatedHat(hat)) throw new Error('test misconfigured');
     const g = buildHatGroup(doc, hat, 0);
     let maxY = -Infinity;
     g.querySelectorAll('rect').forEach(r => { maxY = Math.max(maxY, parseFloat(r.getAttribute('y')!)); });
@@ -32,7 +32,7 @@ describe('buildHatGroup', () => {
     const window = new Window();
     const doc = window.document as unknown as Document;
     const hat = hatById('flat_cap')!;
-    if (hat.rarity === 'legendary') throw new Error('test misconfigured');
+    if (isAnimatedHat(hat)) throw new Error('test misconfigured');
     const v0 = hat.variants[0]!;
     const g = buildHatGroup(doc, hat, 0);
     const firstARect = Array.from(g.querySelectorAll('rect')).find(r => r.getAttribute('class') === 'hat-a');
@@ -49,9 +49,9 @@ describe('buildHatGroup', () => {
   });
 });
 
-describe('buildLegendaryKeyframes', () => {
+describe('buildAnimatedKeyframes', () => {
   it('emits @keyframes for every legendary hat', () => {
-    const css = buildLegendaryKeyframes();
+    const css = buildAnimatedKeyframes();
     for (const hat of HATS.filter(h => h.rarity === 'legendary')) {
       expect(css).toContain(`@keyframes anim-${hat.id}`);
       expect(css).toContain(`.horse-hat-${hat.id} .hat-a`);

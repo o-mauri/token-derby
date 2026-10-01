@@ -1,14 +1,14 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { handler as hbHandler } from '../../src/handlers/heartbeat.js';
 import { handler as createHandler } from '../../src/handlers/create-race.js';
 import { handler as joinHandler } from '../../src/handlers/join-race.js';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { listHorses } from '../../src/db/horses.js';
 import { ddb, TABLE } from '../../src/db/client.js';
-import { raceMetaKey } from '../../src/db/keys.js';
+import { raceMetaKey, horseKey } from '../../src/db/keys.js';
 import { UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { makeUser, makeHorse, type TestUser } from '../helpers/auth-helper.js';
-import type { ModelKey } from '@token-derby/shared';
+import { staminaOf } from '@token-derby/shared';
 import { CURRENT_CLI_VERSION, SAME_MINOR_CLI_VERSION, MISMATCHED_MINOR_CLI_VERSION, OUTDATED_CLI_VERSION } from '../helpers/cli-version.js';
 
 const COLORS = { body: '#8B4513', mane: '#000', tail: '#000', saddle: '#C0392B' };
@@ -49,17 +49,26 @@ async function setup(cliVersion = CURRENT_CLI_VERSION) {
   return { join_code, race_id, horse_id, heartbeat_token };
 }
 
-/** Like setup() but stamps race-level toggles (e.g. stamina) onto the race row. */
+/**
+ * Like setup() but switches mechanics on for the race.
+ *
+ * `legacy` writes the pre-`modifiers` flag instead, so the path a race created
+ * before the settings map takes is covered by the same tests.
+ */
 async function setupLiveRaceWithHorse(
-  opts: { stamina?: boolean } = {},
+  opts: { stamina?: boolean; legacy?: boolean } = {},
 ): Promise<{ join_code: string; race_id: string; horse_id: string; token: string }> {
   const { join_code, race_id, horse_id, heartbeat_token } = await setup();
   if (opts.stamina) {
     await ddb.send(new UpdateCommand({
       TableName: TABLE,
       Key: raceMetaKey(race_id),
-      UpdateExpression: 'SET stamina = :s',
-      ExpressionAttributeValues: { ':s': true },
+      ...(opts.legacy
+        ? { UpdateExpression: 'SET stamina = :s', ExpressionAttributeValues: { ':s': true } }
+        : {
+            UpdateExpression: 'SET modifiers = :m',
+            ExpressionAttributeValues: { ':m': { stamina: { enabled: true } } },
+          }),
     }));
   }
   return { join_code, race_id, horse_id, token: heartbeat_token };
@@ -81,8 +90,8 @@ async function heartbeat(opts: {
   return JSON.parse(res.body);
 }
 
-/** Like setup() but locks a specific primary_model at join time. */
-async function setupWithPrimary(primary_model: ModelKey | undefined, cliVersion = CURRENT_CLI_VERSION) {
+/** Like setup() but lets a test pin the CLI version sent at join time. */
+async function setupWithCliVersion(cliVersion = CURRENT_CLI_VERSION) {
   const user = await makeUser('HB_PM_User');
   const horse = await makeHorse(user, 'HB_PM_Gary', COLORS);
   const createRes: any = await createHandler({
@@ -98,7 +107,6 @@ async function setupWithPrimary(primary_model: ModelKey | undefined, cliVersion 
   });
   const { join_code, race_id } = JSON.parse(createRes.body);
   const joinBody: Record<string, unknown> = { stable_horse_id: horse.stable_horse_id };
-  if (primary_model !== undefined) joinBody.primary_model = primary_model;
   const joinRes: any = await joinHandler({
     version: '2.0', routeKey: 'POST /races/{join_code}/join', rawPath: `/races/${join_code}/join`, rawQueryString: '',
     pathParameters: { join_code },
@@ -134,8 +142,7 @@ function hbEvent(
 }
 
 describe('heartbeat handler', () => {
-  beforeEach(() => { process.env.TOKEN_DERBY_MAX_RATE = '1000000000'; });
-  afterEach(() => { delete process.env.TOKEN_DERBY_MAX_RATE; vi.useRealTimers(); });
+  afterEach(() => { vi.useRealTimers(); });
 
   it('accumulates applied deltas onto current_tokens and returns last_seq', async () => {
     const { join_code, race_id, horse_id, heartbeat_token } = await setup();
@@ -164,6 +171,43 @@ describe('heartbeat handler', () => {
     const pts = await listSeriesPoints(race_id, horse_id);
     expect(pts).toHaveLength(1);
     expect(pts[0]?.d).toBe(750);
+  });
+
+  it('leaves the scored delta off a point no mechanic changed', async () => {
+    const { join_code, race_id, horse_id, heartbeat_token } = await setup();
+    await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { seq: 1, delta: 750 }));
+    const { listSeriesPoints } = await import('../../src/db/series.js');
+    const pts = await listSeriesPoints(race_id, horse_id);
+    // Repeating `d` on every point of every race that runs no mechanics would
+    // be pure storage; absent reads as "unmodified", which it is.
+    expect(pts[0]?.s).toBeUndefined();
+  });
+
+  it('records the scored delta on a point a mechanic changed', async () => {
+    const { join_code, race_id, horse_id, token } = await setupLiveRaceWithHorse({ stamina: true });
+
+    vi.useFakeTimers();
+    // Flat out until the horse is well past the taper floor, so later beats
+    // score below face value and the graph must show the difference.
+    for (let seq = 1; seq <= 20; seq++) {
+      await heartbeat({ join_code, horse_id, token, seq, delta: 400_000, advanceMs: 60_000 });
+    }
+
+    const { listSeriesPoints } = await import('../../src/db/series.js');
+    const pts = await listSeriesPoints(race_id, horse_id);
+    const tapered = pts.filter(p => p.s !== undefined);
+    expect(tapered.length).toBeGreaterThan(0);
+    for (const p of tapered) {
+      expect(p.s!).toBeLessThan(p.d);
+      expect(p.d).toBe(400_000);
+    }
+
+    // The cumulative graph is drawn from these; it must land on the horse's own
+    // scored total rather than the raw one it would otherwise plot.
+    const [horse] = await listHorses(race_id);
+    const graphed = pts.reduce((sum, p) => sum + (p.s ?? p.d), 0);
+    expect(graphed).toBe(horse!.scored_tokens);
+    expect(graphed).toBeLessThan(horse!.current_tokens);
   });
 
   it('accumulates scored_tokens alongside current_tokens with no mechanics enabled', async () => {
@@ -381,8 +425,8 @@ describe('heartbeat handler', () => {
     // First heartbeat — initializes state.
     await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { seq: 1, delta: 100 }));
     await new Promise(r => setTimeout(r, 5));
-    // Second heartbeat with a big token jump should trigger Stampede! (delta >= 7000).
-    const res: any = await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { seq: 2, delta: 9900 }));
+    // Second heartbeat with a big token jump should trigger Stampede! (delta >= 70,000).
+    const res: any = await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { seq: 2, delta: 99_000 }));
     expect(res.statusCode).toBe(200);
     const body = JSON.parse(res.body);
     const own = body.horses.find((h: any) => h.horse_id === horse_id);
@@ -415,25 +459,98 @@ describe('heartbeat handler', () => {
     expect(JSON.parse(res.body).code).toBe('VERSION_MISMATCH');
   });
 
-  // --- multi-model weighting ---
+  // --- per-model components ---
 
-  it('weights components by the horse primary before the rate cap', async () => {
-    // Join with primary_model='codex'; rate cap disabled via TOKEN_DERBY_MAX_RATE=1B
-    const { join_code, race_id, horse_id, heartbeat_token } = await setupWithPrimary('codex');
-    // raw weighted = codex:5000*1 + claude:1000*0.5 + gemini:0*0.5 = 5500
+  it('counts every model at equal weight', async () => {
+    const { join_code, race_id, horse_id, heartbeat_token } = await setupWithCliVersion();
     const res: any = await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, {
       seq: 1,
-      components: { claude: 1000, codex: 5000, gemini: 0 },
+      components: { anthropic: 1000, openai: 5000, google: 200 },
     }));
     expect(res.statusCode).toBe(200);
     const horses = await listHorses(race_id);
     const own = horses.find(h => h.horse_id === horse_id);
-    expect(own?.current_tokens).toBe(5500);
+    expect(own?.current_tokens).toBe(6200);
   });
 
-  it('accepts a legacy bare delta (primary defaults to claude for legacy horses)', async () => {
-    // Join without primary_model; server defaults to 'claude'
-    const { join_code, race_id, horse_id, heartbeat_token } = await setupWithPrimary(undefined);
+  it('accumulates the per-model split, and it sums to current_tokens', async () => {
+    const { join_code, race_id, horse_id, heartbeat_token } = await setupWithCliVersion();
+    await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, {
+      seq: 1, components: { anthropic: 1000, openai: 5000, google: 200 },
+    }));
+    await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, {
+      seq: 2, components: { anthropic: 500, openai: 0, google: 300 },
+    }));
+    const horses = await listHorses(race_id);
+    const own = horses.find(h => h.horse_id === horse_id)!;
+    expect(own.model_tokens).toEqual({ anthropic: 1500, openai: 5000, google: 500 });
+    const summed = own.model_tokens!.anthropic + own.model_tokens!.openai + own.model_tokens!.google;
+    expect(summed).toBe(own.current_tokens);
+  });
+
+  it('reports the per-model split in the response, not one beat behind', async () => {
+    const { join_code, horse_id, heartbeat_token } = await setupWithCliVersion();
+    const res: any = await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, {
+      seq: 1, components: { anthropic: 300, openai: 200, google: 100 },
+    }));
+    const own = JSON.parse(res.body).horses.find((h: any) => h.horse_id === horse_id);
+    expect(own.model_tokens).toEqual({ anthropic: 300, openai: 200, google: 100 });
+    const summed = own.model_tokens.anthropic + own.model_tokens.openai + own.model_tokens.google;
+    expect(summed).toBe(own.current_tokens);
+  });
+
+  it('scores from the per-family split, not a zeroed placeholder', async () => {
+    // components is load-bearing now: a per-family modifier scores from it, so
+    // a beat whose split never reached the pipeline would score nothing.
+    const { join_code, race_id, horse_id, heartbeat_token } = await setupWithCliVersion();
+    await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, {
+      seq: 1, components: { anthropic: 700, openai: 300, google: 0 },
+    }));
+    const own = (await listHorses(race_id)).find(h => h.horse_id === horse_id)!;
+    expect(own.current_tokens).toBe(1000);
+    expect(own.scored_tokens).toBe(1000);   // no modifier active: untouched
+  });
+
+  it('accepts the component keys an un-upgraded CLI sends', async () => {
+    const { join_code, race_id, horse_id, heartbeat_token } = await setupWithCliVersion();
+    // Pre-rename CLIs key components by tool, not by model family.
+    const res: any = await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, {
+      seq: 1, components: { claude: 1000, codex: 500, gemini: 200 },
+    }));
+    expect(res.statusCode).toBe(200);
+    const own = (await listHorses(race_id)).find(h => h.horse_id === horse_id)!;
+    expect(own.current_tokens).toBe(1700);
+    expect(own.model_tokens).toEqual({ anthropic: 1000, openai: 500, google: 200 });
+  });
+
+  it('carries a pre-rename model_tokens map onto the family keys', async () => {
+    const { join_code, race_id, horse_id, heartbeat_token } = await setupWithCliVersion();
+    const { putHorse: _p } = await import('../../src/db/horses.js');
+    const { ddb, TABLE } = await import('../../src/db/client.js');
+    const { UpdateCommand } = await import('@aws-sdk/lib-dynamodb');
+    const { horseKey } = await import('../../src/db/keys.js');
+    // A horse mid-race when the rename deployed: map exists, wrong spelling.
+    await ddb.send(new UpdateCommand({
+      TableName: TABLE,
+      Key: horseKey(race_id, horse_id),
+      UpdateExpression: 'SET model_tokens = :old, current_tokens = :t, scored_tokens = :t',
+      ExpressionAttributeValues: { ':old': { claude: 700, codex: 300, gemini: 0 }, ':t': 1000 },
+    }));
+
+    await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, {
+      seq: 1, components: { anthropic: 100, openai: 0, google: 0 },
+    }));
+
+    const own = (await listHorses(race_id)).find(h => h.horse_id === horse_id)!;
+    // The old figures survive under their new names, and the invariant holds.
+    expect(own.model_tokens).toEqual({ anthropic: 800, openai: 300, google: 0 });
+    const summed = own.model_tokens!.anthropic + own.model_tokens!.openai + own.model_tokens!.google;
+    expect(summed).toBe(own.current_tokens);
+  });
+
+
+  it('accepts a legacy bare delta, attributed to anthropic', async () => {
+    const { join_code, race_id, horse_id, heartbeat_token } = await setupWithCliVersion();
     const res: any = await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, {
       seq: 1,
       delta: 250,
@@ -445,7 +562,7 @@ describe('heartbeat handler', () => {
   });
 
   it('rejects a heartbeat with neither components nor a delta', async () => {
-    const { join_code, horse_id, heartbeat_token } = await setupWithPrimary('claude');
+    const { join_code, horse_id, heartbeat_token } = await setupWithCliVersion();
     const res: any = await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { seq: 1 }));
     expect(res.statusCode).toBe(400);
   });
@@ -474,7 +591,7 @@ describe('heartbeat handler', () => {
     // Big token jump that would normally trigger Stampede!
     await hbHandler(hbEvent(join_code, hid, hbt, { seq: 1, delta: 100 }));
     await new Promise(r => setTimeout(r, 5));
-    const res: any = await hbHandler(hbEvent(join_code, hid, hbt, { seq: 2, delta: 9900 }));
+    const res: any = await hbHandler(hbEvent(join_code, hid, hbt, { seq: 2, delta: 99_000 }));
     const body = JSON.parse(res.body);
     const own = body.horses.find((h: any) => h.horse_id === hid);
     expect(own.live_xp ?? 0).toBe(0);
@@ -487,18 +604,53 @@ describe('heartbeat handler', () => {
     const { join_code, horse_id, token, race_id } = await setupLiveRaceWithHorse({ stamina: true });
 
     vi.useFakeTimers();
-    // Twenty minutes of flat-out pace: 40,000/min is 10x sustainable, so drain
+    // Twenty minutes of flat-out pace: 400,000/min is 10x sustainable, so drain
     // clamps at 6/min and the horse is well past the taper floor by the end.
     let body: Record<string, any> = {};
     for (let seq = 1; seq <= 20; seq++) {
-      body = await heartbeat({ join_code, horse_id, token, seq, delta: 40_000, advanceMs: 60_000 });
+      body = await heartbeat({ join_code, horse_id, token, seq, delta: 400_000, advanceMs: 60_000 });
     }
 
     const [horse] = await listHorses(race_id);
-    expect(horse!.stamina!).toBeLessThan(25);
+    expect(staminaOf(horse!)).toBeLessThan(25);
     expect(horse!.scored_tokens!).toBeLessThan(horse!.current_tokens);
 
     const ownInResponse = body.horses.find((h: any) => h.horse_id === horse_id);
-    expect(ownInResponse.stamina).toBe(horse!.stamina);
+    expect(ownInResponse.modifier_states).toEqual(horse!.modifier_states);
+  });
+
+  it('keeps tiring a race created before the settings map', async () => {
+    const { join_code, horse_id, token, race_id } = await setupLiveRaceWithHorse({ stamina: true, legacy: true });
+
+    vi.useFakeTimers();
+    for (let seq = 1; seq <= 20; seq++) {
+      await heartbeat({ join_code, horse_id, token, seq, delta: 400_000, advanceMs: 60_000 });
+    }
+
+    const [horse] = await listHorses(race_id);
+    expect(staminaOf(horse!)).toBeLessThan(25);
+    expect(horse!.scored_tokens!).toBeLessThan(horse!.current_tokens);
+  });
+
+  it('resumes from a pre-map row\'s flat stamina rather than restarting at full', async () => {
+    const { join_code, horse_id, token, race_id } = await setupLiveRaceWithHorse({ stamina: true });
+    // A horse mid-race when this release deployed: tired, but only the flat
+    // attribute the previous release wrote. It must keep draining from there.
+    await ddb.send(new UpdateCommand({
+      TableName: TABLE,
+      Key: horseKey(race_id, horse_id),
+      UpdateExpression: 'SET stamina = :s',
+      ExpressionAttributeValues: { ':s': 30 },
+    }));
+
+    vi.useFakeTimers();
+    const body = await heartbeat({ join_code, horse_id, token, seq: 1, delta: 400_000, advanceMs: 60_000 });
+
+    const [horse] = await listHorses(race_id);
+    // Drain clamps at 6/min, so one flat-out minute from 30 lands at ~24 --
+    // reachable only by resuming from 30, never from a reset to 100.
+    expect(staminaOf(horse!)).toBeCloseTo(24, 1);
+    const own = body.horses.find((h: any) => h.horse_id === horse_id);
+    expect(staminaOf(own)).toBeCloseTo(24, 1);
   });
 });

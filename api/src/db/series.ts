@@ -28,6 +28,9 @@ export async function appendSeriesPoint(
         ...seriesPointKey(race_id, horse_id, seq),
         t: point.t,
         d: point.d,
+        // Only when a mechanic changed the beat. Storing it unconditionally
+        // would repeat `d` on every point of every race that runs none.
+        ...(point.s !== undefined ? { s: point.s } : {}),
         ttl: Math.floor((point.t + SERIES_RETENTION_MS) / 1000),
       },
       ConditionExpression: 'attribute_not_exists(sk)',
@@ -46,7 +49,7 @@ export async function listSeriesPoints(race_id: string, horse_id: string): Promi
       ':sp': seriesPointPrefix(horse_id),
     },
   }));
-  return Items.map(i => ({ t: Number(i.t ?? 0), d: Number(i.d ?? 0) }));
+  return Items.map(readPoint);
 }
 
 // The most recent `limit` points for a horse. Points are keyed by zero-padded
@@ -68,5 +71,14 @@ export async function listRecentSeriesPoints(
     ScanIndexForward: false, // newest seq first
     Limit: limit,
   }));
-  return Items.map(i => ({ t: Number(i.t ?? 0), d: Number(i.d ?? 0) }));
+  return Items.map(readPoint);
+}
+
+/** A stored point. `s` stays absent for a beat nothing modified. */
+function readPoint(i: Record<string, unknown>): SeriesPoint {
+  return {
+    t: Number(i.t ?? 0),
+    d: Number(i.d ?? 0),
+    ...(i.s === undefined ? {} : { s: Number(i.s) }),
+  };
 }

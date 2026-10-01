@@ -1,6 +1,7 @@
 import { PutCommand, QueryCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { ddb, TABLE } from './client.js';
 import { orgLeagueStandingKey, orgLeagueStandingsPrefix } from './keys.js';
+import { getUserNamesByIds } from './users.js';
 import type { LeagueStanding } from '@token-derby/shared';
 
 export async function listSeasonStandings(org_id: string, season: number): Promise<LeagueStanding[]> {
@@ -17,6 +18,65 @@ export async function listSeasonStandings(org_id: string, season: number): Promi
     for (const it of res.Items ?? []) {
       const { pk: _pk, sk: _sk, scored_rounds: _sr, ...rest } = it;
       out.push(rest as LeagueStanding);
+    }
+    ExclusiveStartKey = res.LastEvaluatedKey;
+  } while (ExclusiveStartKey);
+  // The table shows who these people are now; the stored user_name is the
+  // entry-time fallback for a user row that no longer exists.
+  const names = await getUserNamesByIds(out.map(s => s.user_id));
+  return out.map(s => ({ ...s, user_name: names.get(s.user_id) ?? s.user_name }));
+}
+
+/** stable_horse_id -> division. No name resolution — safe on polled paths. */
+export async function listSeasonStandingDivisions(
+  org_id: string, season: number,
+): Promise<Map<string, number>> {
+  const { pk, skPrefix } = orgLeagueStandingsPrefix(org_id, season);
+  const out = new Map<string, number>();
+  let ExclusiveStartKey: Record<string, any> | undefined;
+  do {
+    const res = await ddb.send(new QueryCommand({
+      TableName: TABLE,
+      KeyConditionExpression: 'pk = :pk AND begins_with(sk, :p)',
+      ExpressionAttributeValues: { ':pk': pk, ':p': skPrefix },
+      ProjectionExpression: 'stable_horse_id, division',
+      ExclusiveStartKey,
+    }));
+    for (const it of res.Items ?? []) {
+      if (it.stable_horse_id) out.set(String(it.stable_horse_id), Number(it.division));
+    }
+    ExclusiveStartKey = res.LastEvaluatedKey;
+  } while (ExclusiveStartKey);
+  return out;
+}
+
+/**
+ * stable_horse_ids that raced at least once this season — those whose
+ * `scored_rounds` set is non-empty. Deliberately a separate query rather than
+ * a field on LeagueStanding: listSeasonStandings strips scored_rounds (it's
+ * an internal idempotency mechanism), and threading a derived `raced` field
+ * through LeagueStanding would leak into buildSeasonStandings and, by
+ * structural typing, into the league.season.ended webhook payload.
+ *
+ * Do not substitute `points > 0` (last place can legitimately score 0 while
+ * having raced) or `season_tokens > 0` (a horse can race and produce no
+ * tokens) — the only correct signal is a non-empty scored_rounds set.
+ */
+export async function listSeasonParticipants(org_id: string, season: number): Promise<Set<string>> {
+  const { pk, skPrefix } = orgLeagueStandingsPrefix(org_id, season);
+  const out = new Set<string>();
+  let ExclusiveStartKey: Record<string, any> | undefined;
+  do {
+    const res = await ddb.send(new QueryCommand({
+      TableName: TABLE,
+      KeyConditionExpression: 'pk = :pk AND begins_with(sk, :p)',
+      ExpressionAttributeValues: { ':pk': pk, ':p': skPrefix },
+      ProjectionExpression: 'stable_horse_id, scored_rounds',
+      ExclusiveStartKey,
+    }));
+    for (const it of res.Items ?? []) {
+      const rounds: Set<number> | undefined = it.scored_rounds;
+      if (it.stable_horse_id && rounds && rounds.size > 0) out.add(String(it.stable_horse_id));
     }
     ExclusiveStartKey = res.LastEvaluatedKey;
   } while (ExclusiveStartKey);

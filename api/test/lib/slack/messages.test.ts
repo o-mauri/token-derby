@@ -67,3 +67,38 @@ describe('message builders', () => {
     expect(m.blocks.some((b: any) => b.text?.text?.includes('Most XP'))).toBe(true);
   });
 });
+
+describe('the live race link on a starting race', () => {
+  it('is a clickable Slack link carrying the scheme and the join code', () => {
+    const msg = buildRaceCreatedMessage(CREATED);
+    const flat = JSON.stringify(msg.blocks);
+    // Slack only renders <url|label>; a bare hostname posts as plain text, which
+    // is what the changelog line elsewhere in this file still does.
+    expect(flat).toContain('<https://app.tokenderby.co.uk/race/AB7XQ2|');
+  });
+
+  it('points at the join code of this race, not a fixed URL', () => {
+    const other = { ...CREATED, race: { ...(CREATED as any).race, join_code: 'ZZ9WQ1' } } as any;
+    const flat = JSON.stringify(buildRaceCreatedMessage(other).blocks);
+    expect(flat).toContain('/race/ZZ9WQ1|');
+    expect(flat).not.toContain('AB7XQ2');
+  });
+});
+
+describe('the copyable join command', () => {
+  it('is a fenced block, which is the only thing Slack puts a copy button on', () => {
+    const flat = JSON.stringify(buildRaceCreatedMessage(CREATED).blocks);
+    // Slack apps cannot touch the clipboard; a fenced block is what gives the
+    // reader one-click copy. Inline code and plain text do not.
+    expect(flat).toContain('```\\ntoken-derby join AB7XQ2\\n```');
+  });
+
+  it('copies the real command, so the exact CLI syntax has to hold', () => {
+    const flat = JSON.stringify(buildRaceCreatedMessage(CREATED).blocks);
+    // bin.ts declares `token-derby join <join-code>`. A wrong command pasted
+    // from a copy button is worse than no command at all.
+    expect(flat).toContain('token-derby join ');
+    expect(flat).not.toContain('token-derby race join');
+    expect(flat).not.toContain('token-derby organisation join');
+  });
+});

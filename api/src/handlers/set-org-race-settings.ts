@@ -1,6 +1,6 @@
 import type { ApiHandler } from '../lib/http.js';
 import type { SetOrgRaceSettingsRequest, SetOrgRaceSettingsResponse, RaceSettings } from '@token-derby/shared';
-import { ORG_NAME_PATTERN, parseSemver, validateStaminaConfig } from '@token-derby/shared';
+import { ORG_NAME_PATTERN, parseSemver, validateModifierSettings } from '@token-derby/shared';
 import { getOrganisationByName } from '../db/organisations.js';
 import { putRaceSettings } from '../db/race-settings.js';
 import { ok, err, parseJson } from '../lib/http.js';
@@ -33,18 +33,18 @@ export const handler: ApiHandler = async (event) => {
   }
 
   if (
-    body.stamina_config !== undefined &&
-    (typeof body.stamina_config !== 'object' || body.stamina_config === null || Array.isArray(body.stamina_config))
+    body.modifiers !== undefined &&
+    (typeof body.modifiers !== 'object' || body.modifiers === null || Array.isArray(body.modifiers))
   ) {
-    return err('BAD_REQUEST', 'stamina_config must be an object');
+    return err('BAD_REQUEST', 'modifiers must be an object');
   }
 
-  const check = validateStaminaConfig(body.stamina_config ?? {});
+  const check = validateModifierSettings((body.modifiers ?? {}) as Record<string, unknown>);
   if (!check.ok) return err('BAD_REQUEST', check.message);
 
   const settings: RaceSettings = {
     org_id: org.org_id,
-    ...(Object.keys(check.value).length > 0 ? { stamina_config: check.value } : {}),
+    ...(Object.keys(check.value).length > 0 ? { modifiers: check.value } : {}),
     updated_at: new Date().toISOString(),
     updated_by_user_id: auth.user_id,
   };

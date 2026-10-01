@@ -2,8 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { apiBase, ENVIRONMENTS } from '../src/config.js';
-import { setSelectedEnv } from '../src/env/env.js';
+import { apiBase, API_BASE } from '../src/config.js';
+import { webOrigin } from '../src/commands/open-web.js';
 
 let tmp: string;
 
@@ -20,28 +20,27 @@ afterEach(async () => {
 });
 
 describe('apiBase precedence', () => {
-  it('TOKEN_DERBY_API_BASE hard-overrides regardless of env', () => {
+  it('TOKEN_DERBY_API_BASE hard-overrides the built-in base', () => {
     process.env.TOKEN_DERBY_API_BASE = 'https://example.test/api';
-    setSelectedEnv('staging');
     expect(apiBase()).toBe('https://example.test/api');
   });
 
-  it('prod env resolves to the production API base', () => {
-    setSelectedEnv('prod');
-    expect(apiBase()).toBe('https://token-derby.mauricode.co.uk/api');
+  it('falls back to the production API base', () => {
+    expect(apiBase()).toBe('https://api.tokenderby.co.uk');
   });
 
-  it('staging env resolves to the staging API base', () => {
-    setSelectedEnv('staging');
-    expect(apiBase()).toBe('https://token-derby-staging.mauricode.co.uk/api');
+  it('API_BASE is the production API', () => {
+    expect(API_BASE).toBe('https://api.tokenderby.co.uk');
+  });
+});
+
+describe('webOrigin', () => {
+  it('opens the production app by default', () => {
+    expect(webOrigin()).toBe('https://app.tokenderby.co.uk');
   });
 
-  it('defaults to prod API base when no pointer exists', () => {
-    expect(apiBase()).toBe('https://token-derby.mauricode.co.uk/api');
-  });
-
-  it('ENVIRONMENTS maps both envs', () => {
-    expect(ENVIRONMENTS.prod.apiBase).toBe('https://token-derby.mauricode.co.uk/api');
-    expect(ENVIRONMENTS.staging.apiBase).toBe('https://token-derby-staging.mauricode.co.uk/api');
+  it('follows an API override to its own site', () => {
+    process.env.TOKEN_DERBY_API_BASE = 'http://localhost:3000/api';
+    expect(webOrigin()).toBe('http://localhost:3000');
   });
 });

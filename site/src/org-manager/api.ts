@@ -6,7 +6,15 @@ import type {
   GetOrgLeagueResponse, SetOrgLeagueRequest, SetOrgLeagueResponse, DeleteOrgLeagueResponse,
   GetOrgSlackResponse, SetOrgSlackRequest,
   GetOrgRaceSettingsResponse, SetOrgRaceSettingsRequest, SetOrgRaceSettingsResponse,
+  AuthLinkStartResponse,
+  CliAuthApproveResponse,
+  ListDevicesResponse,
+  DeleteDeviceResponse,
+  SetOrgAccessRequest, SetOrgAccessResponse,
+  RotateOrgJoinTokenResponse,
+  RemoveOrgMemberResponse,
 } from '@token-derby/shared';
+import { apiUrl } from '@token-derby/shared';
 import { getSession, setSession, clearSession } from './session.js';
 
 export class ApiError extends Error {
@@ -40,7 +48,7 @@ async function authed<T>(method: string, path: string, body: unknown, fetchImpl:
   const init: RequestInit = { method, headers };
   if (body !== undefined) { headers['content-type'] = 'application/json'; init.body = JSON.stringify(body); }
   let res: Response;
-  try { res = await fetchImpl(path, init); }
+  try { res = await fetchImpl(apiUrl(path), init); }
   catch (e: any) { throw new ApiError('NETWORK_ERROR', e?.message ?? 'fetch failed', 0); }
   return parse<T>(res);
 }
@@ -48,7 +56,7 @@ async function authed<T>(method: string, path: string, body: unknown, fetchImpl:
 export async function exchangeCode(code: string, fetchImpl: FetchFn = fetch): Promise<WebSessionExchangeResponse> {
   let res: Response;
   try {
-    res = await fetchImpl('/api/web-sessions/exchange', {
+    res = await fetchImpl(apiUrl('/api/web-sessions/exchange'), {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code }),
     });
   } catch (e: any) { throw new ApiError('NETWORK_ERROR', e?.message ?? 'fetch failed', 0); }
@@ -60,7 +68,7 @@ export async function exchangeCode(code: string, fetchImpl: FetchFn = fetch): Pr
 export async function logout(fetchImpl: FetchFn = fetch): Promise<void> {
   const token = getSession();
   if (token) {
-    try { await fetchImpl('/api/web-sessions', { method: 'DELETE', headers: { authorization: `Bearer ${token}` } }); }
+    try { await fetchImpl(apiUrl('/api/web-sessions'), { method: 'DELETE', headers: { authorization: `Bearer ${token}` } }); }
     catch { /* best-effort */ }
   }
   clearSession();
@@ -102,5 +110,29 @@ export const setRaceSettings = (name: string, body: SetOrgRaceSettingsRequest, f
   authed<SetOrgRaceSettingsResponse>('PUT', `/api/organisations/${u(name)}/race-settings`, body, f);
 export const createOrganisation = (name: string, f: FetchFn = fetch) =>
   authed<CreateOrganisationResponse>('POST', '/api/organisations', { name }, f);
-export const joinOrganisation = (token: string, f: FetchFn = fetch) =>
-  authed<JoinOrganisationResponse>('POST', '/api/organisations/join', { join_token: token }, f);
+// The field is omitted, never sent blank: the server rejects a
+// supplied-but-empty token, and an absent one is what asks to join by the
+// signed-in user's verified email domain.
+export const joinOrganisation = (token: string | undefined, f: FetchFn = fetch) =>
+  authed<JoinOrganisationResponse>('POST', '/api/organisations/join', token ? { join_token: token } : {}, f);
+export const linkStart = (f: FetchFn = fetch) =>
+  authed<AuthLinkStartResponse>('POST', '/api/auth/link/start', undefined, f);
+
+/** Resolves a CLI device's user_code and returns its label WITHOUT approving
+ *  anything — the /cli page shows this before the real approve call. */
+export const previewCliApprove = (user_code: string, f: FetchFn = fetch) =>
+  authed<CliAuthApproveResponse>('POST', '/api/auth/cli/approve', { user_code, preview: true }, f);
+export const approveCliDevice = (user_code: string, f: FetchFn = fetch) =>
+  authed<CliAuthApproveResponse>('POST', '/api/auth/cli/approve', { user_code }, f);
+
+export const listDevices = (f: FetchFn = fetch) =>
+  authed<ListDevicesResponse>('GET', '/api/devices', undefined, f);
+export const deleteDevice = (deviceId: string, f: FetchFn = fetch) =>
+  authed<DeleteDeviceResponse>('DELETE', `/api/devices/${u(deviceId)}`, undefined, f);
+
+export const setOrgAccess = (name: string, body: SetOrgAccessRequest, f: FetchFn = fetch) =>
+  authed<SetOrgAccessResponse>('PUT', `/api/organisations/${u(name)}/access`, body, f);
+export const rotateJoinToken = (name: string, f: FetchFn = fetch) =>
+  authed<RotateOrgJoinTokenResponse>('POST', `/api/organisations/${u(name)}/join-token/rotate`, undefined, f);
+export const removeMember = (name: string, userId: string, f: FetchFn = fetch) =>
+  authed<RemoveOrgMemberResponse>('DELETE', `/api/organisations/${u(name)}/members/${u(userId)}`, undefined, f);

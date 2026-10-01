@@ -3,7 +3,7 @@ import { scanWithTimeout, isStall, type AllSources, type StallReading } from '..
 import { HEARTBEAT_INTERVAL_MS, SCAN_TIMEOUT_MS } from '../../src/config.js';
 
 function reading(): AllSources {
-  return { secondary: { claude: 0, codex: 0, gemini: 0 }, primaryByConv: new Map() };
+  return { byFamily: { anthropic: new Map(), openai: new Map(), google: new Map() }, degraded: [], notices: [] };
 }
 
 describe('SCAN_TIMEOUT_MS', () => {

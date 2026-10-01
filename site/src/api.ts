@@ -1,4 +1,5 @@
 import type { GetRaceResponse, GetRaceSeriesResponse, ListOrgRacesResponse, GetLeagueStandingsResponse } from '@token-derby/shared';
+import { apiUrl } from '@token-derby/shared';
 
 export type ApiErrorCode =
   | 'RACE_NOT_FOUND'
@@ -25,7 +26,7 @@ type FetchFn = typeof fetch;
 async function getJson<T>(url: string, fetchImpl: FetchFn): Promise<T> {
   let res: Awaited<ReturnType<FetchFn>>;
   try {
-    res = await fetchImpl(url);
+    res = await fetchImpl(apiUrl(url));
   } catch (e: any) {
     throw new ApiError('NETWORK_ERROR', e?.message ?? 'fetch failed', 0);
   }

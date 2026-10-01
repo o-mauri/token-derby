@@ -65,10 +65,9 @@ export const handler: ApiHandler = async (event) => {
     end_time: body.end_time,
     tz: body.tz,
     max_participants: body.max_participants,
-    counts_input: body.counts_input,
-    primary_top5: body.primary_top5,
-    stamina: body.stamina,
+    modifiers: body.modifiers,
     creator_user_id: auth.user_id,
+    // Stamped at creation time — a point-in-time record, never re-resolved on rename.
     creator_user_name: auth.display_name,
     cli_version,
     org: org

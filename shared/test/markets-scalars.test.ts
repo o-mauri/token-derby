@@ -91,7 +91,7 @@ describe('constants match the spec', () => {
     expect(SIMULATIONS).toBe(10_000);
     expect(MARKET_OPEN_MIN).toBe(20);
     expect(RECENT_PACES_WINDOW).toBe(10);
-    expect(FIELD_MEDIAN_PACE).toBe(1214);
+    expect(FIELD_MEDIAN_PACE).toBe(12_140);
   });
 });
 

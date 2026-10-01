@@ -17,9 +17,9 @@ export const RECENT_PACES_WINDOW = 10;
 // so live recording and the backfill script can never disagree on the floor.
 export const MIN_PACE_RACE_MINUTES = 30;
 
-// Measured field median, in output-equivalent tokens/min. A debutant with no
-// race history prices as a phantom that turned up.
-export const FIELD_MEDIAN_PACE = 1214;
+// Measured field median, in scored tokens/min (input counted). A debutant with
+// no race history prices as a phantom that turned up.
+export const FIELD_MEDIAN_PACE = 12_140;
 
 // Mean of a horse's trailing paces, or `fallback` (typically FIELD_MEDIAN_PACE)
 // for a debutant with none recorded yet.
@@ -81,7 +81,7 @@ export type MarketRunner = {
   name: string;
   division?: number;
   banked: number;          // scored tokens already in the bank — a fact, not a forecast
-  pace: number;            // blended pace, in this race's token units per minute
+  pace: number;            // blended pace, in scored tokens per minute
 };
 
 // One horse's win/podium prices on a race.
@@ -98,8 +98,7 @@ export type PriceRaceInput = {
   runners: MarketRunner[];
   minutesRemaining: number;
   phantoms: number;
-  phantomPacePool: number[];   // empirical priors, this race's token units per minute
-  maxRemainingPerRunner: number;
+  phantomPacePool: number[];   // empirical priors, scored tokens per minute
 };
 
 // Seeded from the race id alone. Consecutive recomputes share their draws, so
@@ -152,29 +151,10 @@ export function toPrice(probability: number): number {
   return Math.min(1, Math.max(0.01, probability + MARGIN));
 }
 
-// Arithmetic certainty, not just statistical: when the leader's lead already
-// exceeds everything the field could still produce, the race is decided.
-function decidedWinner(runners: MarketRunner[], maxRemaining: number): number | null {
-  if (runners.length < 2) return null;
-  let best = 0;
-  for (let i = 1; i < runners.length; i++) {
-    if (runners[i]!.banked > runners[best]!.banked) best = i;
-  }
-  for (let i = 0; i < runners.length; i++) {
-    if (i === best) continue;
-    if (runners[i]!.banked + maxRemaining >= runners[best]!.banked) return null;
-  }
-  return best;
-}
-
 export function priceRace(input: PriceRaceInput): MarketPrice[] {
-  const { runners, minutesRemaining, phantoms, phantomPacePool, maxRemainingPerRunner } = input;
+  const { runners, minutesRemaining, phantoms, phantomPacePool } = input;
   const n = runners.length;
   if (n === 0) return [];
-
-  // Arithmetic certainty applies to the win market only: the leader cannot be
-  // caught, but second and third are still open and must come from the field.
-  const decided = phantoms === 0 ? decidedWinner(runners, maxRemainingPerRunner) : null;
 
   const rnd = mulberry32(seedFrom(input.race_id));
   const gamma = gammaSampler(rnd);
@@ -240,7 +220,7 @@ export function priceRace(input: PriceRaceInput): MarketPrice[] {
 
   return runners.map((r, i) => ({
     horse_id: r.horse_id,
-    win: decided !== null ? (i === decided ? 1 : 0) : wins[i]! / SIMULATIONS,
+    win: wins[i]! / SIMULATIONS,
     podium: podiums[i]! / SIMULATIONS,
     division: r.division == null ? null : divWins[i]! / SIMULATIONS,
     divisionPodium: r.division == null ? null : divPodiums[i]! / SIMULATIONS,

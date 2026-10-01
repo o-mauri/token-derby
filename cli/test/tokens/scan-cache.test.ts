@@ -153,6 +153,23 @@ describe('ScanCache persistence', () => {
     expect(seen).toEqual([['three']]); // warm across process restarts
   });
 
+  it('does not rewrite an unchanged cache on every heartbeat', async () => {
+    const f = path.join(work, 'a.jsonl');
+    await fs.writeFile(f, 'one\n');
+    const first = await ScanCache.open('claude');
+    await first.readIncremental(f, collector());
+    await first.save();
+
+    const file = path.join(home, 'scan-cache', 'claude.json');
+    await setMtime(file, 1_700_000_000);
+
+    const second = await ScanCache.open('claude');
+    await second.readIncremental(f, collector());
+    await second.save();
+
+    expect((await fs.stat(file)).mtimeMs).toBe(1_700_000_000_000);
+  });
+
   it('drops entries for files it no longer sees, so the cache cannot grow forever', async () => {
     const a = path.join(work, 'a.jsonl');
     const b = path.join(work, 'b.jsonl');

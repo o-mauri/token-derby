@@ -1,20 +1,37 @@
-import type { ModelKey } from './types.js';
+import type { ModelFamily } from './types.js';
 
-export const MODEL_KEYS = ['claude', 'codex', 'gemini'] as const satisfies readonly ModelKey[];
-export const SECONDARY_WEIGHT = 0.5;
+export const MODEL_FAMILIES = ['anthropic', 'openai', 'google'] as const satisfies readonly ModelFamily[];
 
-export function isModelKey(v: unknown): v is ModelKey {
-  return typeof v === 'string' && (MODEL_KEYS as readonly string[]).includes(v);
+/**
+ * What CLIs before the harness/family split called each family. Their keys named
+ * the tool rather than the vendor, which broke down as soon as one tool could run
+ * several vendors' models. Accepted on the wire so an un-upgraded CLI scores
+ * normally rather than silently counting zero; drop once those are gone.
+ */
+export const LEGACY_FAMILY_KEYS: Record<string, ModelFamily> = {
+  claude: 'anthropic',
+  codex: 'openai',
+  gemini: 'google',
+};
+
+export function isModelFamily(v: unknown): v is ModelFamily {
+  return typeof v === 'string' && (MODEL_FAMILIES as readonly string[]).includes(v);
 }
 
-/** Full weight (1) for the locked primary model, SECONDARY_WEIGHT (0.5) for the rest. */
-export function weightFor(primary: ModelKey, key: ModelKey): number {
-  return key === primary ? 1 : SECONDARY_WEIGHT;
+/** The family a wire key names, accepting both current and legacy spellings. */
+export function familyForKey(key: string): ModelFamily | null {
+  if (isModelFamily(key)) return key;
+  return LEGACY_FAMILY_KEYS[key] ?? null;
 }
 
-/** The weighted race score: primary at 1:1, the other two models at 50%. */
-export function weightedTotal(primary: ModelKey, perSource: Record<ModelKey, number>): number {
+/** Race score across the families. Every family counts the same. */
+export function totalFor(perFamily: Record<ModelFamily, number>): number {
   let total = 0;
-  for (const key of MODEL_KEYS) total += perSource[key] * weightFor(primary, key);
+  for (const family of MODEL_FAMILIES) total += perFamily[family];
   return total;
+}
+
+/** A zeroed per-family board. */
+export function zeroPerFamily(): Record<ModelFamily, number> {
+  return { anthropic: 0, openai: 0, google: 0 };
 }

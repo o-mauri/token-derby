@@ -18,8 +18,8 @@ import * as events from 'aws-cdk-lib/aws-events';
 import * as eventsTargets from 'aws-cdk-lib/aws-events-targets';
 import * as path from 'path';
 import type { EnvConfig } from './env-config';
-
-const HOSTED_ZONE_DOMAIN = 'mauricode.co.uk';
+import { SPA_REWRITE_CODE } from './spa-rewrite';
+import { API_PREFIX_CODE, redirectCode } from './edge-functions';
 
 interface TokenDerbyStackProps extends cdk.StackProps {
   config: EnvConfig;
@@ -29,24 +29,37 @@ export class TokenDerbyStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: TokenDerbyStackProps) {
     super(scope, id, props);
     const { config } = props;
-    const DOMAIN_NAME = config.siteDomain;
-    const ADMIN_DOMAIN_NAME = config.adminDomain;
+    const APP_DOMAIN = config.appDomain;
+    const API_DOMAIN = config.apiDomain;
+    const ADMIN_DOMAIN = config.adminDomain;
     const TABLE_NAME = config.tableName;
 
-    // ── Route 53 + ACM (cert must live in us-east-1 for CloudFront) ────
-    const hostedZone = route53.HostedZone.fromLookup(this, 'HostedZone', {
-      domainName: HOSTED_ZONE_DOMAIN,
+    // ── Route 53 + ACM (certs must live in us-east-1 for CloudFront) ───
+    const zone = route53.HostedZone.fromLookup(this, 'Zone', {
+      domainName: config.zoneDomain,
+    });
+
+    const domainCertificate = new acm.DnsValidatedCertificate(this, 'DomainCertificate', {
+      domainName: APP_DOMAIN,
+      subjectAlternativeNames: [API_DOMAIN, ADMIN_DOMAIN, ...config.apexDomains],
+      hostedZone: zone,
+      region: 'us-east-1',
+    }) as unknown as acm.ICertificate;
+
+    // Legacy mauricode.co.uk hosts, kept alive as redirects.
+    const legacyZone = route53.HostedZone.fromLookup(this, 'HostedZone', {
+      domainName: config.legacyZoneDomain,
     });
 
     const certificate = new acm.DnsValidatedCertificate(this, 'Certificate', {
-      domainName: DOMAIN_NAME,
-      hostedZone,
+      domainName: config.legacySiteDomain,
+      hostedZone: legacyZone,
       region: 'us-east-1',
     });
 
     const adminCertificate = new acm.DnsValidatedCertificate(this, 'AdminCertificate', {
-      domainName: ADMIN_DOMAIN_NAME,
-      hostedZone,
+      domainName: config.legacyAdminDomain,
+      hostedZone: legacyZone,
       region: 'us-east-1',
     });
 
@@ -56,7 +69,7 @@ export class TokenDerbyStack extends cdk.Stack {
       partitionKey: { name: 'pk', type: dynamodb.AttributeType.STRING },
       sortKey: { name: 'sk', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-      removalPolicy: config.disposable ? cdk.RemovalPolicy.DESTROY : cdk.RemovalPolicy.RETAIN,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
       timeToLiveAttribute: 'ttl',
     });
 
@@ -120,8 +133,7 @@ export class TokenDerbyStack extends cdk.Stack {
         blockPublicPolicy: false,
         restrictPublicBuckets: false,
       }),
-      removalPolicy: config.disposable ? cdk.RemovalPolicy.DESTROY : cdk.RemovalPolicy.RETAIN,
-      autoDeleteObjects: config.disposable,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
     });
 
     spriteBucket.addToResourcePolicy(new iam.PolicyStatement({
@@ -132,7 +144,16 @@ export class TokenDerbyStack extends cdk.Stack {
 
     // ── Lambda factory ─────────────────────────────────────────────────
     const apiDir = path.resolve(__dirname, '..', '..', 'api', 'src', 'handlers');
-    const commonEnv = { TABLE_NAME, NODE_OPTIONS: '--enable-source-maps', ADMIN_SSM_PREFIX: config.ssmPrefix };
+    // CloudFront replaces the viewer Host with the API Gateway domain, so the
+    // OAuth redirect_uri cannot be derived from the request. App domain: the
+    // org manager and its /api/auth/* proxy (which holds the state cookie) live there.
+    const commonEnv = {
+      TABLE_NAME,
+      NODE_OPTIONS: '--enable-source-maps',
+      ADMIN_SSM_PREFIX: config.ssmPrefix,
+      AUTH_SSM_PREFIX: config.authSsmPrefix,
+      SITE_ORIGIN: `https://${APP_DOMAIN}`,
+    };
 
     const makeFn = (name: string, fileBase: string, opts?: { timeout?: cdk.Duration; memorySize?: number }) => {
       const fn = new NodejsFunction(this, name, {
@@ -194,8 +215,22 @@ export class TokenDerbyStack extends cdk.Stack {
     const createWebSessionFn = makeFn('CreateWebSessionFn', 'create-web-session');
     const exchangeWebSessionFn = makeFn('ExchangeWebSessionFn', 'exchange-web-session');
     const deleteWebSessionFn = makeFn('DeleteWebSessionFn', 'delete-web-session');
+    const authGoogleStartFn = makeFn('AuthGoogleStartFn', 'auth-google-start');
+    const authLinkStartFn = makeFn('AuthLinkStartFn', 'auth-link-start');
+    const authGoogleCallbackFn = makeFn('AuthGoogleCallbackFn', 'auth-google-callback');
     const listOrgMembersFn = makeFn('ListOrgMembersFn', 'list-org-members');
+    const setOrgAccessFn = makeFn('SetOrgAccessFn', 'set-org-access');
+    const rotateOrgJoinTokenFn = makeFn('RotateOrgJoinTokenFn', 'rotate-org-join-token');
+    const removeOrgMemberFn = makeFn('RemoveOrgMemberFn', 'remove-org-member');
     const scheduleTickFn = makeFn('ScheduleTickFn', 'schedule-tick', { timeout: cdk.Duration.seconds(120) });
+
+    const authCliStartFn = makeFn('AuthCliStartFn', 'auth-cli-start');
+    const authCliApproveFn = makeFn('AuthCliApproveFn', 'auth-cli-approve');
+    const authCliPollFn = makeFn('AuthCliPollFn', 'auth-cli-poll');
+    const listDevicesFn = makeFn('ListDevicesFn', 'list-devices');
+    const registerDeviceFn = makeFn('RegisterDeviceFn', 'register-device');
+    const revokeDeviceFn = makeFn('RevokeDeviceFn', 'revoke-device');
+    const logoutDeviceFn = makeFn('LogoutDeviceFn', 'logout-device');
 
     new events.Rule(this, 'ScheduleTickRule', {
       schedule: events.Schedule.rate(cdk.Duration.minutes(1)),
@@ -227,11 +262,25 @@ export class TokenDerbyStack extends cdk.Stack {
     const adminDeleteHorseFn = makeFn('AdminDeleteHorseFn', 'admin-delete-horse');
     const adminAnnounceReleaseFn = makeFn('AdminAnnounceReleaseFn', 'admin-announce-release', { timeout: cdk.Duration.seconds(60) });
 
+    const adminCreateClaimFn = makeFn('AdminCreateClaimFn', 'admin-create-claim');
+    const adminListClaimsFn = makeFn('AdminListClaimsFn', 'admin-list-claims');
+    const adminListClaimRedemptionsFn = makeFn('AdminListClaimRedemptionsFn', 'admin-list-claim-redemptions');
+    const getClaimFn = makeFn('GetClaimFn', 'get-claim');
+    const redeemClaimFn = makeFn('RedeemClaimFn', 'redeem-claim');
+
     const adminSsmArn = `arn:aws:ssm:${this.region}:${this.account}:parameter${config.ssmPrefix}/*`;
-    for (const fn of [adminLoginFn, adminListUsersFn, adminListOrgsFn, adminRenameUserFn, adminRenameHorseFn, adminRemoveHatFn, adminDeleteHorseFn, adminAnnounceReleaseFn]) {
+    for (const fn of [adminLoginFn, adminListUsersFn, adminListOrgsFn, adminRenameUserFn, adminRenameHorseFn, adminRemoveHatFn, adminDeleteHorseFn, adminAnnounceReleaseFn, adminCreateClaimFn, adminListClaimsFn, adminListClaimRedemptionsFn]) {
       fn.addToRolePolicy(new cdk.aws_iam.PolicyStatement({
         actions: ['ssm:GetParameter'],
         resources: [adminSsmArn],
+      }));
+    }
+
+    const authSsmArn = `arn:aws:ssm:${this.region}:${this.account}:parameter${config.authSsmPrefix}/*`;
+    for (const fn of [authGoogleStartFn, authLinkStartFn, authGoogleCallbackFn]) {
+      fn.addToRolePolicy(new cdk.aws_iam.PolicyStatement({
+        actions: ['ssm:GetParameter'],
+        resources: [authSsmArn],
       }));
     }
 
@@ -340,9 +389,34 @@ export class TokenDerbyStack extends cdk.Stack {
       integration: new HttpLambdaIntegration('GetOrgLeagueStandingsInt', getOrgLeagueStandingsFn),
     });
     httpApi.addRoutes({ path: '/api/organisations/{org_name}/members', methods: [HttpMethod.GET], integration: new HttpLambdaIntegration('ListOrgMembersInt', listOrgMembersFn) });
+    httpApi.addRoutes({ path: '/api/organisations/{org_name}/access', methods: [HttpMethod.PUT], integration: new HttpLambdaIntegration('SetOrgAccessInt', setOrgAccessFn) });
+    // Own endpoint, not a flag on the PUT above: a PUT is retryable, and a
+    // retried rotation must not mint a second token. API Gateway prefers a
+    // static segment over a path variable regardless of declaration order, so
+    // this is never at risk of being swallowed by a broader {org_name}/...
+    // pattern here (unlike scripts/local-api.ts, where order matters).
+    httpApi.addRoutes({ path: '/api/organisations/{org_name}/join-token/rotate', methods: [HttpMethod.POST], integration: new HttpLambdaIntegration('RotateOrgJoinTokenInt', rotateOrgJoinTokenFn) });
+    httpApi.addRoutes({ path: '/api/organisations/{org_name}/members/{user_id}', methods: [HttpMethod.DELETE], integration: new HttpLambdaIntegration('RemoveOrgMemberInt', removeOrgMemberFn) });
     httpApi.addRoutes({ path: '/api/web-sessions', methods: [HttpMethod.POST], integration: new HttpLambdaIntegration('CreateWebSessionInt', createWebSessionFn) });
     httpApi.addRoutes({ path: '/api/web-sessions/exchange', methods: [HttpMethod.POST], integration: new HttpLambdaIntegration('ExchangeWebSessionInt', exchangeWebSessionFn) });
     httpApi.addRoutes({ path: '/api/web-sessions', methods: [HttpMethod.DELETE], integration: new HttpLambdaIntegration('DeleteWebSessionInt', deleteWebSessionFn) });
+    httpApi.addRoutes({ path: '/api/auth/google/start', methods: [HttpMethod.GET], integration: new HttpLambdaIntegration('AuthGoogleStartInt', authGoogleStartFn) });
+    httpApi.addRoutes({ path: '/api/auth/link/start', methods: [HttpMethod.POST], integration: new HttpLambdaIntegration('AuthLinkStartInt', authLinkStartFn) });
+    httpApi.addRoutes({ path: '/api/auth/google/callback', methods: [HttpMethod.GET], integration: new HttpLambdaIntegration('AuthGoogleCallbackInt', authGoogleCallbackFn) });
+    httpApi.addRoutes({ path: '/api/auth/cli/start', methods: [HttpMethod.POST], integration: new HttpLambdaIntegration('AuthCliStartInt', authCliStartFn) });
+    httpApi.addRoutes({ path: '/api/auth/cli/approve', methods: [HttpMethod.POST], integration: new HttpLambdaIntegration('AuthCliApproveInt', authCliApproveFn) });
+    httpApi.addRoutes({ path: '/api/auth/cli/poll', methods: [HttpMethod.POST], integration: new HttpLambdaIntegration('AuthCliPollInt', authCliPollFn) });
+    httpApi.addRoutes({ path: '/api/devices', methods: [HttpMethod.GET], integration: new HttpLambdaIntegration('ListDevicesInt', listDevicesFn) });
+    // Distinct from the GET above: a route key is method-plus-path, so the two
+    // coexist on the same path. This is the CLI's direct registration, used by
+    // `link` to trade a legacy account-level credential for a device one.
+    httpApi.addRoutes({ path: '/api/devices', methods: [HttpMethod.POST], integration: new HttpLambdaIntegration('RegisterDeviceInt', registerDeviceFn) });
+    // Static beats variable in API Gateway route selection, so declaration
+    // order here is not what keeps these distinct — but both must exist:
+    // dropping /devices/me would silently fall through to {device_id} with
+    // device_id="me", leaving a live credential un-revoked on logout.
+    httpApi.addRoutes({ path: '/api/devices/me', methods: [HttpMethod.DELETE], integration: new HttpLambdaIntegration('LogoutDeviceInt', logoutDeviceFn) });
+    httpApi.addRoutes({ path: '/api/devices/{device_id}', methods: [HttpMethod.DELETE], integration: new HttpLambdaIntegration('RevokeDeviceInt', revokeDeviceFn) });
     httpApi.addRoutes({ path: '/api/jockey/init', methods: [HttpMethod.POST], integration: new HttpLambdaIntegration('InitJockeyInt', initJockeyFn) });
     httpApi.addRoutes({ path: '/api/jockey/me', methods: [HttpMethod.GET], integration: new HttpLambdaIntegration('GetJockeyInt', getJockeyFn) });
     httpApi.addRoutes({ path: '/api/jockey/me', methods: [HttpMethod.PUT], integration: new HttpLambdaIntegration('UpdateJockeyInt', updateJockeyFn) });
@@ -361,6 +435,11 @@ export class TokenDerbyStack extends cdk.Stack {
     httpApi.addRoutes({ path: '/api/admin/users/{user_id}/horses/{stable_horse_id}/hats/{index}', methods: [HttpMethod.DELETE], integration: new HttpLambdaIntegration('AdminRemoveHatInt', adminRemoveHatFn) });
     httpApi.addRoutes({ path: '/api/admin/users/{user_id}/horses/{stable_horse_id}', methods: [HttpMethod.DELETE], integration: new HttpLambdaIntegration('AdminDeleteHorseInt', adminDeleteHorseFn) });
     httpApi.addRoutes({ path: '/api/admin/releases', methods: [HttpMethod.POST], integration: new HttpLambdaIntegration('AdminAnnounceReleaseInt', adminAnnounceReleaseFn) });
+    httpApi.addRoutes({ path: '/api/admin/claims', methods: [HttpMethod.POST], integration: new HttpLambdaIntegration('AdminCreateClaimInt', adminCreateClaimFn) });
+    httpApi.addRoutes({ path: '/api/admin/claims', methods: [HttpMethod.GET], integration: new HttpLambdaIntegration('AdminListClaimsInt', adminListClaimsFn) });
+    httpApi.addRoutes({ path: '/api/admin/claims/{code}/redemptions', methods: [HttpMethod.GET], integration: new HttpLambdaIntegration('AdminListClaimRedemptionsInt', adminListClaimRedemptionsFn) });
+    httpApi.addRoutes({ path: '/api/claims/{code}', methods: [HttpMethod.GET], integration: new HttpLambdaIntegration('GetClaimInt', getClaimFn) });
+    httpApi.addRoutes({ path: '/api/claims/{code}/redeem', methods: [HttpMethod.POST], integration: new HttpLambdaIntegration('RedeemClaimInt', redeemClaimFn) });
 
     // API throttling (rate-limit guardrails, not hard security)
     const defaultStage = httpApi.defaultStage!.node.defaultChild as apigatewayv2.CfnStage;
@@ -376,41 +455,57 @@ export class TokenDerbyStack extends cdk.Stack {
       autoDeleteObjects: true,
     });
 
-    // ── CloudFront with /api/* proxy to API Gateway ───────────────────
+    // ── CloudFront ─────────────────────────────────────────────────────
     const apiUrl = cdk.Fn.select(1, cdk.Fn.split('://', httpApi.url!));
-    const apiDomain = cdk.Fn.select(0, cdk.Fn.split('/', apiUrl));
-    const apiOrigin = new origins.HttpOrigin(apiDomain, {
+    const apiGatewayDomain = cdk.Fn.select(0, cdk.Fn.split('/', apiUrl));
+    const apiOrigin = new origins.HttpOrigin(apiGatewayDomain, {
       protocolPolicy: cloudfront.OriginProtocolPolicy.HTTPS_ONLY,
     });
 
-    const distribution = new cloudfront.Distribution(this, 'Distribution', {
+    const apiBehaviour = (functionAssociations?: cloudfront.FunctionAssociation[]): cloudfront.BehaviorOptions => ({
+      origin: apiOrigin,
+      viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+      allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
+      cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
+      originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
+      functionAssociations,
+    });
+
+    const viewerRequest = (id: string, code: string): cloudfront.FunctionAssociation[] => [{
+      function: new cloudfront.Function(this, id, {
+        code: cloudfront.FunctionCode.fromInline(code),
+        runtime: cloudfront.FunctionRuntime.JS_2_0,
+      }),
+      eventType: cloudfront.FunctionEventType.VIEWER_REQUEST,
+    }];
+
+    // Rewrites SPA deep links to the shell. See spa-rewrite.ts for why this
+    // replaces a distribution-wide errorResponses block, and spa-rewrite.test.ts
+    // for the guard on the rule it uses.
+    const spaRewriteAssociation = viewerRequest('SpaRewriteFn', SPA_REWRITE_CODE);
+
+    // Redirect-only distributions answer at the edge; this origin is never reached.
+    const redirectOrigin = new origins.HttpOrigin(APP_DOMAIN);
+
+    // app.: the site, plus /api/auth/* so the Google flow's state cookie is
+    // set and read on the same origin as the org manager.
+    const appDistribution = new cloudfront.Distribution(this, 'AppDistribution', {
       defaultBehavior: {
         origin: origins.S3BucketOrigin.withOriginAccessControl(siteBucket),
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
         cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
+        functionAssociations: spaRewriteAssociation,
       },
-      additionalBehaviors: {
-        '/api/*': {
-          origin: apiOrigin,
-          viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-          allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
-          cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
-          originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
-        },
-      },
-      domainNames: [DOMAIN_NAME],
-      certificate: certificate as unknown as acm.ICertificate,
+      additionalBehaviors: { '/api/auth/*': apiBehaviour() },
+      domainNames: [APP_DOMAIN],
+      certificate: domainCertificate,
       defaultRootObject: 'index.html',
-      errorResponses: [
-        { httpStatus: 403, responseHttpStatus: 200, responsePagePath: '/index.html' },
-        { httpStatus: 404, responseHttpStatus: 200, responsePagePath: '/index.html' },
-      ],
     });
 
     new s3deploy.BucketDeployment(this, 'DeploySite', {
       sources: [s3deploy.Source.asset(path.resolve(__dirname, '..', '..', 'site', 'dist'))],
       destinationBucket: siteBucket,
-      distribution,
+      distribution: appDistribution,
       distributionPaths: ['/*'],
       cacheControl: [
         s3deploy.CacheControl.setPublic(),
@@ -419,47 +514,48 @@ export class TokenDerbyStack extends cdk.Stack {
       ],
     });
 
-    new route53.ARecord(this, 'AliasRecord', {
-      zone: hostedZone,
-      recordName: DOMAIN_NAME,
-      target: route53.RecordTarget.fromAlias(new targets.CloudFrontTarget(distribution)),
+    const appRecord = new route53.ARecord(this, 'AppAliasRecord', {
+      zone,
+      recordName: APP_DOMAIN,
+      target: route53.RecordTarget.fromAlias(new targets.CloudFrontTarget(appDistribution)),
     });
 
-    // ── Admin subdomain: its own bucket + CloudFront, /api/* → same API ──
+    // api.: the gateway without the /api prefix.
+    const apiDistribution = new cloudfront.Distribution(this, 'ApiDistribution', {
+      defaultBehavior: apiBehaviour(viewerRequest('ApiPrefixFn', API_PREFIX_CODE)),
+      domainNames: [API_DOMAIN],
+      certificate: domainCertificate,
+    });
+
+    new route53.ARecord(this, 'ApiAliasRecord', {
+      zone,
+      recordName: API_DOMAIN,
+      target: route53.RecordTarget.fromAlias(new targets.CloudFrontTarget(apiDistribution)),
+    });
+
+    // admin.: static only, it calls api. directly.
     const adminBucket = new s3.Bucket(this, 'AdminSiteBucket', {
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
       autoDeleteObjects: true,
     });
 
-    const adminDistribution = new cloudfront.Distribution(this, 'AdminDistribution', {
+    const adminAppDistribution = new cloudfront.Distribution(this, 'AdminAppDistribution', {
       defaultBehavior: {
         origin: origins.S3BucketOrigin.withOriginAccessControl(adminBucket),
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
         cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
+        functionAssociations: spaRewriteAssociation,
       },
-      additionalBehaviors: {
-        '/api/*': {
-          origin: apiOrigin,
-          viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-          allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
-          cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
-          originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
-        },
-      },
-      domainNames: [ADMIN_DOMAIN_NAME],
-      certificate: adminCertificate as unknown as acm.ICertificate,
+      domainNames: [ADMIN_DOMAIN],
+      certificate: domainCertificate,
       defaultRootObject: 'index.html',
-      errorResponses: [
-        { httpStatus: 403, responseHttpStatus: 200, responsePagePath: '/index.html' },
-        { httpStatus: 404, responseHttpStatus: 200, responsePagePath: '/index.html' },
-      ],
     });
 
     new s3deploy.BucketDeployment(this, 'DeployAdminSite', {
       sources: [s3deploy.Source.asset(path.resolve(__dirname, '..', '..', 'admin', 'dist'))],
       destinationBucket: adminBucket,
-      distribution: adminDistribution,
+      distribution: adminAppDistribution,
       distributionPaths: ['/*'],
       cacheControl: [
         s3deploy.CacheControl.setPublic(),
@@ -468,19 +564,80 @@ export class TokenDerbyStack extends cdk.Stack {
       ],
     });
 
-    new route53.ARecord(this, 'AdminAliasRecord', {
-      zone: hostedZone,
-      recordName: ADMIN_DOMAIN_NAME,
-      target: route53.RecordTarget.fromAlias(new targets.CloudFrontTarget(adminDistribution)),
+    const adminRecord = new route53.ARecord(this, 'AdminAppAliasRecord', {
+      zone,
+      recordName: ADMIN_DOMAIN,
+      target: route53.RecordTarget.fromAlias(new targets.CloudFrontTarget(adminAppDistribution)),
     });
 
-    new cdk.CfnOutput(this, 'AdminSiteUrl', { value: `https://${ADMIN_DOMAIN_NAME}` });
-    new cdk.CfnOutput(this, 'AdminDistributionId', { value: adminDistribution.distributionId });
+    // Bare and www hosts → app.
+    const apexDistribution = new cloudfront.Distribution(this, 'ApexRedirectDistribution', {
+      defaultBehavior: {
+        origin: redirectOrigin,
+        viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+        cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
+        functionAssociations: viewerRequest('ApexRedirectFn', redirectCode(APP_DOMAIN)),
+      },
+      domainNames: config.apexDomains,
+      certificate: domainCertificate,
+    });
+
+    config.apexDomains.forEach((domain, i) => {
+      new route53.ARecord(this, i === 0 ? 'ApexAliasRecord' : 'WwwAliasRecord', {
+        zone,
+        recordName: domain,
+        target: route53.RecordTarget.fromAlias(new targets.CloudFrontTarget(apexDistribution)),
+      });
+    });
+
+    // ── Legacy mauricode.co.uk hosts ───────────────────────────────────
+    // Pages 301 to the new hosts; /api/* stays because published CLIs
+    // hardcode token-derby.mauricode.co.uk/api. Each waits for its new
+    // host's record so the redirect never points at a name that isn't live.
+    const legacyDistribution = new cloudfront.Distribution(this, 'Distribution', {
+      defaultBehavior: {
+        origin: redirectOrigin,
+        viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+        cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
+        functionAssociations: viewerRequest('LegacySiteRedirectFn', redirectCode(APP_DOMAIN)),
+      },
+      additionalBehaviors: { '/api/*': apiBehaviour() },
+      domainNames: [config.legacySiteDomain],
+      certificate: certificate as unknown as acm.ICertificate,
+    });
+    legacyDistribution.node.addDependency(appRecord);
+
+    new route53.ARecord(this, 'AliasRecord', {
+      zone: legacyZone,
+      recordName: config.legacySiteDomain,
+      target: route53.RecordTarget.fromAlias(new targets.CloudFrontTarget(legacyDistribution)),
+    });
+
+    const legacyAdminDistribution = new cloudfront.Distribution(this, 'AdminDistribution', {
+      defaultBehavior: {
+        origin: redirectOrigin,
+        viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+        cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
+        functionAssociations: viewerRequest('LegacyAdminRedirectFn', redirectCode(ADMIN_DOMAIN)),
+      },
+      domainNames: [config.legacyAdminDomain],
+      certificate: adminCertificate as unknown as acm.ICertificate,
+    });
+    legacyAdminDistribution.node.addDependency(adminRecord);
+
+    new route53.ARecord(this, 'AdminAliasRecord', {
+      zone: legacyZone,
+      recordName: config.legacyAdminDomain,
+      target: route53.RecordTarget.fromAlias(new targets.CloudFrontTarget(legacyAdminDistribution)),
+    });
 
     // ── Outputs ────────────────────────────────────────────────────────
-    new cdk.CfnOutput(this, 'SiteUrl', { value: `https://${DOMAIN_NAME}` });
+    new cdk.CfnOutput(this, 'SiteUrl', { value: `https://${APP_DOMAIN}` });
+    new cdk.CfnOutput(this, 'ApiUrl', { value: `https://${API_DOMAIN}` });
+    new cdk.CfnOutput(this, 'AdminSiteUrl', { value: `https://${ADMIN_DOMAIN}` });
     new cdk.CfnOutput(this, 'ApiGatewayUrl', { value: httpApi.url! });
     new cdk.CfnOutput(this, 'TableName', { value: table.tableName });
-    new cdk.CfnOutput(this, 'DistributionId', { value: distribution.distributionId });
+    new cdk.CfnOutput(this, 'DistributionId', { value: appDistribution.distributionId });
+    new cdk.CfnOutput(this, 'AdminDistributionId', { value: adminAppDistribution.distributionId });
   }
 }

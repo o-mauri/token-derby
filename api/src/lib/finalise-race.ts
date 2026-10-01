@@ -1,6 +1,6 @@
 import type { Horse, Race, RaceEndedEvent } from '@token-derby/shared';
 import {
-  xpForRaceFinish, raceXpMultiplier, buildSeasonStandings, scoredOf, tokenMultiplier,
+  xpForRaceFinish, raceXpMultiplier, buildSeasonStandings, scoredOf,
   MIN_PACE_RACE_MINUTES,
 } from '@token-derby/shared';
 import { listHorses, setHorseFinalTokens, setHorseXpAwarded } from '../db/horses.js';
@@ -82,7 +82,6 @@ export async function finaliseRace(race: Race, now: Date): Promise<FinaliseResul
   const duration_ms = Math.max(0, now.getTime() - liveStartMs);
   const xp_multiplier = raceXpMultiplier({ distinct_jockeys, duration_ms });
 
-  const tokenMult = tokenMultiplier(race);
   const finishMs = now.getTime();
 
   await Promise.all(ranked.map(async (h, i) => {
@@ -90,18 +89,16 @@ export async function finaliseRace(race: Race, now: Date): Promise<FinaliseResul
     const xp = Math.round(xpForRaceFinish(rank, h.final_scored_tokens, winner_tokens, h.live_xp) * xp_multiplier);
     const isFirstAward = await setHorseXpAwarded(race.race_id, h.horse_id, xp);
     if (isFirstAward && h.user_id && h.stable_horse_id) {
-      // Output-equivalent pace over the whole enrolled window, idle time
-      // included — that is the span a market has to predict over. Below
-      // MIN_PACE_RACE_MINUTES the window is too brief to mean anything, so
-      // the pace is dropped (counters below still record).
+      // Scored pace over the whole enrolled window, idle time included — the
+      // span a market predicts over. Too brief a window records no pace.
       const enrolledMin = Math.max(1, (finishMs - new Date(h.joined_at).getTime()) / 60_000);
       const pace = enrolledMin >= MIN_PACE_RACE_MINUTES
-        ? h.final_scored_tokens / tokenMult / enrolledMin
+        ? h.final_scored_tokens / enrolledMin
         : null;
       await Promise.all([
         awardHorseXp(h.user_id, h.stable_horse_id, xp),
         recordHorseRaceResult(h.user_id, h.stable_horse_id, {
-          final_tokens: h.final_scored_tokens,
+          final_scored_tokens: h.final_scored_tokens,
           rank,
           pace,
         }),

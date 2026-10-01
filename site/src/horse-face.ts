@@ -1,7 +1,9 @@
 // Small pixel horse head, cropped from the in-race sprite (cols 24-31, rows 2-7).
 // Returned as inline SVG markup so it can be dropped into innerHTML templates.
 
-const FACE_ROWS: readonly string[] = [
+// Exported as the single source of the pixel art: logos/gen-logo.mjs imports
+// these so the OAuth consent-screen logo cannot drift from the site header.
+export const FACE_ROWS: readonly string[] = [
   '..MMM...',
   '..MMM...',
   '.MBBEBB.',
@@ -14,7 +16,7 @@ const FACE_ROWS: readonly string[] = [
   'BB......',
 ];
 
-const COLOR: Record<string, string> = {
+export const COLOR: Record<string, string> = {
   B: '#8B4513', // body / face
   M: '#f5e9d3', // mane (light cream — pops against black bg)
   E: '#000000', // eye (dark, contrasts with body now that mane is light)

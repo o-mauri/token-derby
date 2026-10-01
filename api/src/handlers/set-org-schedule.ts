@@ -72,11 +72,9 @@ export const handler: ApiHandler = async (event) => {
     tz: body.tz,
     ...(body.race_name ? { race_name: body.race_name } : {}),
     ...(body.max_participants !== undefined ? { max_participants: body.max_participants } : {}),
-    ...(body.counts_input ? { counts_input: true } : {}),
-    ...(body.primary_top5 ? { primary_top5: true } : {}),
-    ...(body.stamina ? { stamina: true } : {}),
     created_at: new Date().toISOString(),
     creator_user_id: auth.user_id,
+    // Frozen at the moment the schedule was set — do not resolve live on rename.
     creator_user_name: auth.display_name,
   };
   await putSchedule(schedule);

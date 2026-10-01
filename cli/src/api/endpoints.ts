@@ -10,6 +10,12 @@ import type {
   UpdateStableHorseRequest, UpdateStableHorseResponse, DeleteStableHorseResponse,
   RollHatResponse, EquipHatRequest, EquipHatResponse,
   WebSessionCreateResponse,
+  ClaimProbeResponse, RedeemClaimRequest, RedeemClaimResponse,
+  CliAuthStartRequest, CliAuthStartResponse,
+  CliAuthPollRequest, CliAuthPollResponse,
+  DeleteDeviceResponse,
+  LogoutDeviceResponse,
+  RegisterDeviceRequest, RegisterDeviceResponse,
 } from '@token-derby/shared';
 import { request } from './client.js';
 
@@ -94,4 +100,48 @@ export function equipHat(stableHorseId: string, body: EquipHatRequest) {
 
 export function createWebSession() {
   return request<WebSessionCreateResponse>('POST', '/web-sessions', undefined, undefined);
+}
+
+export function probeClaim(code: string) {
+  return request<ClaimProbeResponse>('GET', `/claims/${encodeURIComponent(code)}`, undefined, undefined);
+}
+
+export function redeemClaim(code: string, body: RedeemClaimRequest) {
+  return request<RedeemClaimResponse>('POST', `/claims/${encodeURIComponent(code)}/redeem`, body, undefined);
+}
+
+export function cliAuthStart(body: CliAuthStartRequest) {
+  return request<CliAuthStartResponse>('POST', '/auth/cli/start', body, undefined);
+}
+
+export function cliAuthPoll(body: CliAuthPollRequest) {
+  return request<CliAuthPollResponse>('POST', '/auth/cli/poll', body, undefined);
+}
+
+// Called only on a declined confirm prompt, before identity.json exists — the
+// caller passes the just-issued device credential explicitly since there is
+// no on-disk identity yet for `request` to load.
+export function revokeDevice(deviceId: string, auth: { user_id: string; secret_token: string }) {
+  return request<DeleteDeviceResponse>(
+    'DELETE',
+    `/devices/${encodeURIComponent(deviceId)}`,
+    undefined,
+    undefined,
+    undefined,
+    auth,
+  );
+}
+
+// Registers this machine directly, with no browser leg — `link` uses it to
+// trade the shared account-level credential for a revocable device one. The
+// credential already on disk is what authorises it, so `request` picks it up.
+export function registerDevice(body: RegisterDeviceRequest) {
+  return request<RegisterDeviceResponse>('POST', '/devices', body, undefined);
+}
+
+// Used by `logout`, which runs with identity.json present — the server
+// resolves and deletes whichever device row authenticated this request, since
+// the CLI cannot compute its own device_id from the token it holds.
+export function logoutDevice() {
+  return request<LogoutDeviceResponse>('DELETE', '/devices/me', undefined, undefined);
 }

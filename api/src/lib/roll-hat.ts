@@ -1,4 +1,4 @@
-import { HATS } from '@token-derby/shared';
+import { HATS, isAnimatedHat } from '@token-derby/shared';
 import type { CollectedHat, Hat, HatId, HatRarity } from '@token-derby/shared';
 
 export type RollDecision =
@@ -41,10 +41,13 @@ export function rollHat(inventory: CollectedHat[], rng: () => number = Math.rand
   const tier = pickTier(rng);
   if (tier === 'no_hat') return { result: 'no_hat' };
 
-  const pool = HATS.filter(h => h.rarity === tier);
+  // Claim-only hats are excluded from rolls entirely. A tier whose every hat
+  // is claim-only degrades to no_hat rather than throwing.
+  const pool = HATS.filter(h => h.rarity === tier && h.rollable);
+  if (pool.length === 0) return { result: 'no_hat' };
   const hat = pool[pickIndex(pool, rng)]!;
 
-  if (hat.rarity === 'legendary') {
+  if (isAnimatedHat(hat)) {
     const alreadyHave = inventory.some(c => c.id === hat.id);
     if (alreadyHave) return { result: 'duplicate', hat, hat_id: hat.id };
     return {
@@ -70,6 +73,7 @@ export const DUPLICATE_XP_FRACTION: Record<HatRarity, number> = {
   rare: 0.20,
   epic: 0.35,
   legendary: 0.50,
+  limited: 0.60,
 };
 
 /** XP fraction of `xp_for_level` awarded for the no_hat outcome. */

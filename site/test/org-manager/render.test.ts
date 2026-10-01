@@ -13,7 +13,7 @@ let root: HTMLElement;
 beforeEach(() => { document.body.innerHTML = ''; root = document.createElement('div'); document.body.appendChild(root); });
 
 describe('renderLogin', () => {
-  it('shows the CLI instruction', () => {
+  it('warns CLI users in the muted aside', () => {
     renderLogin(root);
     expect(root.textContent).toContain('token-derby web');
   });
@@ -24,13 +24,48 @@ describe('renderSidebar', () => {
     const onSelect = vi.fn();
     renderSidebar(root, {
       orgs: [{ org_id: 'o1', org_name: 'Acme' }],
-      selected: 'Acme', ownerOrgs: new Set(['Acme']),
-      onSelect, onCreate: vi.fn(), onJoin: vi.fn(), onLogout: vi.fn(),
+      selected: 'Acme', ownerOrgs: new Set(['Acme']), linkedEmail: null,
+      onSelect, onCreate: vi.fn(), onJoin: vi.fn(), onLinkGoogle: vi.fn(), onLogout: vi.fn(),
     });
     expect(root.textContent).toContain('Acme');
     expect(root.textContent.toLowerCase()).toContain('owner');
     (root.querySelector('[data-org="Acme"]') as HTMLElement).click();
     expect(onSelect).toHaveBeenCalledWith('Acme');
+  });
+
+  it('renders a Link Google account button when no account is linked', () => {
+    renderSidebar(root, {
+      orgs: [],
+      selected: null, ownerOrgs: new Set(), linkedEmail: null,
+      onSelect: vi.fn(), onCreate: vi.fn(), onJoin: vi.fn(), onLinkGoogle: vi.fn(), onLogout: vi.fn(),
+    });
+    expect(root.querySelector('.org-link-google')).not.toBeNull();
+    expect(root.textContent).toMatch(/link google account/i);
+  });
+
+  it('fires onLinkGoogle when the button is clicked', () => {
+    const onLinkGoogle = vi.fn();
+    renderSidebar(root, {
+      orgs: [],
+      selected: null, ownerOrgs: new Set(), linkedEmail: null,
+      onSelect: vi.fn(), onCreate: vi.fn(), onJoin: vi.fn(), onLinkGoogle, onLogout: vi.fn(),
+    });
+    (root.querySelector('.org-link-google') as HTMLElement).click();
+    expect(onLinkGoogle).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the linked email instead of an actionable link button when an account is linked', () => {
+    const onLinkGoogle = vi.fn();
+    renderSidebar(root, {
+      orgs: [],
+      selected: null, ownerOrgs: new Set(), linkedEmail: 'alice@example.com',
+      onSelect: vi.fn(), onCreate: vi.fn(), onJoin: vi.fn(), onLinkGoogle, onLogout: vi.fn(),
+    });
+    // The whole bug: a linked account must not offer a clickable link-account control.
+    expect(root.querySelector('.org-link-google')).toBeNull();
+    const buttonTexts = Array.from(root.querySelectorAll('button')).map((b) => b.textContent);
+    expect(buttonTexts.some((t) => /link google/i.test(t ?? ''))).toBe(false);
+    expect(root.textContent).toContain('alice@example.com');
   });
 });
 
@@ -38,7 +73,9 @@ describe('renderOverview', () => {
   it('renders the join token and creator', () => {
     renderOverview(root, {
       org: { org_id: 'o1', org_name: 'Acme', org_join_token: 'JOIN-XYZ',
-        created_at: '2026-05-14T00:00:00Z', creator_user_id: 'u1', creator_user_name: 'omar' },
+        created_at: '2026-05-14T00:00:00Z', creator_user_id: 'u1', creator_user_name: 'omar',
+        access: { allowed_domains: [], join_token_enabled: true,
+          domain_join_enabled: false, restrict_to_allowed_domains: false } },
     });
     expect(root.textContent).toContain('JOIN-XYZ');
     expect(root.textContent).toContain('omar');
@@ -54,17 +91,16 @@ describe('renderSchedule', () => {
     renderSchedule(root, { schedule: null, isOwner: true, onSave: vi.fn(), onClear: vi.fn() });
     expect(root.querySelector('button[data-action="save"]')).toBeTruthy();
   });
-  it('preserves a pre-set stamina flag through a save from this tab', () => {
+  it('does not send a mechanics field: a schedule no longer carries one', () => {
     const onSave = vi.fn();
     const schedule = {
       org_id: 'o1', weekdays: [1, 2], start_local: '09:00', end_local: '17:30', tz: 'Europe/London',
       created_at: '2026-01-01T00:00:00Z', creator_user_id: 'u1', creator_user_name: 'omar',
-      stamina: true,
     };
     renderSchedule(root, { schedule, isOwner: true, onSave, onClear: vi.fn() });
     (root.querySelector('[data-action="save"]') as HTMLElement).click();
     expect(onSave).toHaveBeenCalledTimes(1);
-    expect(onSave.mock.calls[0]![0].stamina).toBe(true);
+    expect(onSave.mock.calls[0]![0]).not.toHaveProperty('stamina');
   });
 });
 
@@ -151,6 +187,48 @@ describe('renderMembers', () => {
     expect(root.textContent).toContain('omar');
     expect(root.innerHTML).not.toContain('<script>evil</script>');
     expect(root.innerHTML).toContain('&lt;script&gt;evil&lt;/script&gt;');
+  });
+
+  it('shows no linkage columns for a non-owner, even when the fields are present', () => {
+    renderMembers(root, {
+      members: [
+        { user_id: 'u1', user_name: 'omar', joined_at: '2026-05-14T00:00:00Z', linked_email: true, matches_domain: 'yes' },
+      ],
+      isOwner: false,
+    });
+    expect(root.textContent).not.toContain('Linked email');
+    expect(root.textContent).not.toContain('Matches domain');
+    expect(root.querySelectorAll('.org-tick, .org-cross, .org-na')).toHaveLength(0);
+  });
+
+  it('renders the three matches-domain states, and both linked-email states, distinguishably for the owner', () => {
+    renderMembers(root, {
+      members: [
+        { user_id: 'u1', user_name: 'linked-match', joined_at: '2026-05-14T00:00:00Z', linked_email: true, matches_domain: 'yes' },
+        { user_id: 'u2', user_name: 'linked-mismatch', joined_at: '2026-05-15T00:00:00Z', linked_email: true, matches_domain: 'no' },
+        { user_id: 'u3', user_name: 'unlinked', joined_at: '2026-05-16T00:00:00Z', linked_email: false, matches_domain: 'n/a' },
+      ],
+      isOwner: true,
+      ownerUserId: 'owner-not-in-list',
+      onRemove: vi.fn(),
+    });
+    expect(root.textContent).toContain('Linked email');
+    expect(root.textContent).toContain('Matches domain');
+
+    const rows = Array.from(root.querySelectorAll('tbody tr'));
+    expect(rows).toHaveLength(3);
+
+    const cellClasses = (row: Element) => Array.from(row.querySelectorAll('td')).map((td) => td.className);
+    expect(cellClasses(rows[0]!)).toEqual(['', 'muted', 'org-tick', 'org-tick', '']);
+    expect(cellClasses(rows[1]!)).toEqual(['', 'muted', 'org-tick', 'org-cross', '']);
+    expect(cellClasses(rows[2]!)).toEqual(['', 'muted', 'org-cross', 'org-na', '']);
+
+    // Distinguishable by glyph too, not colour alone — innerHTML resolves the
+    // numeric/named entities the markup was built with, so assert on the
+    // rendered characters rather than the entity source.
+    expect(rows[0]!.innerHTML).toContain('✓'); // tick
+    expect(rows[2]!.innerHTML).toContain('✗'); // cross for unlinked
+    expect(rows[2]!.innerHTML).toContain('—'); // dash for n/a
   });
 });
 
@@ -264,12 +342,12 @@ describe('renderLeagueEditor', () => {
     expect(onClear).toHaveBeenCalledTimes(1);
   });
 
-  it('preserves a pre-set stamina flag through a save from this tab', () => {
+  it('does not send a mechanics field: a league no longer carries one', () => {
     const onSave = vi.fn();
-    renderLeagueEditor(root, { league: { ...twoDivLeague, stamina: true }, isOwner: true, onSave, onClear: vi.fn() });
+    renderLeagueEditor(root, { league: { ...twoDivLeague }, isOwner: true, onSave, onClear: vi.fn() });
     (root.querySelector('[data-action="save-league"]') as HTMLElement).click();
     expect(onSave).toHaveBeenCalledTimes(1);
-    expect(onSave.mock.calls[0]![0].stamina).toBe(true);
+    expect(onSave.mock.calls[0]![0]).not.toHaveProperty('stamina');
   });
 
   it('notes that shape changes apply next season when editing an existing league', () => {

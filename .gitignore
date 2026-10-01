@@ -46,3 +46,7 @@ cdk.context.json
 
 # Docker volumes
 docker-data/
+
+# /brag output — rendered launch videos, their Hyperframes project and assets
+brag-output/
+brag-output-*/

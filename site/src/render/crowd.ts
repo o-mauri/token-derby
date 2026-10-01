@@ -11,11 +11,19 @@ export const CHEER = {
   MAX_MS: 1_500,
 } as const;
 
-/** Full sprite tiles that fit across `frameWidthPx`, caps included. */
+/** Sprite tiles needed to COVER `frameWidthPx`, caps included.
+ *
+ *  Rounds up, not down. Flooring left up to one tile of frame unfilled, which
+ *  `justify-self: center` then split between the two ends — invisible while the
+ *  crowd was only sprites on a transparent strip, but the London theme hangs a
+ *  continuous bridge and skyline off this element, and a parapet that stops
+ *  short of both edges reads as a bug. The overflowing tile tucks behind the
+ *  right-hand cap, which paints after it, and .crowd's `overflow: hidden`
+ *  catches whatever is still proud of the edge. */
 export function crowdColumns(frameWidthPx: number, scale: number): number {
   const tile = scale * TILE_PX;
   if (!(tile > 0)) return 0;
-  return Math.max(0, Math.floor(frameWidthPx / tile));
+  return Math.max(0, Math.ceil(frameWidthPx / tile));
 }
 
 export type CheerJitter = { durationMs: number; delayMs: number };

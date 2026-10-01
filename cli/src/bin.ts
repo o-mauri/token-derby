@@ -6,34 +6,73 @@ import { createRaceCommand } from './commands/create.js';
 import { joinCommand } from './commands/join.js';
 import { endCommand } from './commands/end.js';
 import { initCommand } from './commands/init.js';
+import { loginCommand } from './commands/login.js';
+import { logoutCommand } from './commands/logout.js';
+import { linkCommand } from './commands/link.js';
+import { whoamiCommand } from './commands/whoami.js';
 import { updateCommand } from './commands/update.js';
 import { rollCommand } from './commands/roll.js';
+import { claimCommand } from './commands/claim.js';
+import { parseFlag } from './args.js';
+import { stableDefaultCommand } from './commands/stable-default.js';
+import { harnessListCommand, harnessToggleCommand } from './commands/harness.js';
 import { orgJoinCommand } from './commands/org-join.js';
 import { webCommand } from './commands/web.js';
 import { derbymarketCommand } from './commands/derbymarket.js';
-import { envCommand } from './commands/env.js';
+import { logsCommand } from './commands/logs.js';
 import { CLI_VERSION } from './version.js';
 import { loadIdentity } from './identity/identity.js';
+import { logInfo, logError } from './log/logger.js';
 
 const HELP = `token-derby v${CLI_VERSION}
 
 Identity:
-  token-derby init                        Set up your jockey identity (run this first)
-                                          Re-running renames you on the server.
-  token-derby init --reset                Wipe local identity and create a fresh account.
-                                          Your previous stable is abandoned on the server.
+  token-derby init                        Deprecated — creates or renames your jockey identity;
+                                          prefer \`login\`, which also links your account.
+  token-derby init --reset                Deprecated — wipes local identity and starts a fresh
+                                          account (previous stable abandoned); \`login\` recovers
+                                          your existing account instead of abandoning it.
+  token-derby login [--device-name <name>]
+                                          About THIS MACHINE: sign in with Google to give
+                                          it a credential of its own. The way in for a
+                                          machine that has none yet. Adds no email to
+                                          your account — see \`link\`.
+  token-derby logout                      Retire this machine's credential and clear
+                                          local identity.
+  token-derby link [--device-name <name>]
+                                          About YOUR JOCKEY: connect it to a Google
+                                          account — adds your email on file, and
+                                          renames your jockey to the first name on
+                                          that account. Then registers this machine
+                                          as a device too, if it is still using the
+                                          shared account credential.
+  token-derby whoami                      Show your jockey name, linked email (if any),
+                                          and this machine's device name (if any).
 
 Maintenance:
   token-derby update                      Check for and install the latest CLI version
+  token-derby logs                        Show the path of the debug log
+  token-derby logs --tail [n]             Print the last n log lines (default 50)
+
+Coding agents:
+  token-derby harness list                Show which agents this machine counts,
+                                          and whether they have anything to count
+  token-derby harness disable <id>        Stop counting one (takes effect next heartbeat)
+  token-derby harness enable <id>         Start counting it again
 
 Stable management:
   token-derby stable create               Make a new horse (interactive)
   token-derby stable list                 Show your saved horses
   token-derby stable edit [name]          Edit an existing horse's colors (interactive picker if no name)
   token-derby stable delete <name>        Remove a horse from your stable
+  token-derby stable default [name]       Show, set, or (--clear) unset the horse that
+                                          claim/join/stable edit use when none is named.
+                                          A stable of one is used automatically.
 
 Organisations:
-  token-derby organisation join <token>   Join an organisation with a join token
+  token-derby organisation join [token]   Join an organisation with a join token,
+                                          or leave the token out to join by your
+                                          verified email domain
   token-derby web                         Open the web org manager (create orgs,
                                           manage schedules, webhooks, members)
   token-derby derbymarket                 Open the Derbymarket to view live race odds
@@ -43,25 +82,47 @@ Races:
                                           Create a new race (interactive). When
                                           --organisation is set, only members of
                                           that org can join.
-  token-derby join <join-code>            Join (or resume) a race
+  token-derby join <join-code> [--horse <name>|--pick]
+                                          Join (or resume) a race
   token-derby end <admin-code>            End a race early
 
 Cosmetics:
-  token-derby roll                        Spend a pending roll to try for a hat.
-                                          Earn rolls by leveling up horses.
+  token-derby roll [--horse <name>]       Spend a pending roll to try for a hat.
+                                          Earn rolls by leveling up horses. The picker
+                                          is a confirmation step, so it is shown unless
+                                          --horse names the horse outright.
+  token-derby claim <token> [--horse <name>|--pick]
+                                          Redeem a claim token for a cosmetic
+                                          awarded to you by an admin.
 
 Environment:
-  token-derby env                         Show the active environment (prod|staging)
-  token-derby env <prod|staging>          Switch environment. Each env has its own
-                                          identity/stable dir, so switching never
-                                          touches the other env's account.
-  TOKEN_DERBY_API_BASE                    Hard-override API base URL (wins over env)
+  TOKEN_DERBY_API_BASE                    Hard-override API base URL
   TOKEN_DERBY_HOME                        Hard-override identity/stable directory
 `;
+
+// Positional arguments carry join codes, admin codes and claim tokens, so only
+// the command, its subcommand where that is a fixed word, and flag NAMES are
+// logged — never a value.
+function describeInvocation(argv: string[]): Record<string, unknown> {
+  const cmd = argv[0] ?? '(none)';
+  const container = cmd === 'stable' || cmd === 'organisation' || cmd === 'org' || cmd === 'harness';
+  return {
+    cmd,
+    sub: container ? argv[1] : undefined,
+    flags: argv.filter(a => a.startsWith('--')).map(a => a.split('=')[0]),
+  };
+}
 
 async function main(): Promise<number> {
   const argv = process.argv.slice(2);
   const cmd = argv[0];
+
+  logInfo('cmd.start', {
+    ...describeInvocation(argv),
+    version: CLI_VERSION,
+    node: process.version,
+    pid: process.pid,
+  });
 
   if (!cmd || cmd === '--help' || cmd === '-h') { console.log(HELP); return 0; }
   if (cmd === '--version' || cmd === '-v') { console.log(CLI_VERSION); return 0; }
@@ -70,16 +131,32 @@ async function main(): Promise<number> {
     const reset = argv.slice(1).includes('--reset');
     return initCommand(reset);
   }
+  // `login` runs before the identity gate: having no identity is the case it
+  // exists to solve, so gating it below would make it unreachable for its
+  // primary user.
+  if (cmd === 'login') return loginCommand(argv.slice(1));
   // `update` runs before the identity gate so a broken or stale install can fix itself.
   if (cmd === 'update') return updateCommand();
-  // `env` runs before the identity gate: switching to a fresh env is exactly
-  // when no identity exists there yet.
-  if (cmd === 'env') return envCommand(argv[1]);
+  // `logs` runs before the identity gate too — a broken or unauthenticated
+  // install is exactly when the log is worth reading.
+  if (cmd === 'logs') return logsCommand(argv.slice(1));
 
-  // Every other command requires an identity. `init`, `update`, and `env` are the only escape hatches.
+  // `harness` runs before the identity gate: which coding agents this machine
+  // counts is local configuration, unrelated to having an account.
+  if (cmd === 'harness') {
+    const sub = argv[1];
+    if (sub === undefined || sub === 'list') return harnessListCommand();
+    if (sub === 'enable') return harnessToggleCommand(argv[2], true);
+    if (sub === 'disable') return harnessToggleCommand(argv[2], false);
+    console.error(`Unknown harness subcommand: ${sub}`);
+    console.error('Try: harness list | harness enable <id> | harness disable <id>');
+    return 2;
+  }
+
+  // Every other command requires an identity. `init` and `update` are the only escape hatches.
   const identity = await loadIdentity();
   if (!identity) {
-    console.error('Run `token-derby init` to set up your identity before using any other command.');
+    console.error('Run `token-derby login` to set up your identity before using any other command.');
     return 1;
   }
 
@@ -89,8 +166,9 @@ async function main(): Promise<number> {
     if (sub === 'list') return stableListCommand();
     if (sub === 'edit') return stableEditCommand(argv[2]);
     if (sub === 'delete') return stableDeleteCommand(argv[2]);
+    if (sub === 'default') return stableDefaultCommand(argv.slice(2));
     console.error(`Unknown stable subcommand: ${sub ?? '(none)'}`);
-    console.error('Try: stable create | stable list | stable edit <name> | stable delete <name>');
+    console.error('Try: stable create | stable list | stable edit <name> | stable delete <name> | stable default [<name>|--clear]');
     return 2;
   }
 
@@ -98,7 +176,7 @@ async function main(): Promise<number> {
     const sub = argv[1];
     if (sub === 'join') return orgJoinCommand(argv[2]);
     console.error(`Organisation management has moved to the web: token-derby web`);
-    console.error(`The only CLI organisation command is: organisation join <token>`);
+    console.error(`The only CLI organisation command is: organisation join [token]`);
     return 2;
   }
 
@@ -106,9 +184,13 @@ async function main(): Promise<number> {
     const orgName = parseFlag(argv.slice(1), '--organisation');
     return createRaceCommand(orgName);
   }
+  if (cmd === 'logout') return logoutCommand();
+  if (cmd === 'link')   return linkCommand(argv.slice(1));
+  if (cmd === 'whoami') return whoamiCommand();
   if (cmd === 'join')   return joinCommand(argv[1], argv.slice(2));
   if (cmd === 'end')    return endCommand(argv[1]);
-  if (cmd === 'roll')      return rollCommand();
+  if (cmd === 'roll')      return rollCommand(argv.slice(1));
+  if (cmd === 'claim')  return claimCommand(argv[1], argv.slice(2));
   if (cmd === 'web')    return webCommand();
   if (cmd === 'derbymarket') return derbymarketCommand();
 
@@ -117,18 +199,38 @@ async function main(): Promise<number> {
   return 2;
 }
 
-function parseFlag(args: string[], flag: string): string | undefined {
-  for (let i = 0; i < args.length; i++) {
-    if (args[i] === flag) return args[i + 1];
-    const eq = `${flag}=`;
-    if (args[i]?.startsWith(eq)) return args[i]!.slice(eq.length);
-  }
-  return undefined;
+// A crash that escapes main() still gets a line — these are exactly the runs
+// worth reading the log for afterwards. Tagging the process keeps a second load
+// of this module from installing (and so firing) a duplicate set.
+const CRASH_HANDLERS_INSTALLED = Symbol.for('token-derby.crash-handlers');
+if (!(CRASH_HANDLERS_INSTALLED in process)) {
+  (process as unknown as Record<symbol, boolean>)[CRASH_HANDLERS_INSTALLED] = true;
+  process.on('uncaughtException', (err: Error) => {
+    logError('cmd.uncaught', { message: err?.message ?? String(err), stack: err?.stack });
+    console.error(err?.stack ?? err);
+    process.exit(1);
+  });
+  process.on('unhandledRejection', (reason: unknown) => {
+    logError('cmd.unhandled', {
+      message: (reason as Error)?.message ?? String(reason),
+      stack: (reason as Error)?.stack,
+    });
+  });
 }
 
+const startedAt = Date.now();
+
 main().then(
-  code => process.exit(code),
+  code => {
+    logInfo('cmd.exit', { code, ms: Date.now() - startedAt });
+    process.exit(code);
+  },
   err => {
+    logError('cmd.crash', {
+      message: err?.message ?? String(err),
+      stack: err?.stack,
+      ms: Date.now() - startedAt,
+    });
     console.error(err?.stack ?? err);
     process.exit(1);
   },

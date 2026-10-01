@@ -1,15 +1,17 @@
 import { spawn } from 'node:child_process';
 import { createWebSession } from '../api/endpoints.js';
-import { apiBase } from '../config.js';
+import { SITE_ORIGIN } from '../config.js';
 import { ApiError } from '../api/client.js';
 
 export type Deps = { spawnImpl?: typeof spawn };
 
-function webOrigin(): string {
-  return apiBase().replace(/\/api\/?$/, '');
+/** An API override (e.g. http://localhost:3000/api) serves its own site. */
+export function webOrigin(): string {
+  const override = process.env.TOKEN_DERBY_API_BASE;
+  return override ? override.replace(/\/api\/?$/, '') : SITE_ORIGIN;
 }
 
-function opener(): string | null {
+export function opener(): string | null {
   if (process.platform === 'darwin') return 'open';
   if (process.platform === 'win32') return 'start';
   if (process.platform === 'linux') return 'xdg-open';

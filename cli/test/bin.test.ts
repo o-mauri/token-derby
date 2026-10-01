@@ -1,0 +1,266 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
+// bin.ts calls process.exit() at the top level (main().then(code => process.exit(code))),
+// so importing it for real must stub process.exit before the import — otherwise it
+// would kill this test worker outright.
+describe('bin.ts command registration order', () => {
+  let origArgv: string[];
+  let exitSpy: any;
+  let errorSpy: any;
+  let logSpy: any;
+
+  beforeEach(() => {
+    origArgv = process.argv;
+    vi.resetModules();
+    logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    exitSpy = vi.spyOn(process, 'exit').mockImplementation(((): never => undefined as never));
+  });
+
+  afterEach(() => {
+    process.argv = origArgv;
+    vi.restoreAllMocks();
+    vi.resetModules();
+  });
+
+  async function settle(): Promise<void> {
+    // Lets the async main()/.then() chain (which runs as a side effect of
+    // importing bin.ts) actually finish before we assert on it.
+    await new Promise((resolve) => setImmediate(resolve));
+    await new Promise((resolve) => setImmediate(resolve));
+  }
+
+  it('reaches `login` even with no identity on disk, instead of the identity gate', async () => {
+    vi.doMock('../src/identity/identity.js', () => ({
+      loadIdentity: vi.fn().mockResolvedValue(null),
+    }));
+    const loginCommand = vi.fn().mockResolvedValue(0);
+    vi.doMock('../src/commands/login.js', () => ({ loginCommand }));
+
+    process.argv = ['node', 'bin.js', 'login', '--device-name', 'x'];
+
+    await import('../src/bin.js');
+    await settle();
+
+    expect(loginCommand).toHaveBeenCalledWith(['--device-name', 'x']);
+    const errorText = errorSpy.mock.calls.map((c: unknown[]) => c.join(' ')).join('\n');
+    expect(errorText).not.toContain('token-derby init');
+    expect(exitSpy).toHaveBeenCalledWith(0);
+  });
+
+  it('does not reach `logout` when there is no identity — the gate bites like any other non-escape-hatch command', async () => {
+    vi.doMock('../src/identity/identity.js', () => ({
+      loadIdentity: vi.fn().mockResolvedValue(null),
+    }));
+    const logoutCommand = vi.fn().mockResolvedValue(0);
+    vi.doMock('../src/commands/logout.js', () => ({ logoutCommand }));
+
+    process.argv = ['node', 'bin.js', 'logout'];
+
+    await import('../src/bin.js');
+    await settle();
+
+    expect(logoutCommand).not.toHaveBeenCalled();
+    const errorText = errorSpy.mock.calls.map((c: unknown[]) => c.join(' ')).join('\n');
+    expect(errorText).toContain('token-derby login');
+    expect(exitSpy).toHaveBeenCalledWith(1);
+  });
+
+  it('reaches `logout` once an identity is on disk', async () => {
+    vi.doMock('../src/identity/identity.js', () => ({
+      loadIdentity: vi.fn().mockResolvedValue({
+        user_id: 'u', display_name: 'D', secret_token: 't', created_at: '2026-01-01T00:00:00Z',
+      }),
+    }));
+    const logoutCommand = vi.fn().mockResolvedValue(0);
+    vi.doMock('../src/commands/logout.js', () => ({ logoutCommand }));
+
+    process.argv = ['node', 'bin.js', 'logout'];
+
+    await import('../src/bin.js');
+    await settle();
+
+    expect(logoutCommand).toHaveBeenCalledTimes(1);
+    expect(exitSpy).toHaveBeenCalledWith(0);
+  });
+
+  it('does not reach `link` when there is no identity — it requires the local account it connects', async () => {
+    vi.doMock('../src/identity/identity.js', () => ({
+      loadIdentity: vi.fn().mockResolvedValue(null),
+    }));
+    const linkCommand = vi.fn().mockResolvedValue(0);
+    vi.doMock('../src/commands/link.js', () => ({ linkCommand }));
+
+    process.argv = ['node', 'bin.js', 'link'];
+
+    await import('../src/bin.js');
+    await settle();
+
+    expect(linkCommand).not.toHaveBeenCalled();
+    const errorText = errorSpy.mock.calls.map((c: unknown[]) => c.join(' ')).join('\n');
+    expect(errorText).toContain('token-derby login');
+    expect(exitSpy).toHaveBeenCalledWith(1);
+  });
+
+  it('reaches `link` once an identity is on disk', async () => {
+    vi.doMock('../src/identity/identity.js', () => ({
+      loadIdentity: vi.fn().mockResolvedValue({
+        user_id: 'u', display_name: 'D', secret_token: 't', created_at: '2026-01-01T00:00:00Z',
+      }),
+    }));
+    const linkCommand = vi.fn().mockResolvedValue(0);
+    vi.doMock('../src/commands/link.js', () => ({ linkCommand }));
+
+    process.argv = ['node', 'bin.js', 'link', '--device-name', 'x'];
+
+    await import('../src/bin.js');
+    await settle();
+
+    // The argv has to reach the command, not just the command reach the
+    // dispatcher: `link` names the device it registers from --device-name.
+    expect(linkCommand).toHaveBeenCalledWith(['--device-name', 'x']);
+    expect(exitSpy).toHaveBeenCalledWith(0);
+  });
+
+  it('does not reach `whoami` when there is no identity — it reports on an identity, so requiring one is correct', async () => {
+    vi.doMock('../src/identity/identity.js', () => ({
+      loadIdentity: vi.fn().mockResolvedValue(null),
+    }));
+    const whoamiCommand = vi.fn().mockResolvedValue(0);
+    vi.doMock('../src/commands/whoami.js', () => ({ whoamiCommand }));
+
+    process.argv = ['node', 'bin.js', 'whoami'];
+
+    await import('../src/bin.js');
+    await settle();
+
+    expect(whoamiCommand).not.toHaveBeenCalled();
+    const errorText = errorSpy.mock.calls.map((c: unknown[]) => c.join(' ')).join('\n');
+    expect(errorText).toContain('token-derby login');
+    expect(exitSpy).toHaveBeenCalledWith(1);
+  });
+
+  it('reaches `whoami` once an identity is on disk', async () => {
+    vi.doMock('../src/identity/identity.js', () => ({
+      loadIdentity: vi.fn().mockResolvedValue({
+        user_id: 'u', display_name: 'D', secret_token: 't', created_at: '2026-01-01T00:00:00Z',
+      }),
+    }));
+    const whoamiCommand = vi.fn().mockResolvedValue(0);
+    vi.doMock('../src/commands/whoami.js', () => ({ whoamiCommand }));
+
+    process.argv = ['node', 'bin.js', 'whoami'];
+
+    await import('../src/bin.js');
+    await settle();
+
+    expect(whoamiCommand).toHaveBeenCalledTimes(1);
+    expect(exitSpy).toHaveBeenCalledWith(0);
+  });
+
+  it('control: a command that is NOT one of the escape hatches still hits the identity gate with no identity', async () => {
+    vi.doMock('../src/identity/identity.js', () => ({
+      loadIdentity: vi.fn().mockResolvedValue(null),
+    }));
+    const joinCommand = vi.fn().mockResolvedValue(0);
+    vi.doMock('../src/commands/join.js', () => ({ joinCommand }));
+
+    process.argv = ['node', 'bin.js', 'join', 'ABCD1234'];
+
+    await import('../src/bin.js');
+    await settle();
+
+    expect(joinCommand).not.toHaveBeenCalled();
+    const errorText = errorSpy.mock.calls.map((c: unknown[]) => c.join(' ')).join('\n');
+    expect(errorText).toContain('token-derby login');
+    expect(exitSpy).toHaveBeenCalledWith(1);
+  });
+
+
+  it('marks both init entries as deprecated and points at login', async () => {
+    vi.doMock('../src/identity/identity.js', () => ({
+      loadIdentity: vi.fn().mockResolvedValue(null),
+    }));
+    process.argv = ['node', 'bin.js', '--help'];
+    await import('../src/bin.js');
+    await settle();
+
+    const help = logSpy.mock.calls.map((c: unknown[]) => c.join(' ')).join('\n');
+    // Both entries, not just one: --reset is the destructive path and the one
+    // most likely to be reached for by someone who should be running login.
+    const initLines = help.split('\n').filter((l: string) => /^\s+token-derby init/.test(l));
+    expect(initLines).toHaveLength(2);
+    for (const line of initLines) expect(line).toMatch(/Deprecated/);
+  });
+
+  it('discloses that `link` renames the jockey, since the rename is silent otherwise', async () => {
+    vi.doMock('../src/identity/identity.js', () => ({
+      loadIdentity: vi.fn().mockResolvedValue(null),
+    }));
+    process.argv = ['node', 'bin.js', '--help'];
+    await import('../src/bin.js');
+    await settle();
+
+    const help = logSpy.mock.calls.map((c: unknown[]) => c.join(' ')).join('\n');
+    // The rename is intended, but it overwrites a name the user chose, so the
+    // help for the command that does it has to say so.
+    const linkBlock = help.slice(help.indexOf('token-derby link'), help.indexOf('token-derby whoami'));
+    expect(linkBlock).toMatch(/renames your jockey/i);
+  });
+
+  it('keeps `login` and `link` distinguished now that both register a device', async () => {
+    vi.doMock('../src/identity/identity.js', () => ({
+      loadIdentity: vi.fn().mockResolvedValue(null),
+    }));
+    process.argv = ['node', 'bin.js', '--help'];
+    await import('../src/bin.js');
+    await settle();
+
+    const help = logSpy.mock.calls.map((c: unknown[]) => c.join(' ')).join('\n');
+    const loginBlock = help.slice(help.indexOf('token-derby login'), help.indexOf('token-derby logout'));
+    const linkBlock = help.slice(help.indexOf('token-derby link'), help.indexOf('token-derby whoami'));
+
+    // `link` now does the machine half too, so the old "does not authorize a new
+    // machine" line would be a lie. What still separates them is what each one
+    // is ABOUT — and each has to point at the other, or a reader picks by
+    // guessing which of two overlapping commands they want.
+    expect(linkBlock).toMatch(/registers this machine/i);
+    expect(linkBlock).not.toMatch(/does not authorize/i);
+    expect(loginBlock).toMatch(/this machine/i);
+    expect(loginBlock).toMatch(/\bsee `link`/);
+    expect(linkBlock).toMatch(/your jockey/i);
+    // And `link` takes the same naming flag, or the two disagree on how a
+    // machine gets named.
+    expect(linkBlock).toContain('--device-name');
+  });
+
+  it('aligns every help description in the same column', async () => {
+    vi.doMock('../src/identity/identity.js', () => ({
+      loadIdentity: vi.fn().mockResolvedValue(null),
+    }));
+
+    process.argv = ['node', 'bin.js', '--help'];
+
+    await import('../src/bin.js');
+    await settle();
+
+    const help = logSpy.mock.calls.map((c: unknown[]) => c.join(' ')).join('\n');
+    const columns = new Map<number, string[]>();
+    for (const line of help.split('\n')) {
+      const m = /^(\s+token-derby\s\S.*?)(\s\s+)\S/.exec(line);
+      if (!m) continue;
+      const col = m[1]!.length + m[2]!.length;
+      columns.set(col, [...(columns.get(col) ?? []), line.trimEnd()]);
+    }
+
+    // Proves the block was actually found, so this cannot pass by matching nothing.
+    // Known limit: the regex needs a 2+-space gap to locate the description, so a
+    // single-space typo is skipped rather than flagged, and three command lines
+    // (`login`, `link`, `create`) legitimately carry no inline description at
+    // all — their flags fill the column, so the text starts on the next line.
+    // Tightening this to "every command line matched" gives a false failure on those.
+    const matched = [...columns.values()].reduce((n, ls) => n + ls.length, 0);
+    expect(matched).toBeGreaterThan(12);
+    expect([...columns.keys()]).toHaveLength(1);
+  });
+});

@@ -34,7 +34,7 @@ describe('boot', () => {
 
   it('clears the token and returns to login on unauthorized', async () => {
     setToken('stale');
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(JSON.stringify({ code: 'UNAUTHENTICATED', message: 'no' }), { status: 401, headers: { 'content-type': 'application/json' } }),
     );
     boot(root);

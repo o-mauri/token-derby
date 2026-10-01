@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { getSession, setSession, clearSession, getUid, setUid, clearUid, readCodeFromHash } from '../../src/org-manager/session.js';
+import { getSession, setSession, clearSession, getUid, setUid, clearUid, getLinkedEmail, setLinkedEmail, clearLinkedEmail, readCodeFromHash } from '../../src/org-manager/session.js';
 
 beforeEach(() => { localStorage.clear(); window.location.hash = ''; });
 
@@ -27,6 +27,23 @@ describe('org-manager session', () => {
     clearSession();
     expect(getSession()).toBeNull();
     expect(getUid()).toBeNull();
+  });
+
+  it('stores and clears the linked email in localStorage', () => {
+    expect(getLinkedEmail()).toBeNull();
+    setLinkedEmail('alice@example.com');
+    expect(getLinkedEmail()).toBe('alice@example.com');
+    expect(localStorage.getItem('td_org_linked_email')).toBe('alice@example.com');
+    clearLinkedEmail();
+    expect(getLinkedEmail()).toBeNull();
+  });
+
+  it('clearSession also clears the linked email, so logout wipes it too', () => {
+    setSession('tok123');
+    setLinkedEmail('alice@example.com');
+    clearSession();
+    expect(getSession()).toBeNull();
+    expect(getLinkedEmail()).toBeNull();
   });
 
   it('reads the code from the hash and wipes it', () => {

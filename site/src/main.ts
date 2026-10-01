@@ -5,8 +5,11 @@ import { renderOrg } from './render/org.js';
 import { renderOrgLive } from './render/org-live.js';
 import { renderCatalog } from './render/catalog.js';
 import { renderAbout } from './render/about.js';
+import { renderPrivacy } from './render/privacy.js';
 import { renderOrgManager } from './org-manager/index.js';
 import { renderDerbyMarket } from './derbymarket/index.js';
+import { renderCliApprove } from './render/cli-approve.js';
+import { renderLinkGoogle } from './render/link-google.js';
 import { initTheme } from './theme.js';
 
 // Legendary hat keyframes are installed lazily on the first buildHatGroup
@@ -37,10 +40,16 @@ function route() {
     activeCleanup = renderCatalog(root);
   } else if (r.type === 'about') {
     renderAbout(root);
+  } else if (r.type === 'privacy') {
+    renderPrivacy(root);
   } else if (r.type === 'org-manager') {
     activeCleanup = renderOrgManager(root);
   } else if (r.type === 'derbymarket') {
     activeCleanup = renderDerbyMarket(root);
+  } else if (r.type === 'cli') {
+    activeCleanup = renderCliApprove(root);
+  } else if (r.type === 'link') {
+    activeCleanup = renderLinkGoogle(root);
   } else {
     root.innerHTML = `
       <section class="error">

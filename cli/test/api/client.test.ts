@@ -162,3 +162,45 @@ describe('ApiError', () => {
     expect(e instanceof Error).toBe(true);
   });
 });
+
+describe('non-JSON success responses', () => {
+  // CloudFront's SPA fallback rewrites 403/404 into `200 text/html` for the whole
+  // distribution, /api/* included, so the CLI receives the site's HTML shell where
+  // it expected JSON. Returning that as `null` made every caller throw
+  // "Cannot read properties of null" far from the cause.
+  function htmlShell(status = 200) {
+    return vi.fn().mockResolvedValue({
+      ok: status >= 200 && status < 300,
+      status,
+      headers: { get: () => 'text/html' },
+      text: async () => '<!DOCTYPE html><html><body><div id="app"></div></body></html>',
+    });
+  }
+
+  it('throws instead of returning null when a 200 is not JSON', async () => {
+    await expect(
+      request('GET', '/claims/ABC', undefined, undefined, htmlShell() as any),
+    ).rejects.toBeInstanceOf(ApiError);
+  });
+
+  it('names the endpoint and what came back instead', async () => {
+    const e = await request('GET', '/claims/ABC', undefined, undefined, htmlShell() as any)
+      .catch((x: unknown) => x as ApiError);
+
+    expect((e as ApiError).message).toContain('text/html');
+    expect((e as ApiError).message).toContain('/claims/');
+  });
+
+  it('throws when a 200 carries an empty body', async () => {
+    const empty = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: { get: () => 'application/json' },
+      text: async () => '',
+    });
+
+    await expect(
+      request('GET', '/jockey/me', undefined, undefined, empty as any),
+    ).rejects.toBeInstanceOf(ApiError);
+  });
+});

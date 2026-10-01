@@ -1,8 +1,8 @@
 import type { Race, Horse } from '@token-derby/shared';
 import { leaguePoints } from '@token-derby/shared';
 import { getLeague } from '../db/leagues.js';
-import { listOrgMembers } from '../db/organisations.js';
-import { listSeasonStandings, ensureStanding, addStandingPointsForRound } from '../db/league-standings.js';
+import { listOrgMemberIds } from '../db/organisations.js';
+import { listSeasonStandingDivisions, ensureStanding, addStandingPointsForRound } from '../db/league-standings.js';
 
 // A finisher as scoreLeagueRace requires it: both token figures already
 // stamped (finaliseRace's `stamped` array guarantees this for its sole caller).
@@ -42,15 +42,14 @@ export async function scoreLeagueRace(
   const round = race.league_round;
   const bottom = league.divisions.length;
 
-  const members = new Set((await listOrgMembers(org_id)).map(m => m.user_id));
+  const members = new Set(await listOrgMemberIds(org_id));
   const participants = horses.filter(
     (h): h is FinishedHorse & { stable_horse_id: string; user_id: string } =>
       Boolean(h.stable_horse_id) && Boolean(h.user_id) && members.has(h.user_id),
   );
   if (participants.length === 0) return null;
 
-  const divByHorse = new Map<string, number>();
-  for (const s of await listSeasonStandings(org_id, season)) divByHorse.set(s.stable_horse_id, s.division);
+  const divByHorse = await listSeasonStandingDivisions(org_id, season);
 
   const now = new Date().toISOString();
   // Resolve each participant's division; create bottom-division rows for new entrants.

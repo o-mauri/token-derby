@@ -1,26 +1,32 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import type { GetRaceResponse, HorseColors, HorseView } from '@token-derby/shared';
-import { levelInfo, MODEL_KEYS, resolveStaminaConfig, scoredOf, SECONDARY_WEIGHT, type ModelKey } from '@token-derby/shared';
+import { levelInfo, resolveStaminaConfig, runsModifier, scoredOf, staminaOf } from '@token-derby/shared';
 import { HorseSprite } from './HorseSprite.js';
 import { MINI_SPRITE } from './sprite.js';
+import { SILENT_THRESHOLD } from '../config.js';
+import type { DegradedSource } from '../tokens/race-tokens.js';
+import { HARNESSES, HARNESS_KEYS, type HarnessKey } from '../tokens/harnesses/registry.js';
 
-const MODEL_LABELS: Record<ModelKey, string> = { claude: 'Claude', codex: 'Codex', gemini: 'Gemini' };
 
-export function ModelList(props: { primaryModel: ModelKey }) {
-  const { primaryModel } = props;
-  const secondaryTag = ` (${Math.round(SECONDARY_WEIGHT * 100)}%)`;
+
+export function ModelList(props: { disabled?: HarnessKey[] }) {
+  const off = new Set(props.disabled ?? []);
   return (
     <Box marginTop={1}>
       <Text>
-        {'Models:  '}
-        {MODEL_KEYS.map((m, i) => (
-          <Text key={m}>
+        {'Counting:  '}
+        {HARNESS_KEYS.map((key, i) => (
+          <Text key={key}>
             {i > 0 ? ' · ' : ''}
-            {MODEL_LABELS[m]}
-            <Text dimColor>{m === primaryModel ? ' (primary)' : secondaryTag}</Text>
+            {/* A harness turned off is shown, not hidden: "why isn't my Codex
+                work counting?" should be answerable from this line alone. */}
+            {off.has(key)
+              ? <Text dimColor>{HARNESSES[key].label} (off)</Text>
+              : HARNESSES[key].label}
           </Text>
         ))}
+        <Text dimColor>{'  (all count the same)'}</Text>
       </Text>
     </Box>
   );
@@ -36,11 +42,14 @@ type Props = {
   lastHeartbeatOk: boolean;
   stalled?: boolean;
   stallReason?: string | null;
-  primaryModel?: ModelKey;
+  sourcesSilent?: boolean;
+  degraded?: DegradedSource[];
+  notices?: string[];
+  disabledHarnesses?: HarnessKey[];
 };
 
 export function StatusScreen(props: Props) {
-  const { race, ownHorseId, ownHorseName, ownColors, ownUserName, lastHeartbeatAgoSec, lastHeartbeatOk, stalled, stallReason, primaryModel } = props;
+  const { race, ownHorseId, ownHorseName, ownColors, ownUserName, lastHeartbeatAgoSec, lastHeartbeatOk, stalled, stallReason, sourcesSilent, degraded, notices, disabledHarnesses } = props;
 
   if (!race) {
     return (
@@ -64,7 +73,7 @@ export function StatusScreen(props: Props) {
   const divisionRank = own ? divisionField.indexOf(own) + 1 : 0;
   const showDivision = (race.league_division_names?.length ?? 0) > 0 && divisionRank > 0;
 
-  const staminaRow = race.stamina === true ? staminaLine(own, race) : null;
+  const staminaRow = runsModifier(race, 'stamina') ? staminaLine(own, race) : null;
 
   const rows: StatRow[] = [
     { label: 'Tokens (race):', value: String(own?.final_scored_tokens ?? (own ? scoredOf(own) : 0)) },
@@ -116,9 +125,25 @@ export function StatusScreen(props: Props) {
         {stalled && (
           <Text color="yellow">⚠ {stallReason ?? "Can't read token usage"}. Your race continues.</Text>
         )}
+        {/* A stall names a more specific cause, so it wins the one warning slot. */}
+        {!stalled && (degraded?.length ?? 0) > 0 && degraded!.map(d => (
+          <Text key={d.harness} color="yellow">
+            ⚠ {d.label} not counted this beat — {d.message}. Your other sources
+            still count, and {d.label} catches up once it can be read.
+          </Text>
+        ))}
+        {!stalled && (notices?.length ?? 0) > 0 && notices!.map(n => (
+          <Text key={n} color="yellow">⚠ {n}</Text>
+        ))}
+        {!stalled && (degraded?.length ?? 0) === 0 && sourcesSilent && (
+          <Text color="yellow">
+            ⚠ No transcripts from any coding agent in {SILENT_THRESHOLD} beats. Your race
+            continues, but your horse cannot move until they can be read.
+          </Text>
+        )}
       </Box>
 
-      {primaryModel && <ModelList primaryModel={primaryModel} />}
+      <ModelList disabled={disabledHarnesses} />
 
       <Box marginTop={1}>
         <Text dimColor>Press Ctrl+C to crash out of the race.</Text>
@@ -164,7 +189,7 @@ function bar(pct: number, width: number): string {
 // Bands match the race page exactly: green above 50, amber down to the org's
 // taper floor, red below it — where scoring actually starts costing.
 function staminaLine(own: HorseView | undefined, race: GetRaceResponse): StatRow {
-  const stamina = own?.stamina ?? 100;
+  const stamina = staminaOf(own ?? {});
   const cfg = resolveStaminaConfig(race);
   const floor = cfg.taper_floor;
   const band = stamina > 50 ? 'green' : stamina >= floor ? 'amber' : 'red';

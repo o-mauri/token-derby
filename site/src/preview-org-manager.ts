@@ -9,13 +9,20 @@ import { renderRacing } from './org-manager/render/tabs/racing.js';
 import { renderWebhook } from './org-manager/render/tabs/webhook.js';
 import { renderSlackbot } from './org-manager/render/tabs/slackbot.js';
 import { renderRaceSettings } from './org-manager/render/tabs/race-settings.js';
+import { renderAccess } from './org-manager/render/tabs/access.js';
+import { renderAccount } from './org-manager/render/account.js';
 
 const app = document.getElementById('app')!;
 
-// Section 1: signed-out state.
+// Section 1: signed-out state, both variants — /org-manager's default and the
+// /cli one, which drops the "CLI racing arrives later" line.
 const loginSection = document.createElement('div');
 app.appendChild(loginSection);
 renderLogin(loginSection);
+
+const cliLoginSection = document.createElement('div');
+app.appendChild(cliLoginSection);
+renderLogin(cliLoginSection, { variant: 'cli' });
 
 // Section 2: signed-in shell — sidebar + a static tab strip + the Overview
 // tab body, matching the real DOM shape produced by org-manager/index.ts.
@@ -30,6 +37,7 @@ shell.innerHTML = `
       <button type="button" class="org-tab">racing</button>
       <button type="button" class="org-tab">webhook</button>
       <button type="button" class="org-tab">slackbot</button>
+      <button type="button" class="org-tab">access</button>
     </nav>
     <div class="org-tabbody"></div>
   </div>
@@ -42,8 +50,43 @@ renderSidebar(shell.querySelector<HTMLElement>('.org-side')!, {
     { org_id: 'o2', org_name: 'RocketTeam' },
   ],
   selected: 'Acme',
+  view: 'org',
   ownerOrgs: new Set(['Acme']),
-  onSelect: () => {}, onCreate: () => {}, onJoin: () => {}, onLogout: () => {},
+  linkedEmail: null,
+  onSelect: () => {}, onAccount: () => {}, onCreate: () => {}, onJoin: () => {}, onLinkGoogle: () => {}, onLogout: () => {},
+});
+
+// Section 2b: the same sidebar with a Google account already linked, shown
+// side by side with the unlinked one above so both renderings are visible.
+const linkedSidebarSection = document.createElement('section');
+linkedSidebarSection.className = 'org-preview-section';
+linkedSidebarSection.innerHTML = `<h2 class="org-preview-heading">Sidebar — Google account linked</h2><div class="org-manager"><div class="org-side"></div></div>`;
+app.appendChild(linkedSidebarSection);
+renderSidebar(linkedSidebarSection.querySelector<HTMLElement>('.org-side')!, {
+  orgs: [
+    { org_id: 'o1', org_name: 'Acme' },
+    { org_id: 'o2', org_name: 'RocketTeam' },
+  ],
+  selected: 'Acme',
+  view: 'org',
+  ownerOrgs: new Set(['Acme']),
+  linkedEmail: 'omar@example.com',
+  onSelect: () => {}, onAccount: () => {}, onCreate: () => {}, onJoin: () => {}, onLinkGoogle: () => {}, onLogout: () => {},
+});
+
+// Section 2c: the Account sidebar entry selected — the state a user with zero
+// organisations lands in, since it is reachable independent of the org list.
+const accountSidebarSection = document.createElement('section');
+accountSidebarSection.className = 'org-preview-section';
+accountSidebarSection.innerHTML = `<h2 class="org-preview-heading">Sidebar — Account selected, zero organisations</h2><div class="org-manager"><div class="org-side"></div></div>`;
+app.appendChild(accountSidebarSection);
+renderSidebar(accountSidebarSection.querySelector<HTMLElement>('.org-side')!, {
+  orgs: [],
+  selected: null,
+  view: 'account',
+  ownerOrgs: new Set(),
+  linkedEmail: 'omar@example.com',
+  onSelect: () => {}, onAccount: () => {}, onCreate: () => {}, onJoin: () => {}, onLinkGoogle: () => {}, onLogout: () => {},
 });
 
 renderOverview(shell.querySelector<HTMLElement>('.org-tabbody')!, {
@@ -54,6 +97,12 @@ renderOverview(shell.querySelector<HTMLElement>('.org-tabbody')!, {
     created_at: '2026-05-14T00:00:00Z',
     creator_user_id: 'u1',
     creator_user_name: 'omar',
+    access: {
+      allowed_domains: [],
+      join_token_enabled: true,
+      domain_join_enabled: false,
+      restrict_to_allowed_domains: false,
+    },
   },
 });
 
@@ -68,12 +117,59 @@ function tabSection(title: string): HTMLElement {
   return section.querySelector<HTMLElement>('.org-tabbody')!;
 }
 
-renderMembers(tabSection('Members tab'), {
+renderMembers(tabSection('Members tab (non-owner — no Remove column)'), {
   members: [
     { user_id: 'u1', user_name: 'omar', joined_at: '2026-05-14T00:00:00Z' },
     { user_id: 'u2', user_name: 'jess', joined_at: '2026-06-01T00:00:00Z' },
     { user_id: 'u3', user_name: 'sam', joined_at: '2026-06-20T00:00:00Z' },
   ],
+});
+
+renderMembers(tabSection('Members tab (owner — Remove available, plus owner-only linkage columns)'), {
+  members: [
+    { user_id: 'u1', user_name: 'omar', joined_at: '2026-05-14T00:00:00Z', linked_email: true, matches_domain: 'yes' },
+    { user_id: 'u2', user_name: 'jess', joined_at: '2026-06-01T00:00:00Z', linked_email: true, matches_domain: 'no' },
+    { user_id: 'u3', user_name: 'sam', joined_at: '2026-06-20T00:00:00Z', linked_email: false, matches_domain: 'n/a' },
+  ],
+  isOwner: true,
+  ownerUserId: 'u1',
+  onRemove: () => {},
+});
+
+renderAccess(tabSection('Access tab (owner — token+domain joins both open)'), {
+  access: {
+    allowed_domains: ['acme.com'],
+    join_token_enabled: true,
+    domain_join_enabled: true,
+    restrict_to_allowed_domains: false,
+  },
+  onSave: () => {},
+  onRotate: () => {},
+});
+
+// The rotation blurb and the removal confirmation both change wording with
+// domain auto-join off, so both states need a fixture.
+renderAccess(tabSection('Access tab (owner — domain auto-join off)'), {
+  access: {
+    allowed_domains: ['acme.com'],
+    join_token_enabled: true,
+    domain_join_enabled: false,
+    restrict_to_allowed_domains: false,
+  },
+  onSave: () => {},
+  onRotate: () => {},
+});
+
+renderAccess(tabSection('Access tab (owner — just rotated the join token)'), {
+  access: {
+    allowed_domains: ['acme.com', 'acme.io'],
+    join_token_enabled: true,
+    domain_join_enabled: true,
+    restrict_to_allowed_domains: true,
+  },
+  rotatedToken: 'td_join_k3mP9qXz',
+  onSave: () => {},
+  onRotate: () => {},
 });
 
 renderRacing(tabSection('Racing tab (owner) — League mode'), {
@@ -89,7 +185,6 @@ renderRacing(tabSection('Racing tab (owner) — League mode'), {
     tz: 'Europe/London',
     race_name: 'Acme League',
     max_participants: 20,
-    primary_top5: true,
     current_season: 1,
     status: 'active',
     created_at: '2026-05-14T00:00:00Z',
@@ -108,7 +203,6 @@ renderRacing(tabSection('Racing tab (owner) — Scheduled races mode'), {
     end_local: '17:30',
     tz: 'Europe/London',
     max_participants: 20,
-    primary_top5: true,
     created_at: '2026-05-14T00:00:00Z',
     creator_user_id: 'u1',
     creator_user_name: 'omar',
@@ -150,18 +244,55 @@ renderRaceSettings(tabSection('Race Settings tab (owner, saved override)'), {
     org_id: 'o1',
     // drain_per_min stays below the default max_drain_per_min cap here, so its
     // own effect on the time-to-red readout is visible rather than swallowed by the cap.
-    stamina_config: { drain_per_min: 5, taper_floor: 40 },
+    modifiers: { stamina: { enabled: true, params: { drain_per_min: 5, taper_floor: 40 } } },
     updated_at: '2026-06-01T00:00:00Z',
     updated_by_user_id: 'u1',
   },
-  staminaOn: true,
   isOwner: true,
-  onSave: () => {}, onReset: () => {}, onToggleStamina: () => {},
+  onSave: () => {}, onReset: () => {},
 });
 
 renderRaceSettings(tabSection('Race Settings tab (owner, no override — defaults)'), {
   settings: null,
-  staminaOn: false,
   isOwner: true,
-  onSave: () => {}, onReset: () => {}, onToggleStamina: () => {},
+  onSave: () => {}, onReset: () => {},
+});
+
+// Section 4: the Account view — rendered directly into `.org-main` (no
+// `.org-tabs` nav), matching how index.ts draws it: a sidebar-level view, not
+// a tab. Two states side by side: zero organisations / no devices at all
+// (the state a brand-new SSO user lands in), and a linked account with
+// several devices, including two sharing a label to show the timestamps
+// disambiguating them.
+function accountSection(title: string): HTMLElement {
+  const section = document.createElement('section');
+  section.className = 'org-preview-section';
+  section.innerHTML = `<h2 class="org-preview-heading">${title}</h2><div class="org-manager"><div class="org-main"></div></div>`;
+  app.appendChild(section);
+  return section.querySelector<HTMLElement>('.org-main')!;
+}
+
+renderAccount(accountSection('Account view — zero organisations, no devices, no Google account linked'), {
+  email: null,
+  devices: [],
+  hasLegacyCredential: false,
+  onRevoke: () => {},
+});
+
+renderAccount(accountSection('Account view — no devices, but a legacy account credential still live'), {
+  email: null,
+  devices: [],
+  hasLegacyCredential: true,
+  onRevoke: () => {},
+});
+
+renderAccount(accountSection('Account view — linked account, several devices'), {
+  email: 'omar@example.com',
+  devices: [
+    { device_id: 'd1', label: "Omar's MacBook", created_at: '2026-05-14T09:12:00Z', last_seen_at: '2026-08-20T07:45:00Z' },
+    { device_id: 'd2', label: "Omar's MacBook", created_at: '2026-07-02T18:00:00Z', last_seen_at: '2026-08-19T22:10:00Z' },
+    { device_id: 'd3', label: 'CI runner', created_at: '2026-06-01T00:00:00Z', last_seen_at: '2026-08-20T06:00:00Z' },
+  ],
+  hasLegacyCredential: false,
+  onRevoke: () => {},
 });

@@ -1,11 +1,15 @@
 import React from 'react';
 import { render } from 'ink';
-import { levelFromXp, hatById } from '@token-derby/shared';
+import { levelFromXp, hatById, isAnimatedHat } from '@token-derby/shared';
 import type { StableHorse } from '@token-derby/shared';
 import { ApiError } from '../api/client.js';
 import { listStable, rollHat, equipHat } from '../api/endpoints.js';
-import { RollReveal, type RollOutcome } from '../ui/RollReveal.js';
+import type { RollOutcome } from '../ui/RollReveal.js';
 import { RollHorsePicker } from '../ui/RollHorsePicker.js';
+import { parseFlag } from '../args.js';
+import { resolveHorse, noticeFor, noTtyMessage, interactive } from '../stable/resolve-horse.js';
+import { promptYesNo } from '../ui/prompt.js';
+import { runReveal } from '../ui/reveal.js';
 
 function pendingFor(horse: StableHorse): number {
   // Mirrors api/src/handlers/roll-hat.ts: rolls accrue from level 2 onwards;
@@ -15,49 +19,7 @@ function pendingFor(horse: StableHorse): number {
   return level - lastRolled;
 }
 
-async function promptYesNo(question: string): Promise<boolean> {
-  resetStdinAfterInk();
-  const readline = await import('node:readline/promises');
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-  const a = (await rl.question(question)).trim().toLowerCase();
-  rl.close();
-  return a === '' || a === 'y' || a === 'yes';
-}
-
-/**
- * After an Ink mount unmounts, stdin is left in a state where readline
- * mis-behaves:
- *   1. Ink calls `stdin.unref()` in its raw-mode teardown, so with no
- *      other pending I/O the event loop exits as soon as we await
- *      readline's `question` — the prompt prints, the process drops to
- *      the shell, and the user never gets to answer.
- *   2. Ink may have buffered bytes its useInput didn't consume; those
- *      would auto-resolve readline's first read.
- * Reset to a known-clean, ref'd state before any readline prompt.
- */
-function resetStdinAfterInk(): void {
-  if (process.stdin.isTTY && typeof process.stdin.setRawMode === 'function') {
-    process.stdin.setRawMode(false);
-  }
-  // Drain any buffered bytes the picker's useInput didn't consume.
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  while (process.stdin.read() !== null) { /* discard */ }
-  process.stdin.pause();
-  // Re-ref stdin so readline's await actually keeps the process alive.
-  process.stdin.ref();
-}
-
-/** Closed box → 3s suspense beat → open/reveal animation, all in one Ink mount. */
-async function runReveal(outcome: RollOutcome): Promise<void> {
-  await new Promise<void>(resolve => {
-    const app = render(React.createElement(RollReveal, {
-      outcome,
-      onDone: () => { app.unmount(); resolve(); },
-    }));
-  });
-}
-
-export async function rollCommand(): Promise<number> {
+export async function rollCommand(args: string[] = []): Promise<number> {
   let stable;
   try {
     stable = await listStable();
@@ -75,15 +37,39 @@ export async function rollCommand(): Promise<number> {
     return 0;
   }
 
-  // Always show the picker, even with one eligible horse — it doubles as
-  // a confirmation step so the user can back out before spending a roll.
-  const picked = await new Promise<StableHorse | null>(resolve => {
-    const app = render(React.createElement(RollHorsePicker, {
-      horses: eligible,
-      onPick: (h) => { app.unmount(); resolve(h); },
-      onCancel: () => { app.unmount(); resolve(null); },
-    }));
+  // Show the picker even with one eligible horse — it doubles as a
+  // confirmation step so the user can back out before spending a roll.
+  // Hence autoSelect: false, unlike claim/join/stable edit — a stored default
+  // must not silently spend a consumable. Naming a horse outright is itself
+  // the confirmation, so --horse is still honoured.
+  const choice = await resolveHorse(eligible, {
+    name: parseFlag(args, '--horse'),
+    autoSelect: false,
   });
+  if (choice.kind === 'not_found') {
+    console.error(`No horse named "${choice.name}" has a roll available.`);
+    console.error(`With rolls: ${eligible.map(h => h.name).join(', ')}`);
+    return 1;
+  }
+  if (choice.kind === 'no_tty') {
+    console.error(noTtyMessage('token-derby roll'));
+    return 1;
+  }
+
+  let picked: StableHorse | null;
+  if (choice.kind === 'resolved') {
+    picked = choice.horse;
+    const notice = noticeFor(choice);
+    if (notice) console.log(notice);
+  } else {
+    picked = await new Promise<StableHorse | null>(resolve => {
+      const app = render(React.createElement(RollHorsePicker, {
+        horses: eligible,
+        onPick: (h) => { app.unmount(); resolve(h); },
+        onCancel: () => { app.unmount(); resolve(null); },
+      }));
+    });
+  }
   if (!picked) { console.log('Cancelled.'); return 0; }
   let chosen: StableHorse = picked;
 
@@ -125,11 +111,14 @@ export async function rollCommand(): Promise<number> {
 
     if (result.result === 'hat') {
       const hat = hatById(result.collected.id)!;
-      const variantSuffix = hat.rarity !== 'legendary' && result.collected.variant !== undefined
+      const variantSuffix = !isAnimatedHat(hat) && result.collected.variant !== undefined
         ? ` #${result.collected.variant + 1}`
         : '';
       console.log(`\n✨ ${hat.name}${variantSuffix} [${hat.rarity.toUpperCase()}]\n`);
-      if (await promptYesNo('Equip now? [Y/n] ')) {
+      // See claim.ts: no terminal means no answer, so take the reversible side.
+      if (!interactive()) {
+        console.log(`Not equipped — no terminal to confirm. Equip it with: token-derby stable edit "${chosen.name}"`);
+      } else if (await promptYesNo('Equip now? [Y/n] ')) {
         try {
           await equipHat(chosen.stable_horse_id, { hat_index: result.hat_index });
           console.log(`Equipped on ${chosen.name}.`);
@@ -147,6 +136,10 @@ export async function rollCommand(): Promise<number> {
     }
 
     if (result.remaining_rolls <= 0) return 0;
+    if (!interactive()) {
+      console.log(`${result.remaining_rolls} more roll${result.remaining_rolls === 1 ? '' : 's'} available. Run again to spend another.`);
+      return 0;
+    }
     if (!(await promptYesNo(`${result.remaining_rolls} more roll${result.remaining_rolls === 1 ? '' : 's'} available. Roll again? [Y/n] `))) return 0;
   }
 }

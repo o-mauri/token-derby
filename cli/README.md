@@ -55,7 +55,7 @@ the schedule or webhook — is done on the web:
 token-derby web
 ```
 
-This opens `token-derby.mauricode.co.uk/org-manager` with a one-time login
+This opens `app.tokenderby.co.uk/org-manager` with a one-time login
 link, signed in as your CLI identity.
 
 ## What's tracked
@@ -74,11 +74,15 @@ Nothing here asks you to hold work back. A flat-out day still beats a lazy one �
 
 Stamina is off by default; org owners turn it on and tune it from the Race Settings tab of `token-derby web`. When it's on, the live view shows your horse's stamina as a percentage and bar, plus a multiplier once you're actually losing score to fatigue.
 
-## Other models (Codex, Gemini)
+## Other coding agents (Codex CLI, Gemini CLI)
 
-At join you pick one **primary** model — Claude, Codex, or Gemini — counted 1:1.
-The other two count at **10%**. The choice is locked for the whole race and can't
-be changed, even by rejoining.
+Every token is worth the same wherever it came from, so you can use one tool or
+all three and nothing needs choosing at join.
+
+Tokens are counted per **model family** — Anthropic, OpenAI or Google — rather
+than per tool. The two are usually the same thing today, since each tool runs one
+vendor's models, but they are tracked separately so a tool that can run several
+vendors' models counts each one correctly.
 
 - **Codex CLI** — counted from `~/.codex/sessions/**/rollout-*.jsonl` (and
   `archived_sessions/`). Fresh input = `input_tokens − cached_input_tokens`;
@@ -87,8 +91,38 @@ be changed, even by rejoining.
 - **Gemini CLI** — counted from `~/.gemini/tmp/<project>/chats/session-*.jsonl`.
   Fresh input = `input − cached`; output = `output` (thoughts included).
 
-Pick at join with `token-derby join <code> --primary codex` (or the interactive
-picker). Overrides: `TOKEN_DERBY_CODEX_DIR`, `TOKEN_DERBY_GEMINI_DIR`.
+A tool you've never run simply contributes nothing — no configuration needed.
+Overrides: `TOKEN_DERBY_CODEX_DIR`, `TOKEN_DERBY_GEMINI_DIR`.
+
+- **Pi** — counted from `~/.pi/agent/sessions/**/*.jsonl`, and **off until you
+  turn it on**: `token-derby harness enable pi`.
+
+  Pi is the one agent that can run models from several vendors, so its tokens
+  are attributed to whichever vendor actually produced them — a Pi session that
+  starts on Claude and switches to GPT counts as both. OpenAI subscription usage
+  reported by Pi's `openai-codex` provider counts as OpenAI. Fresh input is
+  uncached input plus cache writes; cache reads are excluded, as everywhere else.
+
+  Usage on a provider outside those three is not counted, and the race view says
+  so rather than leaving you to wonder. That includes gateways such as Bedrock,
+  OpenRouter and Cloudflare: they can serve models we score, but their model ids
+  do not reliably say which vendor is behind them, so we decline to guess.
+
+### Choosing what gets counted
+
+```
+token-derby harness list              # what this machine counts, and what it found
+token-derby harness disable codex-cli # stop counting one
+token-derby harness enable codex-cli  # start counting it again
+```
+
+A disabled agent is not scanned at all, which is also the way to keep a very
+large history from eating into the per-beat scan budget. Changes take effect on
+your next heartbeat — no need to rejoin — and the race view marks anything
+turned off, so it is never a mystery why work is not counting.
+
+Nothing is lost by turning one off mid-race: your totals hold where they are and
+catch up when you turn it back on.
 
 All of this counts **real** tokens you actually generated. Please don't point it
 at usage you didn't produce.
@@ -97,10 +131,43 @@ at usage you didn't produce.
 
 - `~/.token-derby/stable.json` — saved horses
 - `~/.token-derby/active-races/<join-code>.json` — per-race state for rejoin
+- `~/.token-derby/logs/token-derby.log` — debug log (see below)
+
+## Debug log
+
+Every command appends to a rolling log, so a race that stalls overnight can be
+diagnosed afterwards. The race UI takes over the terminal, which is exactly when
+nothing can be printed to the screen.
+
+```bash
+token-derby logs             # print the path of the log file
+token-derby logs --tail 100  # print the last 100 lines (default 50)
+```
+
+The log rolls at 2MB and keeps five files (`token-derby.log` plus `.1`–`.4`), so
+it never exceeds ~10MB. Each environment has its own, next to that environment's
+identity.
+
+What the lines mean when a race misbehaves:
+
+- `beat.prepare.start` with no `beat.prepare.done` after it — the token scan
+  hung, and the poller is still waiting on it.
+- repeated `beat.send.err` with a climbing `next_ms` — the heartbeat is
+  reaching the network and failing; `retry` counts the attempts.
+- `scan.timeout` — the scan blew its budget; `reason` names the source that was
+  still running.
+
+Credentials are never written: identity and horse tokens, request headers and
+bodies are all omitted, and claim tokens and admin codes are masked out of the
+URLs they travel in.
 
 ## Environment
 
-- `TOKEN_DERBY_API_BASE` — override the API base URL (default: `https://token-derby.mauricode.co.uk/api`)
+- `TOKEN_DERBY_API_BASE` — override the API base URL (default: `https://api.tokenderby.co.uk`)
 - `TOKEN_DERBY_HOME` — override the data directory (default: `~/.token-derby`)
 - `TOKEN_DERBY_CLAUDE_DIR` — override the transcripts directory (default: `~/.claude/projects`)
-- **Top-5 conversations (primary):** a race can be created so that only each racer's **5 most-active conversations per heartbeat** count toward their **primary** model's score (secondaries unaffected). The race creator opts in at `token-derby create` (prompt) or, for organisation-scheduled races, via the "Primary top-5 cap" option on the schedule tab of `token-derby web`. Off by default (every conversation counts).
+- `CLAUDE_CONFIG_DIR` — Claude Code's own config override. When set, transcripts are read from `$CLAUDE_CONFIG_DIR/projects`. `TOKEN_DERBY_CLAUDE_DIR` still wins.
+
+Token Derby counts usage from this machine's filesystem only. If Claude Code runs
+in a container, over SSH, or on another machine, join the race from there — `join`
+warns before entering a race when none of the three tools has transcripts to read.

@@ -8,7 +8,7 @@ import { formatDuration, predictTimeLeftSeconds, type CountdownAnchor } from '..
 import { startAutoScroll } from './autoscroll.js';
 import { horseFaceSvg } from '../horse-face.js';
 import { createTicker, collectFreshItems, leagueOrderCells, leagueStandingsCells, type TickerCell } from './ticker.js';
-import { applyCheerJitter, crowdColumns, syncSpectators, TILE_PX } from './crowd.js';
+import { applyCheerJitter, crowdColumns, syncSpectators } from './crowd.js';
 import { createRaceGraphs } from './race-graphs.js';
 import { createThemePicker } from './theme-picker.js';
 
@@ -153,7 +153,8 @@ export function renderRace(root: HTMLElement, joinCode: string, opts: RenderRace
     const fitCrowd = () => {
       const scale = parseFloat(getComputedStyle(crowd).getPropertyValue('--sprite-scale')) || 2;
       const cols = crowdColumns(frame.clientWidth, scale);
-      crowd.style.width = `${cols * scale * TILE_PX}px`;
+      // No inline width: the strip is `width: 100%` in CSS and spans the frame.
+      // The sprite count covers that width rather than defining it.
       syncSpectators(crowdBody, Math.max(0, cols - 2)); // the two caps take a tile each
     };
     fitCrowd();

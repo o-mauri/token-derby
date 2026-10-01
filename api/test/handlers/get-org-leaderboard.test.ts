@@ -47,7 +47,7 @@ describe('getOrgLeaderboard handler', () => {
     const { org_id } = JSON.parse(created.body);
 
     const bob = await makeUser('LB_Bob');
-    await addMember(org_id, bob.user_id, 'LB_Bob', new Date().toISOString());
+    await addMember(org_id, bob.user_id, new Date().toISOString());
 
     await putStableHorse(alice.user_id, horse('h-a', 'Comet', { xp: 300, wins: 5, podiums: 8, races_entered: 12 }));
     await putStableHorse(bob.user_id,   horse('h-b', 'Bolt',  { xp: 900, wins: 2, podiums: 3, races_entered: 4 }));

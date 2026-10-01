@@ -1,119 +1,200 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
-import { scoreFor, readAllSources, type AllSources } from '../../src/tokens/race-tokens.js';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { SourceRootMissing } from '../../src/tokens/source-root.js';
 import { ScanProgress } from '../../src/tokens/scan-progress.js';
+import * as fs from 'node:fs/promises';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import { setHarnessEnabled } from '../../src/stable/prefs.js';
+import type { HarnessKey } from '../../src/tokens/harnesses/harness.js';
+import type { CountResult } from '../../src/tokens/harnesses/engine.js';
 
-vi.mock('../../src/tokens/transcripts.js', async (orig) => ({
-  ...(await orig<typeof import('../../src/tokens/transcripts.js')>()),
-  sumTokens: vi.fn(),
-  sumTokensByConversation: vi.fn(),
+const counts: Record<HarnessKey, ReturnType<typeof vi.fn>> = {
+  'claude-code': vi.fn(),
+  'codex-cli': vi.fn(),
+  'gemini-cli': vi.fn(),
+  pi: vi.fn(),
+};
+
+// Mock the engine, not the harnesses: readAllSources' job is merging by family
+// and degrading a failure, which is independent of how any file is parsed.
+vi.mock('../../src/tokens/harnesses/engine.js', () => ({
+  count: (h: { id: HarnessKey }) => counts[h.id](),
 }));
-vi.mock('../../src/tokens/codex.js', () => ({ sumCodexTokens: vi.fn(), sumCodexByConversation: vi.fn() }));
-vi.mock('../../src/tokens/gemini.js', () => ({ sumGeminiTokens: vi.fn(), sumGeminiByConversation: vi.fn() }));
 
-import { sumTokens, sumTokensByConversation } from '../../src/tokens/transcripts.js';
-import { sumCodexTokens, sumCodexByConversation } from '../../src/tokens/codex.js';
-import { sumGeminiTokens, sumGeminiByConversation } from '../../src/tokens/gemini.js';
+const { readAllSources, isStall, scoreFor } = await import('../../src/tokens/race-tokens.js');
+import type { AllSources } from '../../src/tokens/race-tokens.js';
 
-afterEach(() => vi.clearAllMocks());
+/** A CountResult for one family, keyed as the engine would key it. */
+function result(family: string, conversations: Record<string, number>, notices: string[] = []): CountResult {
+  const map = new Map<string, { input: number; output: number }>();
+  for (const [id, output] of Object.entries(conversations)) map.set(id, { input: 0, output });
+  return { byFamily: new Map([[family as any, map]]), notices };
+}
 
-/** Assert a reading is usable (not a stall) and return it narrowed. */
+function allEmpty() {
+  for (const fn of Object.values(counts)) fn.mockResolvedValue({ byFamily: new Map(), notices: [] });
+}
+
 function ok(r: AllSources | { stall: string }): AllSources {
   if ('stall' in r) throw new Error(`expected a usable reading, got stall: ${r.stall}`);
   return r;
 }
 
+let home: string | undefined;
+
+beforeEach(async () => {
+  home = await fs.mkdtemp(path.join(os.tmpdir(), 'td-rt-'));
+  process.env.TOKEN_DERBY_HOME = home;
+});
+
+afterEach(async () => {
+  vi.clearAllMocks();
+  delete process.env.TOKEN_DERBY_HOME;
+  if (home) await fs.rm(home, { recursive: true, force: true });
+  home = undefined;
+});
+
 describe('scoreFor', () => {
-  it('output-only when the race does not count input', () => {
-    expect(scoreFor({}, { input: 100, output: 20 })).toBe(20);
-  });
-  it('input+output when the race counts input', () => {
-    expect(scoreFor({ counts_input: true }, { input: 100, output: 20 })).toBe(120);
+  it('sums input and output', () => {
+    expect(scoreFor({ input: 100, output: 20 })).toBe(120);
   });
 });
 
 describe('readAllSources', () => {
-  it('reads the primary by-conversation (scored) and secondaries scalar (scored)', async () => {
-    vi.mocked(sumTokensByConversation).mockResolvedValue(new Map([
-      ['proj/a', { input: 1, output: 100 }],
-      ['proj/b', { input: 2, output: 200 }],
-    ]));
-    vi.mocked(sumCodexTokens).mockResolvedValue({ input: 7, output: 50 });
-    vi.mocked(sumGeminiTokens).mockResolvedValue({ input: 3, output: 9 });
-    const res = ok(await readAllSources({}, 'claude'));
-    expect(res.secondary.codex).toBe(50);
-    expect(res.secondary.gemini).toBe(9);
-    expect(Object.fromEntries(res.primaryByConv)).toEqual({ 'proj/a': 100, 'proj/b': 200 });
+  it('files each harness under the family it reported', async () => {
+    allEmpty();
+    counts['claude-code'].mockResolvedValue(result('anthropic', { 'claude-code:a': 100 }));
+    counts['codex-cli'].mockResolvedValue(result('openai', { 'codex-cli:r': 50 }));
+    counts['gemini-cli'].mockResolvedValue(result('google', { 'gemini-cli:g': 9 }));
+
+    const res = ok(await readAllSources());
+    expect(Object.fromEntries(res.byFamily.anthropic)).toEqual({ 'claude-code:a': 100 });
+    expect(Object.fromEntries(res.byFamily.openai)).toEqual({ 'codex-cli:r': 50 });
+    expect(Object.fromEntries(res.byFamily.google)).toEqual({ 'gemini-cli:g': 9 });
+    expect(res.degraded).toEqual([]);
   });
 
-  it('scores the primary conversations in input+output mode', async () => {
-    vi.mocked(sumCodexByConversation).mockResolvedValue(new Map([['rollout-x', { input: 5, output: 50 }]]));
-    vi.mocked(sumTokens).mockResolvedValue({ input: 0, output: 0 });
-    vi.mocked(sumGeminiTokens).mockResolvedValue({ input: 0, output: 0 });
-    const res = ok(await readAllSources({ counts_input: true }, 'codex'));
-    expect(Object.fromEntries(res.primaryByConv)).toEqual({ 'rollout-x': 55 });
+  it('merges several harnesses feeding the same family', async () => {
+    // The whole point of the split: Pi will land here alongside Claude Code.
+    allEmpty();
+    counts['claude-code'].mockResolvedValue(result('anthropic', { 'claude-code:a': 100 }));
+    counts['codex-cli'].mockResolvedValue(result('anthropic', { 'codex-cli:b': 40 }));
+
+    const res = ok(await readAllSources());
+    expect(Object.fromEntries(res.byFamily.anthropic)).toEqual({ 'claude-code:a': 100, 'codex-cli:b': 40 });
   });
 
-  it('starts the secondary scans without waiting for the primary to finish', async () => {
-    // The beat should cost the SLOWEST source, not the sum of all of them.
-    let releasePrimary!: (m: Map<string, { input: number; output: number }>) => void;
-    vi.mocked(sumTokensByConversation).mockReturnValue(new Promise((r) => { releasePrimary = r; }));
-    vi.mocked(sumCodexTokens).mockResolvedValue({ input: 0, output: 50 });
-    vi.mocked(sumGeminiTokens).mockResolvedValue({ input: 0, output: 9 });
+  it('scans every harness concurrently — a beat costs the slowest, not the sum', async () => {
+    allEmpty();
+    let release!: (r: CountResult) => void;
+    counts['claude-code'].mockReturnValue(new Promise((r) => { release = r; }));
+    counts['codex-cli'].mockResolvedValue(result('openai', { 'codex-cli:r': 50 }));
 
-    const pending = readAllSources({}, 'claude');
-    await Promise.resolve(); // flush scheduling; primary is still in flight
-    expect(sumCodexTokens).toHaveBeenCalled();
-    expect(sumGeminiTokens).toHaveBeenCalled();
+    const pending = readAllSources();
+    // waitFor rather than a microtask flush: the beat reads prefs before
+    // dispatching, so dispatch is a file read away, not a tick away.
+    await vi.waitFor(() => {
+      expect(counts['codex-cli']).toHaveBeenCalled();
+      expect(counts['gemini-cli']).toHaveBeenCalled();
+    });
 
-    releasePrimary(new Map([['proj/a', { input: 0, output: 100 }]]));
+    release(result('anthropic', { 'claude-code:a': 100 }));
     const res = ok(await pending);
-    expect(res.secondary.codex).toBe(50);
-    expect(Object.fromEntries(res.primaryByConv)).toEqual({ 'proj/a': 100 });
+    expect(Object.fromEntries(res.byFamily.openai)).toEqual({ 'codex-cli:r': 50 });
   });
 
-  it('records which sources are still scanning when a beat runs long', async () => {
-    vi.mocked(sumTokensByConversation).mockReturnValue(new Promise(() => {})); // never settles
-    vi.mocked(sumCodexTokens).mockResolvedValue({ input: 0, output: 50 });
-    vi.mocked(sumGeminiTokens).mockResolvedValue({ input: 0, output: 9 });
-
+  it('records which harnesses are still scanning when a beat runs long', async () => {
+    allEmpty();
+    counts['claude-code'].mockReturnValue(new Promise(() => {})); // never settles
     const progress = new ScanProgress();
-    void readAllSources({}, 'claude', progress);
-    await vi.waitFor(() => expect(progress.outstanding()).toEqual(['claude']));
+    void readAllSources(progress);
+    await vi.waitFor(() => expect(progress.outstanding()).toEqual(['claude-code']));
   });
 
-  it('a secondary source failure contributes 0, not a stall', async () => {
-    vi.mocked(sumTokensByConversation).mockResolvedValue(new Map([['proj/a', { input: 0, output: 100 }]]));
-    vi.mocked(sumCodexTokens).mockRejectedValue(new Error('boom'));
-    vi.mocked(sumGeminiTokens).mockResolvedValue({ input: 0, output: 9 });
-    const res = ok(await readAllSources({}, 'claude'));
-    expect(res.secondary.codex).toBe(0);
-    expect(res.secondary.gemini).toBe(9);
+  it('skips a harness it cannot read, and still counts the others', async () => {
+    allEmpty();
+    counts['codex-cli'].mockRejectedValue(new Error('EACCES: permission denied'));
+    counts['claude-code'].mockResolvedValue(result('anthropic', { 'claude-code:a': 100 }));
+
+    const res = ok(await readAllSources());       // not a stall — the race continues
+    expect(res.degraded).toEqual([
+      { harness: 'codex-cli', label: 'Codex CLI', message: 'EACCES: permission denied' },
+    ]);
+    expect(res.byFamily.openai.size).toBe(0);     // skipped, not partially counted
+    expect(Object.fromEntries(res.byFamily.anthropic)).toEqual({ 'claude-code:a': 100 });
   });
 
-  it('a genuine PRIMARY read error stalls the beat and reports the cause', async () => {
-    vi.mocked(sumCodexByConversation).mockRejectedValue(new Error('disk exploded'));
-    vi.mocked(sumTokens).mockResolvedValue({ input: 0, output: 0 });
-    vi.mocked(sumGeminiTokens).mockResolvedValue({ input: 0, output: 0 });
-    const res = await readAllSources({}, 'codex');
-    expect(res).toHaveProperty('stall');
-    const reason = (res as { stall: string }).stall;
-    expect(reason).toContain('codex');       // names the source that failed…
-    expect(reason).toContain('disk exploded'); // …and the underlying cause
+  it('degrades every failing harness, in registry order', async () => {
+    allEmpty();
+    counts['codex-cli'].mockRejectedValue(new Error('codex broke'));
+    counts['gemini-cli'].mockRejectedValue(new Error('gemini broke'));
+    const res = ok(await readAllSources());
+    expect(res.degraded.map(d => d.harness)).toEqual(['codex-cli', 'gemini-cli']);
   });
 
-  it('a PRIMARY with a missing home dir (ENOENT) reads as empty — never a stall', async () => {
-    // The user's real bug: primary = a CLI they've never run, so its home dir is
-    // absent. That must count as "0 tokens", not freeze the whole race.
-    vi.mocked(sumGeminiByConversation).mockRejectedValue(
-      Object.assign(new Error('ENOENT: no such file or directory'), { code: 'ENOENT' }),
-    );
-    vi.mocked(sumTokens).mockResolvedValue({ input: 4, output: 40 });
-    vi.mocked(sumCodexTokens).mockResolvedValue({ input: 7, output: 70 });
-    const res = await readAllSources({}, 'gemini');
-    expect(res).not.toHaveProperty('stall');
-    const ok = res as AllSources;
-    expect(ok.primaryByConv.size).toBe(0); // gemini has no data → empty
-    expect(ok.secondary.claude).toBe(40);  // secondaries keep counting normally
-    expect(ok.secondary.codex).toBe(70);
+  it('carries notices through from a harness that counted only part of what it saw', async () => {
+    allEmpty();
+    counts['claude-code'].mockResolvedValue(result('anthropic', { 'claude-code:a': 1 }, ['provider deepseek not counted']));
+    expect(ok(await readAllSources()).notices).toEqual(['provider deepseek not counted']);
+  });
+
+  it('a missing home dir is not degraded — an uninstalled tool is normal', async () => {
+    allEmpty();
+    counts['gemini-cli'].mockRejectedValue(new SourceRootMissing('/home/u/.gemini/tmp'));
+    counts['claude-code'].mockResolvedValue(result('anthropic', { 'claude-code:a': 44 }));
+
+    const res = ok(await readAllSources());
+    expect(res.degraded).toEqual([]);             // no warning for a tool you don't have
+    expect(res.byFamily.google.size).toBe(0);
+  });
+
+  it('does not even scan a harness this machine has turned off', async () => {
+    allEmpty();
+    await setHarnessEnabled('codex-cli', false);
+    counts['claude-code'].mockResolvedValue(result('anthropic', { 'claude-code:a': 100 }));
+
+    const res = ok(await readAllSources());
+    expect(counts['codex-cli']).not.toHaveBeenCalled();   // skipped, not counted as zero
+    expect(counts['claude-code']).toHaveBeenCalled();
+    expect(res.degraded).toEqual([]);                     // off is not a failure
+    expect(Object.fromEntries(res.byFamily.anthropic)).toEqual({ 'claude-code:a': 100 });
+  });
+
+  it('picks up a toggle on the next beat, without a restart', async () => {
+    allEmpty();
+    counts['codex-cli'].mockResolvedValue(result('openai', { 'codex-cli:r': 10 }));
+    expect(ok(await readAllSources()).byFamily.openai.size).toBe(1);
+
+    await setHarnessEnabled('codex-cli', false);
+    expect(ok(await readAllSources()).byFamily.openai.size).toBe(0);
+
+    await setHarnessEnabled('codex-cli', true);
+    expect(ok(await readAllSources()).byFamily.openai.size).toBe(1);
+  });
+
+  it('does not scan a harness that ships disabled until it is asked for', async () => {
+    allEmpty();
+    await readAllSources();
+    expect(counts.pi).not.toHaveBeenCalled();   // Pi is opt-in
+    await setHarnessEnabled('pi', true);
+    await readAllSources();
+    expect(counts.pi).toHaveBeenCalled();
+  });
+
+  it('scans nothing, and fails nothing, when every harness is off', async () => {
+    allEmpty();
+    for (const key of ['claude-code', 'codex-cli', 'gemini-cli'] as const) await setHarnessEnabled(key, false);
+    const res = ok(await readAllSources());
+    for (const fn of Object.values(counts)) expect(fn).not.toHaveBeenCalled();
+    expect(res.degraded).toEqual([]);
+    expect(isStall(res)).toBe(false);
+  });
+
+  it('never stalls on a harness failure, even when all of them fail', async () => {
+    allEmpty();
+    for (const fn of Object.values(counts)) fn.mockRejectedValue(new Error('boom'));
+    const res = await readAllSources();
+    expect(isStall(res)).toBe(false);             // the race keeps running, scoring 0
+    expect(ok(res).degraded).toHaveLength(3);
   });
 });

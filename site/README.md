@@ -15,6 +15,18 @@ Static spectator site for Token Derby races. Single-page HTML + one bundled JS f
 
 CloudFront rewrites 403/404 to `/index.html` so virtual `/race/...` paths work without server-side routing.
 
+## Themes
+
+The picker in the page header writes `td_theme` to localStorage; `src/theme.ts`
+holds the registry, and `public/styles.css` a `:root[data-theme="…"]` block per id.
+
+To put everyone on one theme for an event, set `EVENT_THEME` in `src/theme.ts` and
+mirror the two literals in the pre-paint script in `public/index.html` (a test
+fails if they drift). The next load flips every browser to it once, whatever they
+had saved; the picker works normally afterwards, so people can still switch away.
+Set both to `null` to end the event — everyone keeps whatever they last had, which
+for most will be the event theme. Bump the tag to run the same theme again later.
+
 ## Local dev
 
 ```bash

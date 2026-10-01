@@ -2,7 +2,9 @@
 
 A pixel-art daily horse race where each horse is a participant and every length gained is an output token their Claude Code produced. One-shot races, scheduled start/end times, customizable horses, terminal-as-life-support (close the terminal → your horse crashes).
 
-- **Site:** https://token-derby.mauricode.co.uk
+- **Site:** https://app.tokenderby.co.uk
+- **API:** https://api.tokenderby.co.uk
+- **Admin:** https://admin.tokenderby.co.uk
 
 ## Project layout
 
@@ -10,7 +12,7 @@ A pixel-art daily horse race where each horse is a participant and every length 
 - `api/` — Lambda handlers (`createRace`, `getRace`, `joinRace`, `heartbeat`, `endRace`)
 - `infra/` — AWS CDK stack (eu-west-2, with cross-region ACM in us-east-1)
 - `cli/` — [`@mauricode/token-derby`](https://www.npmjs.com/package/@mauricode/token-derby) npm package — see `cli/README.md`
-- `site/` — static race viewer — see `site/README.md`. Live at [token-derby.mauricode.co.uk](https://token-derby.mauricode.co.uk).
+- `site/` — static race viewer — see `site/README.md`. Live at [app.tokenderby.co.uk](https://app.tokenderby.co.uk).
 
 ## Install the CLI
 
@@ -37,7 +39,16 @@ make dynamodb-down
 
 ## Deploy
 
-Requires AWS credentials for an account where `mauricode.co.uk` is hosted in Route 53.
+Requires AWS credentials for an account where `tokenderby.co.uk` and `mauricode.co.uk` are hosted in Route 53.
+
+| Host | Serves |
+| --- | --- |
+| `app.tokenderby.co.uk` | the site, plus `/api/auth/*` so the Google sign-in state cookie lives on the site's origin |
+| `api.tokenderby.co.uk` | the API, with no `/api` prefix (a CloudFront function adds it before the gateway) |
+| `admin.tokenderby.co.uk` | the admin dashboard, which calls `api.` directly |
+| `tokenderby.co.uk`, `www.` | 301 to `app.` |
+| `token-derby.mauricode.co.uk` | 301 to `app.`, except `/api/*`, which still proxies the API for older CLIs |
+| `admin.token-derby.mauricode.co.uk` | 301 to `admin.` |
 
 ```bash
 cd infra
@@ -60,7 +71,7 @@ The announcement needs these in the root `.env` (gitignored):
 ```
 ADMIN_USERNAME=...
 ADMIN_PASSWORD=...
-TOKEN_DERBY_API_BASE=https://token-derby.mauricode.co.uk/api   # optional, this is the default
+TOKEN_DERBY_API_BASE=https://api.tokenderby.co.uk   # optional, this is the default
 ```
 
 If the announcement fails after a successful publish, the release still
@@ -68,7 +79,7 @@ succeeds — retry with `make announce-release COMPONENT=cli VERSION=2.13.0`.
 
 ## Admin dashboard
 
-The admin dashboard at `admin.token-derby.mauricode.co.uk` reads its single
+The admin dashboard at `admin.tokenderby.co.uk` reads its single
 owner credential from SSM SecureString parameters (never committed). Provision
 them once per AWS account:
 
@@ -94,39 +105,44 @@ parameters encrypted with the default `aws/ssm` managed key (as created above). 
 you instead encrypt them with a customer-managed KMS key, also grant the Lambdas
 `kms:Decrypt` on that key.
 
-## Staging environment
+## Google SSO
 
-A full staging stack runs alongside production in the same AWS account at
-`https://token-derby-staging.mauricode.co.uk`.
+Web sign-in uses a Google OAuth client. Three SSM SecureStrings hold its
+config, read at Lambda cold start and cached:
 
-Deploy / tear down:
+    /token-derby/auth/google-client-id
+    /token-derby/auth/google-client-secret
+    /token-derby/auth/state-secret          # openssl rand -hex 32
 
-    make deploy-staging      # deploy staging (cdk deploy -c env=staging)
-    make destroy-staging     # tear down staging (table is disposable)
+Provision them in the same account and region the stack deploys into
+(`eu-west-2` — the CLI default is `eu-west-1`, and params in the wrong region
+make sign-in 500 with no obvious cause):
 
-`make deploy` / `make destroy` continue to target production unchanged.
+```bash
+aws ssm put-parameter --profile personal --region eu-west-2 --type SecureString \
+  --name /token-derby/auth/google-client-id     --value 'YOUR_CLIENT_ID'
+aws ssm put-parameter --profile personal --region eu-west-2 --type SecureString \
+  --name /token-derby/auth/google-client-secret --value 'YOUR_CLIENT_SECRET'
+aws ssm put-parameter --profile personal --region eu-west-2 --type SecureString \
+  --name /token-derby/auth/state-secret         --value "$(openssl rand -hex 32)"
+```
 
-### One-time: seed staging admin secrets
+The Google client is a **Web application** client with two authorised redirect
+URIs — the production callback, `https://app.tokenderby.co.uk/api/auth/google/callback`,
+and `http://localhost:3000/api/auth/google/callback`
+for the local harness. Authorised JavaScript origins stay empty: this is the
+server-side code flow, not the browser SDK.
 
-Staging admin login reads `/token-derby-staging/admin/*` in SSM. Seed the three
-parameters once (see `docs/superpowers/specs/2026-07-03-staging-environment-design.md`
-for the exact commands):
+`tokenderby.co.uk` must be a verified domain in Google Search Console (DNS TXT at
+the apex) before the consent screen will accept it. That record is **deliberately
+not managed by CDK** — it covers the whole domain, and a `cdk destroy` would take
+it with it, un-verifying the OAuth app.
 
-- `/token-derby-staging/admin/username`
-- `/token-derby-staging/admin/password-hash` (scrypt `saltHex:hashHex`)
-- `/token-derby-staging/admin/session-secret`
+To rotate the client secret: reset it in the Google console, then re-run the
+`google-client-secret` command above. It takes effect on the next Lambda cold
+start; no redeploy is needed.
 
-### CLI against staging
-
-    token-derby env staging   # switch the CLI to staging (own identity dir)
-    token-derby env           # show the active environment
-    token-derby env prod      # switch back
-
-Each environment keeps its own identity under `~/.token-derby` (prod) and
-`~/.token-derby-staging` (staging), so switching never touches the other
-account's credentials.
-
-## API (base: `https://token-derby.mauricode.co.uk/api`)
+## API (base: `https://api.tokenderby.co.uk`)
 
 ```
 POST   /races                                              -> create a race

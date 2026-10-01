@@ -39,7 +39,7 @@ describe('buildReleaseMessage', () => {
   });
 
   it('links the changelog and names the component in the fallback text', () => {
-    expect(flat(buildReleaseMessage(SITE))).toContain('token-derby.mauricode.co.uk/about');
+    expect(flat(buildReleaseMessage(SITE))).toContain('app.tokenderby.co.uk/about');
     expect(buildReleaseMessage(SITE).text).toBe('Token Derby Site v0.12.2 released');
     expect(buildReleaseMessage(CLI).text).toBe('Token Derby CLI v2.13.0 released');
   });

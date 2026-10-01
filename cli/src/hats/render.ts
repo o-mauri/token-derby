@@ -1,4 +1,5 @@
 import type { Hat, HorseColors } from '@token-derby/shared';
+import { hatColors, channelColor } from '@token-derby/shared';
 import { FIXED_COLORS, type SlotTag } from '../ui/sprite.js';
 
 export type HatGrid = {
@@ -54,7 +55,7 @@ export function composeHatGrid(
     }
   }
 
-  const hatColors = hatColorsFor(hat, variantIdx);
+  const colors = hatColors(hat, variantIdx);
   for (let y = 0; y < hatH; y++) {
     const row = hat.rows[y]!;
     for (let x = 0; x < hatW; x++) {
@@ -62,7 +63,7 @@ export function composeHatGrid(
       if (ch === '.' || ch === undefined) continue;
       const gx = hat.anchor_x + x + horseOffsetX;
       if (gx < 0 || gx >= canvasW) continue;
-      const color = ch === 'A' ? hatColors.A : (hatColors.Q ?? hatColors.A);
+      const color = channelColor(colors, ch);
       grid[y]![gx] = color;
     }
   }
@@ -79,9 +80,4 @@ function tagToColor(tag: Exclude<SlotTag, null>, c: HorseColors): string {
     case 'E': return FIXED_COLORS.E;
     case 'H': return FIXED_COLORS.H;
   }
-}
-
-function hatColorsFor(hat: Hat, variantIdx: number): { A: string; Q?: string } {
-  if (hat.rarity === 'legendary') return hat.colors;
-  return hat.variants[variantIdx] ?? hat.variants[0]!;
 }

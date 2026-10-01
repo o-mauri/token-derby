@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { handler as getRaceHandler } from '../../src/handlers/get-race.js';
 import { handler as createHandler } from '../../src/handlers/create-race.js';
 import { handler as joinHandler } from '../../src/handlers/join-race.js';
@@ -43,8 +43,6 @@ function evt(
 }
 
 describe('getRace handler', () => {
-  beforeEach(() => { process.env.TOKEN_DERBY_MAX_RATE = '1000000000'; });
-  afterEach(() => { delete process.env.TOKEN_DERBY_MAX_RATE; });
   async function setupRace(creator: TestUser, overrides: Record<string, any> = {}) {
     const createRes: any = await createHandler(evt({
       name: 'GetRace Test',
@@ -143,15 +141,6 @@ describe('getRace handler', () => {
     expect(body.horses[0].crashed).toBeUndefined();
   });
 
-  it('echoes primary_top5 when the race was created with it', async () => {
-    const creator = await makeUser('GR_Top5Creator');
-    const { join_code } = await setupRace(creator, { primary_top5: true });
-
-    const getRes: any = await getRaceHandler(evt(null, `/races/${join_code}`, 'GET /races/{join_code}', { join_code }));
-    expect(getRes.statusCode).toBe(200);
-    expect(JSON.parse(getRes.body).primary_top5).toBe(true);
-  });
-
   it('exposes a trailing pace_15m for a live horse with recent tokens', async () => {
     const creator = await makeUser('GR_PaceCreator');
     // Start 5 min ago so the pace window is comfortably over the 1-min floor.
@@ -239,7 +228,7 @@ describe('getRace handler', () => {
     // Horse with a season standing in division 2.
     const userA = await makeUser('GR_LgA');
     const horseA = await makeHorse(userA, 'LgHorseA');
-    await addMember(org_id, userA.user_id, userA.display_name, now);
+    await addMember(org_id, userA.user_id, now);
     const joinResA: any = await joinHandler(evt(
       { stable_horse_id: horseA.stable_horse_id }, `/races/${join_code}/join`, 'POST /races/{join_code}/join', { join_code }, userA,
     ));
@@ -253,7 +242,7 @@ describe('getRace handler', () => {
     // Horse with NO standing — should default to the bottom division (3).
     const userB = await makeUser('GR_LgB');
     const horseB = await makeHorse(userB, 'LgHorseB');
-    await addMember(org_id, userB.user_id, userB.display_name, now);
+    await addMember(org_id, userB.user_id, now);
     const joinResB: any = await joinHandler(evt(
       { stable_horse_id: horseB.stable_horse_id }, `/races/${join_code}/join`, 'POST /races/{join_code}/join', { join_code }, userB,
     ));

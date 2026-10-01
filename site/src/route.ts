@@ -5,8 +5,11 @@ export type Route =
   | { type: 'org-live'; orgName: string }
   | { type: 'catalog' }
   | { type: 'about' }
+  | { type: 'privacy' }
   | { type: 'org-manager' }
   | { type: 'derbymarket' }
+  | { type: 'cli' }
+  | { type: 'link' }
   | { type: 'not-found' };
 
 export function parseRoute(pathname: string): Route {
@@ -19,6 +22,9 @@ export function parseRoute(pathname: string): Route {
   if (trimmed === '/org-manager') return { type: 'org-manager' };
 
   if (trimmed === '/derbymarket') return { type: 'derbymarket' };
+  if (trimmed === '/cli') return { type: 'cli' };
+
+  if (trimmed === '/link') return { type: 'link' };
 
   const orgLiveMatch = trimmed.match(/^\/org\/([A-Za-z0-9]{1,12})\/live$/);
   if (orgLiveMatch) return { type: 'org-live', orgName: orgLiveMatch[1]! };
@@ -29,6 +35,8 @@ export function parseRoute(pathname: string): Route {
   if (trimmed === '/catalog') return { type: 'catalog' };
 
   if (trimmed === '/about') return { type: 'about' };
+
+  if (trimmed === '/privacy') return { type: 'privacy' };
 
   return { type: 'not-found' };
 }

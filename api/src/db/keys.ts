@@ -125,3 +125,58 @@ export function releaseKey(component: string, version: string) {
 export function releaseOrgKey(component: string, version: string, org_id: string) {
   return { pk: `${RELEASE_PK_PREFIX}${component}#${version}`, sk: `ORG#${org_id}` };
 }
+
+export const CLAIM_PK_PREFIX = 'CLAIM#';
+
+export function claimKey(code: string) {
+  return { pk: `${CLAIM_PK_PREFIX}${code}`, sk: 'META' };
+}
+
+export const CLAIM_REDEMPTION_SK_PREFIX = 'REDEEM#';
+
+/** Redemptions live under their claim, so the sort key is the per-user gate. */
+export function claimRedemptionKey(code: string, user_id: string) {
+  return { pk: `${CLAIM_PK_PREFIX}${code}`, sk: `${CLAIM_REDEMPTION_SK_PREFIX}${user_id}` };
+}
+
+export const RATELIMIT_PK_PREFIX = 'RATELIMIT#';
+
+export function rateLimitKey(bucket: string, subject: string, windowStart: number) {
+  return { pk: `${RATELIMIT_PK_PREFIX}${bucket}#${subject}`, sk: `WINDOW#${windowStart}` };
+}
+
+export const AUTHREQ_PK_PREFIX = 'AUTHREQ#';
+
+export function authRequestKey(state: string) {
+  return { pk: `${AUTHREQ_PK_PREFIX}${state}`, sk: 'META' };
+}
+
+export const EMAIL_PK_PREFIX = 'EMAIL#';
+
+export function emailClaimKey(email: string) {
+  return { pk: `${EMAIL_PK_PREFIX}${email}`, sk: 'CLAIM' };
+}
+
+export const DOMAIN_PK_PREFIX = 'DOMAIN#';
+
+export function orgDomainKey(domain: string) {
+  return { pk: `${DOMAIN_PK_PREFIX}${domain}`, sk: 'CLAIM' };
+}
+
+export const DEVICE_SK_PREFIX = 'DEVICE#';
+
+export function deviceKey(user_id: string, tokenHash: string) {
+  return { pk: `${USER_PK_PREFIX}${user_id}`, sk: `${DEVICE_SK_PREFIX}${tokenHash}` };
+}
+
+export const CLIREQ_PK_PREFIX = 'CLIREQ#';
+export const CLICODE_PK_PREFIX = 'CLICODE#';
+
+export function cliAuthRequestKey(device_code: string) {
+  return { pk: `${CLIREQ_PK_PREFIX}${device_code}`, sk: 'META' };
+}
+
+/** Pointer row: lets the approve page resolve a typed user_code to its device_code without a scan. */
+export function cliAuthCodeKey(user_code: string) {
+  return { pk: `${CLICODE_PK_PREFIX}${user_code}`, sk: 'META' };
+}

@@ -1,5 +1,5 @@
 import type { GetRaceResponse, HorseView, ResolvedStaminaConfig } from '@token-derby/shared';
-import { levelFromXp, hatById, scoredOf, resolveStaminaConfig } from '@token-derby/shared';
+import { levelFromXp, hatById, scoredOf, resolveStaminaConfig, runsModifier, staminaOf } from '@token-derby/shared';
 import { elapsedPct, horseXPct } from '../position.js';
 import { buildHorseSvg } from '../sprite-svg.js';
 import { buildHatGroup } from '../hat-svg.js';
@@ -39,7 +39,7 @@ export function reconcileHorses(
   for (const horse of visible) {
     let lane = existing.get(horse.horse_id);
     if (!lane) {
-      lane = createLane(track.ownerDocument, horse, race.league_id != null, race.stamina === true);
+      lane = createLane(track.ownerDocument, horse, race.league_id != null, runsModifier(race, 'stamina'));
     }
     track.appendChild(lane);
     updateLane(
@@ -152,6 +152,12 @@ function createLane(doc: Document, horse: HorseView, isLeague: boolean, staminaE
   const trackStrip = doc.createElement('div');
   trackStrip.className = 'lane-track';
 
+  // Matrix's in-lane glyph rain; every other theme hides it. Always built so a
+  // theme switch is pure CSS — it costs one empty div per lane.
+  const rain = doc.createElement('div');
+  rain.className = 'lane-rain';
+  trackStrip.appendChild(rain);
+
   const wrap = doc.createElement('div');
   wrap.className = 'horse';
   wrap.dataset.horseId = horse.horse_id;
@@ -228,7 +234,7 @@ function updateLane(
   tokensEl.textContent = `${tokenFmt.format(displayTokens)} tok`;
 
   const staminaBar = wrap.querySelector<HTMLElement>('.stamina-bar');
-  if (staminaBar) updateStaminaBar(staminaBar, horse.stamina ?? 100, staminaCfg);
+  if (staminaBar) updateStaminaBar(staminaBar, staminaOf(horse), staminaCfg);
 
   const paceEl = lane.querySelector<HTMLElement>('.horse-pace')!;
   paceEl.textContent = pace === null ? '—' : `+${tokenFmt.format(pace)}/min`;

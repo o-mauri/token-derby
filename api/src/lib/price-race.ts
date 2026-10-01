@@ -1,10 +1,8 @@
 import {
-  priceRace, phantomCount, blendedPace, MARKET_OPEN_MIN, FIELD_MEDIAN_PACE,
-  tokenMultiplier, scoredOf,
+  priceRace, phantomCount, blendedPace, MARKET_OPEN_MIN, FIELD_MEDIAN_PACE, scoredOf,
   type MarketRunner, type MarketSnapshot,
 } from '@token-derby/shared';
 import { getSnapshot, putSnapshot, appendHistory, HISTORY_INTERVAL_MIN, HISTORY_RETENTION_MS } from '../db/markets.js';
-import { envRate } from './rate-cap.js';
 import type { Race, Horse } from '@token-derby/shared';
 
 export function priceRaceNow(race: Race, horses: Horse[], nowMs: number): MarketSnapshot {
@@ -17,14 +15,12 @@ export function priceRaceNow(race: Race, horses: Horse[], nowMs: number): Market
   const endMs = new Date(race.end_time).getTime();
   const minutesRemaining = Math.max(1, (endMs - atMs) / 60_000);
   const elapsedFraction = Math.min(1, Math.max(0, (atMs - startMs) / (endMs - startMs)));
-  const mult = tokenMultiplier(race);
 
   const runners: MarketRunner[] = horses.map((h) => {
     const banked = scoredOf(h);
     const elapsedMin = Math.max(0, (atMs - new Date(h.joined_at).getTime()) / 60_000);
     const observed = elapsedMin > 0 ? banked / elapsedMin : 0;
-    // prior_pace is stamped output-equivalent; bring it into this race's units.
-    const prior = (h.prior_pace ?? FIELD_MEDIAN_PACE) * mult;
+    const prior = h.prior_pace ?? FIELD_MEDIAN_PACE;
     return {
       horse_id: h.horse_id,
       name: h.name,
@@ -37,7 +33,7 @@ export function priceRaceNow(race: Race, horses: Horse[], nowMs: number): Market
   const expectedField = Math.max(runners.length, race.expected_field ?? runners.length);
   const phantoms = phantomCount({ elapsedFraction, expectedField });
   const pool = horses
-    .map((h) => (h.prior_pace ?? FIELD_MEDIAN_PACE) * mult)
+    .map((h) => h.prior_pace ?? FIELD_MEDIAN_PACE)
     .filter((p) => p > 0);
 
   const prices = priceRace({
@@ -45,10 +41,7 @@ export function priceRaceNow(race: Race, horses: Horse[], nowMs: number): Market
     runners,
     minutesRemaining,
     phantoms,
-    phantomPacePool: pool.length ? pool : [FIELD_MEDIAN_PACE * mult],
-    // Same cap clampDelta actually enforces (env override included) — a
-    // decided-race verdict must agree with what a horse can really produce.
-    maxRemainingPerRunner: envRate() * (minutesRemaining * 60) * mult,
+    phantomPacePool: pool.length ? pool : [FIELD_MEDIAN_PACE],
   });
 
   return {

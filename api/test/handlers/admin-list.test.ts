@@ -57,11 +57,13 @@ describe('admin list handlers', () => {
 
   it('list-organisations returns grouped orgs with members for a valid token', async () => {
     const oid = `o-${Math.random().toString(36).slice(2)}`;
+    const c1 = `u-${Math.random().toString(36).slice(2)}`;
+    await putUser({ user_id: c1, display_name: 'Creator', created_at: '2026-04-22T00:00:00.000Z' }, 'H');
     await putOrganisation(
-      { org_id: oid, org_name: `O${oid.slice(2, 6)}`, created_at: '2026-04-22T00:00:00.000Z', creator_user_id: 'c1', creator_user_name: 'Creator' },
+      { org_id: oid, org_name: `O${oid.slice(2, 6)}`, created_at: '2026-04-22T00:00:00.000Z', creator_user_id: c1, creator_user_name: 'Creator' },
       'JT',
     );
-    await addMember(oid, 'c1', 'Creator', '2026-04-22T00:00:00.000Z');
+    await addMember(oid, c1, '2026-04-22T00:00:00.000Z');
 
     const res: any = await listOrgs(ev(goodToken()) as any);
     expect(res.statusCode).toBe(200);

@@ -66,12 +66,13 @@ export const handler: ApiHandler = async (event) => {
     time_left_seconds: timeLeftSeconds(race, now),
     ...(race.org_id ? { org_id: race.org_id } : {}),
     ...(race.organisation_name ? { organisation_name: race.organisation_name } : {}),
-    ...(race.counts_input ? { counts_input: true } : {}),
-    ...(race.primary_top5 ? { primary_top5: true } : {}),
     ...(race.league_id ? { league_id: race.league_id } : {}),
     ...(race.league_season !== undefined ? { league_season: race.league_season } : {}),
     ...(race.league_round !== undefined ? { league_round: race.league_round } : {}),
     ...(league_division_names ? { league_division_names } : {}),
+    ...(race.modifiers ? { modifiers: race.modifiers } : {}),
+    // Races created before the settings map still carry the old pair, and the
+    // bar reads whichever the race was actually scored with.
     ...(race.stamina ? { stamina: true } : {}),
     ...(race.stamina_config ? { stamina_config: race.stamina_config } : {}),
   };

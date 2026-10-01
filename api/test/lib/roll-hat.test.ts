@@ -1,7 +1,8 @@
-import { describe, it, expect } from 'vitest';
-import { rollHat } from '../../src/lib/roll-hat.js';
+import { describe, it, expect, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { rollHat, DUPLICATE_XP_FRACTION } from '../../src/lib/roll-hat.js';
 import { HATS } from '@token-derby/shared';
-import type { CollectedHat } from '@token-derby/shared';
+import type { CollectedHat, Hat } from '@token-derby/shared';
 
 function seededRng(values: number[]): () => number {
   let i = 0;
@@ -76,7 +77,9 @@ describe('rollHat', () => {
   });
 
   it('treats a legendary re-roll as a duplicate (no variant field)', () => {
-    const legendaries = HATS.filter(h => h.rarity === 'legendary');
+    // Must mirror rollHat's own pool, which excludes claim-only hats — otherwise
+    // an exclusive sorted before a rollable one would shift index 0 apart.
+    const legendaries = HATS.filter(h => h.rarity === 'legendary' && h.rollable);
     const target = legendaries[0]!;
     const inventory: CollectedHat[] = [
       { id: target.id, obtained_at: '2026-01-01T00:00:00.000Z' },
@@ -88,5 +91,59 @@ describe('rollHat', () => {
       expect(decision.variant).toBeUndefined();
       expect(decision.hat_id).toBe(target.id);
     }
+  });
+});
+
+describe('rollHat respects the rollable flag', () => {
+  it('never returns a non-rollable hat across a full sweep of the RNG', () => {
+    // Walk rng outputs across [0,1) so every tier and every hat inside it is
+    // selected at least once.
+    const seen = new Set<string>();
+    for (let i = 0; i < 2000; i++) {
+      const r = i / 2000;
+      const decision = rollHat([], () => r);
+      if (decision.result === 'hat') seen.add(decision.collected.id);
+      if (decision.result === 'duplicate') seen.add(decision.hat_id);
+    }
+    const nonRollable = new Set(HATS.filter(h => !h.rollable).map(h => h.id));
+    for (const id of seen) expect(nonRollable.has(id)).toBe(false);
+  });
+
+  it('falls through to no_hat when a tier has no rollable hats', () => {
+    // A catalog where the tier the rng picks is entirely claim-only.
+    const claimOnly: Hat[] = HATS.map(h => ({ ...h, rollable: false }));
+    const spy = vi.spyOn(HATS, 'filter');
+    spy.mockImplementation((fn: any) => claimOnly.filter(fn));
+    try {
+      // 0.5 lands in the 'common' band (no_hat is [0,0.40), common [0.40,0.77)).
+      expect(rollHat([], () => 0.5)).toEqual({ result: 'no_hat' });
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});
+
+describe('limited edition is unreachable by rolling', () => {
+  it('never returns a limited hat across a full sweep of the RNG', () => {
+    for (let i = 0; i <= 1000; i++) {
+      const r = i / 1000;
+      const decision = rollHat([], seededRng([r, r, r]));
+      if (decision.result === 'no_hat') continue;
+      const id = decision.result === 'hat' ? decision.collected.id : decision.hat_id;
+      const hat = HATS.find(h => h.id === id);
+      expect(hat?.rarity, `roll at ${r} produced a limited hat`).not.toBe('limited');
+    }
+  });
+
+  it('has no limited entry in the tier weights', () => {
+    // A limited tier weight would make the tier reachable regardless of rollable.
+    const src = readFileSync(new URL('../../src/lib/roll-hat.ts', import.meta.url), 'utf8');
+    const weights = src.slice(src.indexOf('TIER_WEIGHTS'), src.indexOf('function pickTier'));
+    expect(weights).not.toContain('limited');
+  });
+
+  it('pays a higher duplicate fraction for limited than legendary', () => {
+    expect(DUPLICATE_XP_FRACTION.limited).toBe(0.60);
+    expect(DUPLICATE_XP_FRACTION.limited).toBeGreaterThan(DUPLICATE_XP_FRACTION.legendary);
   });
 });

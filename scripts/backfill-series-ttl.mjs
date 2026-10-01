@@ -8,7 +8,7 @@
 //
 // Usage (per environment):
 //   AWS_PROFILE=personal node scripts/backfill-series-ttl.mjs token-derby
-//   AWS_PROFILE=personal node scripts/backfill-series-ttl.mjs token-derby-staging
+//   AWS_PROFILE=personal node scripts/backfill-series-ttl.mjs token-derby
 // Add --dry-run to only count rows that would be updated.
 //
 // Idempotent: only rows missing `ttl` are touched, so it is safe to re-run.

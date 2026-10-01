@@ -1,7 +1,10 @@
-import { PutCommand, GetCommand, QueryCommand, BatchGetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
+import { PutCommand, GetCommand, QueryCommand, BatchGetCommand, UpdateCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb';
 import { ddb, TABLE } from './client.js';
 import { orgMetaKey, orgMemberKey, ORG_PK_PREFIX, MEMBER_SK_PREFIX, parseOrgId } from './keys.js';
-import type { Organisation, OrganisationSummary, OrgSlackMessages, OrgSlackDigest } from '@token-derby/shared';
+import { getUserNamesByIds } from './users.js';
+import { normaliseDomain } from './org-domains.js';
+import { generateOrgJoinToken } from '../lib/codes.js';
+import type { Organisation, OrganisationSummary, OrgSlackMessages, OrgSlackDigest, OrgAccessSettings } from '@token-derby/shared';
 
 // Sparse index over org meta rows that have Slack configured. Only those rows
 // carry `slack_marker`, so the index holds one entry per Slack-enabled org.
@@ -19,12 +22,22 @@ export type OrgSlackConfig = {
 // `org_join_token`, `webhook_secret`, and `slack.bot_token` are secrets. Never
 // include this record directly in an HTTP response — handlers must
 // cherry-pick the safe fields.
-type OrgRecord = Organisation & {
-  org_join_token: string;
-  webhook_url?: string;
-  webhook_secret?: string;
-  slack?: OrgSlackConfig;
-};
+//
+// The four access-control fields are declared required here (unlike on
+// `Organisation`, where they're optional) because every reader below funnels
+// through `pickOrgRecord`, which fills in Phase 3 defaults for rows that
+// predate this change. Callers of getOrganisationBy* can rely on them always
+// being present.
+type OrgRecord = Omit<Organisation, keyof OrgAccessSettings> &
+  OrgAccessSettings & {
+    org_join_token: string;
+    webhook_url?: string;
+    webhook_secret?: string;
+    slack?: OrgSlackConfig;
+    // Bumped by every setOrgAccess write and used as its compare-and-swap
+    // token. Absent until the first access save, including on legacy rows.
+    access_rev?: number;
+  };
 
 export async function putOrganisation(org: Organisation, org_join_token: string): Promise<void> {
   await ddb.send(new PutCommand({
@@ -38,10 +51,16 @@ export async function putOrganisation(org: Organisation, org_join_token: string)
   }));
 }
 
-export async function getOrganisationById(org_id: string): Promise<OrgRecord | null> {
+// `consistent` is for read-modify-write callers: setOrgAccess compares
+// access_rev, and a stale copy of it would refuse a legitimate save.
+export async function getOrganisationById(
+  org_id: string,
+  options: { consistent?: boolean } = {},
+): Promise<OrgRecord | null> {
   const { Item } = await ddb.send(new GetCommand({
     TableName: TABLE,
     Key: orgMetaKey(org_id),
+    ...(options.consistent ? { ConsistentRead: true } : {}),
   }));
   return Item ? pickOrgRecord(Item) : null;
 }
@@ -73,7 +92,6 @@ export async function getOrganisationByJoinToken(join_token: string): Promise<Or
 export async function addMember(
   org_id: string,
   user_id: string,
-  user_name: string,
   joined_at: string,
 ): Promise<void> {
   await ddb.send(new PutCommand({
@@ -81,7 +99,6 @@ export async function addMember(
     Item: {
       ...orgMemberKey(org_id, user_id),
       member_user_id: user_id,
-      user_name,
       joined_at,
     },
   }));
@@ -94,6 +111,98 @@ export async function isMember(org_id: string, user_id: string): Promise<boolean
     ProjectionExpression: 'member_user_id',
   }));
   return !!Item;
+}
+
+// Hard delete, not a soft-delete flag. isMember gates create-race, join-race,
+// get-organisation, list-org-members and join-organisation — removing the
+// MEMBER# row revokes all of them with zero read-path changes. A flag would
+// need filtering added in isMember, listOrgMembers, listOrganisationsForUser
+// AND admin-scan, and one missed filter would silently grant access back.
+// Returns false (rather than throwing) for a non-member, so the caller can
+// tell "removed" from "there was nothing to remove".
+export async function removeMember(org_id: string, user_id: string): Promise<boolean> {
+  try {
+    await ddb.send(new DeleteCommand({
+      TableName: TABLE,
+      Key: orgMemberKey(org_id, user_id),
+      ConditionExpression: 'attribute_exists(pk)',
+    }));
+    return true;
+  } catch (err: any) {
+    if (err?.name === 'ConditionalCheckFailedException') return false;
+    throw err;
+  }
+}
+
+/** Raised when the org's access settings changed between the caller's read and
+ *  its write, so the write was refused rather than clobbering the other save. */
+export class OrgAccessConflictError extends Error {
+  constructor(org_id: string) {
+    super(`Access settings for ${org_id} changed since they were read`);
+    this.name = 'OrgAccessConflictError';
+  }
+}
+
+// Writes all four access fields together, never one at a time: the settings
+// are validated as a set (restrict_to_allowed_domains with an empty
+// allowed_domains locks everyone out), so a writer that could land half of a
+// validated pair would be able to reach a combination nothing validated.
+//
+// `expected_rev` is the `access_rev` the caller read, or undefined for a row
+// that has never been saved. The condition makes this a compare-and-swap: two
+// overlapping saves cannot both land, so the loser cannot strand the winner's
+// stored domains with claim rows it reconciled against a stale snapshot.
+// Attribute names go through ExpressionAttributeNames because several of these
+// words are DynamoDB reserved words.
+export async function setOrgAccess(
+  org_id: string,
+  access: OrgAccessSettings,
+  expected_rev: number | undefined,
+): Promise<void> {
+  try {
+    await ddb.send(new UpdateCommand({
+      TableName: TABLE,
+      Key: orgMetaKey(org_id),
+      UpdateExpression: 'SET #ad = :ad, #jte = :jte, #dje = :dje, #rad = :rad, #rev = :next_rev',
+      ConditionExpression: expected_rev === undefined
+        ? 'attribute_exists(pk) AND attribute_not_exists(#rev)'
+        : 'attribute_exists(pk) AND #rev = :rev',
+      ExpressionAttributeNames: {
+        '#ad': 'allowed_domains',
+        '#jte': 'join_token_enabled',
+        '#dje': 'domain_join_enabled',
+        '#rad': 'restrict_to_allowed_domains',
+        '#rev': 'access_rev',
+      },
+      ExpressionAttributeValues: {
+        ':ad': access.allowed_domains,
+        ':jte': access.join_token_enabled,
+        ':dje': access.domain_join_enabled,
+        ':rad': access.restrict_to_allowed_domains,
+        ':next_rev': (expected_rev ?? 0) + 1,
+        ...(expected_rev === undefined ? {} : { ':rev': expected_rev }),
+      },
+    }));
+  } catch (err: any) {
+    if (err?.name === 'ConditionalCheckFailedException') throw new OrgAccessConflictError(org_id);
+    throw err;
+  }
+}
+
+// `org_join_token` is queried through OrgJoinTokenIndex (see
+// getOrganisationByJoinToken above), so this UpdateCommand write is what
+// invalidates the old token: once the indexed attribute changes, the old
+// value simply has no row projecting into that index for it anymore.
+export async function rotateJoinToken(org_id: string): Promise<string> {
+  const org_join_token = generateOrgJoinToken();
+  await ddb.send(new UpdateCommand({
+    TableName: TABLE,
+    Key: orgMetaKey(org_id),
+    UpdateExpression: 'SET org_join_token = :t',
+    ConditionExpression: 'attribute_exists(pk)',
+    ExpressionAttributeValues: { ':t': org_join_token },
+  }));
+  return org_join_token;
 }
 
 export async function listOrganisationsForUser(user_id: string): Promise<OrganisationSummary[]> {
@@ -133,6 +242,23 @@ export async function listOrganisationsForUser(user_id: string): Promise<Organis
 
 export type OrgMember = { user_id: string; user_name: string; joined_at: string };
 
+// Membership-only lookup — no name resolution, no BatchGet. Use this when all
+// a caller needs is "is this user a member", not display names.
+export async function listOrgMemberIds(org_id: string): Promise<string[]> {
+  const { Items = [] } = await ddb.send(new QueryCommand({
+    TableName: TABLE,
+    KeyConditionExpression: 'pk = :pk AND begins_with(sk, :mp)',
+    ExpressionAttributeValues: {
+      ':pk': `${ORG_PK_PREFIX}${org_id}`,
+      ':mp': MEMBER_SK_PREFIX,
+    },
+    ProjectionExpression: 'member_user_id',
+  }));
+  return Items
+    .map(it => String(it.member_user_id ?? ''))
+    .filter(id => id !== '');
+}
+
 export async function listOrgMembers(org_id: string): Promise<OrgMember[]> {
   const { Items = [] } = await ddb.send(new QueryCommand({
     TableName: TABLE,
@@ -141,18 +267,19 @@ export async function listOrgMembers(org_id: string): Promise<OrgMember[]> {
       ':pk': `${ORG_PK_PREFIX}${org_id}`,
       ':mp': MEMBER_SK_PREFIX,
     },
-    ProjectionExpression: 'member_user_id, user_name, joined_at',
+    ProjectionExpression: 'member_user_id, joined_at',
   }));
-  return Items.map(it => ({
-    user_id: String(it.member_user_id ?? ''),
-    user_name: String(it.user_name ?? ''),
-    joined_at: String(it.joined_at ?? ''),
-  })).filter(m => m.user_id !== '');
-}
+  const rows = Items
+    .map(it => ({
+      user_id: String(it.member_user_id ?? ''),
+      joined_at: String(it.joined_at ?? ''),
+    }))
+    .filter(m => m.user_id !== '');
 
-// Stable for tests. Not used in handler paths.
-export async function listMembersForOrg(org_id: string): Promise<string[]> {
-  return (await listOrgMembers(org_id)).map(m => m.user_id);
+  // Names come from the user rows, never from the member row — a copy there
+  // would go stale on rename.
+  const names = await getUserNamesByIds(rows.map(r => r.user_id));
+  return rows.map(r => ({ user_id: r.user_id, user_name: names.get(r.user_id) ?? '', joined_at: r.joined_at }));
 }
 
 export async function setOrgWebhook(
@@ -250,7 +377,33 @@ export async function listOrgsWithSlackRelease(): Promise<OrgRecord[]> {
   return listSlackOrgs((org) => Boolean(org.slack?.messages.release_published));
 }
 
+// Every org row created before Phase 3 (org access control) has none of the
+// four fields below. This is the single place that fills in their defaults,
+// because getOrganisationById/ByName/ByJoinToken all funnel through here —
+// applying the defaults anywhere else would leave one of those three doors
+// returning `undefined`, and a downstream falsy check would then treat a
+// legacy org's join token as disabled.
+//
+// Each default is written as an explicit `?? true` / `?? false`, never `||`
+// and never a bare truthy check: `false || true` evaluates to `true`, which
+// would silently re-enable a token an admin explicitly disabled, and reading
+// an absent `restrict_to_allowed_domains` as truthy would lock every existing
+// org out of its own (empty) allow-list.
 function pickOrgRecord(item: Record<string, any>): OrgRecord {
   const { pk: _pk, sk: _sk, slack_marker: _m, ...rest } = item;
-  return rest as OrgRecord;
+  return {
+    ...rest,
+    allowed_domains: normaliseAllowedDomains(rest.allowed_domains),
+    join_token_enabled: rest.join_token_enabled ?? true,
+    domain_join_enabled: rest.domain_join_enabled ?? false,
+    restrict_to_allowed_domains: rest.restrict_to_allowed_domains ?? false,
+  } as OrgRecord;
+}
+
+// Defensively re-normalises on read too, so an allow-list written elsewhere
+// (or by hand) can't make restriction checks depend on how a domain was
+// typed. Mirrors the normalisation in org-domains.ts.
+function normaliseAllowedDomains(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.map(d => normaliseDomain(String(d)));
 }

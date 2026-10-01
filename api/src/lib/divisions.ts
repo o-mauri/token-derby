@@ -1,6 +1,6 @@
 import type { Race } from '@token-derby/shared';
 import { getLeague } from '../db/leagues.js';
-import { listSeasonStandings } from '../db/league-standings.js';
+import { listSeasonStandingDivisions } from '../db/league-standings.js';
 
 // League fixtures only: stamps each horse's `division` from this season's
 // standings (unscored new entrants default to the bottom division) so both
@@ -14,10 +14,7 @@ export async function stampDivisions<T extends { stable_horse_id?: string; divis
   if (!league) return undefined;
 
   const bottom = league.divisions.length;
-  const divByHorse = new Map<string, number>();
-  for (const s of await listSeasonStandings(race.league_id, race.league_season)) {
-    divByHorse.set(s.stable_horse_id, s.division);
-  }
+  const divByHorse = await listSeasonStandingDivisions(race.league_id, race.league_season);
   for (const h of horses) {
     if (h.stable_horse_id) h.division = divByHorse.get(h.stable_horse_id) ?? bottom;
   }

@@ -1,25 +1,39 @@
 import { describe, it, expect } from 'vitest';
-import { MODEL_KEYS, SECONDARY_WEIGHT, isModelKey, weightFor, weightedTotal } from '../src/models.js';
+import { MODEL_FAMILIES, isModelFamily, familyForKey, totalFor, zeroPerFamily } from '../src/models.js';
 
-describe('models', () => {
-  it('lists exactly the three model keys', () => {
-    expect(MODEL_KEYS).toEqual(['claude', 'codex', 'gemini']);
-    expect(SECONDARY_WEIGHT).toBe(0.5);
+describe('model families', () => {
+  it('lists exactly the three families we score', () => {
+    expect(MODEL_FAMILIES).toEqual(['anthropic', 'openai', 'google']);
   });
 
-  it('isModelKey validates the enum', () => {
-    expect(isModelKey('codex')).toBe(true);
-    expect(isModelKey('gpt')).toBe(false);
-    expect(isModelKey(undefined)).toBe(false);
+  it('isModelFamily validates the enum', () => {
+    expect(isModelFamily('openai')).toBe(true);
+    expect(isModelFamily('deepseek')).toBe(false);
+    expect(isModelFamily(undefined)).toBe(false);
   });
 
-  it('weightFor is 1 for the primary and 0.5 for others', () => {
-    expect(weightFor('codex', 'codex')).toBe(1);
-    expect(weightFor('codex', 'claude')).toBe(0.5);
+  it('totalFor sums every family at equal weight', () => {
+    expect(totalFor({ anthropic: 1_240_000, openai: 310_000, google: 52_000 })).toBe(1_602_000);
   });
 
-  it('weightedTotal sums primary at full weight and others at 50%', () => {
-    // primary codex: 310000*1 + 1240000*0.5 + 52000*0.5 = 310000 + 620000 + 26000 = 956000
-    expect(weightedTotal('codex', { claude: 1_240_000, codex: 310_000, gemini: 52_000 })).toBe(956_000);
+  it('zeroPerFamily starts every family at nothing', () => {
+    expect(zeroPerFamily()).toEqual({ anthropic: 0, openai: 0, google: 0 });
+  });
+});
+
+describe('familyForKey', () => {
+  it('accepts a current family key unchanged', () => {
+    expect(familyForKey('anthropic')).toBe('anthropic');
+  });
+
+  it('translates the keys older CLIs send, which named the tool not the vendor', () => {
+    expect(familyForKey('claude')).toBe('anthropic');
+    expect(familyForKey('codex')).toBe('openai');
+    expect(familyForKey('gemini')).toBe('google');
+  });
+
+  it('rejects anything else rather than guessing', () => {
+    expect(familyForKey('deepseek')).toBeNull();
+    expect(familyForKey('')).toBeNull();
   });
 });

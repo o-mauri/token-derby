@@ -1,5 +1,4 @@
-import type { CollectedHat, HatId, HorseColors, HorseView, MarketSnapshot, Race, RaceStatus, RaceSummary, RaceView, OrganisationSummary, StableHorse, RaceSchedule, League, DivisionConfig, ModelKey, SeasonStandings, RaceSettings } from './types.js';
-import type { StaminaConfig } from './scoring.js';
+import type { CollectedHat, HatId, HorseColors, HorseView, MarketSnapshot, Race, RaceStatus, RaceSummary, RaceView, OrganisationSummary, OrgAccessSettings, StableHorse, RaceSchedule, League, DivisionConfig, ModifierId, ModifierSettings, SeasonStandings, RaceSettings } from './types.js';
 
 export type CreateRaceRequest = {
   name: string;
@@ -8,9 +7,9 @@ export type CreateRaceRequest = {
   tz: string;
   max_participants?: number;
   organisation_name?: string;
-  counts_input?: boolean;
-  primary_top5?: boolean;
-  stamina?: boolean;
+  // Mechanics a one-off race opts into. A race in an org takes the org's
+  // configuration instead, so this is only read when there is no org.
+  modifiers?: ModifierId[];
 };
 
 export type CreateRaceResponse = {
@@ -23,18 +22,16 @@ export type GetRaceResponse = RaceView;
 
 export type JoinRaceRequest = {
   stable_horse_id: string;
-  primary_model?: ModelKey;   // omitted ⇒ server locks 'claude'
 };
 
 export type JoinRaceResponse = {
   horse_id: string;
   heartbeat_token: string;
-  primary_model: ModelKey;    // the locked value (fresh join or resume)
 };
 
 export type HeartbeatRequest = {
   seq: number;
-  components?: Record<ModelKey, number>;  // per-source deltas (each ≥ 0)
+  components?: Record<string, number>;     // per-family deltas (each ≥ 0); legacy keys accepted
   delta?: number;                         // legacy single delta (pre-multi-model CLIs)
 };
 
@@ -49,7 +46,11 @@ export type HeartbeatResponse = {
 
 export type SeriesPoint = {
   t: number; // server epoch ms
-  d: number; // applied delta (tokens)
+  d: number; // raw tokens produced in this beat
+  // Scored distance for the same beat, when a modifier changed it. Omitted when
+  // it equals `d`, which is every beat of a race running no mechanics -- read it
+  // as `s ?? d`. Absent on points written before scored distance was recorded.
+  s?: number;
 };
 
 export type GetRaceSeriesResponse = {
@@ -76,7 +77,9 @@ export type CreateOrganisationResponse = {
 };
 
 export type JoinOrganisationRequest = {
-  join_token: string;
+  // Optional: omitted means "join by my email domain", which only resolves an
+  // org that has claimed that domain.
+  join_token?: string;
 };
 
 export type JoinOrganisationResponse = {
@@ -95,11 +98,26 @@ export type GetOrganisationResponse = {
   created_at: string;
   creator_user_id: string;
   creator_user_name: string;
+  // The access settings the Access tab renders. Always present: the db layer
+  // defaults them, so a pre-Phase-3 org reads as today's behaviour rather than
+  // as absent.
+  access: OrgAccessSettings;
 };
 
 export type OrgMembersResponse = {
-  members: { user_id: string; user_name: string; joined_at: string }[];
+  members: {
+    user_id: string;
+    user_name: string;
+    joined_at: string;
+    // Owner-only. The server omits both keys entirely for a non-owner caller
+    // — never sends `false`/`n/a` in their place — so the disclosure is the
+    // presence of the key, not just its value.
+    linked_email?: boolean;
+    matches_domain?: 'yes' | 'no' | 'n/a';
+  }[];
 };
+
+export type RemoveOrgMemberResponse = { ok: true };
 
 export type ListOrgRacesResponse = {
   org_name: string;
@@ -134,6 +152,8 @@ export type GetJockeyResponse = {
   user_id: string;
   display_name: string;
   created_at: string;
+  email?: string;
+  device_label?: string;
 };
 
 export type UpdateJockeyRequest = {
@@ -166,6 +186,18 @@ export type UpdateStableHorseResponse = StableHorse;
 export type DeleteStableHorseResponse = {
   ok: true;
 };
+
+// A whole-settings replace, not a patch: the Access tab renders all four
+// fields and saves all four, so an omitted field is a malformed request rather
+// than "leave this one alone". Rotation is deliberately NOT a field here — see
+// RotateOrgJoinTokenResponse.
+export type SetOrgAccessRequest = OrgAccessSettings;
+export type SetOrgAccessResponse = { access: OrgAccessSettings };
+
+// The new token is returned because rotating is the only moment it is shown in
+// the rotation flow. Nothing else about the org comes back — widening an org
+// response with the token would leak it to every caller of that endpoint.
+export type RotateOrgJoinTokenResponse = { org_join_token: string };
 
 export type SetOrgWebhookRequest = { url: string };
 export type SetOrgWebhookResponse = { webhook_url: string; webhook_secret: string };
@@ -225,9 +257,6 @@ export type SetOrgScheduleRequest = {
   tz: string;
   race_name?: string;
   max_participants?: number;
-  counts_input?: boolean;
-  primary_top5?: boolean;
-  stamina?: boolean;
 };
 export type SetOrgScheduleResponse = { schedule: RaceSchedule };
 export type GetOrgScheduleResponse = { schedule: RaceSchedule | null };
@@ -243,9 +272,6 @@ export type SetOrgLeagueRequest = {
   tz: string;
   race_name?: string;
   max_participants?: number;
-  counts_input?: boolean;
-  primary_top5?: boolean;
-  stamina?: boolean;
 };
 export type SetOrgLeagueResponse = { league: League };
 export type GetOrgLeagueResponse = { league: League | null };
@@ -254,7 +280,7 @@ export type DeleteOrgLeagueResponse = { ok: true };
 export type GetLeagueStandingsResponse = { standings: SeasonStandings | null };
 
 export type GetOrgRaceSettingsResponse = { settings: RaceSettings | null };
-export type SetOrgRaceSettingsRequest = { stamina_config?: StaminaConfig };
+export type SetOrgRaceSettingsRequest = { modifiers?: ModifierSettings };
 export type SetOrgRaceSettingsResponse = { settings: RaceSettings };
 
 export type MarketHorse = {

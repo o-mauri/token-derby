@@ -44,7 +44,7 @@ function horse(
     user_name,
     xp,
     ...(equipped_hat ? { equipped_hat } : {}),
-    ...(stamina !== undefined ? { stamina } : {}),
+    ...(stamina !== undefined ? { modifier_states: { stamina: { level: stamina } } } : {}),
   };
 }
 
@@ -92,10 +92,10 @@ function snapshot(now: number): GetRaceResponse {
     status: 'live',
     server_time: new Date(now).toISOString(),
     time_left_seconds: Math.max(0, Math.floor((RACE_END_MS - now) / 1000)),
-    stamina: true,
-    // Org tuned the taper floor up from the 25 default — demonstrates the bar
-    // reading the race's own snapshotted config, not the STAMINA constant.
-    stamina_config: { taper_floor: 40 },
+    // The shape a race created today actually carries. Org tuned the taper
+    // floor up from the 25 default, so the bar is demonstrably reading the
+    // race's own snapshotted config rather than the modifier's.
+    modifiers: { stamina: { enabled: true, params: { taper_floor: 40 } } },
     horses: ranked,
   };
 }
@@ -119,7 +119,35 @@ function seriesFor(h: HorseView, seed: number): SeriesPoint[] {
     if (w <= 0) return; // idle minute — no point recorded
     points.push({ t: RACE_START_MS + m * 60_000 + 30_000, d: Math.round((w / sum) * total) });
   });
-  return points;
+  return taper(points, scoredOf(h));
+}
+
+/**
+ * Score a horse's later points down until the series totals its scored
+ * distance, the shape a tiring horse actually produces: full value until it
+ * drops through the taper floor, then progressively less.
+ *
+ * The taper starts at the latest point from which the remaining output can
+ * absorb the whole reduction — walking back from the end rather than from a
+ * fixed fraction, which would clamp at zero and leave the line above target for
+ * a horse that lost most of its score. Earlier points carry no `s`, exactly as
+ * the server writes them.
+ */
+function taper(points: SeriesPoint[], scoredTotal: number): SeriesPoint[] {
+  const raw = points.reduce((a, p) => a + p.d, 0);
+  if (raw <= 0 || scoredTotal >= raw) return points;
+
+  const reduction = raw - scoredTotal;
+  let start = points.length;
+  let tailRaw = 0;
+  while (start > 0 && tailRaw < reduction) {
+    start--;
+    tailRaw += points[start]!.d;
+  }
+  if (tailRaw <= 0) return points;
+
+  const ratio = (tailRaw - reduction) / tailRaw;
+  return points.map((p, i) => (i < start ? p : { ...p, s: Math.round(p.d * ratio) }));
 }
 
 const SERIES: GetRaceSeriesResponse = {

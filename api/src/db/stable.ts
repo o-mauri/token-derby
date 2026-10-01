@@ -179,7 +179,7 @@ export async function awardHorseXp(
 export async function recordHorseRaceResult(
   user_id: string,
   stable_horse_id: string,
-  result: { final_tokens: number; rank: number; pace: number | null },
+  result: { final_scored_tokens: number; rank: number; pace: number | null },
 ): Promise<void> {
   const appendPace = result.pace !== null;
   try {
@@ -195,7 +195,7 @@ export async function recordHorseRaceResult(
         ':one': 1,
         ':w': result.rank === 1 ? 1 : 0,
         ':p': result.rank <= 3 ? 1 : 0,
-        ':t': Math.max(0, result.final_tokens),
+        ':t': Math.max(0, result.final_scored_tokens),
         ':r': result.rank,
         ...(appendPace ? { ':empty': [] as number[], ':pace': [Math.max(0, result.pace!)] } : {}),
       },
@@ -266,6 +266,32 @@ export async function applyRollResult(
     ConditionExpression: 'attribute_exists(pk) AND (' + conditionExpr + ')',
     ExpressionAttributeValues: eav,
   }));
+}
+
+/**
+ * Append a hat without touching last_rolled_level — a claim must not consume a
+ * pending roll. Returns the index the hat landed at, or null if the horse is gone.
+ */
+export async function appendStableHorseHat(
+  user_id: string,
+  stable_horse_id: string,
+  hat: CollectedHat,
+): Promise<number | null> {
+  try {
+    const { Attributes } = await ddb.send(new UpdateCommand({
+      TableName: TABLE,
+      Key: stableHorseKey(user_id, stable_horse_id),
+      UpdateExpression: 'SET hats = list_append(if_not_exists(hats, :empty), :new_hat)',
+      ConditionExpression: 'attribute_exists(pk)',
+      ExpressionAttributeValues: { ':empty': [], ':new_hat': [hat] },
+      ReturnValues: 'UPDATED_NEW',
+    }));
+    const hats = (Attributes?.hats ?? []) as CollectedHat[];
+    return hats.length - 1;
+  } catch (e: any) {
+    if (e?.name === 'ConditionalCheckFailedException') return null;
+    throw e;
+  }
 }
 
 /**

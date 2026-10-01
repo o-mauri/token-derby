@@ -1,4 +1,3 @@
-import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render } from 'ink-testing-library';
 import { HorseCreator } from '../../src/ui/HorseCreator.js';
@@ -6,6 +5,24 @@ import { defaultColors, PALETTES } from '../../src/ui/palette.js';
 
 // Flush React effects and state updates (effects register via setTimeout in Ink's reconciler)
 function tick() { return new Promise<void>(resolve => setTimeout(resolve, 0)); }
+
+// Ink wires a newly mounted TextInput's key handler one effect flush after the
+// frame already shows the prompt, so a keystroke sent too early is dropped
+// silently. Retry until the keystroke actually takes effect; a landed write is
+// reflected in the frame synchronously, so this never types twice.
+async function writeUntil(
+  stdin: { write: (data: string) => void },
+  data: string,
+  landed: () => boolean,
+): Promise<void> {
+  for (let i = 0; i < 50; i++) {
+    if (landed()) return;
+    stdin.write(data);
+    if (landed()) return;
+    await tick();
+  }
+  throw new Error(`keystroke ${JSON.stringify(data)} never took effect`);
+}
 
 describe('HorseCreator', () => {
   it('renders the four slot rows with the body slot selected', async () => {
@@ -37,16 +54,14 @@ describe('HorseCreator', () => {
 
   it('Right arrow advances the selected slot to the next palette color', async () => {
     const onSubmit = vi.fn();
-    const { stdin } = render(<HorseCreator onSubmit={onSubmit} onCancel={() => {}} />);
+    const { stdin, lastFrame } = render(<HorseCreator onSubmit={onSubmit} onCancel={() => {}} />);
     await tick();
     stdin.write('\x1B[C'); // right — body advances
     await tick();
     stdin.write('\r');       // enter — go to name prompt
     await tick();
-    stdin.write('Gary');
-    await tick();
-    stdin.write('\r');       // submit
-    await tick();
+    await writeUntil(stdin, 'Gary', () => !!lastFrame()?.includes('Gary'));
+    await writeUntil(stdin, '\r', () => onSubmit.mock.calls.length > 0);
     expect(onSubmit).toHaveBeenCalledOnce();
     const [name, colors] = onSubmit.mock.calls[0]!;
     expect(name).toBe('Gary');
@@ -56,16 +71,14 @@ describe('HorseCreator', () => {
 
   it('Left arrow at index 0 wraps to the last palette entry', async () => {
     const onSubmit = vi.fn();
-    const { stdin } = render(<HorseCreator onSubmit={onSubmit} onCancel={() => {}} />);
+    const { stdin, lastFrame } = render(<HorseCreator onSubmit={onSubmit} onCancel={() => {}} />);
     await tick();
     stdin.write('\x1B[D'); // left
     await tick();
     stdin.write('\r');
     await tick();
-    stdin.write('X');
-    await tick();
-    stdin.write('\r');
-    await tick();
+    await writeUntil(stdin, 'X', () => !!lastFrame()?.includes('X'));
+    await writeUntil(stdin, '\r', () => onSubmit.mock.calls.length > 0);
     const [, colors] = onSubmit.mock.calls[0]!;
     expect(colors.body).toBe(PALETTES.body[PALETTES.body.length - 1]);
   });
@@ -90,8 +103,8 @@ describe('HorseCreator', () => {
     await tick();
     stdin.write('\r');     // accept
     await tick();
-    stdin.write('\r');     // submit name (already filled)
-    await tick();
+    // submit name (already filled)
+    await writeUntil(stdin, '\r', () => onSubmit.mock.calls.length > 0);
     expect(onSubmit).toHaveBeenCalledWith('Pony', initial);
   });
 
@@ -125,8 +138,8 @@ describe('HorseCreator', () => {
     await tick();
     stdin.write('\r');      // accept colors
     await tick();
-    stdin.write('\r');      // submit empty
-    await tick();
+    // submit empty — the prompt rejects it rather than calling onSubmit
+    await writeUntil(stdin, '\r', () => !!lastFrame()?.includes('Name required'));
     expect(onSubmit).not.toHaveBeenCalled();
     expect(lastFrame()).toContain('Name required');
   });

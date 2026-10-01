@@ -13,7 +13,7 @@ const snap = (race_id: string, bucket: number, win: number): MarketSnapshot => (
   race_id, bucket,
   computed_at: new Date(bucket * 60_000).toISOString(),
   phantoms: 2,
-  prices: [{ horse_id: 'h1', win, podium: 0.9, division: 0.5 }],
+  prices: [{ horse_id: 'h1', win, podium: 0.9, division: 0.5, divisionPodium: 0.8 }],
 });
 
 describe('market snapshots', () => {

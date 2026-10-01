@@ -4,10 +4,14 @@
 // dry run.
 import { ScanCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { ddb, TABLE } from '../src/db/client.js';
-import { tokenMultiplier, RECENT_PACES_WINDOW, MIN_PACE_RACE_MINUTES } from '@token-derby/shared';
+import { RECENT_PACES_WINDOW, MIN_PACE_RACE_MINUTES } from '@token-derby/shared';
 import { stableHorseKey } from '../src/db/keys.js';
 
 const APPLY = process.argv.includes('--apply');
+
+// Races from before input was always counted scored output tokens only; this
+// is the calibrated input+output / output ratio that brings them into today's units.
+const OUTPUT_ONLY_SCALE = 10;
 
 type Row = Record<string, any>;
 
@@ -49,7 +53,6 @@ async function main(): Promise<void> {
     if (!m?.ended_at) continue;
     const endMs = new Date(m.ended_at).getTime();
     if (!Number.isFinite(endMs)) continue;
-    const mult = tokenMultiplier({ counts_input: m.counts_input });
     for (const h of horses) {
       const sid = h.stable_horse_id, uid = h.user_id;
       if (!sid || !uid) continue;
@@ -59,8 +62,10 @@ async function main(): Promise<void> {
       const enrolledMin = Math.max(1, (endMs - joinedMs) / 60_000);
       if (!(enrolledMin >= MIN_PACE_RACE_MINUTES)) continue;   // too brief to mean anything
       const tokens = Number(h.final_scored_tokens ?? h.final_tokens ?? 0);
+      // model_tokens is seeded at join only by code that counts input on every race.
+      const scale = m.counts_input || h.model_tokens ? 1 : OUTPUT_ONLY_SCALE;
       const entry = paces.get(sid) ?? { user_id: uid, rows: [] as Array<{ t: number; pace: number }> };
-      entry.rows.push({ t: endMs, pace: Math.max(0, tokens / mult / enrolledMin) });
+      entry.rows.push({ t: endMs, pace: Math.max(0, tokens * scale / enrolledMin) });
       paces.set(sid, entry);
     }
   }

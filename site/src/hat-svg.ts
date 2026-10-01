@@ -1,5 +1,5 @@
 import type { Hat } from '@token-derby/shared';
-import { HATS } from '@token-derby/shared';
+import { HATS, hatColors, channelColor, isAnimatedHat } from '@token-derby/shared';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -22,40 +22,35 @@ export function buildHatGroup(doc: Document, hat: Hat, variantIdx: number): SVGG
   g.setAttribute('class', `horse-hat horse-hat-${hat.id}`);
 
   const ext = Math.max(0, hat.rows.length - 4);
-  const colors = hatColorsFor(hat, variantIdx);
+  const colors = hatColors(hat, variantIdx);
 
   for (let i = 0; i < hat.rows.length; i++) {
     const row = hat.rows[i]!;
     for (let j = 0; j < row.length; j++) {
       const ch = row[j];
-      if (ch === '.') continue;
+      if (ch === '.' || ch === undefined) continue;
       const rect = doc.createElementNS(SVG_NS, 'rect');
       rect.setAttribute('x', String(hat.anchor_x + j));
       rect.setAttribute('y', String(i - ext));
       rect.setAttribute('width', '1');
       rect.setAttribute('height', '1');
-      rect.setAttribute('class', ch === 'A' ? 'hat-a' : 'hat-q');
-      rect.setAttribute('fill', ch === 'A' ? colors.A : (colors.Q ?? colors.A));
+      rect.setAttribute('class', `hat-${ch.toLowerCase()}`);
+      rect.setAttribute('fill', channelColor(colors, ch));
       g.appendChild(rect);
     }
   }
   return g;
 }
 
-function hatColorsFor(hat: Hat, variantIdx: number): { A: string; Q?: string } {
-  if (hat.rarity === 'legendary') return hat.colors;
-  return hat.variants[variantIdx] ?? hat.variants[0]!;
-}
-
 /**
- * Build a <style> block with @keyframes for every legendary hat's animation.
+ * Build a <style> block with @keyframes for every animated hat's animation.
  * Each animation frame is held for its full slice of duration (discrete frame
  * replacement, no interpolation) via dual stops.
  */
-export function buildLegendaryKeyframes(): string {
+export function buildAnimatedKeyframes(): string {
   const blocks: string[] = [];
   for (const hat of HATS) {
-    if (hat.rarity !== 'legendary') continue;
+    if (!isAnimatedHat(hat)) continue;
     const { frames, fps } = hat.animation;
     const N = frames.length;
     const dur = N / fps;
@@ -81,6 +76,6 @@ export function ensureLegendaryStylesInstalled(doc: Document): void {
   if (doc.getElementById(STYLE_MARKER_ID)) return;
   const style = doc.createElement('style');
   style.id = STYLE_MARKER_ID;
-  style.textContent = buildLegendaryKeyframes();
+  style.textContent = buildAnimatedKeyframes();
   doc.head.appendChild(style);
 }

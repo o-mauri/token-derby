@@ -45,6 +45,42 @@ describe('resampleToTicks', () => {
   });
 });
 
+describe('resampleToTicks — scored distance vs raw production', () => {
+  it('accumulates the scored delta, not the raw one', () => {
+    // A tiring horse: 1,000 raw tokens scored down to 500.
+    const out = resampleToTicks([{ t: 30_000, d: 1_000, s: 500 }], 0, 2 * MIN);
+    expect(out[1]!.total).toBe(500);
+  });
+
+  it('still reports raw production per minute, so a tiring horse sees its true pace', () => {
+    const out = resampleToTicks([{ t: 30_000, d: 1_000, s: 500 }], 0, 2 * MIN);
+    expect(out[1]!.perMin).toBe(1_000);
+  });
+
+  it('carries the scored total forward across idle ticks', () => {
+    const out = resampleToTicks([{ t: 30_000, d: 1_000, s: 500 }], 0, 3 * MIN);
+    expect(out[2]).toEqual({ t: 2 * MIN, total: 500, perMin: 0 });
+  });
+
+  it('mixes scored and unscored points within one tick', () => {
+    const out = resampleToTicks([{ t: 10_000, d: 100 }, { t: 50_000, d: 400, s: 200 }], 0, 1 * MIN);
+    expect(out[1]).toEqual({ t: 1 * MIN, total: 300, perMin: 500 });
+  });
+
+  it('reads a point written before scored distance as unmodified', () => {
+    // No `s` means nothing changed the beat, so distance is the raw delta.
+    const out = resampleToTicks([{ t: 30_000, d: 700 }], 0, 2 * MIN);
+    expect(out[1]).toEqual({ t: 1 * MIN, total: 700, perMin: 700 });
+  });
+
+  it('keeps the two quantities identical on a race running no mechanics', () => {
+    const points = [{ t: 10_000, d: 300 }, { t: 70_000, d: 600 }];
+    const out = resampleToTicks(points, 0, 2 * MIN);
+    expect(out.map(p => p.total)).toEqual([0, 300, 900]);
+    expect(out.map(p => p.perMin)).toEqual([0, 300, 600]);
+  });
+});
+
 describe('trailingPace', () => {
   const now = 100 * MIN;
 
@@ -75,6 +111,13 @@ describe('trailingPace', () => {
   it('divides by the clamped window early in a race (not the full 15 min)', () => {
     // Race only 3 minutes old: caller passes a 3-min window, so 600 tokens => 200/min.
     expect(trailingPace([{ t: now - 1 * MIN, d: 600 }], now, 3 * MIN)).toBe(200);
+  });
+
+  it('stays on raw production even where a scored delta is recorded', () => {
+    // The number a player compares against the race's sustainable pace, and the
+    // one stamina drains from — scoring it would make the comparison meaningless.
+    expect(trailingPace([{ t: 0, d: 1_000, s: 100 }], 0, PACE_WINDOW_MS))
+      .toBe(Math.round(1_000 / (PACE_WINDOW_MS / 60_000)));
   });
 
   it('returns null when the window is under a minute (too little race to measure)', () => {

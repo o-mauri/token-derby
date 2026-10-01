@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Box, Text } from 'ink';
 import type { Hat } from '@token-derby/shared';
+import { isAnimatedHat } from '@token-derby/shared';
 import { HatSprite, AnimatedHatSprite } from './HatSprite.js';
 import { ansiFg } from './half-blocks.js';
 
@@ -16,6 +17,7 @@ const TIER_PALETTE: Record<Hat['rarity'], string[]> = {
   rare:      ['#42A5F5', '#1E88E5', '#90CAF9', '#0277BD'],
   epic:      ['#AB47BC', '#8E24AA', '#CE93D8', '#6A1B9A'],
   legendary: ['#FFD700', '#FF7F00', '#FF0000', '#FF00FF', '#00BFFF', '#7CFC00', '#8B00FF'],
+  limited:   ['#F472B6', '#EC4899', '#FF4FA3', '#FBCFE8', '#FFFFFF'],
 };
 
 const CONFETTI_CHARS = ['✦', '✧', '⋆', '★', '☆', '✨', '*', '•', '◆', '◇'];
@@ -177,7 +179,8 @@ const CLOSED_HOLD_MS = 3000;
 
 export function RollReveal({ outcome, onDone }: RevealProps) {
   const isNoHat = outcome.kind === 'no_hat';
-  const isLegendary = outcome.kind !== 'no_hat' && outcome.hat.rarity === 'legendary';
+  const isShowpiece = outcome.kind !== 'no_hat'
+    && (outcome.hat.rarity === 'legendary' || outcome.hat.rarity === 'limited');
 
   const [phase, setPhase] = useState<'closed' | 'open1' | 'open2' | 'burst' | 'empty' | 'reveal'>('closed');
 
@@ -191,10 +194,10 @@ export function RollReveal({ outcome, onDone }: RevealProps) {
     } else {
       timers.push(setTimeout(() => setPhase('burst'), CLOSED_HOLD_MS + 700));
       timers.push(setTimeout(() => setPhase('reveal'), CLOSED_HOLD_MS + 1650));
-      timers.push(setTimeout(onDone, CLOSED_HOLD_MS + (isLegendary ? 4650 : 2650)));
+      timers.push(setTimeout(onDone, CLOSED_HOLD_MS + (isShowpiece ? 4650 : 2650)));
     }
     return () => timers.forEach(clearTimeout);
-  }, [isNoHat, isLegendary, onDone]);
+  }, [isNoHat, isShowpiece, onDone]);
 
   if (phase === 'closed') return <GiftBox frame={BOX_CLOSED} color={BOX_COLOR} />;
   if (phase === 'open1') return <GiftBox frame={BOX_OPENING_1} color={BOX_COLOR} />;
@@ -205,7 +208,7 @@ export function RollReveal({ outcome, onDone }: RevealProps) {
   }
   // phase === 'reveal' — only reachable for hat/duplicate outcomes
   if (outcome.kind === 'no_hat') return <GiftBox frame={BOX_EMPTY} color={BOX_COLOR} />;
-  return outcome.hat.rarity === 'legendary'
+  return isAnimatedHat(outcome.hat)
     ? <AnimatedHatSprite hat={outcome.hat} centerIn={{ w: SCENE_W, h: SCENE_H }} />
     : <HatSprite hat={outcome.hat} variant={outcome.variant} centerIn={{ w: SCENE_W, h: SCENE_H }} />;
 }

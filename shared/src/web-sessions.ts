@@ -9,5 +9,9 @@ export type WebSessionExchangeRequest = {
 export type WebSessionExchangeResponse = {
   token: string;
   expires_at: string;
-  user: { user_id: string; display_name: string };
+  user: { user_id: string; display_name: string; email?: string };
+};
+
+export type AuthLinkStartResponse = {
+  authorize_url: string;
 };

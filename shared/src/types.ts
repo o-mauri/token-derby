@@ -2,7 +2,41 @@ import type { RecentEvent } from './midrace.js';
 import type { StaminaConfig } from './scoring.js';
 import type { MarketPrice } from './markets.js';
 
-export type ModelKey = 'claude' | 'codex' | 'gemini';
+/**
+ * Which vendor's model produced a token. Deliberately NOT the tool it came
+ * from: one harness (Pi) can run models from several vendors, and several
+ * harnesses (Claude Code, Pi) can produce the same vendor's tokens.
+ */
+export type ModelFamily = 'anthropic' | 'openai' | 'google';
+
+/**
+ * A scoring mechanic. Adding one means adding its id here, writing
+ * scoring/modifiers/<id>.ts and registering it -- nothing else.
+ */
+export type ModifierId = 'stamina';
+
+/** One modifier's own persisted numbers, carried between beats. */
+export type ModifierState = Record<string, number>;
+
+/**
+ * Every modifier's state on a horse, keyed by modifier id. On the wire as well
+ * as in storage: a client showing a mechanic needs the same numbers the server
+ * scored with, and a generic map means a new mechanic needs no new field.
+ */
+export type ModifierStates = Partial<Record<ModifierId, ModifierState>>;
+
+/**
+ * One modifier's configuration: whether a race runs it, and its tuning. Tuning
+ * is kept while switched off, so turning a mechanic back on does not discard
+ * what was set up for it.
+ */
+export type ModifierSetting = {
+  enabled: boolean;
+  params?: Record<string, number>;
+};
+
+/** Every modifier's configuration, keyed by modifier id. */
+export type ModifierSettings = Partial<Record<ModifierId, ModifierSetting>>;
 
 export type HorseColors = {
   body: string;
@@ -24,7 +58,9 @@ export type Horse = {
   user_name: string;
   xp: number;
   xp_awarded?: number;
-  primary_model?: ModelKey;   // locked model for this race-horse; absent ⇒ 'claude'
+  // Per-model token totals. Nested so more models (or more per-model figures)
+  // need no new top-level attribute. Absent on rows predating the split.
+  model_tokens?: Record<ModelFamily, number>;
   last_seq?: number;          // highest applied heartbeat sequence (delta protocol)
   // Mid-race XP state — all optional for backwards compat with existing race-horse rows.
   live_xp?: number;
@@ -46,8 +82,10 @@ export type Horse = {
   // Absent on rows written before the feature; read via scoredOf().
   scored_tokens?: number;
   final_scored_tokens?: number;
-  stamina?: number;
-  prior_pace?: number;       // stamped at join, output-equivalent tokens/min
+  // Per-modifier state, e.g. { stamina: { level: 73 } }. Absent until the first
+  // beat of a race running a modifier; read via a modifier's own accessor.
+  modifier_states?: ModifierStates;
+  prior_pace?: number;       // stamped at join, scored tokens/min
   // League fixtures only: computed per-request from season standings (see
   // HorseView). Absent for non-league races and outside that enrichment step.
   division?: number;
@@ -70,14 +108,6 @@ export type Race = {
   creator_user_name?: string;
   org_id?: string;
   organisation_name?: string;
-  // When true, races count input+output tokens (incl. cache reads/creations)
-  // instead of just output. Server-side achievement and rate-cap thresholds
-  // scale by TOKEN_INPUT_MULTIPLIER for these races.
-  counts_input?: boolean;
-  // When true, only each racer's 5 most-active conversations per heartbeat
-  // count toward their PRIMARY model's score (secondaries unaffected). Absent
-  // ⇒ off: every conversation counts. Locked at race creation.
-  primary_top5?: boolean;
   // League fixture tags — present only on races materialised for a league.
   // `league_id` is the org id (one league per org); `league_season`/`league_round`
   // locate the fixture within its season for scoring and the "round X/N" display.
@@ -88,10 +118,12 @@ export type Race = {
   // (top flight). Lets clients label the division-grouped order without a
   // separate config fetch. Absent for non-league races.
   league_division_names?: string[];
-  // Stamina: a horse above a sustainable pace tires and scores less until it
-  // recovers. Locked at race creation.
+  // Which mechanics this race runs and how they are tuned, snapshotted at
+  // creation so a later org change never rescores a race in flight.
+  modifiers?: ModifierSettings;
+  // Pre-`modifiers` spelling of the same thing, still read for races that were
+  // already running when the map replaced it. Never written.
   stamina?: boolean;
-  // Per-org stamina tuning, snapshotted at race creation.
   stamina_config?: StaminaConfig;
   // Mean ACTUAL ATTENDANCE (horse count, not the max_participants cap) of the
   // org's last 10 finished races, stamped at creation so pricing never has to
@@ -155,6 +187,21 @@ export type Organisation = {
   created_at: string;
   creator_user_id: string;
   creator_user_name: string;
+  // Absent on every org row written before Phase 3 (org access control).
+  // Readers must default these, not treat their absence as falsy/truthy.
+  allowed_domains?: string[];
+  join_token_enabled?: boolean;
+  domain_join_enabled?: boolean;
+  restrict_to_allowed_domains?: boolean;
+};
+
+// The four fields above, always present with Phase 3 defaults applied —
+// what every reader in api/src/db/organisations.ts actually returns.
+export type OrgAccessSettings = {
+  allowed_domains: string[];
+  join_token_enabled: boolean;
+  domain_join_enabled: boolean;
+  restrict_to_allowed_domains: boolean;
 };
 
 export type OrganisationMember = {
@@ -173,13 +220,21 @@ export type User = {
   user_id: string;
   display_name: string;
   created_at: string;
+  // Set once a Google account is linked. Absent on every pre-SSO row.
+  email?: string;
+  email_verified?: boolean;
+  idp?: 'google';
+  idp_sub?: string;
+  hd?: string;            // Google hosted-domain claim; Workspace accounts only
 };
 
-export type HatRarity = 'common' | 'rare' | 'epic' | 'legendary';
+export type HatRarity = 'common' | 'rare' | 'epic' | 'legendary' | 'limited';
 
 export type HatId = string;
 
-export type HatVariant = { A: string; Q?: string };
+// Five paint channels, A required. An explicit key list rather than an index
+// signature, so a sixth channel fails to compile instead of needing a rule.
+export type HatVariant = { A: string; Q?: string; C?: string; D?: string; F?: string };
 
 export type HatAnimation = { type: 'cycle'; frames: string[]; fps: number };
 
@@ -192,6 +247,8 @@ export type Hat =
       anchor_x: number;
       rows: string[];
       variants: HatVariant[];
+      // false = obtainable only via a claim token, never from a roll.
+      rollable: boolean;
     }
   | {
       id: HatId;
@@ -202,6 +259,28 @@ export type Hat =
       rows: string[];
       colors: HatVariant;
       animation: HatAnimation;
+      rollable: boolean;
+    }
+  | {
+      id: HatId;
+      name: string;
+      rarity: 'limited';
+      width: number;
+      anchor_x: number;
+      rows: string[];
+      variants: HatVariant[];
+      rollable: boolean;
+    }
+  | {
+      id: HatId;
+      name: string;
+      rarity: 'limited';
+      width: number;
+      anchor_x: number;
+      rows: string[];
+      colors: HatVariant;
+      animation: HatAnimation;
+      rollable: boolean;
     };
 
 export type CollectedHat = {
@@ -226,13 +305,17 @@ export type StableHorse = {
   hats?: CollectedHat[];
   equipped_hat?: number | null;   // number = equipped index into hats[]; null = explicitly unequipped; undefined = pre-feature stable horses
   last_rolled_level?: number;         // high-water mark for pending rolls
-  recent_paces?: number[];   // output-equivalent tokens/min, oldest first
+  recent_paces?: number[];   // scored tokens/min, oldest first
 };
 
 // Per-org tuning for the scoring mechanics. Its own row rather than living on
 // SCHEDULE or LEAGUE, because it applies to both and is exclusive with neither.
 export type RaceSettings = {
   org_id: string;
+  // Which mechanics the org's races run and how they are tuned. Tuning is kept
+  // while a mechanic is switched off, so turning it back on restores the setup.
+  modifiers?: ModifierSettings;
+  // Pre-`modifiers` spelling, kept only so an old row still parses. Never written.
   stamina_config?: StaminaConfig;
   updated_at: string;
   updated_by_user_id: string;
@@ -247,9 +330,6 @@ export type RaceSchedule = {
   tz: string;                // IANA, e.g. "Europe/London"
   race_name?: string;        // optional name for created races
   max_participants?: number;
-  counts_input?: boolean;
-  primary_top5?: boolean;    // stamped onto each scheduled race (see Race.primary_top5)
-  stamina?: boolean;         // stamped onto each scheduled race (see Race.stamina)
   created_at: string;
   creator_user_id: string;   // stamped onto each scheduled race
   creator_user_name: string; // stamped onto each scheduled race
@@ -284,9 +364,6 @@ export type League = {
   tz: string;                     // IANA
   race_name?: string;
   max_participants?: number;
-  counts_input?: boolean;
-  primary_top5?: boolean;
-  stamina?: boolean;         // stamped onto each fixture (see Race.stamina)
   current_season: number;         // 1-based; the season fixtures accrue into
   status: LeagueStatus;           // 'complete' is transient during rollover
   pending_structural?: PendingStructural; // shape edits staged mid-season, applied at rollover

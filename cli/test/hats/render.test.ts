@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { composeHatGrid } from '../../src/hats/render.js';
 import { MAIN_SPRITE } from '../../src/ui/sprite.js';
-import { hatById } from '@token-derby/shared';
+import { hatById, isAnimatedHat } from '@token-derby/shared';
 
 const HORSE_COLORS = { body: '#A0522D', mane: '#2F1B0C', tail: '#2F1B0C', saddle: '#8B4513' };
 
@@ -25,7 +25,7 @@ describe('composeHatGrid', () => {
 
   it('uses the requested variant for hat A pixels', () => {
     const hat = hatById('flat_cap')!;
-    if (hat.rarity === 'legendary') throw new Error('test misconfigured');
+    if (isAnimatedHat(hat)) throw new Error('test misconfigured');
     const v0 = hat.variants[0]!;
     const { grid, offsetX } = composeHatGrid(MAIN_SPRITE, hat, 0, HORSE_COLORS);
     // Find any 'A' in flat_cap and verify the corresponding grid cell uses v0.A.
@@ -57,7 +57,7 @@ describe('composeHatGrid', () => {
     // when anchor_x=23. Horse row 2 has mane `MMM` at cols 26..28. After compositing,
     // those mane cells should be hat color (not mane color) because the hat overlays.
     const hat = hatById('flat_cap')!;
-    if (hat.rarity === 'legendary') throw new Error('test misconfigured');
+    if (isAnimatedHat(hat)) throw new Error('test misconfigured');
     const v0 = hat.variants[0]!;
     const { grid, offsetX } = composeHatGrid(MAIN_SPRITE, hat, 0, HORSE_COLORS);
     const ext = Math.max(0, hat.rows.length - 4);

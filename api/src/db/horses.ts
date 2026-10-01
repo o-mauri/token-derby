@@ -1,7 +1,8 @@
 import { PutCommand, QueryCommand, UpdateCommand, GetCommand } from '@aws-sdk/lib-dynamodb';
 import { ddb, TABLE } from './client.js';
 import { horseKey, parseHorseId, RACE_PK_PREFIX, HORSE_SK_PREFIX } from './keys.js';
-import type { Horse, RecentEvent, ModelKey } from '@token-derby/shared';
+import { MODEL_FAMILIES, LEGACY_FAMILY_KEYS, zeroPerFamily } from '@token-derby/shared';
+import type { Horse, RecentEvent, ModelFamily, ModifierStates } from '@token-derby/shared';
 import type { AchievementState } from '../lib/evaluate-achievements.js';
 
 export async function putHorse(race_id: string, horse: Horse, heartbeat_token: string): Promise<void> {
@@ -9,6 +10,7 @@ export async function putHorse(race_id: string, horse: Horse, heartbeat_token: s
     TableName: TABLE,
     Item: {
       ...horseKey(race_id, horse.horse_id),
+      model_tokens: zeroPerFamily(),
       ...horse,
       heartbeat_token,
     },
@@ -133,10 +135,10 @@ export async function setHorseXpAwarded(
 export type HorseHeartbeatRecord = {
   current_tokens: number;
   scored_tokens?: number;
-  stamina?: number;
+  modifier_states?: ModifierStates;
   last_heartbeat: string;
   last_seq: number;
-  primary_model?: ModelKey;
+  model_tokens?: Record<ModelFamily, number>;
   live_xp: number;
   last_rank: number | undefined;
   racer_streak_ms: number;
@@ -166,10 +168,10 @@ export async function getHorseForHeartbeat(
   return {
     current_tokens: Number(Item.current_tokens ?? 0),
     scored_tokens: Item.scored_tokens === undefined ? undefined : Number(Item.scored_tokens),
-    stamina: Item.stamina === undefined ? undefined : Number(Item.stamina),
+    modifier_states: readModifierStates(Item),
     last_heartbeat: String(Item.last_heartbeat ?? ''),
     last_seq: Number(Item.last_seq ?? 0),
-    primary_model: Item.primary_model as ModelKey | undefined,
+    model_tokens: Item.model_tokens as Record<ModelFamily, number> | undefined,
     live_xp: Number(Item.live_xp ?? 0),
     last_rank: Item.last_rank == null ? undefined : Number(Item.last_rank),
     racer_streak_ms: Number(Item.racer_streak_ms ?? 0),
@@ -235,26 +237,63 @@ async function seedScoredTokens(race_id: string, horse_id: string): Promise<void
   }
 }
 
+// The per-family map has to exist before its members can be incremented: a SET on
+// `model_tokens.anthropic` is rejected outright when `model_tokens` itself is
+// absent. Rows created before the split have no map, hence this seed.
+//
+// A row written before families replaced harness-named keys carries the OLD
+// spelling, so the map exists but under the wrong names. Left alone, the new
+// keys would be added beside the old ones and the per-family figures would stop
+// summing to current_tokens. `existing` carries that row forward instead.
+async function seedModelTokens(
+  race_id: string,
+  horse_id: string,
+  existing?: Record<string, number>,
+): Promise<void> {
+  const seed = zeroPerFamily();
+  for (const [key, family] of Object.entries(LEGACY_FAMILY_KEYS)) {
+    const carried = existing?.[key];
+    if (typeof carried === 'number' && Number.isFinite(carried)) seed[family] += carried;
+  }
+  try {
+    await ddb.send(new UpdateCommand({
+      TableName: TABLE,
+      Key: horseKey(race_id, horse_id),
+      UpdateExpression: 'SET model_tokens = :seed',
+      ConditionExpression: 'attribute_exists(pk)',
+      ExpressionAttributeValues: { ':seed': seed },
+    }));
+  } catch (e: any) {
+    if (e?.name !== 'ConditionalCheckFailedException') throw e;
+  }
+}
+
 export type ApplyHeartbeatDeltaInput = {
   race_id: string;
   horse_id: string;
   seq: number;
   applied: number;
   scored_applied: number;
-  stamina: number | undefined;
+  /** Every modifier's state after this beat. Written whole, never incremented. */
+  modifier_states: ModifierStates;
   last_heartbeat: string;
   state: AchievementState;
-  // True only on a horse's first-ever apply (scored_tokens not yet on the row).
-  // Skips the redundant seed round-trip on every later heartbeat.
+  // This beat's applied delta split by source. Sums to `applied`, and is written
+  // in the same conditional update so the split can never drift from the total.
+  components: Record<ModelFamily, number>;
+  // True only on a horse's first-ever apply, or on the first apply after the
+  // harness/family rename. Skips the redundant seed round-trips on later beats.
   needsSeed: boolean;
+  // A pre-rename model_tokens map, carried into the renamed one when seeding.
+  legacyModelTokens?: Record<string, number>;
 };
 
 // Atomic, idempotent heartbeat apply. Adds `applied` to current_tokens and
 // advances last_seq ONLY when the incoming seq is newer. Returns false (no
 // mutation) for a duplicate/out-of-order seq.
 export async function applyHeartbeatDelta(input: ApplyHeartbeatDeltaInput): Promise<boolean> {
-  const { race_id, horse_id, seq, applied, scored_applied, stamina, last_heartbeat, state, needsSeed } = input;
-  if (needsSeed) await seedScoredTokens(race_id, horse_id);
+  const { race_id, horse_id, seq, applied, scored_applied, modifier_states, last_heartbeat, state, components, needsSeed, legacyModelTokens } = input;
+  if (needsSeed) await Promise.all([seedScoredTokens(race_id, horse_id), seedModelTokens(race_id, horse_id, legacyModelTokens)]);
 
   const eav: Record<string, unknown> = {
     ':seq': seq,
@@ -284,6 +323,17 @@ export async function applyHeartbeatDelta(input: ApplyHeartbeatDeltaInput): Prom
   const addParts = ['current_tokens :applied', 'scored_tokens :sapplied'];
   eav[':sapplied'] = scored_applied;
 
+  // ADD is documented as top-level only, so the nested counters use arithmetic.
+  // DynamoDB Local accepts `ADD model_tokens.claude` but the real service does
+  // not — using it would pass the suite here and fail on deploy.
+  const ean: Record<string, string> = {};
+  for (const key of MODEL_FAMILIES) {
+    setParts.push(`model_tokens.#m_${key} = if_not_exists(model_tokens.#m_${key}, :zero) + :mt_${key}`);
+    ean[`#m_${key}`] = key;
+    eav[`:mt_${key}`] = components[key];
+  }
+  eav[':zero'] = 0;
+
   if (state.last_stampede_at !== undefined) {
     setParts.push('last_stampede_at = :sa');
     eav[':sa'] = state.last_stampede_at;
@@ -298,9 +348,11 @@ export async function applyHeartbeatDelta(input: ApplyHeartbeatDeltaInput): Prom
   } else {
     removeParts.push('last_gap_in_1st');
   }
-  if (stamina !== undefined) {
-    setParts.push('stamina = :stam');
-    eav[':stam'] = stamina;
+  // Written whole rather than per-member: a modifier owns its whole bag, so
+  // there is no counter to increment and no parent map to seed first.
+  if (Object.keys(modifier_states).length > 0) {
+    setParts.push('modifier_states = :ms');
+    eav[':ms'] = modifier_states;
   }
 
   const updateExpression =
@@ -315,6 +367,7 @@ export async function applyHeartbeatDelta(input: ApplyHeartbeatDeltaInput): Prom
       UpdateExpression: updateExpression,
       ConditionExpression:
         'attribute_exists(pk) AND (attribute_not_exists(last_seq) OR last_seq < :seq)',
+      ExpressionAttributeNames: ean,
       ExpressionAttributeValues: eav,
     }));
     return true;
@@ -327,6 +380,19 @@ export async function applyHeartbeatDelta(input: ApplyHeartbeatDeltaInput): Prom
 function pickHorse(item: Record<string, any>): Horse {
   const horse_id = parseHorseId(item.sk);
   if (!horse_id) throw new Error(`not a horse item: ${item.sk}`);
-  const { pk: _pk, sk: _sk, heartbeat_token: _hb, ...rest } = item;
-  return { ...rest, horse_id } as Horse;
+  const { pk: _pk, sk: _sk, heartbeat_token: _hb, stamina: _stam, ...rest } = item;
+  const modifier_states = readModifierStates(item);
+  return { ...rest, horse_id, ...(modifier_states ? { modifier_states } : {}) } as Horse;
+}
+
+/**
+ * A row's modifier state, hydrating the flat `stamina` attribute that rows
+ * written before the map still carry. The map wins where both exist, so a row
+ * mid-conversion never reads back the older of its two values.
+ */
+function readModifierStates(item: Record<string, any>): ModifierStates | undefined {
+  const stored = item.modifier_states as ModifierStates | undefined;
+  if (stored && Object.keys(stored).length > 0) return stored;
+  const level = item.stamina;
+  return typeof level === 'number' ? { stamina: { level } } : undefined;
 }

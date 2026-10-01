@@ -9,7 +9,6 @@ const base = {
   minutesRemaining: 240,
   phantoms: 0,
   phantomPacePool: [1200],
-  maxRemainingPerRunner: 1e12,   // effectively unbounded unless a test says otherwise
 };
 
 describe('priceRace', () => {
@@ -136,21 +135,21 @@ describe('priceRace', () => {
     expect(diluted.win).toBeGreaterThan(0);
   });
 
-  it('prices a decided race at the bounds', () => {
-    // The leader's lead exceeds everything the field could still produce.
+  it('prices an uncatchable leader at the bounds', () => {
+    // No draw comes close to closing the lead, so the simulation alone settles it.
     const runners = [runner('a', 1_000_000, 10), runner('b', 1000, 10)];
-    const priced = priceRace({ ...base, runners, maxRemainingPerRunner: 5000 });
+    const priced = priceRace({ ...base, runners });
     expect(priced[0]!.win).toBe(1);
     expect(priced[1]!.win).toBe(0);
   });
 
-  it('keeps the podium open in a decided race', () => {
+  it('keeps the podium open behind an uncatchable leader', () => {
     // The leader cannot be caught, but second and third are still contested.
     const runners = [
       runner('a', 1_000_000, 10), runner('b', 1000, 30), runner('c', 900, 30),
       runner('d', 800, 30), runner('e', 700, 30),
     ];
-    const priced = priceRace({ ...base, runners, maxRemainingPerRunner: 5000 });
+    const priced = priceRace({ ...base, runners });
     expect(priced[0]!.win).toBe(1);
     expect(priced.slice(1).every((m) => m.win === 0)).toBe(true);
     expect(priced.reduce((s, m) => s + m.podium, 0)).toBeCloseTo(3, 1);

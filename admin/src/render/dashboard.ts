@@ -1,10 +1,17 @@
-import type { AdminOrgsResponse, AdminUsersResponse, AdminOrg } from '@token-derby/shared';
+import type {
+  AdminOrgsResponse, AdminUsersResponse, AdminOrg,
+  AdminClaimsResponse, AdminClaimRedemptionsResponse, CreateClaimRequest, CreateClaimResponse,
+} from '@token-derby/shared';
 import { esc } from '../esc.js';
 import { renderUsersTable, type UsersTableMutations, type UsersTableHandle } from './users-table.js';
+import { renderClaims } from './claims.js';
 
 export type DashboardDeps = {
   fetchUsers: () => Promise<AdminUsersResponse>;
   fetchOrganisations: () => Promise<AdminOrgsResponse>;
+  fetchClaims: () => Promise<AdminClaimsResponse>;
+  createClaim: (body: CreateClaimRequest) => Promise<CreateClaimResponse>;
+  fetchRedemptions: (code: string) => Promise<AdminClaimRedemptionsResponse>;
   mutations: UsersTableMutations;
   onSignOut: () => void;
   onUnauthorized: () => void;
@@ -33,6 +40,10 @@ export function renderDashboard(root: HTMLElement, deps: DashboardDeps): void {
         <h2>Organisations <span class="count"></span></h2>
         <div id="orgs-body"></div>
       </div>
+      <div class="section" id="claims-section" hidden>
+        <h2>Claim tokens</h2>
+        <div id="claims-body"></div>
+      </div>
     </div>
   `;
 
@@ -49,12 +60,24 @@ export function renderDashboard(root: HTMLElement, deps: DashboardDeps): void {
 
   let tableHandle: UsersTableHandle | null = null;
   let editMode = false;
+  const claimsSection = root.querySelector<HTMLElement>('#claims-section')!;
+  let claimsMounted = false;
   const editBtn = root.querySelector<HTMLButtonElement>('.edit-toggle')!;
   editBtn.addEventListener('click', () => {
     editMode = !editMode;
     editBtn.setAttribute('aria-pressed', String(editMode));
     editBtn.textContent = editMode ? 'Done' : 'Edit';
     tableHandle?.setEditMode(editMode);
+    claimsSection.hidden = !editMode;
+    if (editMode && !claimsMounted) {
+      claimsMounted = true;
+      renderClaims(root.querySelector<HTMLElement>('#claims-body')!, {
+        fetchClaims: deps.fetchClaims,
+        createClaim: deps.createClaim,
+        fetchRedemptions: deps.fetchRedemptions,
+        onUnauthorized: () => { unauthorized({ status: 401 }); },
+      });
+    }
   });
 
   void (async () => {

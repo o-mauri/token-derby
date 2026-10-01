@@ -17,7 +17,6 @@ export type SeedRaceJockey = {
 export type SeedRaceOptions = {
   distinct_jockeys: number;
   duration_hours: number;
-  counts_input?: boolean;
   tokens: number[];
   jockey?: SeedRaceJockey;
   // Anchor instant. All horses join at (now - duration_hours) and the race
@@ -47,7 +46,6 @@ export async function seedRace(opts: SeedRaceOptions): Promise<SeedRaceResult> {
     max_participants: 30,
     join_code: `J${randomUUID().slice(0, 6).toUpperCase()}`,
     created_at: start_time,
-    ...(opts.counts_input !== undefined ? { counts_input: opts.counts_input } : {}),
   };
   await putRace(race, `admin-${race_id}`);
 
@@ -97,7 +95,6 @@ export type SeedLiveRaceOptions = {
   runners: number;
   elapsedMin: number;
   durationHours?: number;   // total race length; default keeps it live well past elapsedMin
-  countsInput?: boolean;
   tokens?: number[];        // per-horse current_tokens; default a plausible banked amount
   priorPace?: number[];     // per-horse prior_pace; default FIELD_MEDIAN_PACE
   expectedField?: number;
@@ -126,7 +123,6 @@ export async function seedLiveRace(opts: SeedLiveRaceOptions): Promise<SeedLiveR
     max_participants: 30,
     join_code: `J${randomUUID().slice(0, 6).toUpperCase()}`,
     created_at: start_time,
-    ...(opts.countsInput !== undefined ? { counts_input: opts.countsInput } : {}),
     ...(opts.expectedField !== undefined ? { expected_field: opts.expectedField } : {}),
     ...(opts.league ? { league_id: opts.league.league_id, league_season: opts.league.season } : {}),
   };

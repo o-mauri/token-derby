@@ -23,6 +23,8 @@
   --label-col: 124px;
   --label-mid: 23%;  /* vertical centre of the name-tag — aligned with the horse's middle */
   --ticker-h: 2.6rem;
+  --error: #ff6b6b;
+  --error-wash: rgba(255, 107, 107, 0.1);
   --pixel-font: "VT323", "Courier New", ui-monospace, monospace;
 }
 
@@ -950,6 +952,7 @@ html, body {
   --rarity-rare: #60a5fa;
   --rarity-epic: #c084fc;
   --rarity-legendary: #fbbf24;
+  --rarity-limited: #f472b6;
 }
 
 .catalog {
@@ -1047,6 +1050,7 @@ html, body {
 .rarity-heading.rarity-rare .rarity-name      { color: var(--rarity-rare); }
 .rarity-heading.rarity-epic .rarity-name      { color: var(--rarity-epic); }
 .rarity-heading.rarity-legendary .rarity-name { color: var(--rarity-legendary); }
+.rarity-heading.rarity-limited .rarity-name { color: var(--rarity-limited); }
 .rarity-meta {
   color: var(--muted);
   font-size: 0.7rem;
@@ -1105,6 +1109,17 @@ html, body {
 .rarity-badge.rarity-rare      { background: var(--rarity-rare); }
 .rarity-badge.rarity-epic      { background: var(--rarity-epic); }
 .rarity-badge.rarity-legendary { background: var(--rarity-legendary); }
+.rarity-badge.rarity-limited { background: var(--rarity-limited); }
+
+.hat-exclusive {
+  margin-left: 0.5rem;
+  padding: 0.1rem 0.4rem;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  font-size: 0.7em;
+  letter-spacing: 0.08em;
+  opacity: 0.85;
+}
 
 .variants-strip {
   flex: 1;
@@ -1330,8 +1345,103 @@ body.tv .race-header .meta .btn {
   color: var(--accent);
   font-size: clamp(2rem, 6vw, 3rem);
   letter-spacing: 0.08em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4em;
+}
+.org-login-subtitle {
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  font-size: 0.9rem;
 }
 .org-login p { color: var(--muted); margin: 0; max-width: 42ch; }
+
+/* Two equal-weight paths (Option B): a new visitor and an existing CLI racer.
+   Stacks under the org-manager breakpoint used elsewhere in this file. */
+.org-login-lanes {
+  display: flex;
+  gap: 40px;
+  align-items: stretch;
+  justify-content: center;
+  flex-wrap: wrap;
+  width: 100%;
+  max-width: 640px;
+}
+.org-login-lane {
+  flex: 1 1 220px;
+  max-width: 280px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 22px;
+  background: var(--panel);
+  border: 2px solid var(--border);
+  border-radius: 6px;
+}
+/* Inline commands keep the surrounding pixel font and size — the browser's
+   default monospace is both a different face and a larger one, which breaks
+   the line mid-sentence. */
+.org-login code {
+  font-family: inherit;
+  font-size: inherit;
+  color: var(--accent);
+  background: var(--bg);
+  padding: 0 4px;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+@media (max-width: 720px) {
+  .org-login-lanes { flex-direction: column; align-items: center; gap: 24px; }
+  .org-login-lane { max-width: 320px; width: 100%; }
+}
+
+/* Google's compliant "Sign in with Google" light button, built to Google's
+   published spec exactly (height/radius/padding/colours/type). It must look
+   identical in every theme, so it is deliberately literal-coloured and set in
+   Roboto rather than the site's tokens and pixel font — resetting both here
+   and on the label span so neither the global font nor a theme's glow can
+   reach it. */
+.org-login .google-signin,
+.org-login .google-signin-label {
+  font-family: Roboto, Arial, sans-serif;
+  font-weight: 500;
+  font-size: 14px;
+  letter-spacing: 0.25px;
+  text-shadow: none;
+  text-decoration: none;
+}
+.org-login .google-signin {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  height: 40px;
+  box-sizing: border-box;
+  padding: 0 12px;
+  background: #FFFFFF;
+  border: 1px solid #747775;
+  border-radius: 4px;
+  color: #1F1F1F;
+}
+.org-login .google-signin:hover { background: #F8F9FA; }
+.google-mark { flex-shrink: 0; }
+
+/* Reads as an error, not a hint: .org-login-error on the signed-out screen,
+   .org-auth-error on the signed-in shell. Scoped under .org-login so it outranks
+   `.org-login p`, which would otherwise paint the text muted. */
+.org-login .org-login-error,
+.org-auth-error {
+  color: var(--error);
+  background: var(--panel);
+  border: 2px solid var(--error);
+  border-radius: 4px;
+  padding: 10px 16px;
+  font-size: 0.95rem;
+  margin: 0;
+}
+.org-auth-error { margin: 16px 24px 0; }
+
 .org-login .cmd,
 .cmd {
   display: inline-block;
@@ -1342,6 +1452,127 @@ body.tv .race-header .meta .btn {
   font-size: 1.15rem;
   letter-spacing: 0.05em;
   border-radius: 4px;
+}
+
+/* ── CLI device approval ("/cli": render/cli-approve.ts) ─────────────────── */
+
+.cli-approve {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 32px;
+  text-align: center;
+}
+.cli-approve h1 {
+  margin: 0;
+  color: var(--accent);
+  font-size: clamp(1.6rem, 5vw, 2.4rem);
+  letter-spacing: 0.06em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4em;
+}
+/* The one load-bearing sentence on this page — kept visually louder than the
+   rest of the copy, the same way .org-login-error reads as urgent. */
+.cli-approve-warning {
+  max-width: 46ch;
+  margin: 0;
+  color: var(--error);
+  font-weight: bold;
+  font-size: 1rem;
+}
+.cli-approve-warning-detail {
+  max-width: 46ch;
+  margin: 0;
+  font-size: 0.85rem;
+}
+.cli-approve-form {
+  width: 100%;
+  max-width: 360px;
+  align-items: stretch;
+  text-align: left;
+}
+.cli-approve-form input {
+  font-family: inherit;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  font-size: 1.2rem;
+  text-align: center;
+  color: var(--text);
+  background: var(--bg);
+  border: 2px solid var(--border);
+  border-radius: 4px;
+  padding: 10px;
+  width: 100%;
+}
+.cli-approve-form input:focus { outline: none; border-color: var(--accent); }
+/* Structural attribution for the attacker-controlled device label: framed as
+   a quote FROM the requesting machine, never styled like the page's own
+   voice, so a label that reads like our copy still cannot pass as ours. */
+.cli-approve-label-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cli-approve-label {
+  margin: 0;
+  padding: 10px 14px;
+  background: var(--bg);
+  border: 2px dashed var(--border);
+  border-radius: 4px;
+  color: var(--muted);
+  font-style: italic;
+  word-break: break-word;
+  /* Defense in depth: the server now rejects bidi-override/format characters
+     at intake, but this keeps the label's own text direction from leaking
+     into the surrounding page if one ever reaches render by another route. */
+  unicode-bidi: isolate;
+}
+.cli-approve-success {
+  color: var(--accent);
+  font-weight: bold;
+  margin: 0;
+}
+.cli-approve-return-note {
+  max-width: 42ch;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 10px 16px;
+  font-size: 0.9rem;
+}
+
+/* ── Google account linking ("/link": render/link-google.ts) ─────────────── */
+
+.link-google {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 32px;
+  text-align: center;
+}
+.link-google h1 {
+  margin: 0;
+  color: var(--accent);
+  font-size: clamp(1.6rem, 5vw, 2.4rem);
+  letter-spacing: 0.06em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4em;
+}
+.link-google-explain,
+.link-google-status {
+  max-width: 46ch;
+  margin: 0;
+  color: var(--muted);
 }
 
 /* Signed-in shell (org-manager/index.ts): sidebar + tabs + tab body. */
@@ -1397,6 +1628,10 @@ body.tv .race-header .meta .btn {
   gap: 8px;
   padding: 10px 12px;
   background: var(--bg);
+  /* Explicit, because the account row is a <button>: without this it takes the
+     UA's buttontext, which is near-black on the black background. The org rows
+     are divs and inherit --text, so they never showed the problem. */
+  color: var(--text);
   border: 2px solid var(--border);
   border-radius: 4px;
   letter-spacing: 0.02em;
@@ -1419,7 +1654,7 @@ body.tv .race-header .meta .btn {
    inline save/clear row inside a tab panel. */
 .org-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 .org-sidebar .org-actions { flex-direction: column; margin-top: auto; }
-.org-create, .org-join, .org-btn {
+.org-create, .org-join, .org-link-google, .org-btn {
   background: var(--accent);
   color: var(--bg);
   border: none;
@@ -1431,8 +1666,16 @@ body.tv .race-header .meta .btn {
   border-radius: 4px;
   cursor: pointer;
 }
-.org-create:hover, .org-join:hover, .org-btn:hover { filter: brightness(1.1); }
-.org-sidebar .org-create, .org-sidebar .org-join { width: 100%; }
+.org-create:hover, .org-join:hover, .org-link-google:hover, .org-btn:hover { filter: brightness(1.1); }
+.org-sidebar .org-create, .org-sidebar .org-join, .org-sidebar .org-link-google { width: 100%; }
+.org-linked-email {
+  text-align: center;
+  font-size: 0.75rem;
+  letter-spacing: 0.03em;
+  padding: 9px 16px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
 
 .org-main {
   flex: 1 1 auto;
@@ -1490,7 +1733,7 @@ label.label {
   max-width: 260px;
 }
 label.label:has(input[type="checkbox"]) { flex-direction: row; align-items: center; max-width: none; }
-label.label input, label.label select {
+label.label input, label.label select, label.label textarea {
   font-family: inherit;
   text-transform: none;
   letter-spacing: normal;
@@ -1503,8 +1746,9 @@ label.label input, label.label select {
   width: 100%;
 }
 label.label input[type="checkbox"] { width: auto; }
-label.label input:focus, label.label select:focus { outline: none; border-color: var(--accent); }
-label.label input:disabled, label.label select:disabled { opacity: 0.5; }
+label.label textarea { resize: vertical; }
+label.label input:focus, label.label select:focus, label.label textarea:focus { outline: none; border-color: var(--accent); }
+label.label input:disabled, label.label select:disabled, label.label textarea:disabled { opacity: 0.5; }
 
 .org-token {
   display: inline-block;
@@ -1551,6 +1795,12 @@ label.label input:disabled, label.label select:disabled { opacity: 0.5; }
 .org-table td { padding: 10px 14px; font-size: 0.95rem; }
 .org-table tbody tr:nth-child(even) { background: rgba(255, 255, 255, 0.04); }
 
+/* Members tab linkage columns (owner-only). Distinguishable by glyph as well
+   as colour — tick/cross/dash reads the same even where colour doesn't. */
+.org-tick { color: var(--live); text-align: center; }
+.org-cross { color: var(--error); text-align: center; }
+.org-na { color: var(--muted); text-align: center; }
+
 .org-days { display: flex; flex-wrap: wrap; gap: 10px; }
 .org-day {
   display: inline-flex;
@@ -1566,7 +1816,71 @@ label.label input:disabled, label.label select:disabled { opacity: 0.5; }
 .org-day:has(input:checked) { border-color: var(--accent); color: var(--accent); }
 .org-day input[type="checkbox"] { accent-color: var(--accent); }
 
-.org-stamina-toggle { flex-direction: row !important; align-items: center; gap: 8px; max-width: none !important; }
+/* Race settings tab (render/tabs/race-settings.ts). One collapsible section per
+   scoring mechanic: the header carries the on/off switch, the tuning lives
+   inside so the page stays quiet until someone wants to tune it. */
+/* No border of its own — it sits inside the tab's .org-panel, and a box inside
+   a box just doubles the rule. Sibling sections are separated instead. */
+.org-accordion + .org-accordion { border-top: 1px solid var(--border); }
+.org-accordion-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 4px 0;
+  cursor: pointer;
+  list-style: none;
+}
+.org-accordion-head::-webkit-details-marker { display: none; }
+.org-accordion-heading { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+/* Disclosure caret, inline with the title so it reads as part of that line
+   rather than floating beside a wrapped description. */
+.org-accordion-title::before {
+  content: '';
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 8px;
+  border-left: 5px solid var(--muted);
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  transition: transform 120ms ease;
+}
+.org-accordion[open] .org-accordion-title::before { transform: rotate(90deg); }
+.org-accordion-title { color: var(--text); font-size: 1rem; }
+.org-accordion-sub { font-size: 0.85rem; }
+.org-accordion-body {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 16px 0 6px;
+}
+
+/* On/off switch. A real button with role="switch" rather than a checkbox, so
+   the header reads as a control rather than a form field. */
+.org-switch {
+  flex: none;
+  position: relative;
+  width: 40px; height: 22px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg);
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+.org-switch::after {
+  content: '';
+  position: absolute;
+  top: 2px; left: 2px;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition: transform 120ms ease, background 120ms ease;
+}
+.org-switch[aria-checked="true"] { background: var(--accent); border-color: var(--accent); }
+.org-switch[aria-checked="true"]::after { transform: translateX(18px); background: var(--bg); }
+.org-switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.org-switch:disabled { cursor: not-allowed; opacity: 0.5; }
+
 .org-sliders { display: flex; flex-direction: column; gap: 14px; }
 .org-slider-row { display: flex; flex-direction: column; gap: 4px; }
 .org-slider-row input[type="range"] { width: 100%; accent-color: var(--accent); }
@@ -1587,6 +1901,77 @@ label.label input:disabled, label.label select:disabled { opacity: 0.5; }
 }
 .org-secret code { font-size: 1rem; letter-spacing: 0.03em; word-break: break-all; }
 
+/* Access tab (render/tabs/access.ts). Lays a checkbox and its label out on one
+   row, against .org-panel's column default. */
+.org-access-toggle { flex-direction: row !important; align-items: center; gap: 8px; max-width: none !important; }
+/* A sub-section within the tab's own .org-panel, not a nested panel — a box
+   inside a box would just double the border. A top rule is enough to set the
+   rotation controls apart from the toggles above. */
+.org-access-rotate {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.org-member-remove {
+  background: none;
+  border: 1px solid var(--error);
+  color: var(--error);
+  font: inherit;
+  font-size: 0.8rem;
+  padding: 4px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.org-member-remove:hover { background: var(--error-wash); }
+
+/* Account sidebar entry (render/sidebar.ts): styled like an org row so it
+   reads as a peer entry, not a lesser one, even though it sits above the org
+   list rather than inside it. */
+.org-account-row {
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  letter-spacing: 0.02em;
+}
+
+/* Account view (render/account.ts) — a sidebar-level view rendered straight
+   into .org-main with no .org-tabs nav, since it is reachable with zero
+   organisations and must not depend on one being selected. */
+.org-account { display: flex; flex-direction: column; gap: 18px; }
+.org-account-email-value { color: var(--text); }
+.org-account-devices .org-table { max-width: 720px; }
+/* The account-level credential the device table cannot list. Warning-coloured
+   because it is the one thing on this view that revoking cannot remove. */
+.org-account-legacy {
+  max-width: 720px;
+  margin: 12px 0 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+  border-left: 2px solid var(--error);
+  padding-left: 10px;
+}
+.org-account-legacy strong { color: var(--error); }
+/* The site has no global link colour; these two are the only anchors in the
+   org manager's own copy, so they take the accent rather than browser blue. */
+.org-account-devices a, .org-empty a { color: var(--accent); }
+/* Attacker-influenced text, sanitised at intake — this keeps a label's own
+   text direction from leaking into the surrounding row as defense in depth,
+   the same treatment .cli-approve-label gives the device label at /cli. */
+.org-device-label { unicode-bidi: isolate; }
+.org-device-revoke {
+  background: none;
+  border: 1px solid var(--error);
+  color: var(--error);
+  font: inherit;
+  font-size: 0.8rem;
+  padding: 4px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.org-device-revoke:hover { background: var(--error-wash); }
+
 /* Preview-only scaffolding (site/src/preview-org-manager.ts) — not emitted by
    the render modules, just labels stacking the extra tab screenshots. */
 .org-preview-section { padding: 8px 24px 24px; border-top: 2px solid var(--panel); }
@@ -1603,7 +1988,7 @@ label.label input:disabled, label.label select:disabled { opacity: 0.5; }
   .org-side { flex: 0 0 auto; }
   .org-sidebar { border-right: none; border-bottom: 2px solid var(--border); }
   .org-sidebar .org-actions { flex-direction: row; margin-top: 0; }
-  .org-sidebar .org-create, .org-sidebar .org-join { width: auto; flex: 1; }
+  .org-sidebar .org-create, .org-sidebar .org-join, .org-sidebar .org-link-google { width: auto; flex: 1; }
 }
 
 /* ── Derbymarket board (derbymarket/render/board.ts) ─────────────────── */
@@ -2182,6 +2567,412 @@ label.label input:disabled, label.label select:disabled { opacity: 0.5; }
   --ticker-accent: #e5e5e5;
 }
 
+/* ── London ─────────────────────────────────────────────
+   A wet night on the Underground. The palette is the Tube map's own: Johnston
+   blue in the lanes, roundel red as the accent, Circle yellow on the ticker,
+   District green for LIVE — four strong hues that only work together because
+   everything holding them is slate.
+
+   Kept clear of Midnight, the other blue theme: Midnight is a muted steel blue
+   under a cyan accent, this is a saturated indigo under red, so the two never
+   read as variants in the picker. */
+:root[data-theme="london"] {
+  --bg: #0b0f14;
+  --panel: #151c25;
+  --text: #e6ecf2;
+  --muted: #8794a5;
+  /* Roundel red, lifted off #E32017 — the true red lands at 3.8:1 on --panel,
+     and --accent is text on selected tabs, not just a border colour. */
+  --accent: #ff4b3e;
+  --border: #2a3441;
+  /* Asphalt at night: near-neutral, only a breath of blue in it. The rest of
+     the theme is slate, and a road that picks up the same slate reads as
+     painted metal rather than tarmac.
+
+     This is the one theme whose lanes are not the dirt sprite re-tinted (see
+     the .lane-track override below), so --lane is the surface colour outright
+     rather than a hue for `luminosity` to push into the sprite — which is also
+     why --track-blend and --track-shade are absent here. */
+  --lane: #24262b;
+  --rail: #f2f6fa;
+  --label-box: #121922;
+  --live: #4ad991;
+  --ticker-accent: #ffd300;
+}
+
+/* They are racing up a road, so the track is a road: the dirt sprite goes
+   entirely — asphalt has no grain worth drawing at this size — and the lanes
+   are divided by dashed markings instead of by the sprite's kerb bands. The
+   square corners go with it; roads do not have rounded ends. */
+:root[data-theme="london"] .lane-track {
+  background: var(--lane);
+  border-radius: 0;
+}
+/* A marking divides one lane from the one above it, so the first lane has none
+   — there is nothing above it to be divided from. Long dash, longer gap, which
+   is how road markings are actually spaced and what keeps them from reading as
+   a dotted rule. */
+:root[data-theme="london"] .lane + .lane .lane-track {
+  background-image: repeating-linear-gradient(
+    90deg,
+    var(--rail) 0 34px,
+    transparent 34px 62px
+  );
+  background-repeat: no-repeat;
+  background-size: 100% 3px;
+  background-position: left top;
+}
+
+/* Victorian lamps down both kerbs. Hung off the first and last lanes rather
+   than off .track, which stretches to fill whatever height is left over and
+   would have stood them well below the road.
+
+   Both rows are absolutely positioned so they paint over their neighbours:
+   z-index 2 clears the z-index 1 the horses carry and the z-index 0 stacking
+   context the crowd strip sits in. `left` matches .lane-info's flex basis, so
+   they start exactly where the road does and never cross the name plates. */
+:root[data-theme="london"] .lane:last-child { position: relative; }
+
+/* Far kerb: hung off the bottom of the crowd strip, which puts the bases on the
+   boundary between the grandstand and the road. It cannot hang off the first
+   lane instead — .track carries `overflow: auto` so it can scroll a long field,
+   and anything reaching above the first lane is clipped at the road's edge.
+   Being a positioned pseudo-element, it paints over the crowd sprites, which is
+   right: this row stands in front of the grandstand, not among it.
+
+   Shorter than the near row because it is further away, and offset half a span
+   so the two rows never line up into columns. */
+:root[data-theme="london"] .crowd::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 92px;
+  pointer-events: none;
+  background: url('img/london-lamp.svg') repeat-x 96px bottom / auto 92px;
+}
+
+/* Near kerb: bases below the last lane, so the posts rise across the lower
+   lanes. A horse passing behind a post is the depth cue that sells the street. */
+:root[data-theme="london"] .lane:last-child::after {
+  content: '';
+  position: absolute;
+  left: var(--label-col);
+  right: 0;
+  bottom: -18px;
+  height: 116px;
+  z-index: 2;
+  pointer-events: none;
+  background: url('img/london-lamp.svg') repeat-x left bottom / auto 116px;
+}
+
+/* Fog, in front of the page rather than behind it — fog is the thing that comes
+   between you and what you are looking at, so a backdrop layer (Matrix's trick)
+   would be the wrong way round. That puts it over live text, so the banks peak
+   at 0.10 alpha: enough to read as weather drifting past, not enough to move
+   any foreground pair off its contrast ratio. z-index 2 matches the scanlines;
+   no theme wears both.
+
+   One element, not three: the banks are three gradients in one tile, so the
+   whole thing is a single composited layer moved by `transform` — the same
+   performance rule the Matrix backdrop is built on. Tiled at exactly 100vw and
+   drifting exactly 100vw, so the loop has no seam. */
+:root[data-theme="london"] body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 200vw;
+  z-index: 2;
+  pointer-events: none;
+  /* Every bank fades out well inside its own 100vw tile (centre ± 0.7 × the
+     horizontal radius, the point the stop reaches zero alpha). A bank that
+     overruns is clipped at the tile edge instead of bleeding into the next
+     one, which puts a hard vertical seam down the page as the layer drifts.
+     The ~2vw of clear air left either side of the tile is the seam, and clear
+     air has no edge to see. Stops fade to an alpha-0 *grey* rather than
+     `transparent`, which is alpha-0 black and greys the falloff. */
+  background:
+    radial-gradient(34vw 40vh at 25vw 78vh, rgba(197, 214, 232, 0.13), rgba(197, 214, 232, 0) 70%),
+    radial-gradient(30vw 32vh at 58vw 46vh, rgba(186, 205, 226, 0.09), rgba(186, 205, 226, 0) 70%),
+    radial-gradient(24vw 30vh at 82vw 92vh, rgba(205, 219, 234, 0.12), rgba(205, 219, 234, 0) 70%);
+  background-size: 100vw 100%;
+  background-repeat: repeat-x;
+}
+/* Slow enough that you never catch it moving — you just notice the page looks
+   different than it did a minute ago. */
+@media (prefers-reduced-motion: no-preference) {
+  :root[data-theme="london"] body::before {
+    animation: london-fog-drift 90s linear infinite;
+  }
+}
+@keyframes london-fog-drift {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-100vw); }
+}
+/* Same rule the crowd and the chromatic wash follow — the page stops moving
+   once the race is over. The fog itself stays; only the drift halts. */
+:root[data-theme="london"]:has(.race.finished) body::before {
+  animation-play-state: paused;
+}
+
+
+/* Rain, in the same .rain-backdrop element Matrix uses — it is built for every
+   theme in theme.ts and hidden in CSS by whichever ones do not want it, so this
+   costs no new markup.
+
+   In FRONT of the page (z-index 3, above the fog) rather than behind it, which
+   is the opposite of Matrix. Glyph rain is a backdrop you read the page over;
+   real rain is weather between you and the thing you are looking at, and a
+   racecourse seen through it is the entire point of the theme.
+
+   Everything that matters about the performance of this is inherited from the
+   Matrix fix (PR #19): the fall is a `transform`, so each layer is rasterised
+   once and every later frame is a matrix change on the compositor. Nothing here
+   animates background-position, and nothing here is per-lane — this is one
+   fixed layer for the whole page, so its cost does not grow with the field. */
+:root[data-theme="london"] .rain-backdrop {
+  display: block;
+  position: fixed;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  overflow: hidden;
+  /* Low, because this sheet crosses live text. Tuned against the horse names at
+     the left of the track, which are the smallest thing it has to stay behind;
+     at 0.5 the streaks started competing with them rather than sitting behind. */
+  opacity: 0.32;
+}
+/* Each layer carries a tile of headroom on the two edges it travels away from —
+   above, and to the right — so that after moving exactly one tile in each axis
+   it still covers the screen and the pattern lands back on itself. The loop is
+   invisible without the layer ever being redrawn. */
+:root[data-theme="london"] .rain-backdrop > i {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  background-image: url('img/london-rain.svg');
+  background-repeat: repeat;
+}
+/* One tile at three scales, each travelling its own size over the same
+   duration — which is where the parallax comes from. The x-offsets stop the
+   three landing on top of each other and showing the repeat. */
+:root[data-theme="london"] .rain-backdrop > i:nth-child(1) {
+  top: -480px;
+  right: -120px;
+  background-size: 120px 480px;
+  background-position: 0 0;
+}
+:root[data-theme="london"] .rain-backdrop > i:nth-child(2) {
+  top: -336px;
+  right: -84px;
+  background-size: 84px 336px;
+  background-position: 40px 0;
+}
+:root[data-theme="london"] .rain-backdrop > i:nth-child(3) {
+  top: -672px;
+  right: -168px;
+  background-size: 168px 672px;
+  background-position: 70px 0;
+}
+/* Down and to the left, one tile of each per cycle. The x and y distances are
+   the tile's own width and height, which is what keeps the loop seamless and
+   the streaks travelling along their own slope. */
+@keyframes london-rain-fall-1 { to { transform: translate3d(-120px, 480px, 0); } }
+@keyframes london-rain-fall-2 { to { transform: translate3d(-84px, 336px, 0); } }
+@keyframes london-rain-fall-3 { to { transform: translate3d(-168px, 672px, 0); } }
+
+@media (prefers-reduced-motion: no-preference) {
+  :root[data-theme="london"] .rain-backdrop > i:nth-child(1) { animation: london-rain-fall-1 0.9s linear infinite; }
+  :root[data-theme="london"] .rain-backdrop > i:nth-child(2) { animation: london-rain-fall-2 0.9s linear infinite; }
+  :root[data-theme="london"] .rain-backdrop > i:nth-child(3) { animation: london-rain-fall-3 0.9s linear infinite; }
+}
+/* Same rule the crowd, the bus and the chromatic wash follow — the page stops
+   moving once the race is over. */
+:root[data-theme="london"]:has(.race.finished) .rain-backdrop > i {
+  animation-play-state: paused;
+}
+
+/* ── The city ───────────────────────────────────────────
+   Two mountings for one piece of art, because the race view and everything
+   else have opposite problems.
+
+   On the race view it goes in a strip of sky opened up above the crowd, so it
+   is behind the grandstand and ALWAYS on screen. The obvious mounting — a
+   fixed layer at the foot of the page, the way Matrix hangs its rain — only
+   works while the field is short enough to leave the bottom of the page empty;
+   a full field covers it completely, which is exactly when a theme most needs
+   to still look like itself. The strip costs the track about two lanes of
+   height, and the track already scrolls when a field outgrows it.
+
+   Everywhere else (home, the org pages) there is no crowd to sit behind, so
+   the same art hangs along the bottom of the viewport instead. The two are
+   mutually exclusive by construction: one requires a .crowd on the page, the
+   other requires there not to be one.
+
+   Both draw the landmarks ONCE, centred — the whole point of them is that they
+   are Tower Bridge and Big Ben, and a tiled skyline would put two Big Bens on
+   screen at laptop width — with the generic rooftops tiling out from behind
+   them to both edges, so the city runs off the screen rather than ending in
+   mid-air where the centrepiece stops. */
+
+:root[data-theme="london"] .crowd {
+  /* The sky strip. Sprites are pinned to the bottom of the taller box and given
+     back their own height, since .crowd-person's `height: 100%` would otherwise
+     stretch one 32px sprite over the whole strip. */
+  height: calc(var(--sprite-scale) * 32px + var(--city-h));
+  align-items: flex-end;
+  /* z-index (not just position) so this is a stacking context of its own, which
+     is what lets the bus below sit at z-index -1: inside a stacking context a
+     negative-z child paints above the element's own background — the skyline —
+     but below its in-flow children, the crowd sprites. Without it the bus would
+     drop out to the page's stacking context and vanish behind the skyline. */
+  position: relative;
+  z-index: 0;
+  /* Layers, front to back: the bridge you are standing on (its parapet, lamps
+     and phone boxes are one tile — see gen-london-skyline.mjs for why), haze,
+     the city downriver, generic rooftops.
+
+     The haze sits BELOW the bridge and above the distant city, which is what
+     separates the two: the bridge is where you are standing and stays crisp,
+     the city is a mile downriver and goes soft.
+
+     Everything shares one ground line, sat a little way INTO the crowd rather
+     than resting on top of it, so the roadway disappears behind the grandstand
+     instead of balancing on it. */
+  --city-ground: calc(var(--sprite-scale) * 32px - 10px);
+  /* Every layer is sized off this one number, so the narrow-screen rules below
+     only have to change --city-h. */
+  --city-h: 124px;
+  /* The pavement line: the top of the parapet, which is also what the bus runs
+     along. Anything standing on the bridge shares it. */
+  --bridge-deck: calc(var(--city-ground) + var(--city-h) * 20 / 124);
+  background-image:
+    url('img/london-bridge.svg'),
+    linear-gradient(180deg, rgba(150, 175, 205, 0) 45%, rgba(150, 175, 205, 0.12) 100%),
+    url('img/london-skyline.svg'),
+    url('img/london-rooftops.svg');
+  background-repeat: repeat-x, no-repeat, no-repeat, repeat-x;
+  background-position:
+    center bottom var(--city-ground),
+    center bottom var(--city-ground),
+    center bottom var(--city-ground),
+    center bottom var(--city-ground);
+  background-size:
+    auto var(--city-h),
+    100% var(--city-h),
+    auto var(--city-h),
+    auto calc(var(--city-h) * 44 / 124);
+}
+/* A tall strip costs the track height, which a short screen has least of. */
+@media (max-width: 760px) {
+  :root[data-theme="london"] .crowd { --city-h: 88px; }
+}
+:root[data-theme="london"] .crowd-cap,
+:root[data-theme="london"] .crowd-person {
+  height: calc(var(--sprite-scale) * 32px);
+}
+
+/* Declared on body, a real element, rather than inside the body::after rule
+   below where they started. A custom property set on a pseudo-element is
+   visible to that pseudo-element and nothing else — and the bus is #app::after,
+   a different element's pseudo. It could not see --bridge-deck, so its
+   `bottom` was invalid at computed-value time and fell back to auto, which
+   pinned the bus to the top of the viewport instead of the roadway. On body
+   both pseudo-elements inherit them. */
+:root[data-theme="london"]:not(:has(.crowd)) body {
+  --city-h: 190px;
+  --bridge-deck: calc(var(--ticker-h) + var(--city-h) * 20 / 124);
+}
+:root[data-theme="london"]:not(:has(.crowd)) #app { position: relative; z-index: 1; }
+:root[data-theme="london"]:not(:has(.crowd)) body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  /* Same six layers as the crowd strip, one ticker-height up so the roadway
+     runs along the top of the ticker rather than having its feet cut off. */
+  background-image:
+    url('img/london-bridge.svg'),
+    linear-gradient(180deg, rgba(150, 175, 205, 0) 45%, rgba(150, 175, 205, 0.12) 100%),
+    url('img/london-skyline.svg'),
+    url('img/london-rooftops.svg');
+  background-repeat: repeat-x, no-repeat, no-repeat, repeat-x;
+  background-position:
+    center bottom var(--ticker-h),
+    center bottom var(--ticker-h),
+    center bottom var(--ticker-h),
+    center bottom var(--ticker-h);
+  background-size:
+    auto var(--city-h),
+    100% var(--city-h),
+    auto var(--city-h),
+    auto calc(var(--city-h) * 44 / 124);
+}
+
+/* A Routemaster along the front, left to right — which is the direction the
+   lane nearest the kerb runs in a country that drives on the left. Drawn well
+   out of scale with the city behind it (a bus at Big Ben's scale would be six
+   pixels long); the size difference is what makes it read as near traffic in
+   front of a far skyline rather than a toy parked on the Embankment.
+
+   In the crowd strip it is an absolutely positioned pseudo-element, which is
+   out of flow and so never becomes a flex item of .crowd; .crowd's existing
+   `overflow: hidden` is what clips it at both ends of its run. */
+:root[data-theme="london"] .crowd::before,
+:root[data-theme="london"]:not(:has(.crowd)) #app::after {
+  content: '';
+  /* One number per mounting; the height follows the sprite's own proportions.
+     The two skylines are drawn at different heights, so the bus is sized
+     against each rather than shared, or it would read as a different distance
+     away on the home page than on the race view. */
+  width: var(--bus-w);
+  aspect-ratio: 58 / 28;
+  pointer-events: none;
+  background: url('img/london-bus.svg') no-repeat center / contain;
+}
+/* Behind the crowd, not over it — the road it is on runs along the back of the
+   grandstand. Absolute positioning alone would paint it in front of them, since
+   a positioned element outranks its non-positioned siblings whatever the source
+   order; the negative z-index is what puts it back. Its wheels dip the same few
+   pixels into the top of the crowd that the buildings' feet do, so bus and city
+   stand on one ground line. */
+:root[data-theme="london"] .crowd::before {
+  --bus-w: 92px;
+  position: absolute;
+  left: 0;
+  bottom: var(--bridge-deck);
+  z-index: -1;
+}
+:root[data-theme="london"]:not(:has(.crowd)) #app::after {
+  --bus-w: 140px;
+  position: fixed;
+  left: 0;
+  bottom: var(--bridge-deck);
+  z-index: -1;
+}
+@media (prefers-reduced-motion: no-preference) {
+  :root[data-theme="london"] .crowd::before,
+  :root[data-theme="london"]:not(:has(.crowd)) #app::after {
+    animation: london-bus-pass 34s linear infinite;
+  }
+}
+/* Starts and ends fully off-screen, so it arrives and leaves rather than
+   popping. The long gap between passes is the point — a bus you see every half
+   minute is scenery, a bus you see constantly is a distraction. */
+@keyframes london-bus-pass {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(100vw); }
+}
+/* Same rule the crowd and the chromatic wash follow — the page stops moving
+   once the race is over. */
+:root[data-theme="london"] .race.finished .crowd::before {
+  animation-play-state: paused;
+}
+
 /* A neutral --lane + luminosity flattens the dirt to greyscale texture; the wash
    then paints hue/saturation back across the lane's width with `color` (which
    takes hue+sat from the gradient and luminosity from the backdrop), so the
@@ -2234,6 +3025,230 @@ label.label input:disabled, label.label select:disabled { opacity: 0.5; }
 }
 /* Same rule the crowd follows — the spectacle stops once the race is over. */
 .race.finished .lane-track { animation-play-state: paused; }
+
+/* ── Matrix / Phosphor ──────────────────────────────────
+   One phosphor-on-black CRT palette, worn two ways. Phosphor is the bare
+   terminal: green on black, scanlines, glow, and no glyph rain anywhere. Matrix
+   adds the rain, both as a page backdrop and running through the lanes.
+
+   Both are deliberately pushed away from Turf, the other dark green theme: Turf
+   is a desaturated grass palette on #06120a, these are a saturated #00ff41 on
+   true black, so no two of the three read as variants in the picker.
+
+   Phosphor being the still one does NOT make it a reduced-motion option — the
+   crowd still cheers and the horses still run. OS-level prefers-reduced-motion
+   is honoured separately, in the gates below. */
+:root:is([data-theme="phosphor"], [data-theme="matrix"]) {
+  --bg: #000000;
+  --panel: #04140a;
+  --text: #8affa8;
+  /* Lighter than a dark theme's muted would normally go: these are the only
+     themes with moving glyphs behind the text, and at the top of the rain's
+     opacity swing a dimmer muted stopped being readable on the home page. */
+  --muted: #4fbf6e;
+  --accent: #00ff41;
+  --border: #10401f;
+  --lane: #0b6626;
+  --track-blend: luminosity;
+  /* Heavier than the other themes': the dirt sprite is pale tan, and luminosity
+     keeps that luminance, so without a strong shade the lanes come out grass-
+     bright — reading as Turf rather than as a phosphor track on black. */
+  --track-shade: rgba(0, 10, 3, 0.62);
+  --rail: #b9ffcb;
+  --label-box: #04160b;
+  --live: #00ff41;
+  --ticker-accent: #00ff41;
+}
+
+/* Matrix's page backdrop — what fills the page around the track. A fixed
+   layer at z-index 0, not a lane treatment: it shows through wherever the page
+   is transparent (the header strip, the margins, everything below a short
+   field) while every panel keeps its own opaque background. Raising #app above
+   it is the only reason that rule exists, so both are scoped to Matrix —
+   Phosphor has no backdrop to sit in front of.
+
+   The fall is driven by `transform`, not `background-position`. That is a
+   performance rule, not a style one: transforms are handed to the compositor,
+   so a layer is rasterised once and then only moved, while an animated
+   background-position repaints the element on the main thread every frame —
+   here a full viewport of tiled SVG text, sixty times a second, which is what
+   pinned people's CPUs.
+
+   A transform moves the whole element, so the three parallax speeds need three
+   boxes; that is why this is markup (see index.html) rather than the three
+   background layers on one pseudo-element it used to be. */
+:root[data-theme="matrix"] #app { position: relative; z-index: 1; }
+
+.rain-backdrop { display: none; }
+:root[data-theme="matrix"] .rain-backdrop {
+  display: block;
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  opacity: 0.2;
+}
+/* Each layer carries one tile-height of headroom above the viewport, so that
+   after travelling exactly its own tile height it still covers the screen and
+   the pattern lands back on itself — the loop is invisible without the layer
+   ever being redrawn. */
+:root[data-theme="matrix"] .rain-backdrop > i {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: url('img/matrix-rain.svg');
+  background-repeat: repeat;
+  /* The page-wide `pixelated` would crunch the rasterised glyphs — the tile is
+     vector text, not sprite art, and the widest layer is scaled up 1.4x. */
+  image-rendering: auto;
+}
+/* One tile at three scales and x-offsets. The tile repeats every 20 glyphs, so
+   staggering the layers is what stops the eye locking onto that repeat. Each
+   travels its own tile height over the same 6s, which is where the parallax
+   comes from. */
+:root[data-theme="matrix"] .rain-backdrop > i:nth-child(1) {
+  top: -600px;
+  background-size: 300px 600px;
+  background-position: 0 0;
+}
+:root[data-theme="matrix"] .rain-backdrop > i:nth-child(2) {
+  top: -420px;
+  background-size: 210px 420px;
+  background-position: 90px 0;
+}
+:root[data-theme="matrix"] .rain-backdrop > i:nth-child(3) {
+  top: -840px;
+  background-size: 420px 840px;
+  background-position: 30px 0;
+}
+@keyframes matrix-rain-fall-1 { to { transform: translate3d(0, 600px, 0); } }
+@keyframes matrix-rain-fall-2 { to { transform: translate3d(0, 420px, 0); } }
+@keyframes matrix-rain-fall-3 { to { transform: translate3d(0, 840px, 0); } }
+/* The "fading in and out" pass. Held well off any round multiple of the fall
+   duration so the swell drifts against the rain instead of pulsing with it.
+   It rides on the parent so it stays a plain opacity animation — also
+   compositor-driven — rather than forcing the three layers to repaint. */
+@keyframes matrix-rain-breathe {
+  0%, 100% { opacity: 0.08; }
+  50%      { opacity: 0.28; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  :root[data-theme="matrix"] .rain-backdrop {
+    animation: matrix-rain-breathe 19s ease-in-out infinite;
+  }
+  :root[data-theme="matrix"] .rain-backdrop > i:nth-child(1) { animation: matrix-rain-fall-1 6s linear infinite; }
+  :root[data-theme="matrix"] .rain-backdrop > i:nth-child(2) { animation: matrix-rain-fall-2 6s linear infinite; }
+  :root[data-theme="matrix"] .rain-backdrop > i:nth-child(3) { animation: matrix-rain-fall-3 6s linear infinite; }
+}
+/* Same rule the crowd and the chromatic wash follow — the spectacle stops once
+   the race is over. Reached with :has() because the backdrop sits outside the
+   .race subtree those rules can match directly. */
+:root[data-theme="matrix"]:has(.race.finished) :is(.rain-backdrop, .rain-backdrop > i) {
+  animation-play-state: paused;
+}
+
+/* ── Matrix only: rain in the lanes ─────────────────────
+   Its own element inside .lane-track, for the same compositor reason as the
+   backdrop: as a fourth background layer the fall could only be animated
+   through background-position, which repaints the lane every frame — and a
+   lane's paint is three blended layers of dirt sprite and wash, so that was
+   the more expensive of the two rains despite covering far less of the screen.
+   As an element it repaints never, and the cost stops scaling with the size of
+   the field.
+
+   z-index -1 keeps the arrangement the background-layer version bought us: it
+   paints above .lane-track's own background but below every child, so the
+   horses and their shadows stay on top with nothing to juggle. That needs the
+   track to be a stacking context, or the layer would drop behind the lane
+   entirely — hence the z-index below.
+
+   The layer is anchored to its own lane, so each lane runs its own rain rather
+   than all of them sampling one page-wide sheet, and the rain travels with the
+   lane — which is what makes it safe in TV mode, where .track is a scroll
+   container.
+
+   Anchoring per lane is why this uses its own tile: a lane is ~60px tall, so
+   the 600px backdrop tile would park the same frozen slice in every lane. The
+   lane tile is 180px — short enough to cycle through a lane, tall enough to
+   keep glyphs legible — and 900px wide, because one layer has nothing to
+   disguise its horizontal repeat the way the backdrop's three scales do. */
+:root[data-theme="matrix"] .lane-track { z-index: 0; }
+
+.lane-rain { display: none; }
+:root[data-theme="matrix"] .lane-rain {
+  display: block;
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  border-radius: 4px;
+  pointer-events: none;
+}
+/* One tile height of headroom above the lane, then travel exactly that — same
+   seamless-loop trick as the backdrop. 180px over 1.8s is 100px/s, the same
+   fall speed as the backdrop's 600px over 6s, so the two rains agree where they
+   meet at the edge of the track. */
+:root[data-theme="matrix"] .lane-rain::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -180px;
+  bottom: 0;
+  background: url('img/matrix-rain-lane.svg') repeat var(--rain-x, 0px) 0 / 900px 180px;
+  image-rendering: auto;
+}
+@keyframes matrix-lane-fall { to { transform: translate3d(0, 180px, 0); } }
+@media (prefers-reduced-motion: no-preference) {
+  :root[data-theme="matrix"] .lane-rain::before {
+    animation: matrix-lane-fall 1.8s linear infinite;
+  }
+}
+/* Without this every lane would run the identical tile in lockstep, which reads
+   as one sheet of wallpaper scrolling rather than as rain. Each lane gets a
+   different slice of the tile and a different point in the cycle; the delays are
+   negative so they start already offset instead of pausing first. Five variants,
+   which shares no common factor with the field sizes that show up in practice,
+   so the pattern doesn't line up into visible bands. */
+:root[data-theme="matrix"] .lane:nth-child(5n+1) .lane-rain::before { --rain-x:    0px; animation-delay:  0s; }
+:root[data-theme="matrix"] .lane:nth-child(5n+2) .lane-rain::before { --rain-x: -137px; animation-delay: -0.7s; }
+:root[data-theme="matrix"] .lane:nth-child(5n+3) .lane-rain::before { --rain-x: -311px; animation-delay: -1.3s; }
+:root[data-theme="matrix"] .lane:nth-child(5n+4) .lane-rain::before { --rain-x: -466px; animation-delay: -0.4s; }
+:root[data-theme="matrix"] .lane:nth-child(5n+5) .lane-rain::before { --rain-x: -703px; animation-delay: -1.1s; }
+/* The generic `.race.finished .lane-track` pause further up cannot reach this —
+   different element — so the pause is repeated here. */
+:root[data-theme="matrix"] .race.finished .lane-rain::before { animation-play-state: paused; }
+
+/* Scanlines sit above the page content — a CRT's raster falls on the whole
+   screen, not behind what it's drawing. z-index 2 is chosen to clear the
+   z-index 1 that Matrix puts on #app; in Phosphor anything positive would do. */
+:root:is([data-theme="phosphor"], [data-theme="matrix"]) body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    180deg,
+    rgba(0, 0, 0, 0.22) 0 1px,
+    transparent 1px 3px
+  );
+}
+
+/* The crowd sprites carry their own baked-in shirt colours, which no palette
+   token can reach — left alone they're the one full-colour band on an otherwise
+   monochrome page. Greyscale first so the filter works off luminance only, then
+   sepia+hue-rotate tints the result green. The horses are deliberately NOT
+   filtered: their colours are how you tell the racers apart. */
+:root:is([data-theme="phosphor"], [data-theme="matrix"]) .crowd {
+  filter: grayscale(1) sepia(1) hue-rotate(75deg) saturate(2.4) brightness(0.85);
+}
+
+:root:is([data-theme="phosphor"], [data-theme="matrix"]) :is(.home h1, .race-header h1, .race-status--live) {
+  text-shadow: 0 0 8px rgba(0, 255, 65, 0.55);
+}
 
 /* ── Theme picker ───────────────────────────────────── */
 

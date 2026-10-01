@@ -14,10 +14,10 @@ export const ACHIEVEMENT_DESCRIPTIONS: Record<AchievementName, string> = {
   'Racer!': 'Raced continuously for an hour',
   'Overtake!': 'Overtook another horse',
   'Pacesetter!': 'Led the race for an hour straight',
-  'Stampede!': 'Gained 7,000+ tokens in a single minute',
+  'Stampede!': 'Gained 70,000+ tokens in a single minute',
   'Took the lead!': 'Charged into first place',
   'Comeback!': 'Climbed from last place to the top half',
-  'Pulled Away!': 'Grew the lead by 5,000+ tokens in a minute',
+  'Pulled Away!': 'Grew the lead by 50,000+ tokens in a minute',
 };
 
 // Describe an Overtake! event with multi-position climb.
@@ -26,33 +26,10 @@ export function overtakeDescription(positionsClimbed: number): string {
   return `Overtook ${positionsClimbed} horses`;
 }
 
-// Multiplier applied to token thresholds (Stampede!, Pulled Away!, rate cap)
-// when a race counts input+output. Calibrated against real Claude Code
-// transcripts: with cache_read_input_tokens excluded (they're passive,
-// reflect context size rather than work), the aggregate ratio of
-// (fresh_input + cache_creation + output) / output is ~8x. Set to 10 so the
-// rate cap clears all but the busiest peak minutes (~p90).
-export const TOKEN_INPUT_MULTIPLIER = 10;
-
-export function tokenMultiplier(race: { counts_input?: boolean }): number {
-  return race.counts_input ? TOKEN_INPUT_MULTIPLIER : 1;
-}
-
-// Race-aware description for an event. Stampede!/Pulled Away! report their
-// scaled thresholds for input+output races; everything else is static.
-export function describeAchievement(
-  event: { name: AchievementName; xp: number },
-  race: { counts_input?: boolean },
-): string {
+// Description for an event. Only Overtake! varies, by positions climbed.
+export function describeAchievement(event: { name: AchievementName; xp: number }): string {
   if (event.name === 'Overtake!') {
     return overtakeDescription(Math.floor(event.xp / 3));
-  }
-  const m = tokenMultiplier(race);
-  if (event.name === 'Stampede!') {
-    return `Gained ${(MIDRACE_THRESHOLDS.stampede_tokens * m).toLocaleString('en-US')}+ tokens in a single minute`;
-  }
-  if (event.name === 'Pulled Away!') {
-    return `Grew the lead by ${(MIDRACE_THRESHOLDS.pulled_away_gap * m).toLocaleString('en-US')}+ tokens in a minute`;
   }
   return ACHIEVEMENT_DESCRIPTIONS[event.name];
 }
@@ -80,9 +57,9 @@ export const MIDRACE_THRESHOLDS = {
   warm_up_fraction: 0.08,              // first 8% of race time
   streak_hour_ms: 3_600_000,           // 1 hour for Racer!/Pacesetter!
   racer_dt_cap_ms: 90_000,             // single-tick credit cap for Racer!
-  stampede_tokens: 7_000,              // tokens-in-a-minute threshold
+  stampede_tokens: 70_000,             // tokens-in-a-minute threshold
   stampede_cooldown_ms: 7_200_000,     // 2 hours
-  pulled_away_gap: 5_000,              // gap-growth threshold per minute
+  pulled_away_gap: 50_000,             // gap-growth threshold per minute
   pulled_away_cooldown_ms: 7_200_000,  // 2 hours
   recent_events_retention_ms: 90_000,  // sliding window for recent_events
 } as const;

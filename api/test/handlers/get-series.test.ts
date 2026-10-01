@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { handler as getSeriesHandler } from '../../src/handlers/get-series.js';
 import { handler as createHandler } from '../../src/handlers/create-race.js';
@@ -28,8 +28,6 @@ function evt(
 }
 
 describe('getSeries handler', () => {
-  beforeEach(() => { process.env.TOKEN_DERBY_MAX_RATE = '1000000000'; });
-  afterEach(() => { delete process.env.TOKEN_DERBY_MAX_RATE; });
 
   async function setup() {
     const user = await makeUser('GS_User');

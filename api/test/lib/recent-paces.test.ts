@@ -4,18 +4,17 @@ import { getStableHorse } from '../../src/db/stable.js';
 import { seedRace } from '../helpers/races.js';
 
 describe('recent_paces', () => {
-  it('records output-equivalent tokens per minute', async () => {
+  it('records scored tokens per minute', async () => {
     // Reuse seedRace's anchor for finalisation so the enrolled window is
     // exactly 120 minutes rather than drifting by the DB round-trip time.
     const { race, horses, now } = await seedRace({
       distinct_jockeys: 3,
       duration_hours: 2,          // 120 enrolled minutes
-      counts_input: true,         // x10
       tokens: [1_200_000, 100, 100],
     });
     await finaliseRace(race, now);
     const h = await getStableHorse(horses[0]!.user_id, horses[0]!.stable_horse_id);
-    expect(h!.recent_paces!.at(-1)).toBeCloseTo(1000, 3);   // 1.2M / 10 / 120
+    expect(h!.recent_paces!.at(-1)).toBeCloseTo(10_000, 3);   // 1.2M / 120
   });
 
   it('counts idle time against the horse', async () => {
@@ -25,7 +24,7 @@ describe('recent_paces', () => {
     });
     await finaliseRace(race, now);
     const h = await getStableHorse(horses[0]!.user_id, horses[0]!.stable_horse_id);
-    expect(h!.recent_paces!.at(-1)).toBeCloseTo(5000, 3);   // 1.2M / 1 / 240
+    expect(h!.recent_paces!.at(-1)).toBeCloseTo(5000, 3);   // 1.2M / 240
   });
 
   it('appends oldest-first across races', async () => {

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { putLeague, getLeague, commitRollover } from '../../src/db/leagues.js';
-import { ensureLeagueSeason, getLeagueSeason, stampFinalFixtureEnd, markSeasonComplete } from '../../src/db/league-seasons.js';
+import { ensureLeagueSeason, getLeagueSeason, stampFinalFixtureEnd } from '../../src/db/league-seasons.js';
 import { ensureStanding, listSeasonStandings, tryMarkPrizeAwarded } from '../../src/db/league-standings.js';
 import { putSeasonResultIfAbsent, getSeasonResult } from '../../src/db/league-results.js';
 import type { League, LeagueStanding, LeagueSeasonResult } from '@token-derby/shared';

@@ -1,4 +1,3 @@
-import React from 'react';
 import { describe, it, expect } from 'vitest';
 import { render } from 'ink-testing-library';
 import { StatusScreen } from '../../src/ui/StatusScreen.js';
@@ -95,5 +94,105 @@ describe('StatusScreen division lines', () => {
     // 'Position (Division):' (4 chars longer) joins the panel.
     expect(plain).toMatch(/Last heartbeat: {1}12s ago/);
     expect(league).toMatch(/Last heartbeat: {6}12s ago/);
+  });
+});
+
+function screenWith(props: Record<string, unknown>) {
+  const { lastFrame } = render(
+    <StatusScreen
+      race={race()}
+      ownHorseId="b"
+      ownHorseName="Beta"
+      ownColors={COLORS}
+      ownUserName="BetaOwner"
+      lastHeartbeatAgoSec={12}
+      lastHeartbeatOk
+      {...props}
+    />,
+  );
+  return lastFrame() ?? '';
+}
+
+describe('disabled harnesses', () => {
+  it('marks a harness this machine has turned off, rather than hiding it', () => {
+    const frame = screenWith({ disabledHarnesses: ['codex-cli'] });
+    expect(frame).toMatch(/Codex CLI \(off\)/);
+    // The others are still listed plainly, so the line stays readable.
+    expect(frame).toMatch(/Claude Code/);
+    expect(frame).not.toMatch(/Claude Code \(off\)/);
+  });
+
+  it('marks nothing when every harness is counted', () => {
+    expect(screenWith({ disabledHarnesses: [] })).not.toMatch(/\(off\)/);
+  });
+});
+
+describe('degraded source warning', () => {
+  it('is absent when every source read cleanly', () => {
+    expect(screenWith({ degraded: [] })).not.toMatch(/not counted this beat/i);
+  });
+
+  it('names the source that could not be read, and why', () => {
+    const frame = screenWith({ degraded: [{ harness: 'codex-cli', label: 'Codex CLI', message: 'EACCES: permission denied' }] });
+    expect(frame).toMatch(/Codex CLI not counted this beat/i);
+    expect(frame).toContain('EACCES');
+  });
+
+  it('reassures the player the other sources still count', () => {
+    const frame = screenWith({ degraded: [{ harness: 'codex-cli', label: 'Codex CLI', message: 'boom' }] });
+    expect(frame).toMatch(/other sources\s+still count/i);
+  });
+
+  it('lists every degraded source, not just the first', () => {
+    const frame = screenWith({
+      degraded: [{ harness: 'codex-cli', label: 'Codex CLI', message: 'boom' }, { harness: 'gemini-cli', label: 'Gemini CLI', message: 'bang' }],
+    });
+    expect(frame).toMatch(/Codex CLI not counted/i);
+    expect(frame).toMatch(/Gemini CLI not counted/i);
+  });
+
+  it('yields to a stall, which names a more specific cause', () => {
+    const frame = screenWith({
+      degraded: [{ harness: 'codex-cli', label: 'Codex CLI', message: 'boom' }],
+      stalled: true,
+      stallReason: 'Token scan timed out after 45s',
+    });
+    expect(frame).toContain('Token scan timed out after 45s');
+    expect(frame).not.toMatch(/not counted this beat/i);
+  });
+
+  it('takes the warning slot ahead of the all-quiet message', () => {
+    const frame = screenWith({
+      degraded: [{ harness: 'codex-cli', label: 'Codex CLI', message: 'boom' }],
+      sourcesSilent: true,
+    });
+    expect(frame).toMatch(/Codex CLI not counted/i);
+    expect(frame).not.toMatch(/No transcripts from any coding agent/i);
+  });
+});
+
+describe('source silence warning', () => {
+  it('is absent while any source is producing conversations', () => {
+    expect(screenWith({})).not.toMatch(/No transcripts from any coding agent/i);
+  });
+
+  it('names every source once none of them can be read', () => {
+    const frame = screenWith({ sourcesSilent: true });
+    expect(frame).toMatch(/No transcripts from any coding agent/i);
+  });
+
+  it('reassures the player the race is still running', () => {
+    const frame = screenWith({ sourcesSilent: true });
+    expect(frame).toMatch(/race\s+continues/i);
+  });
+
+  it('yields to a stall, which names a more specific cause', () => {
+    const frame = screenWith({
+      sourcesSilent: true,
+      stalled: true,
+      stallReason: 'Token scan timed out after 45s',
+    });
+    expect(frame).toContain('Token scan timed out after 45s');
+    expect(frame).not.toMatch(/No transcripts from any coding agent/i);
   });
 });

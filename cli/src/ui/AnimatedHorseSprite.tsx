@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Box, Text } from 'ink';
 import type { Hat, HorseColors } from '@token-derby/shared';
+import { isAnimatedHat } from '@token-derby/shared';
 import type { SlotTag } from './sprite.js';
 import { composeHatGrid } from '../hats/render.js';
 import { hexGridToHalfBlocks } from './half-blocks.js';
@@ -13,22 +14,22 @@ type Props = {
 };
 
 export function AnimatedHorseSprite({ sprite, colors, hat }: Props) {
-  const isLegendary = hat.rarity === 'legendary';
-  const frames = isLegendary ? hat.animation.frames : [];
-  const fps = isLegendary ? hat.animation.fps : 1;
+  const animated = isAnimatedHat(hat);
+  const frames = animated ? hat.animation.frames : [];
+  const fps = animated ? hat.animation.fps : 1;
 
   const [idx, setIdx] = useState(0);
   useEffect(() => {
-    if (!isLegendary || frames.length <= 1) return;
+    if (!animated || frames.length <= 1) return;
     const interval = setInterval(
       () => setIdx(i => (i + 1) % frames.length),
       Math.max(1, Math.round(1000 / fps)),
     );
     return () => clearInterval(interval);
-  }, [isLegendary, frames.length, fps]);
+  }, [animated, frames.length, fps]);
 
   // For legendaries, override hat.colors.A with the current frame.
-  const renderedHat: Hat = isLegendary && frames[idx]
+  const renderedHat: Hat = animated && frames[idx]
     ? { ...hat, colors: { ...hat.colors, A: frames[idx]! } }
     : hat;
 

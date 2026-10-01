@@ -1,4 +1,3 @@
-import React from 'react';
 import { describe, it, expect } from 'vitest';
 import { render } from 'ink-testing-library';
 import { AchievementToast } from '../../src/ui/AchievementToast.js';

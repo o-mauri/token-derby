@@ -1,6 +1,7 @@
 import type { ApiHandler } from '../lib/http.js';
 import type { WebSessionExchangeRequest, WebSessionExchangeResponse } from '@token-derby/shared';
 import { consumeWebGrant, putWebSession } from '../db/web-sessions.js';
+import { getUserById } from '../db/users.js';
 import { generateWebSessionToken } from '../lib/codes.js';
 import { ok, err, parseJson } from '../lib/http.js';
 
@@ -19,10 +20,13 @@ export const handler: ApiHandler = async (event) => {
   const expires_at = new Date(Date.now() + SESSION_TTL_SECONDS * 1000).toISOString();
   await putWebSession(token, grant.user_id, grant.display_name, expires_at, SESSION_TTL_SECONDS);
 
+  // The grant is already valid, so a missing user row (shouldn't happen) still returns the session.
+  const user = await getUserById(grant.user_id);
+
   const response: WebSessionExchangeResponse = {
     token,
     expires_at,
-    user: { user_id: grant.user_id, display_name: grant.display_name },
+    user: { user_id: grant.user_id, display_name: grant.display_name, ...(user?.email ? { email: user.email } : {}) },
   };
   return ok(response);
 };

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import type { CollectedHat, HorseColors } from '@token-derby/shared';
-import { hatById } from '@token-derby/shared';
+import { hatById, isAnimatedHat } from '@token-derby/shared';
 import { HorseSprite } from './HorseSprite.js';
 import { AnimatedHorseSprite } from './AnimatedHorseSprite.js';
 import { MAIN_SPRITE } from './sprite.js';
@@ -111,7 +111,7 @@ export function HorseCreator({
 
       <Box marginBottom={1}>
         {previewHatDef
-          ? (previewHatDef.rarity === 'legendary'
+          ? (isAnimatedHat(previewHatDef)
               ? <AnimatedHorseSprite sprite={MAIN_SPRITE} colors={colors} hat={previewHatDef} />
               : <HorseSprite sprite={MAIN_SPRITE} colors={colors} hat={{ hat: previewHatDef, variant: previewHat?.variant ?? 0 }} />)
           : <HorseSprite sprite={MAIN_SPRITE} colors={colors} />}
@@ -166,11 +166,14 @@ function renderHatLabel(
   if (!collected) return <Text dimColor>?</Text>;
   const hat = hatById(collected.id);
   const name = hat?.name ?? collected.id;
-  const variantSuffix = hat && hat.rarity !== 'legendary' && collected.variant !== undefined
+  const variantSuffix = hat && !isAnimatedHat(hat) && collected.variant !== undefined
     ? ` #${collected.variant + 1}`
     : '';
   const rarityColor = hat
-    ? (hat.rarity === 'legendary' ? 'yellow' : hat.rarity === 'epic' ? 'magenta' : hat.rarity === 'rare' ? 'blue' : 'gray')
+    ? (hat.rarity === 'limited' ? 'magentaBright'
+        : hat.rarity === 'legendary' ? 'yellow'
+        : hat.rarity === 'epic' ? 'magenta'
+        : hat.rarity === 'rare' ? 'blue' : 'gray')
     : 'gray';
   const equippedMark = initialEquipped === hatChoice ? ' ✓' : '';
   return (

@@ -94,7 +94,7 @@ export function collectFreshItems(
       items.push({
         horseName: horse.name,
         name: ev.name,
-        description: describeAchievement(ev, race),
+        description: describeAchievement(ev),
         xp: ev.xp,
       });
     }

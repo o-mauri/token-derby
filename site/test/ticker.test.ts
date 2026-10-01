@@ -113,22 +113,11 @@ describe('collectFreshItems', () => {
     expect(items[0]!.description).toBe('Overtook 3 horses');
   });
 
-  it('scales token thresholds by the input multiplier when the race counts input', () => {
-    const shownAt = new Map<string, number>();
-    const r = {
-      ...race([horse({ horse_id: 'h1', recent_events: [{ at: 5, name: 'Stampede!', xp: 2 }] })]),
-      counts_input: true,
-    } as GetRaceResponse;
-    const items = collectFreshItems(r, shownAt);
-    // 7,000 base × 10 = 70,000 (matches the CLI), not the base 7,000.
-    expect(items[0]!.description).toContain('70,000');
-  });
-
-  it('uses the base threshold when the race does not count input', () => {
+  it('reports the Stampede! token threshold', () => {
     const shownAt = new Map<string, number>();
     const r = race([horse({ horse_id: 'h1', recent_events: [{ at: 5, name: 'Stampede!', xp: 2 }] })]);
     const items = collectFreshItems(r, shownAt);
-    expect(items[0]!.description).toContain('7,000');
+    expect(items[0]!.description).toContain('70,000');
   });
 
   it('returns an empty array when no horse has fresh events', () => {

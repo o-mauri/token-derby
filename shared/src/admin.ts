@@ -14,6 +14,7 @@ export type AdminUser = {
   user_id: string;
   display_name: string;
   created_at: string;
+  email?: string;
   horses: StableHorse[];
 };
 

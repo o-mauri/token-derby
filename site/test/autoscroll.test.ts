@@ -1,13 +1,38 @@
 import { describe, it, expect } from 'vitest';
-import { computeAutoScrollY, startAutoScroll, BOUNCE } from '../src/render/autoscroll.js';
+import {
+  computeAutoScrollY,
+  autoScrollDirection,
+  phaseForScrollY,
+  startAutoScroll,
+  BOUNCE,
+} from '../src/render/autoscroll.js';
 
-const { HOLD_MS, SCROLL_MS } = BOUNCE;
+const { HOLD_MS, SCROLL_MS, RESUME_MS } = BOUNCE;
 const CYCLE = 2 * HOLD_MS + 2 * SCROLL_MS;
+
+/** Minimal event-target stand-in: fires every listener registered for a type. */
+function makeEmitter() {
+  const listeners = new Map<string, Set<(ev: unknown) => void>>();
+  return {
+    addEventListener: (type: string, fn: (ev: unknown) => void) => {
+      if (!listeners.has(type)) listeners.set(type, new Set());
+      listeners.get(type)!.add(fn);
+    },
+    removeEventListener: (type: string, fn: (ev: unknown) => void) => {
+      listeners.get(type)?.delete(fn);
+    },
+    emit: (type: string, ev?: unknown) => {
+      listeners.get(type)?.forEach((fn) => fn(ev));
+    },
+    count: (type: string) => listeners.get(type)?.size ?? 0,
+  };
+}
 
 /** Fake window whose only rAF callback is held so the test can step time. */
 function makeHarness(tvOn: boolean) {
   let now = 0;
   let pending: FrameRequestCallback | null = null;
+  const winEvents = makeEmitter();
   const win = {
     document: { body: { classList: { contains: (c: string) => tvOn && c === 'tv' } } },
     performance: { now: () => now },
@@ -18,15 +43,30 @@ function makeHarness(tvOn: boolean) {
     cancelAnimationFrame: () => {
       pending = null;
     },
+    addEventListener: winEvents.addEventListener,
+    removeEventListener: winEvents.removeEventListener,
   } as unknown as Window;
-  const target = { scrollHeight: 2000, clientHeight: 500, scrollTop: 0 } as HTMLElement;
+  const targetEvents = makeEmitter();
+  const target = {
+    scrollHeight: 2000,
+    clientHeight: 500,
+    scrollTop: 0,
+    addEventListener: targetEvents.addEventListener,
+    removeEventListener: targetEvents.removeEventListener,
+  } as unknown as HTMLElement;
   const step = (t: number) => {
     now = t;
     const cb = pending;
     pending = null;
     cb?.(t);
   };
-  return { win, target, step };
+  /** Viewer drags the track to `y`: the gesture event, then the scroll it causes. */
+  const manualScrollTo = (y: number) => {
+    targetEvents.emit('wheel');
+    target.scrollTop = y;
+    targetEvents.emit('scroll');
+  };
+  return { win, target, step, manualScrollTo, winEvents, targetEvents };
 }
 
 describe('computeAutoScrollY', () => {
@@ -106,5 +146,131 @@ describe('startAutoScroll', () => {
     expect(target.scrollTop).toBe(0);
     step(HOLD_MS + SCROLL_MS); // no further frames should run
     expect(target.scrollTop).toBe(0);
+  });
+
+  it('drops its listeners on abort', () => {
+    const ctrl = new AbortController();
+    const { win, target, winEvents, targetEvents } = makeHarness(true);
+    startAutoScroll({ signal: ctrl.signal, target, win });
+    expect(targetEvents.count('wheel')).toBe(1);
+    expect(winEvents.count('keydown')).toBe(1);
+    ctrl.abort();
+    expect(targetEvents.count('wheel')).toBe(0);
+    expect(targetEvents.count('scroll')).toBe(0);
+    expect(winEvents.count('keydown')).toBe(0);
+  });
+});
+
+describe('startAutoScroll manual override', () => {
+  it('leaves the scroll alone while the viewer is scrolling', () => {
+    const { win, target, step, manualScrollTo } = makeHarness(true);
+    startAutoScroll({ signal: new AbortController().signal, target, win });
+    step(HOLD_MS + SCROLL_MS / 2);
+    expect(target.scrollTop).toBe(750);
+
+    step(HOLD_MS + SCROLL_MS / 2 + 10);
+    manualScrollTo(200);
+    step(HOLD_MS + SCROLL_MS / 2 + 20); // next frame must not yank it back
+    expect(target.scrollTop).toBe(200);
+    step(HOLD_MS + SCROLL_MS / 2 + RESUME_MS - 1);
+    expect(target.scrollTop).toBe(200);
+  });
+
+  it('keeps holding off while momentum scrolling keeps firing scroll events', () => {
+    const { win, target, step, manualScrollTo, targetEvents } = makeHarness(true);
+    startAutoScroll({ signal: new AbortController().signal, target, win });
+    step(HOLD_MS + SCROLL_MS / 2);
+    const t0 = HOLD_MS + SCROLL_MS / 2;
+
+    manualScrollTo(200);
+    step(t0 + RESUME_MS - 1);
+    target.scrollTop = 180; // inertia carries on after the gesture ends
+    targetEvents.emit('scroll');
+    step(t0 + RESUME_MS + 1); // past the original deadline
+    expect(target.scrollTop).toBe(180);
+  });
+
+  it('resumes from where the viewer left off, in the same direction', () => {
+    const { win, target, step, manualScrollTo } = makeHarness(true);
+    startAutoScroll({ signal: new AbortController().signal, target, win });
+    const maxScroll = 1500;
+    step(HOLD_MS + SCROLL_MS / 2); // heading down, halfway
+    const t0 = HOLD_MS + SCROLL_MS / 2;
+
+    manualScrollTo(200);
+    step(t0 + RESUME_MS); // quiet again: pick the bounce up at 200
+    expect(target.scrollTop).toBe(200);
+
+    step(t0 + RESUME_MS + SCROLL_MS / 10); // carries on downwards at the normal rate
+    expect(target.scrollTop).toBe(200 + maxScroll / 10);
+  });
+
+  it('resumes upwards when the bounce was on its way back up', () => {
+    const { win, target, step, manualScrollTo } = makeHarness(true);
+    startAutoScroll({ signal: new AbortController().signal, target, win });
+    const upLeg = HOLD_MS + SCROLL_MS + HOLD_MS;
+    step(upLeg + SCROLL_MS / 2); // heading up, halfway
+    expect(target.scrollTop).toBe(750);
+    const t0 = upLeg + SCROLL_MS / 2;
+
+    manualScrollTo(1200);
+    step(t0 + RESUME_MS);
+    expect(target.scrollTop).toBe(1200);
+    step(t0 + RESUME_MS + SCROLL_MS / 10);
+    expect(target.scrollTop).toBe(1200 - 1500 / 10);
+  });
+
+  it('treats scroll keys as manual input but ignores other keys', () => {
+    const { win, target, step, winEvents } = makeHarness(true);
+    startAutoScroll({ signal: new AbortController().signal, target, win });
+    step(HOLD_MS + SCROLL_MS / 2);
+    const t0 = HOLD_MS + SCROLL_MS / 2;
+
+    winEvents.emit('keydown', { key: 'a' });
+    step(t0 + 10);
+    expect(target.scrollTop).toBe(computeAutoScrollY(t0 + 10, 1500));
+
+    winEvents.emit('keydown', { key: 'PageDown' });
+    target.scrollTop = 900;
+    step(t0 + 20);
+    expect(target.scrollTop).toBe(900);
+  });
+
+  it('ignores the scroll events its own writes produce', () => {
+    const { win, target, step, targetEvents } = makeHarness(true);
+    startAutoScroll({ signal: new AbortController().signal, target, win });
+    step(HOLD_MS + SCROLL_MS / 2);
+    targetEvents.emit('scroll'); // fired by our own scrollTop write
+    step(HOLD_MS + SCROLL_MS / 2 + SCROLL_MS / 10);
+    expect(target.scrollTop).toBe(computeAutoScrollY(HOLD_MS + SCROLL_MS / 2 + SCROLL_MS / 10, 1500));
+  });
+});
+
+describe('autoScrollDirection', () => {
+  it('reads the hold legs as the direction they precede', () => {
+    expect(autoScrollDirection(0)).toBe('down');
+    expect(autoScrollDirection(HOLD_MS + SCROLL_MS / 2)).toBe('down');
+    expect(autoScrollDirection(HOLD_MS + SCROLL_MS)).toBe('up'); // bottom hold
+    expect(autoScrollDirection(CYCLE - 1)).toBe('up');
+    expect(autoScrollDirection(CYCLE)).toBe('down');
+  });
+});
+
+describe('phaseForScrollY', () => {
+  it('inverts computeAutoScrollY on the down leg', () => {
+    const t = phaseForScrollY(600, 1000, 'down');
+    expect(computeAutoScrollY(t, 1000)).toBe(600);
+  });
+
+  it('inverts computeAutoScrollY on the up leg', () => {
+    const t = phaseForScrollY(600, 1000, 'up');
+    expect(autoScrollDirection(t)).toBe('up');
+    expect(computeAutoScrollY(t, 1000)).toBe(600);
+  });
+
+  it('clamps out-of-range positions and handles a track that fits', () => {
+    expect(computeAutoScrollY(phaseForScrollY(-50, 1000, 'down'), 1000)).toBe(0);
+    expect(computeAutoScrollY(phaseForScrollY(5000, 1000, 'down'), 1000)).toBe(1000);
+    expect(phaseForScrollY(0, 0, 'down')).toBe(0);
   });
 });

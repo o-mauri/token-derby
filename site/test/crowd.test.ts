@@ -17,9 +17,11 @@ function makeBody(): HTMLElement {
 }
 
 describe('crowdColumns', () => {
-  it('counts only whole sprite tiles', () => {
+  it('covers the frame, rounding a partial tile up', () => {
     expect(crowdColumns(10 * 2 * TILE_PX, 2)).toBe(10);
-    expect(crowdColumns(10 * 2 * TILE_PX + 31, 2)).toBe(10);
+    // 31px of an 11th tile still has to be covered, or the strip — and the
+    // bridge the London theme hangs off it — stops short of the frame edge.
+    expect(crowdColumns(10 * 2 * TILE_PX + 31, 2)).toBe(11);
   });
 
   it('scales with the sprite scale', () => {
