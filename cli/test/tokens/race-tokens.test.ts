@@ -198,3 +198,20 @@ describe('readAllSources', () => {
     expect(ok(res).degraded).toHaveLength(3);
   });
 });
+
+describe('readAllSources — which tools read cleanly', () => {
+  it('lists the tools that scanned, counting an uninstalled one as read, and leaves out a failed one', async () => {
+    allEmpty();
+    counts['codex-cli'].mockRejectedValue(new Error('Cannot create a string longer than 0x1fffffe8 characters'));
+    counts['gemini-cli'].mockRejectedValue(new SourceRootMissing('/nowhere'));
+    const r = ok(await readAllSources());
+    expect(r.readCleanly).toEqual(['claude-code', 'gemini-cli']);
+    expect(r.readCleanly).not.toContain('codex-cli');
+  });
+
+  it('passes through the conversations a tool could not read', async () => {
+    allEmpty();
+    counts['codex-cli'].mockResolvedValue({ byFamily: new Map(), notices: [], unreadable: ['codex-cli:big'] });
+    expect(ok(await readAllSources()).unreadable).toEqual(['codex-cli:big']);
+  });
+});

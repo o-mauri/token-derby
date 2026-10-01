@@ -86,12 +86,19 @@ describe.each(HARNESS_KEYS)('Harness contract — %s', (key) => {
     expect(notices).toEqual([]);
   });
 
-  it('propagates a per-file read error rather than counting it as zero', async () => {
+  it('reports a per-file read error rather than counting it as zero', async () => {
     const root = await makeRoot(key);
     const file = await writeCountable(key, root, '{}\n');
     await fs.chmod(file, 0o000);   // unreadable, but discoverable
     try {
-      await expect(count(harness)).rejects.toThrow();
+      if (harness.counting.mode === 'custom') {
+        // Whole-history readers can't single out one file, so the harness fails as a whole.
+        await expect(count(harness)).rejects.toThrow();
+      } else {
+        const result = await count(harness);
+        expect(result.unreadable).toHaveLength(1);
+        expect([...result.byFamily.values()].every(c => c.size === 0)).toBe(true);
+      }
     } finally {
       await fs.chmod(file, 0o644);
     }

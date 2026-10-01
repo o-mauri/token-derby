@@ -20,6 +20,10 @@ export type AllSources = {
   byFamily: Record<ModelFamily, Map<string, number>>; // family → convId → scored value
   degraded: DegradedSource[];
   notices: string[];
+  // Tools scanned without error this beat (an uninstalled tool counts as read).
+  readCleanly?: HarnessKey[];
+  // Conversations whose files could not be read this beat.
+  unreadable?: string[];
 };
 
 /** A beat that could not be read at all. `stall` is a human-readable cause for the UI. */
@@ -116,20 +120,24 @@ export async function readAllSources(progress?: ScanProgress): Promise<BeatReadi
   const byFamily = emptyByFamily();
   const degraded: DegradedSource[] = [];
   const notices = new Set<string>();
+  const readCleanly: HarnessKey[] = [];
+  const unreadable: string[] = [];
   // Registry order, so warnings list harnesses the same way every beat.
   for (const outcome of results) {
     const harness = HARNESSES[outcome.key];
     if (!outcome.ok) {
-      if (outcome.err instanceof SourceRootMissing) continue; // not installed → 0
+      if (outcome.err instanceof SourceRootMissing) { readCleanly.push(outcome.key); continue; } // not installed → 0
       const message = outcome.err?.message ?? String(outcome.err);
       logWarn('scan.source.err', { harness: outcome.key, message });
       degraded.push({ harness: outcome.key, label: harness.label, message });
       continue;
     }
+    readCleanly.push(outcome.key);
+    unreadable.push(...(outcome.result.unreadable ?? []));
     mergeInto(byFamily, outcome.result);
     for (const notice of outcome.result.notices) notices.add(notice);
   }
-  return { byFamily, degraded, notices: [...notices] };
+  return { byFamily, degraded, notices: [...notices], readCleanly, unreadable };
 }
 
 /**

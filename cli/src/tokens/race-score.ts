@@ -5,6 +5,8 @@
 
 import { MODEL_FAMILIES, zeroPerFamily, type ModelFamily } from '@token-derby/shared';
 import { isStall, type BeatReading } from './race-tokens.js';
+import { HARNESS_KEYS } from './harnesses/registry.js';
+import type { HarnessKey } from './harnesses/harness.js';
 import { SILENT_THRESHOLD } from '../config.js';
 
 export type PerFamily<T> = Record<ModelFamily, T>;
@@ -16,6 +18,11 @@ export type RaceScoreState = {
   convAcked: PerFamily<ConvAnchors>;  // per model, per conversation: credited so far
   counted: PerFamily<number>;         // cumulative credited per model, for the UI
   seq: number;
+  // Tools whose conversations have join-time anchors. Absent on state saved
+  // before this existed, which is read as every tool.
+  baselined?: HarnessKey[];
+  // Conversations unreadable at join, anchored when first seen rather than credited.
+  unanchored?: string[];
 };
 
 export type BeatSnapshot = {
@@ -30,6 +37,28 @@ function cloneAnchors(a: PerFamily<ConvAnchors>): PerFamily<ConvAnchors> {
   return { anthropic: { ...a.anthropic }, openai: { ...a.openai }, google: { ...a.google } };
 }
 
+/**
+ * State for a fresh join: every conversation read now is anchored at its current
+ * value. A stalled or failed scan anchors nothing and baselines no tool, so the
+ * first good reading anchors everything instead of crediting it.
+ */
+export function joinState(reading: BeatReading | null, seq: number): RaceScoreState {
+  const convAcked: PerFamily<ConvAnchors> = { anthropic: {}, openai: {}, google: {} };
+  const usable = reading !== null && !isStall(reading);
+  if (usable) {
+    for (const family of MODEL_FAMILIES) {
+      for (const [id, value] of reading.byFamily[family]) convAcked[family][id] = value;
+    }
+  }
+  return {
+    convAcked,
+    counted: zeroPerFamily(),
+    seq,
+    baselined: usable ? [...(reading.readCleanly ?? [])] : [],
+    unanchored: usable ? [...(reading.unreadable ?? [])] : [],
+  };
+}
+
 export class RaceScoreTracker {
   private convAcked: PerFamily<ConvAnchors>;
   private convLast: PerFamily<ConvAnchors>;
@@ -38,12 +67,17 @@ export class RaceScoreTracker {
   private stalls = 0;
   private lastStall: string | null = null;
   private emptyBeats = 0;
+  private readonly baselined: Set<HarnessKey>;
+  // Conversations seen unreadable before any reading: anchored at first sight.
+  private readonly unanchored = new Set<string>();
 
   constructor(init: RaceScoreState) {
     this.convAcked = cloneAnchors(init.convAcked);
     this.convLast = cloneAnchors(init.convAcked); // seed last from the join-time anchors
     this.counted = { ...init.counted };
     this.seq = init.seq;
+    this.baselined = new Set(init.baselined ?? HARNESS_KEYS);
+    for (const id of init.unanchored ?? []) this.unanchored.add(id);
   }
 
   /**
@@ -67,14 +101,31 @@ export class RaceScoreTracker {
     const anyConversations = MODEL_FAMILIES.some(family => reading.byFamily[family].size > 0);
     this.emptyBeats = anyConversations ? 0 : this.emptyBeats + 1;
 
+    // A tool read for the first time since joining (unreadable then, or turned
+    // on since) has history but no anchors: anchor it now rather than credit it.
+    const fresh = (reading.readCleanly ?? []).filter(key => !this.baselined.has(key));
+    for (const id of reading.unreadable ?? []) {
+      if (!this.known(id)) this.unanchored.add(id);
+    }
+
     // Per-conversation monotonic floor: a conversation never moves down, so a
     // truncated or half-written transcript can't retract tokens already counted.
     for (const family of MODEL_FAMILIES) {
       for (const [id, value] of reading.byFamily[family]) {
+        if (this.unanchored.delete(id) || fresh.some(key => id.startsWith(`${key}:`))) {
+          this.convAcked[family][id] = value;
+          this.convLast[family][id] = value;
+          continue;
+        }
         const prev = this.convLast[family][id] ?? 0;
         if (value > prev) this.convLast[family][id] = value;
       }
     }
+    for (const key of fresh) this.baselined.add(key);
+  }
+
+  private known(id: string): boolean {
+    return MODEL_FAMILIES.some(family => id in this.convLast[family]);
   }
 
   /** Frozen payload for the next heartbeat. Pure — call repeatedly for retries. */
@@ -137,6 +188,7 @@ export class RaceScoreTracker {
       convAcked: cloneAnchors(this.convAcked),
       counted: { ...this.counted },
       seq: this.seq,
+      baselined: [...this.baselined],
     };
   }
 }

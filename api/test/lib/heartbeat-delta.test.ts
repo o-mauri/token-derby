@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resolveHeartbeatDelta } from '../../src/lib/heartbeat-delta.js';
+import { resolveHeartbeatDelta, capBeat, MAX_RAW_TOKENS_PER_BEAT } from '../../src/lib/heartbeat-delta.js';
 
 describe('resolveHeartbeatDelta', () => {
   it('sums every family at equal weight', () => {
@@ -52,5 +52,33 @@ describe('resolveHeartbeatDelta', () => {
     expect(resolveHeartbeatDelta({})).toBeNull();
     expect(resolveHeartbeatDelta({ delta: -1 })).toBeNull();
     expect(resolveHeartbeatDelta({ components: null as any })).toBeNull();
+  });
+});
+
+describe('capBeat', () => {
+  const beat = (anthropic: number, openai: number, google = 0) =>
+    ({ total: anthropic + openai + google, components: { anthropic, openai, google } });
+
+  it('caps a single beat at 5,000,000 raw tokens', () => {
+    expect(MAX_RAW_TOKENS_PER_BEAT).toBe(5_000_000);
+  });
+
+  it('leaves a beat at or under the cap alone', () => {
+    expect(capBeat(beat(4_000_000, 1_000_000))).toEqual({ ...beat(4_000_000, 1_000_000), discarded: 0 });
+  });
+
+  it('throws away everything above the cap', () => {
+    const r = capBeat(beat(0, 30_405_384));
+    expect(r.total).toBe(5_000_000);
+    expect(r.components).toEqual({ anthropic: 0, openai: 5_000_000, google: 0 });
+    expect(r.discarded).toBe(25_405_384);
+  });
+
+  it('keeps each family\'s share and still sums exactly to the cap', () => {
+    const r = capBeat(beat(6_000_000, 3_000_000, 1_000_001));
+    expect(r.components.anthropic + r.components.openai + r.components.google).toBe(5_000_000);
+    expect(r.components.anthropic).toBeCloseTo(3_000_000, -1);
+    expect(r.components.openai).toBeCloseTo(1_500_000, -1);
+    expect(r.total).toBe(5_000_000);
   });
 });
