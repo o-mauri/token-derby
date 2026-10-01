@@ -116,7 +116,8 @@ describe('renderMarket — org board', () => {
     const root = document.createElement('div');
     renderMarket(root, { type: 'org', orgName: 'acme' }, { hostname: 'market.tokenderby.co.uk' });
     await vi.advanceTimersByTimeAsync(0);
-    expect(root.textContent).toContain("There's no organisation called acme");
+    expect(root.querySelector('.not-found h2')!.textContent).toBe('Organisation not found');
+    expect(root.querySelector('.not-found strong')!.textContent).toBe('acme');
   });
 });
 
@@ -157,7 +158,7 @@ describe('renderMarket — wrong-org and recovery', () => {
     expect(replacePath).toHaveBeenCalledTimes(1);
     expect(calls).toBeLessThanOrEqual(5);
     expect((fetch as unknown as ReturnType<typeof vi.fn>).mock.calls.length).toBe(calls);
-    expect(root.textContent).toContain('There is nothing here.');
+    expect(root.querySelector('.not-found h2')!.textContent).toBe('Race not found');
     dispose();
   });
 
@@ -167,7 +168,7 @@ describe('renderMarket — wrong-org and recovery', () => {
     const dispose = renderMarket(root, { type: 'race', orgName: 'acme', joinCode: 'Q79KSH' },
       { replacePath: vi.fn(), hostname: 'market.tokenderby.co.uk' });
     await vi.advanceTimersByTimeAsync(0);
-    expect(root.querySelector('.dm-empty')).not.toBeNull();
+    expect(root.querySelector('.not-found strong')!.textContent).toBe('Q79KSH');
     expect(root.querySelector('.loader')).toBeNull();
     dispose();
   });

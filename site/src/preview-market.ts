@@ -64,6 +64,6 @@ const entries: PickerEntry[] = [
 ];
 renderPickerSignedIn(section('Picker, signed in'), entries, (p) => p);
 renderPickerSignedOut(section('Picker, signed out'), () => {});
-renderMarketNotFound(section('Not found'), 'acme', (p) => p);
+renderMarketNotFound(section('Not found'), { org: 'acme' }, (p) => p);
 const loaderBox = section('Loading');
 loaderBox.appendChild(createLoader(document));

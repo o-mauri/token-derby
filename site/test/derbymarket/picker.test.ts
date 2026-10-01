@@ -69,15 +69,28 @@ describe('renderNoRaces / renderMarketNotFound', () => {
     expect(root.textContent).toContain('No races yet for StackOne');
     expect(root.textContent).toContain('League Race 1/10');
   });
-  it('names the missing organisation and links back', () => {
+  it('names the missing organisation in the porthole and links back', () => {
     const root = document.createElement('div');
-    renderMarketNotFound(root, 'acme', href);
-    expect(root.textContent).toContain('acme');
-    expect(root.querySelector<HTMLAnchorElement>('a')!.getAttribute('href')).toBe('/');
+    renderMarketNotFound(root, { org: 'acme' }, href);
+    expect(root.querySelector('.not-found h2')!.textContent).toBe('Organisation not found');
+    expect(root.querySelector('.not-found strong')!.textContent).toBe('acme');
+    expect(root.querySelector('.dm-brand')).not.toBeNull();
+    expect(root.querySelector<HTMLAnchorElement>('.not-found a')!.getAttribute('href')).toBe('/');
   });
-  it('escapes the organisation name', () => {
+  it('names a missing race code', () => {
     const root = document.createElement('div');
-    renderMarketNotFound(root, '<img>', href);
+    renderMarketNotFound(root, { race: 'Q79KSH' }, href);
+    expect(root.querySelector('.not-found h2')!.textContent).toBe('Race not found');
+    expect(root.querySelector('.not-found strong')!.textContent).toBe('Q79KSH');
+  });
+  it('falls back to page not found', () => {
+    const root = document.createElement('div');
+    renderMarketNotFound(root, null, href);
+    expect(root.querySelector('.not-found h2')!.textContent).toBe('Page not found');
+  });
+  it('renders the organisation name as text', () => {
+    const root = document.createElement('div');
+    renderMarketNotFound(root, { org: '<img>' }, href);
     expect(root.querySelector('img')).toBeNull();
   });
 });

@@ -63,7 +63,7 @@ export function renderMarket(root: HTMLElement, route: MarketRoute, deps: Market
       if (e instanceof SiteApiError && e.status === 404) {
         clearInner();
         if (joinCode) { await moveRaceToItsOrg(); return; }
-        renderMarketNotFound(root, orgName, href);
+        renderMarketNotFound(root, { org: orgName }, href);
         stopPolling();
         return;
       }
@@ -174,7 +174,7 @@ export function renderMarket(root: HTMLElement, route: MarketRoute, deps: Market
 
   // A join code under the wrong org: follow the race to the org it belongs to.
   const moveRaceToItsOrg = async (): Promise<void> => {
-    const notFound = () => { clearInner(); renderMarketNotFound(root, null, href); stopPolling(); };
+    const notFound = () => { clearInner(); renderMarketNotFound(root, { race: joinCode! }, href); stopPolling(); };
     if (moved) { notFound(); return; }
     let race;
     try { race = await fetchRace(joinCode!); }

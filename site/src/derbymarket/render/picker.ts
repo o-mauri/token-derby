@@ -1,8 +1,9 @@
 // site/src/derbymarket/render/picker.ts
 // The market's own pages around the board: the org picker, an org with no
-// races yet, and not-found.
+// races yet, and the porthole not-found.
 import type { RaceSummary } from '@token-derby/shared';
 import { esc } from '../../esc.js';
+import { createNotFound, type NotFoundOptions } from '../../render/not-found.js';
 
 export type PickerEntry = { org_name: string; live: RaceSummary | null; next: RaceSummary | null };
 
@@ -77,11 +78,22 @@ export function renderNoRaces(root: HTMLElement, orgName: string, next: RaceSumm
     </section>`;
 }
 
-export function renderMarketNotFound(root: HTMLElement, orgName: string | null, href: (path: string) => string): void {
-  root.innerHTML = `
-    <section class="dm dm-empty">
-      <div class="dm-brand">DERBYMARKET</div>
-      <p>${orgName ? `There's no organisation called <b>${esc(orgName)}</b>.` : 'There is nothing here.'}</p>
-      <p><a href="${esc(href('/'))}">← All markets</a></p>
-    </section>`;
+export type MissingThing = { org: string } | { race: string } | null;
+
+export function renderMarketNotFound(root: HTMLElement, missing: MissingThing, href: (path: string) => string): void {
+  const doc = root.ownerDocument;
+  const section = doc.createElement('section');
+  section.className = 'dm';
+  section.innerHTML = '<div class="dm-brand">DERBYMARKET</div>';
+  section.append(createNotFound(doc, notFoundCopy(missing, href('/'))));
+  root.replaceChildren(section);
+}
+
+function notFoundCopy(missing: MissingThing, home: string): NotFoundOptions {
+  const back = { label: '← All markets', href: home };
+  if (missing && 'org' in missing) {
+    return { title: 'Organisation not found', message: ['No organisation named ', { strong: missing.org }, '.'], back };
+  }
+  if (missing) return { title: 'Race not found', message: ['No race with code ', { strong: missing.race }, '.'], back };
+  return { title: 'Page not found', message: ["There's nothing at this address."], back };
 }
