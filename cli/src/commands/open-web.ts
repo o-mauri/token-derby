@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { createWebSession } from '../api/endpoints.js';
-import { SITE_ORIGIN } from '../config.js';
+import { SITE_ORIGIN, MARKET_ORIGIN } from '../config.js';
 import { ApiError } from '../api/client.js';
 
 export type Deps = { spawnImpl?: typeof spawn };
@@ -9,6 +9,12 @@ export type Deps = { spawnImpl?: typeof spawn };
 export function webOrigin(): string {
   const override = process.env.TOKEN_DERBY_API_BASE;
   return override ? override.replace(/\/api\/?$/, '') : SITE_ORIGIN;
+}
+
+/** Where Derbymarket lives; an API override serves it from its own site. */
+export function marketOrigin(): string {
+  const override = process.env.TOKEN_DERBY_API_BASE;
+  return override ? override.replace(/\/api\/?$/, '') : MARKET_ORIGIN;
 }
 
 export function opener(): string | null {
@@ -22,6 +28,7 @@ export async function openWeb(
   path: string,
   label: string,
   deps: Deps = {},
+  origin: string = webOrigin(),
 ): Promise<number> {
   const spawnImpl = deps.spawnImpl ?? spawn;
   let code: string;
@@ -35,7 +42,7 @@ export async function openWeb(
     throw e;
   }
 
-  const url = `${webOrigin()}${path}#code=${code}`;
+  const url = `${origin}${path}#code=${code}`;
   console.log('');
   console.log(`  Opening the Token Derby ${label} in your browser...`);
   console.log(`  ${url}`);

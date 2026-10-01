@@ -63,7 +63,7 @@ link, signed in as your CLI identity.
 
 ### `token-derby derbymarket`
 
-Opens the Derbymarket board for your organisation's live race, signed in. Prices come from
+Opens Derbymarket at market.tokenderby.co.uk on the race you're in, signed in (or your organisations, if you aren't racing). The market is public: `market.tokenderby.co.uk/<organisation>` shows anyone its live odds. Prices come from
 10,000 simulated finishes. Each one draws who turns up, when they arrive and when they leave
 from the last two weeks of the org's races, so a regular who usually starts after lunch still
 counts before they've joined. Signed-in members can show those not-joined players with

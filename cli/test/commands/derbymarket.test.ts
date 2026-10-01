@@ -36,32 +36,53 @@ function ok(body: unknown) {
 }
 
 describe('derbymarketCommand', () => {
-  it('mints a code, builds the /derbymarket URL, prints and opens it', async () => {
-    (globalThis as any).fetch = vi.fn(async (url: any) => {
-      if (String(url).endsWith('/web-sessions')) return ok({ code: 'CODE123' });
-      throw new Error(`unexpected ${url}`);
-    });
-    const spawnImpl = vi.fn(() => ({ on: () => {}, unref: () => {} })) as any;
+  const spawn = () => vi.fn(() => ({ on: () => {}, unref: () => {} })) as any;
+  const fetchWith = (race?: unknown) => vi.fn(async (url: any) => {
+    if (String(url).endsWith('/web-sessions')) return ok({ code: 'CODE123' });
+    if (race && String(url).endsWith('/races/Q79KSH')) return ok(race);
+    throw new Error(`unexpected ${url}`);
+  });
 
+  it('opens the market picker when the player has no active race', async () => {
+    (globalThis as any).fetch = fetchWith();
+    const spawnImpl = spawn();
     const { derbymarketCommand } = await import('../../src/commands/derbymarket.js');
-    const rc = await derbymarketCommand({ spawnImpl });
+    expect(await derbymarketCommand({ spawnImpl })).toBe(0);
+    expect(logs.join('\n')).toContain('https://example.test/?host=market#code=CODE123');
+  });
 
-    expect(rc).toBe(0);
-    const out = logs.join('\n');
-    expect(out).toContain('https://example.test/derbymarket#code=CODE123');
-    expect(spawnImpl).toHaveBeenCalled();
-    const args = spawnImpl.mock.calls[0];
-    expect(JSON.stringify(args)).toContain('https://example.test/derbymarket#code=CODE123');
+  it("opens the player's race under its organisation", async () => {
+    (globalThis as any).fetch = fetchWith({ join_code: 'Q79KSH', organisation_name: 'StackOne' });
+    const { saveActiveRace } = await import('../../src/stable/active-race.js');
+    await saveActiveRace({ join_code: 'Q79KSH' } as any);
+    const spawnImpl = spawn();
+    const { derbymarketCommand } = await import('../../src/commands/derbymarket.js');
+    expect(await derbymarketCommand({ spawnImpl })).toBe(0);
+    expect(logs.join('\n')).toContain('https://example.test/StackOne/Q79KSH?host=market#code=CODE123');
+    expect(JSON.stringify(spawnImpl.mock.calls[0])).toContain('/StackOne/Q79KSH');
+  });
+
+  it('falls back to the picker when the race lookup fails', async () => {
+    (globalThis as any).fetch = fetchWith();
+    const { saveActiveRace } = await import('../../src/stable/active-race.js');
+    await saveActiveRace({ join_code: 'Q79KSH' } as any);
+    const { derbymarketCommand } = await import('../../src/commands/derbymarket.js');
+    expect(await derbymarketCommand({ spawnImpl: spawn() })).toBe(0);
+    expect(logs.join('\n')).toContain('https://example.test/?host=market#code=CODE123');
   });
 
   it('still returns 0 when there is no opener, having printed the URL', async () => {
-    (globalThis as any).fetch = vi.fn(async (url: any) => {
-      if (String(url).endsWith('/web-sessions')) return ok({ code: 'CODE123' });
-      throw new Error(`unexpected ${url}`);
-    });
+    (globalThis as any).fetch = fetchWith();
     const spawnImpl = vi.fn(() => { throw new Error('no opener'); }) as any;
-
     const { derbymarketCommand } = await import('../../src/commands/derbymarket.js');
     expect(await derbymarketCommand({ spawnImpl })).toBe(0);
+  });
+});
+
+describe('marketOrigin', () => {
+  it('is the market host without an API override', async () => {
+    delete process.env.TOKEN_DERBY_API_BASE;
+    const { marketOrigin } = await import('../../src/commands/open-web.js');
+    expect(marketOrigin()).toBe('https://market.tokenderby.co.uk');
   });
 });
