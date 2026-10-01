@@ -3,7 +3,14 @@ import { resampleToTicks, trailingMovingAverage, PACE_SMOOTH_WINDOW_MIN } from '
 import { scale, smoothPath } from './chart-paths.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
+// Drawing height is fixed; width follows the box's aspect (see fitWidth) so the
+// chart fills wide boxes instead of letterboxing. W is the pre-layout default.
 const W = 600, H = 300, PAD_L = 40, PAD_R = 16, PAD_T = 20, PAD_B = 36;
+const MIN_W = H; // never narrower than square, so labels don't crowd on tall boxes
+
+function fitWidth(boxW: number, boxH: number): number {
+  return Math.max(MIN_W, Math.round((H * boxW) / boxH));
+}
 
 // Distinct, well-separated line colours assigned by finishing rank — so every
 // horse is tellable apart on the graph regardless of its own (possibly similar)
@@ -75,34 +82,49 @@ function buildFace(
   const valuesByHorse = ranked.map((h) => ({ h, vals: valuesFor(mode, byId.get(h.horse_id) ?? [], series.start_ms, endMs) }));
   const maxV = Math.max(1, ...valuesByHorse.flatMap((x) => x.vals.map((p) => p.v)));
 
-  const svg = el(doc, 'svg', { viewBox: `0 0 ${W} ${H}`, class: 'chart-svg' });
-  // gridlines
-  for (const y of [PAD_T, (PAD_T + (H - PAD_B)) / 2, H - PAD_B]) {
-    svg.appendChild(el(doc, 'line', { x1: `${PAD_L}`, y1: `${y}`, x2: `${W - PAD_R}`, y2: `${y}`, class: 'chart-grid' }));
-  }
-  const sx = (t: number) => scale(t, series.start_ms, endMs, PAD_L, W - PAD_R);
+  const svg = el(doc, 'svg', { class: 'chart-svg' });
   const sy = (v: number) => scale(v, 0, maxV, H - PAD_B, PAD_T);
-
-  valuesByHorse.forEach(({ h, vals }, i) => {
-    const stroke = colourOf(h, i);
-    // Idle horses resample to an all-zero tick series, so this is naturally a
-    // flat baseline at y=0 spanning the window — no special-casing needed.
-    const pts: [number, number][] = vals.map((p) => [sx(p.t), sy(p.v)]);
-    if (mode === 'cumulative') {
-      svg.appendChild(el(doc, 'path', { d: smoothPath(pts), fill: 'none', stroke, 'stroke-width': '2', class: 'chart-line' }));
-    } else {
-      svg.appendChild(el(doc, 'polyline', { points: pts.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' '), fill: 'none', stroke, 'stroke-width': '1.7', class: 'chart-line' }));
+  let drawnW = 0;
+  const draw = (w: number) => {
+    if (w === drawnW) return;
+    drawnW = w;
+    svg.replaceChildren();
+    svg.setAttribute('viewBox', `0 0 ${w} ${H}`);
+    // gridlines
+    for (const y of [PAD_T, (PAD_T + (H - PAD_B)) / 2, H - PAD_B]) {
+      svg.appendChild(el(doc, 'line', { x1: `${PAD_L}`, y1: `${y}`, x2: `${w - PAD_R}`, y2: `${y}`, class: 'chart-grid' }));
     }
-  });
-  // axis labels
-  const axis = (x: number, y: number, text: string) => {
-    const t = el(doc, 'text', { x: `${x}`, y: `${y}`, class: 'chart-axis' });
-    t.textContent = text;
-    svg.appendChild(t);
+    const sx = (t: number) => scale(t, series.start_ms, endMs, PAD_L, w - PAD_R);
+
+    valuesByHorse.forEach(({ h, vals }, i) => {
+      const stroke = colourOf(h, i);
+      // Idle horses resample to an all-zero tick series, so this is naturally a
+      // flat baseline at y=0 spanning the window — no special-casing needed.
+      const pts: [number, number][] = vals.map((p) => [sx(p.t), sy(p.v)]);
+      if (mode === 'cumulative') {
+        svg.appendChild(el(doc, 'path', { d: smoothPath(pts), fill: 'none', stroke, 'stroke-width': '2', class: 'chart-line' }));
+      } else {
+        svg.appendChild(el(doc, 'polyline', { points: pts.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' '), fill: 'none', stroke, 'stroke-width': '1.7', class: 'chart-line' }));
+      }
+    });
+    // axis labels
+    const axis = (x: number, y: number, text: string) => {
+      const t = el(doc, 'text', { x: `${x}`, y: `${y}`, class: 'chart-axis' });
+      t.textContent = text;
+      svg.appendChild(t);
+    };
+    axis(PAD_L, H - 8, fmtClock(series.start_ms));
+    axis(w - PAD_R - 30, H - 8, fmtClock(endMs));
+    axis(2, PAD_T + 6, mode === 'cumulative' ? `${Math.round(maxV)}` : `${Math.round(maxV)}/m`);
   };
-  axis(PAD_L, H - 8, fmtClock(series.start_ms));
-  axis(W - PAD_R - 30, H - 8, fmtClock(endMs));
-  axis(2, PAD_T + 6, mode === 'cumulative' ? `${Math.round(maxV)}` : `${Math.round(maxV)}/m`);
+  draw(W);
+  // Re-draw at the box's real aspect; removing the face from the page ends the watch.
+  const ro = new ResizeObserver(([entry]) => {
+    if (!svg.isConnected) { ro.disconnect(); return; }
+    const { width, height } = entry!.contentRect;
+    if (width > 0 && height > 0) draw(fitWidth(width, height));
+  });
+  ro.observe(svg);
 
   // face wrapper: title + chart + legend
   const face = doc.createElement('div');

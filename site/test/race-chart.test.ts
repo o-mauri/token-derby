@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { buildChartFaces, lineColor } from '../src/render/race-chart.js';
 import type { GetRaceSeriesResponse, HorseView } from '@token-derby/shared';
 
@@ -177,5 +177,58 @@ describe('buildChartFaces options', () => {
     expect(faces).toHaveLength(2);
     const strokes = [...faces[0]!.querySelectorAll('path.chart-line')].map((p) => p.getAttribute('stroke'));
     expect(strokes[0]).toBe(lineColor(0));
+  });
+});
+
+describe('chart width follows its box', () => {
+  // Captures the chart's ResizeObserver so a test can report a box size to it.
+  let notify: ((rect: { width: number; height: number }) => void) | null = null;
+  let disconnected = false;
+  beforeEach(() => {
+    notify = null;
+    disconnected = false;
+    vi.stubGlobal('ResizeObserver', class {
+      constructor(private cb: ResizeObserverCallback) {}
+      observe() { notify = (rect) => this.cb([{ contentRect: rect } as ResizeObserverEntry], this as unknown as ResizeObserver); }
+      disconnect() { disconnected = true; }
+      unobserve() {}
+    });
+  });
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  const viewBox = (face: HTMLElement) => face.querySelector('svg.chart-svg')!.getAttribute('viewBox');
+  const gridEnd = (face: HTMLElement) => Number(face.querySelector('line.chart-grid')!.getAttribute('x2'));
+
+  it('draws at 600×300 before it has been laid out', () => {
+    const [face] = buildChartFaces(document, series, horses, { modes: ['cumulative'] });
+    expect(viewBox(face!)).toBe('0 0 600 300');
+  });
+
+  it('widens the drawing to match a wide box, so lines span the full width', () => {
+    const [face] = buildChartFaces(document, series, horses, { modes: ['cumulative'] });
+    document.body.appendChild(face!);
+    notify!({ width: 1930, height: 585 });
+    expect(viewBox(face!)).toBe('0 0 990 300');          // 300 × 1930/585
+    expect(gridEnd(face!)).toBe(990 - 16);                // gridlines reach the new right edge
+    expect(face!.querySelectorAll('svg path.chart-line').length).toBe(2);
+    face!.remove();
+  });
+
+  it('never squeezes narrower than square on a tall, thin box', () => {
+    const [face] = buildChartFaces(document, series, horses, { modes: ['cumulative'] });
+    document.body.appendChild(face!);
+    notify!({ width: 200, height: 500 });
+    expect(viewBox(face!)).toBe('0 0 300 300');
+    face!.remove();
+  });
+
+  it('ignores an unlaid-out box and stops observing once removed', () => {
+    const [face] = buildChartFaces(document, series, horses, { modes: ['cumulative'] });
+    document.body.appendChild(face!);
+    notify!({ width: 0, height: 0 });
+    expect(viewBox(face!)).toBe('0 0 600 300');
+    face!.remove();
+    notify!({ width: 0, height: 0 });
+    expect(disconnected).toBe(true);
   });
 });
