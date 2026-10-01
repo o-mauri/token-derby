@@ -290,7 +290,7 @@ describe('domains', () => {
   it('serves every host from exactly one distribution', () => {
     const aliases = Object.values(distributions).flatMap((r: any) => r.Properties.DistributionConfig.Aliases ?? []);
     const expected = [
-      CONFIG.appDomain, CONFIG.apiDomain, CONFIG.adminDomain, ...CONFIG.apexDomains,
+      CONFIG.appDomain, CONFIG.apiDomain, CONFIG.adminDomain, CONFIG.marketDomain, ...CONFIG.apexDomains,
       CONFIG.legacySiteDomain, CONFIG.legacyAdminDomain,
     ];
     expect([...aliases].sort()).toEqual([...expected].sort());
@@ -312,5 +312,24 @@ describe('domains', () => {
 
   it('does not proxy the API from the admin host', () => {
     expect(configFor(CONFIG.adminDomain).CacheBehaviors ?? []).toEqual([]);
+  });
+
+  it('serves the market host from the site bucket with the SPA rewrite and no API behaviour', () => {
+    const market = configFor(CONFIG.marketDomain);
+    const app = configFor(CONFIG.appDomain);
+    expect(market.Origins[0].DomainName).toEqual(app.Origins[0].DomainName);
+    expect(market.DefaultCacheBehavior.FunctionAssociations).toBeDefined();
+    expect(market.DefaultRootObject).toBe('index.html');
+    expect(market.CacheBehaviors ?? []).toEqual([]);
+  });
+
+  it('puts the market host on the shared certificate and in DNS', () => {
+    const template = synth();
+    const json = JSON.stringify(template.toJSON());
+    expect(json).toContain(CONFIG.marketDomain);
+    const records = Object.values(template.findResources('AWS::Route53::RecordSet')) as any[];
+    expect(records.some((r) => String(r.Properties.Name).startsWith(CONFIG.marketDomain))).toBe(true);
+    const certs = Object.values(template.findResources('AWS::CloudFormation::CustomResource')) as any[];
+    expect(certs.some((c) => (c.Properties.SubjectAlternativeNames ?? []).includes(CONFIG.marketDomain))).toBe(true);
   });
 });

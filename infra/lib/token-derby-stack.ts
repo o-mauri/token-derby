@@ -32,6 +32,7 @@ export class TokenDerbyStack extends cdk.Stack {
     const APP_DOMAIN = config.appDomain;
     const API_DOMAIN = config.apiDomain;
     const ADMIN_DOMAIN = config.adminDomain;
+    const MARKET_DOMAIN = config.marketDomain;
     const TABLE_NAME = config.tableName;
 
     // ── Route 53 + ACM (certs must live in us-east-1 for CloudFront) ───
@@ -41,7 +42,7 @@ export class TokenDerbyStack extends cdk.Stack {
 
     const domainCertificate = new acm.DnsValidatedCertificate(this, 'DomainCertificate', {
       domainName: APP_DOMAIN,
-      subjectAlternativeNames: [API_DOMAIN, ADMIN_DOMAIN, ...config.apexDomains],
+      subjectAlternativeNames: [API_DOMAIN, ADMIN_DOMAIN, MARKET_DOMAIN, ...config.apexDomains],
       hostedZone: zone,
       region: 'us-east-1',
     }) as unknown as acm.ICertificate;
@@ -519,6 +520,25 @@ export class TokenDerbyStack extends cdk.Stack {
       zone,
       recordName: APP_DOMAIN,
       target: route53.RecordTarget.fromAlias(new targets.CloudFrontTarget(appDistribution)),
+    });
+
+    // market.: the same site, which renders Derbymarket at its root when served on this host.
+    const marketDistribution = new cloudfront.Distribution(this, 'MarketDistribution', {
+      defaultBehavior: {
+        origin: origins.S3BucketOrigin.withOriginAccessControl(siteBucket),
+        viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+        cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
+        functionAssociations: spaRewriteAssociation,
+      },
+      domainNames: [MARKET_DOMAIN],
+      certificate: domainCertificate,
+      defaultRootObject: 'index.html',
+    });
+
+    new route53.ARecord(this, 'MarketAliasRecord', {
+      zone,
+      recordName: MARKET_DOMAIN,
+      target: route53.RecordTarget.fromAlias(new targets.CloudFrontTarget(marketDistribution)),
     });
 
     // api.: the gateway without the /api prefix.

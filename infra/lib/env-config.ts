@@ -4,6 +4,8 @@ export interface EnvConfig {
   appDomain: string;
   apiDomain: string;
   adminDomain: string;
+  /** Derbymarket, served from the site bucket by host. */
+  marketDomain: string;
   /** Bare and www hosts, both redirected to appDomain. */
   apexDomains: string[];
   legacyZoneDomain: string;
@@ -24,6 +26,7 @@ export const CONFIG: EnvConfig = {
   appDomain: 'app.tokenderby.co.uk',
   apiDomain: 'api.tokenderby.co.uk',
   adminDomain: 'admin.tokenderby.co.uk',
+  marketDomain: 'market.tokenderby.co.uk',
   apexDomains: ['tokenderby.co.uk', 'www.tokenderby.co.uk'],
   legacyZoneDomain: 'mauricode.co.uk',
   legacySiteDomain: 'token-derby.mauricode.co.uk',
