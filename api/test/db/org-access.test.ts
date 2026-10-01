@@ -28,6 +28,7 @@ async function putLegacyOrg() {
       ...orgMetaKey(org_id),
       org_id,
       org_name,
+      org_name_key: org_name.toLowerCase(),   // every stored org carries this since the backfill
       created_at: new Date().toISOString(),
       creator_user_id: 'u-legacy',
       creator_user_name: 'Legacy Creator',

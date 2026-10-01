@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { randomUUID } from 'node:crypto';
-import { PutCommand, GetCommand } from '@aws-sdk/lib-dynamodb';
+import { GetCommand } from '@aws-sdk/lib-dynamodb';
 import { ddb, TABLE } from '../../src/db/client.js';
 import { orgMetaKey } from '../../src/db/keys.js';
 import { putOrganisation, getOrganisationByName, orgNameKey } from '../../src/db/organisations.js';
@@ -39,17 +39,6 @@ describe('organisation name lookup', () => {
       expect(org?.org_id).toBe(org_id);
       expect(org?.org_name).toBe(name);
     }
-  });
-
-  it('still finds an org written before the key existed, by its exact name', async () => {
-    const name = uniqueName();
-    const org_id = randomUUID();
-    await ddb.send(new PutCommand({
-      TableName: TABLE,
-      Item: { ...orgMetaKey(org_id), org_id, org_name: name, created_at: new Date().toISOString(),
-        creator_user_id: 'u', creator_user_name: 'U', org_join_token: randomUUID() },
-    }));
-    expect((await getOrganisationByName(name))?.org_id).toBe(org_id);
   });
 
   it('returns null for an unknown name', async () => {

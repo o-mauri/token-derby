@@ -47,6 +47,12 @@ describe('organisation name index', () => {
     const index = gsis.find((g: any) => g.IndexName === 'OrgNameKeyIndex');
     expect(index?.KeySchema).toEqual([{ AttributeName: 'org_name_key', KeyType: 'HASH' }]);
   });
+
+  it('no longer carries the exact-name index', () => {
+    const tables = Object.values(synth().findResources('AWS::DynamoDB::Table')) as any[];
+    const names = tables.flatMap((t) => (t.Properties.GlobalSecondaryIndexes ?? []).map((g: any) => g.IndexName));
+    expect(names).not.toContain('OrgNameIndex');
+  });
 });
 
 describe('the synthesised prod stack', () => {
