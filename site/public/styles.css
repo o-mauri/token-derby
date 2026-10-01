@@ -3475,4 +3475,4 @@ body.tv .race-header .meta .theme-select { padding: 3px 10px; font-size: 0.9rem;
 .dm-org-form-row input::placeholder { color: var(--muted); }
 .dm-org-form-row button { background: transparent; border: 1px solid var(--text); border-radius: 3px; padding: 5px 10px; color: var(--text); font: inherit; cursor: pointer; }
 .dm-empty a, .dm-picker a:not(.dm-org-open) { color: var(--accent); }
-.dm-picker .cmd { font-size: 1rem; max-width: 100%; overflow-x: auto; box-sizing: border-box; }
+.dm-picker .cmd { font-size: 1rem; max-width: 100%; box-sizing: border-box; white-space: pre-wrap; overflow-wrap: anywhere; }

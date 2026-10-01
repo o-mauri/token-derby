@@ -68,6 +68,26 @@ describe('renderMarket — org board', () => {
     dispose();
   });
 
+  it('keeps the board on screen when a later poll fails', async () => {
+    let marketsOk = true;
+    stubFetch({
+      '/api/organisations/stackone/races': () => json({ org_name: 'StackOne', races: [live] }),
+      '/api/races/Q79KSH': () => json(raceView('live')),
+      '/api/races/Q79KSH/markets': () => (marketsOk ? json({ open: true, snapshot, horses: [] }) : json({ code: 'X', message: 'x' }, 500)),
+    });
+    const root = document.createElement('div');
+    const dispose = renderMarket(root, { type: 'org', orgName: 'stackone' });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(root.querySelector('.dm-row')).not.toBeNull();
+    marketsOk = false;
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(root.querySelector('.dm-row')).not.toBeNull();
+    marketsOk = true;
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(root.querySelector('.dm-row')).not.toBeNull();
+    dispose();
+  });
+
   it('shows the last race\'s final prices and the next race between races', async () => {
     stubFetch({
       '/api/organisations/stackone/races': () => json({ org_name: 'StackOne', races: [finished, next] }),
@@ -251,14 +271,16 @@ describe('renderMarket — picker', () => {
   it('goes straight to the only org with a live race', async () => {
     localStorage.setItem('td_market_session', 'good');
     const navigate = vi.fn();
+    const forward = vi.fn();
     stubFetch({
       '/api/organisations': () => json({ organisations: [{ org_id: 'o1', org_name: 'StackOne' }] }),
       '/api/organisations/StackOne/races': () => json({ org_name: 'StackOne', races: [live] }),
     });
     const root = document.createElement('div');
-    renderMarket(root, { type: 'picker' }, { navigate, hostname: 'market.tokenderby.co.uk' });
+    renderMarket(root, { type: 'picker' }, { navigate, forward, hostname: 'market.tokenderby.co.uk' });
     await vi.advanceTimersByTimeAsync(0);
-    expect(navigate).toHaveBeenCalledWith('/StackOne');
+    expect(forward).toHaveBeenCalledWith('/StackOne');
+    expect(navigate).not.toHaveBeenCalled();
   });
 
   it('shows the loader while organisations load', async () => {

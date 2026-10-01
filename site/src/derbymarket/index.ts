@@ -1,5 +1,5 @@
 import type { HorseColors, RaceSummary } from '@token-derby/shared';
-import { scoredOf } from '@token-derby/shared';
+import { scoredOf, MARKET_OPEN_MIN } from '@token-derby/shared';
 import * as api from './api.js';
 import { ApiError } from './api.js';
 import { getSession, getShowNotJoined, setShowNotJoined, setUid, clearSession, readCodeFromHash } from './session.js';
@@ -19,6 +19,7 @@ const POLL_INTERVAL_MS = 30_000;
 
 export type MarketDeps = {
   navigate?: (path: string) => void;
+  forward?: (path: string) => void;
   replacePath?: (path: string) => void;
   hostname?: string;
 };
@@ -27,6 +28,7 @@ export function renderMarket(root: HTMLElement, route: MarketRoute, deps: Market
   const hostname = deps.hostname ?? window.location.hostname;
   const href = (path: string) => marketHref(path, hostname);
   const navigate = deps.navigate ?? ((path: string) => window.location.assign(href(path)));
+  const forward = deps.forward ?? ((path: string) => window.location.replace(href(path)));
   const replacePath = deps.replacePath ?? ((path: string) => history.replaceState(null, '', href(path)));
 
   let disposed = false;
@@ -36,6 +38,9 @@ export function renderMarket(root: HTMLElement, route: MarketRoute, deps: Market
   let timer: ReturnType<typeof setTimeout> | null = null;
   // Polling pauses while a chart is open, so a refresh can't pull it away mid-hover.
   let detailOpen = false;
+  // Once a board is up, a failed refresh leaves it in place.
+  let boardShown = false;
+  const loadFailed = () => { if (boardShown) return; clearInner(); renderLoadError(root); };
 
   const clearInner = () => { innerDispose?.(); innerDispose = null; };
   const showLoader = () => { clearInner(); root.replaceChildren(createLoader(root.ownerDocument)); };
@@ -55,14 +60,14 @@ export function renderMarket(root: HTMLElement, route: MarketRoute, deps: Market
       ({ org_name: orgName, races } = await fetchOrgRaces(orgKey));
     } catch (e) {
       if (stale()) return;
-      clearInner();
       if (e instanceof SiteApiError && e.status === 404) {
+        clearInner();
         if (joinCode) { await moveRaceToItsOrg(); return; }
         renderMarketNotFound(root, orgName, href);
         stopPolling();
         return;
       }
-      renderLoadError(root);
+      loadFailed();
       return;
     }
     if (stale()) return;
@@ -76,7 +81,7 @@ export function renderMarket(root: HTMLElement, route: MarketRoute, deps: Market
 
     let race;
     try { race = await fetchRace(pick.join_code); }
-    catch { if (!stale()) { clearInner(); renderLoadError(root); } return; }
+    catch { if (!stale()) loadFailed(); return; }
     if (stale()) return;
 
     // Scored, not raw: the prices beside them are priced on scored tokens too.
@@ -110,6 +115,7 @@ export function renderMarket(root: HTMLElement, route: MarketRoute, deps: Market
     };
 
     const show = (data: BoardData) => {
+      boardShown = true;
       showBoard = () => {
         data.showNotJoined = getShowNotJoined();
         clearInner();
@@ -126,7 +132,7 @@ export function renderMarket(root: HTMLElement, route: MarketRoute, deps: Market
     if (race.status === 'live') {
       let markets;
       try { markets = await api.getMarkets(pick.join_code); }
-      catch { if (!stale()) { clearInner(); renderLoadError(root); } return; }
+      catch { if (!stale()) loadFailed(); return; }
       if (stale()) return;
       if (!markets.open) {
         clearInner();
@@ -145,7 +151,7 @@ export function renderMarket(root: HTMLElement, route: MarketRoute, deps: Market
     if (race.status === 'finished') {
       let history;
       try { ({ history } = await api.getMarketHistory(pick.join_code)); }
-      catch { if (!stale()) { clearInner(); renderLoadError(root); } return; }
+      catch { if (!stale()) loadFailed(); return; }
       if (stale()) return;
       const last = history[history.length - 1];
       clearInner();
@@ -162,7 +168,7 @@ export function renderMarket(root: HTMLElement, route: MarketRoute, deps: Market
     clearInner();
     innerDispose = renderMarketNotOpen(root, {
       raceName: race.name,
-      opensInSeconds: Math.max(0, Math.round((Date.parse(race.start_time) + 20 * 60_000 - Date.now()) / 1000)),
+      opensInSeconds: Math.max(0, Math.round((Date.parse(race.start_time) + MARKET_OPEN_MIN * 60_000 - Date.now()) / 1000)),
     });
   };
 
@@ -215,7 +221,7 @@ export function renderMarket(root: HTMLElement, route: MarketRoute, deps: Market
     }));
     if (disposed) return;
     const liveOrgs = entries.filter((e) => e.live);
-    if (liveOrgs.length === 1) { navigate(`/${encodeURIComponent(liveOrgs[0]!.org_name)}`); return; }
+    if (liveOrgs.length === 1) { forward(`/${encodeURIComponent(liveOrgs[0]!.org_name)}`); return; }
     renderPickerSignedIn(root, entries, href);
   };
 

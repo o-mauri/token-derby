@@ -1,17 +1,19 @@
 // Derbymarket lives on its own subdomain. Local harnesses all run on localhost,
 // so they opt into market routing with ?host=market.
 export const MARKET_ORIGIN = 'https://market.tokenderby.co.uk';
-const PROD_SUFFIX = '.tokenderby.co.uk';
+const APEX = 'tokenderby.co.uk';
+const MARKET_HOST = `market.${APEX}`;
+const isProd = (hostname: string) => hostname === APEX || hostname.endsWith(`.${APEX}`);
 
 export function isMarketHost(hostname: string, search: string): boolean {
-  if (hostname.startsWith('market.')) return true;
-  if (hostname.endsWith(PROD_SUFFIX)) return false;
+  if (hostname === MARKET_HOST) return true;
+  if (isProd(hostname)) return false;
   return new URLSearchParams(search).get('host') === 'market';
 }
 
 /** A link to a market path that works from any host, including local harnesses. */
 export function marketHref(path: string, hostname: string): string {
-  if (hostname.endsWith(PROD_SUFFIX)) return hostname.startsWith('market.') ? path : MARKET_ORIGIN + path;
+  if (isProd(hostname)) return hostname === MARKET_HOST ? path : MARKET_ORIGIN + path;
   return `${path}?host=market`;
 }
 
