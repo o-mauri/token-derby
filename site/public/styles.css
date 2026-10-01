@@ -3458,3 +3458,15 @@ body.tv .race-header .meta .theme-select { padding: 3px 10px; font-size: 0.9rem;
   .race-header .meta .org-btn { display: none; }
   .race-header .meta .btn { padding: 3px 6px; }
 }
+
+.dm-picker p { max-width: 62ch; }
+.dm-org-card { display: flex; align-items: center; gap: 14px; border: 1px solid var(--muted); border-radius: 4px; padding: 12px 14px; margin-bottom: 10px; }
+.dm-org-card-main { flex: 1; min-width: 0; }
+.dm-org-card-detail { color: var(--muted); font-size: 0.8rem; margin-top: 4px; }
+.dm-org-open { border: 1px solid var(--text); border-radius: 3px; padding: 5px 10px; color: var(--text); text-decoration: none; }
+.dm-pill { font-size: 0.62rem; border: 1px solid var(--muted); color: var(--muted); border-radius: 10px; padding: 1px 7px; }
+.dm-pill--live { border-color: var(--accent); color: var(--accent); }
+.dm-org-form-row { display: flex; gap: 8px; flex-wrap: wrap; margin: 6px 0 4px; }
+.dm-org-form-row input { min-width: 0; flex: 1 1 180px; }
+.dm-picker-error { color: var(--accent); }
+.dm-muted { color: var(--muted); }
