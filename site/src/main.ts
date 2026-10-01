@@ -8,6 +8,7 @@ import { renderAbout } from './render/about.js';
 import { renderPrivacy } from './render/privacy.js';
 import { renderOrgManager } from './org-manager/index.js';
 import { derbymarketRedirect } from './market/host.js';
+import { renderMarket } from './derbymarket/index.js';
 import { renderCliApprove } from './render/cli-approve.js';
 import { renderLinkGoogle } from './render/link-google.js';
 import { initTheme } from './theme.js';
@@ -44,6 +45,8 @@ function route() {
     renderPrivacy(root);
   } else if (r.type === 'org-manager') {
     activeCleanup = renderOrgManager(root);
+  } else if (r.type === 'market') {
+    activeCleanup = renderMarket(root, r.market);
   } else if (r.type === 'derbymarket') {
     // Older CLIs open app…/derbymarket#code=…; the market lives on its own host now.
     window.location.replace(derbymarketRedirect(window.location.hostname, window.location.hash));

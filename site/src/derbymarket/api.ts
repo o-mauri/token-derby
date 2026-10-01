@@ -1,3 +1,4 @@
+import { apiUrl } from '@token-derby/shared';
 import type {
   WebSessionExchangeResponse, ListOrganisationsResponse,
   GetMarketsResponse, GetMarketHistoryResponse,
@@ -30,7 +31,7 @@ async function parse<T>(res: Response): Promise<T> {
 
 async function get<T>(path: string, fetchImpl: FetchFn): Promise<T> {
   let res: Response;
-  try { res = await fetchImpl(path); }
+  try { res = await fetchImpl(apiUrl(path)); }
   catch (e: any) { throw new ApiError('NETWORK_ERROR', e?.message ?? 'fetch failed', 0); }
   return parse<T>(res);
 }
@@ -39,7 +40,7 @@ async function authed<T>(path: string, fetchImpl: FetchFn): Promise<T> {
   const token = getSession();
   if (!token) throw new ApiError('UNAUTHENTICATED', 'Not signed in', 401);
   let res: Response;
-  try { res = await fetchImpl(path, { headers: { authorization: `Bearer ${token}` } }); }
+  try { res = await fetchImpl(apiUrl(path), { headers: { authorization: `Bearer ${token}` } }); }
   catch (e: any) { throw new ApiError('NETWORK_ERROR', e?.message ?? 'fetch failed', 0); }
   return parse<T>(res);
 }
@@ -48,7 +49,7 @@ async function authed<T>(path: string, fetchImpl: FetchFn): Promise<T> {
 async function maybeAuthed<T>(path: string, fetchImpl: FetchFn): Promise<T> {
   const token = getSession();
   let res: Response;
-  try { res = await fetchImpl(path, token ? { headers: { authorization: `Bearer ${token}` } } : undefined); }
+  try { res = await fetchImpl(apiUrl(path), token ? { headers: { authorization: `Bearer ${token}` } } : undefined); }
   catch (e: any) { throw new ApiError('NETWORK_ERROR', e?.message ?? 'fetch failed', 0); }
   return parse<T>(res);
 }
@@ -56,7 +57,7 @@ async function maybeAuthed<T>(path: string, fetchImpl: FetchFn): Promise<T> {
 export async function exchangeCode(code: string, fetchImpl: FetchFn = fetch): Promise<WebSessionExchangeResponse> {
   let res: Response;
   try {
-    res = await fetchImpl('/api/web-sessions/exchange', {
+    res = await fetchImpl(apiUrl('/api/web-sessions/exchange'), {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code }),
     });
   } catch (e: any) { throw new ApiError('NETWORK_ERROR', e?.message ?? 'fetch failed', 0); }
