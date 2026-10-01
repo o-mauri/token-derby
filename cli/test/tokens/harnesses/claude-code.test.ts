@@ -207,3 +207,69 @@ describe('sumTokens — resilience of the directory walk', () => {
     await expect(totalOf(claudeCode)).rejects.toThrow();
   });
 });
+
+describe('forked and resumed sessions', () => {
+  // A dated response the way Claude Code writes it: one line per content block,
+  // each repeating the request's usage.
+  function resp(id: string, ts: string, output: number, input = 0): string {
+    return JSON.stringify({ requestId: id, timestamp: ts, message: { usage: { output_tokens: output, input_tokens: input } } });
+  }
+
+  it('counts a request copied into a fork once, not once per file', async () => {
+    const root = await tmpProjects();
+    const proj = path.join(root, 'proj');
+    await fs.mkdir(proj, { recursive: true });
+    const history = [resp('r1', '2026-10-01T15:00:01Z', 100), resp('r2', '2026-10-01T15:01:00Z', 50)];
+    await fs.writeFile(path.join(proj, 'parent.jsonl'), history.join('\n') + '\n');
+    // The fork copies the history verbatim, then adds its own turn.
+    await fs.writeFile(path.join(proj, 'fork.jsonl'), [...history, resp('r3', '2026-10-01T15:02:00Z', 7)].join('\n') + '\n');
+
+    expect((await totalOf(claudeCode)).output).toBe(157);
+  });
+
+  it('dedupes a non-contiguous repeat of the same request within a file', async () => {
+    const root = await tmpProjects();
+    const proj = path.join(root, 'proj');
+    await fs.mkdir(proj, { recursive: true });
+    const ts = '2026-10-01T15:00:00Z';
+    await fs.writeFile(path.join(proj, 'a.jsonl'), [resp('r1', ts, 100), resp('r2', ts, 5), resp('r1', ts, 100)].join('\n') + '\n');
+    expect((await totalOf(claudeCode)).output).toBe(105);
+  });
+
+  it("groups dated responses by hour, so deleting a fork's donor never moves a request to a new conversation", async () => {
+    const root = await tmpProjects();
+    const proj = path.join(root, 'proj');
+    await fs.mkdir(proj, { recursive: true });
+    const history = [resp('r1', '2026-10-01T14:59:00Z', 100), resp('r2', '2026-10-01T15:01:00Z', 50)];
+    await fs.writeFile(path.join(proj, 'a-donor.jsonl'), history.join('\n') + '\n');
+    await fs.writeFile(path.join(proj, 'b-fork.jsonl'), history.join('\n') + '\n');
+
+    const before = await conversationsOf(claudeCode, FAMILY);
+    expect([...before.keys()].sort()).toEqual(['@2026-10-01T14', '@2026-10-01T15']);
+
+    await fs.rm(path.join(proj, 'a-donor.jsonl'));
+    const after = await conversationsOf(claudeCode, FAMILY);
+    expect(after).toEqual(before);
+  });
+
+  it('skips a transcript deleted between discovery and read instead of stalling', async () => {
+    const root = await tmpProjects();
+    const proj = path.join(root, 'proj');
+    await fs.mkdir(proj, { recursive: true });
+    await fs.writeFile(path.join(proj, 'kept.jsonl'), resp('r1', '2026-10-01T15:00:00Z', 10) + '\n');
+    const gone = path.join(proj, 'gone.jsonl');
+    await fs.writeFile(gone, resp('r2', '2026-10-01T15:00:00Z', 20) + '\n');
+
+    const discover = claudeCode.discover;
+    (claudeCode as any).discover = async (r: string) => {
+      const files = await discover.call(claudeCode, r);
+      await fs.rm(gone);
+      return files;
+    };
+    try {
+      expect((await totalOf(claudeCode)).output).toBe(10);
+    } finally {
+      (claudeCode as any).discover = discover;
+    }
+  });
+});

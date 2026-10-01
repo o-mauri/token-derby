@@ -15,9 +15,10 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { claudeProjectsDir } from '../../../paths.js';
-import type { FileFold } from '../../scan-cache.js';
+import type { FileFold, ScanCache } from '../../scan-cache.js';
 import { readRoot } from '../../source-root.js';
-import { constant, incremental, type Harness, type TokenTotals } from '../harness.js';
+import { mapWithConcurrency, SCAN_CONCURRENCY } from '../../pool.js';
+import { custom, type CustomReading, type Harness } from '../harness.js';
 
 // How deep to recurse below each project dir. Subagents and dynamic workflows
 // write their OWN transcripts nested under the session, e.g.
@@ -34,26 +35,40 @@ const TRANSCRIPT_EXT = '.jsonl';
 // turn). cache_read_input_tokens is intentionally excluded — those are
 // passive context that don't represent work done in the race.
 //
-// Fold state carries the last request seen so the dedupe below survives a beat
-// boundary: readIncremental resumes from the committed value, so remembering it
-// here is what stops a response whose blocks straddle two beats being counted
-// twice. Persisted into the scan cache with the totals (hence CACHE_VERSION).
-type ClaudeFoldState = TokenTotals & { last?: string };
+// It is a WHOLE-HISTORY harness, like Pi. Resuming or forking a session
+// (`--fork-session`, and the Agent SDK, which forks on every turn) copies the
+// parent's lines verbatim into a new session file, so one request's usage can
+// sit in many files at once. Counted a file at a time, every fork re-credited
+// the whole conversation so far — measured at ~30x real usage under an SDK
+// proxy. Each request is therefore counted once across every file.
+
+/** One API response, with enough identity to spot a copy of it in another file. */
+type ClaudeResponse = {
+  /** requestId (message.id for older transcripts). Absent ⇒ cannot be deduped. */
+  id?: string;
+  /** UTC hour the response was written, `YYYY-MM-DDTHH`. Copies keep it verbatim. */
+  hour?: string;
+  input: number;
+  output: number;
+};
+
+// Fold state carries the last request seen so a response whose blocks straddle
+// two beats collapses into one entry: readIncremental resumes from the committed
+// value. Persisted into the scan cache (hence CACHE_VERSION).
+type ClaudeFileState = { responses: ClaudeResponse[]; last?: string };
+
+const HOUR = /^\d{4}-\d{2}-\d{2}T\d{2}/;
 
 // `usage` is reported per REQUEST, but Claude Code writes one transcript line
 // per content block — a turn with thinking + text + three tool calls is five
-// lines, each repeating the same usage verbatim. Summing per line inflated real
-// races by 2.1x-7.6x. Count each response once, keyed on requestId (message.id
-// for older transcripts that predate it).
-//
-// A response's lines are contiguous, so comparing against the previous line's
-// id is enough and stays O(1) — no unbounded set of ids in the cache. Measured
-// across 390 real transcripts: 38,986 responses contiguous, 9 not. Those 9 are
-// counted twice, which is the deliberate trade for a bounded cache entry.
-const CLAUDE_FOLD: FileFold<ClaudeFoldState> = {
-  empty: () => ({ input: 0, output: 0 }),
+// lines, each repeating the same usage verbatim. A response's lines are
+// contiguous, so collapsing against the previous line keeps the per-file list
+// short; the cross-file dedupe in readAll catches everything else.
+const CLAUDE_FOLD: FileFold<ClaudeFileState> = {
+  empty: () => ({ responses: [] }),
   append: (acc, lines) => {
-    let { input, output, last } = acc;
+    let last = acc.last;
+    const responses = [...acc.responses]; // never mutate the cached value
     for (const line of lines) {
       if (!line.trim()) continue;
       let parsed: any;
@@ -66,11 +81,16 @@ const CLAUDE_FOLD: FileFold<ClaudeFoldState> = {
       const id: string | undefined = parsed?.requestId ?? parsed?.message?.id ?? undefined;
       if (id !== undefined && id === last) continue;
       last = id;
-      input += addNum(usage.input_tokens) + addNum(usage.cache_creation_input_tokens);
-      output += addNum(usage.output_tokens);
+      const ts = parsed?.timestamp;
+      const hour = typeof ts === 'string' && HOUR.test(ts) ? ts.slice(0, 13) : undefined;
+      responses.push({
+        ...(id !== undefined ? { id } : {}),
+        ...(hour !== undefined ? { hour } : {}),
+        input: addNum(usage.input_tokens) + addNum(usage.cache_creation_input_tokens),
+        output: addNum(usage.output_tokens),
+      });
     }
-    // Fresh object: never mutate the cached value.
-    return last === undefined ? { input, output } : { input, output, last };
+    return last === undefined ? { responses } : { responses, last };
   },
 };
 
@@ -88,7 +108,7 @@ export const claudeCode: Harness = {
     `check it points at the config root, not the projects directory.`,
   ],
   root: claudeProjectsDir,
-  counting: incremental(CLAUDE_FOLD, constant('anthropic')),
+  counting: custom(readAll),
 
   async discover(root) {
     const entries = await readRoot(root, () => fs.readdir(root, { withFileTypes: true }));
@@ -100,16 +120,62 @@ export const claudeCode: Harness = {
     return out;
   },
 
-  // A "conversation" is one top-level session: <project>/<session>. The main
-  // session transcript and everything nested under <session>/subagents/** roll
-  // up into the same id.
-  conversationId(file, root) {
-    const rel = path.relative(root, file);
-    const [project, session] = rel.split(path.sep);
-    if (project === undefined || session === undefined) return rel.replace(/\.jsonl$/, '');
-    return `${project}/${session.replace(/\.jsonl$/, '')}`;
-  },
+  conversationId: sessionOf,
 };
+
+// A "session" is one top-level transcript: <project>/<session>. The main
+// session transcript and everything nested under <session>/subagents/** roll
+// up into the same id.
+function sessionOf(file: string, root: string): string {
+  const rel = path.relative(root, file);
+  const [project, session] = rel.split(path.sep);
+  if (project === undefined || session === undefined) return rel.replace(/\.jsonl$/, '');
+  return `${project}/${session.replace(/\.jsonl$/, '')}`;
+}
+
+/**
+ * Read every transcript, then count each request once across all of them.
+ *
+ * Which conversation a response lands in must not depend on WHICH file holds it:
+ * the race tracker credits a never-seen conversation from zero, so if a fork's
+ * copy took over a request once its donor was deleted, the whole history would
+ * be credited again. A dated response is therefore grouped by the hour it was
+ * written — a fact every copy shares — not by session. Only undated (legacy)
+ * lines fall back to the session they were found in.
+ *
+ * Deleting the only copy of a request drops its hour's total; the tracker's
+ * monotonic floor keeps what was already credited, so that can only under-count.
+ */
+async function readAll(cache: ScanCache, files: string[], root: string): Promise<CustomReading> {
+  const sorted = [...files].sort(); // deterministic winner for undated copies
+  const states = await mapWithConcurrency(sorted, SCAN_CONCURRENCY, f =>
+    cache.readIncremental(f, CLAUDE_FOLD).catch((e: any) => {
+      // Deleted between discovery and read: SDK hosts prune sessions constantly.
+      // Its requests are either copied elsewhere or gone; neither is a stall.
+      if (e?.code === 'ENOENT') return null;
+      throw e;
+    }),
+  );
+
+  const byConversation: CustomReading['byConversation'] = new Map();
+  const seen = new Set<string>();
+  sorted.forEach((file, i) => {
+    const state = states[i];
+    if (!state) return;
+    for (const r of state.responses) {
+      if (r.id !== undefined) {
+        if (seen.has(r.id)) continue;
+        seen.add(r.id);
+      }
+      const conversation = r.hour !== undefined ? `@${r.hour}` : sessionOf(file, root);
+      const totals = byConversation.get(conversation)?.anthropic ?? { input: 0, output: 0 };
+      totals.input += r.input;
+      totals.output += r.output;
+      byConversation.set(conversation, { anthropic: totals });
+    }
+  });
+  return { byConversation };
+}
 
 /**
  * Recursively collect transcripts up to `depth` levels below `dir`.
