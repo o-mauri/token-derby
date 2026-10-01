@@ -39,12 +39,18 @@ type OrgRecord = Omit<Organisation, keyof OrgAccessSettings> &
     access_rev?: number;
   };
 
+/** Org names are matched case-insensitively; this is the form the lookup index holds. */
+export function orgNameKey(org_name: string): string {
+  return org_name.toLowerCase();
+}
+
 export async function putOrganisation(org: Organisation, org_join_token: string): Promise<void> {
   await ddb.send(new PutCommand({
     TableName: TABLE,
     Item: {
       ...orgMetaKey(org.org_id),
       ...org,
+      org_name_key: orgNameKey(org.org_name),
       org_join_token,
     },
     ConditionExpression: 'attribute_not_exists(pk)',
@@ -66,15 +72,26 @@ export async function getOrganisationById(
 }
 
 export async function getOrganisationByName(org_name: string): Promise<OrgRecord | null> {
+  const byKey = await queryOne('OrgNameKeyIndex', 'org_name_key', orgNameKey(org_name)).catch((e) => {
+    // The index may not exist yet mid-deploy; the exact-name query below still works.
+    if (e?.name === 'ValidationException') return undefined;
+    throw e;
+  });
+  // Orgs written before org_name_key existed only match by their exact name.
+  const item = byKey ?? await queryOne('OrgNameIndex', 'org_name', org_name);
+  return item ? pickOrgRecord(item) : null;
+}
+
+async function queryOne(IndexName: string, attribute: string, value: string): Promise<Record<string, any> | undefined> {
   const { Items = [] } = await ddb.send(new QueryCommand({
     TableName: TABLE,
-    IndexName: 'OrgNameIndex',
-    KeyConditionExpression: 'org_name = :n',
-    ExpressionAttributeValues: { ':n': org_name },
+    IndexName,
+    KeyConditionExpression: '#a = :v',
+    ExpressionAttributeNames: { '#a': attribute },
+    ExpressionAttributeValues: { ':v': value },
     Limit: 1,
   }));
-  const item = Items[0];
-  return item ? pickOrgRecord(item) : null;
+  return Items[0];
 }
 
 export async function getOrganisationByJoinToken(join_token: string): Promise<OrgRecord | null> {
@@ -390,7 +407,7 @@ export async function listOrgsWithSlackRelease(): Promise<OrgRecord[]> {
 // an absent `restrict_to_allowed_domains` as truthy would lock every existing
 // org out of its own (empty) allow-list.
 function pickOrgRecord(item: Record<string, any>): OrgRecord {
-  const { pk: _pk, sk: _sk, slack_marker: _m, ...rest } = item;
+  const { pk: _pk, sk: _sk, slack_marker: _m, org_name_key: _k, ...rest } = item;
   return {
     ...rest,
     allowed_domains: normaliseAllowedDomains(rest.allowed_domains),

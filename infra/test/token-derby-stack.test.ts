@@ -39,6 +39,16 @@ function appFunctions(template: Template) {
     .map(([id, r]) => ({ id, env: (r as any).Properties.Environment.Variables as Record<string, unknown> }));
 }
 
+describe('organisation name index', () => {
+  it('indexes the lower-cased org name for case-insensitive lookups', () => {
+    const template = synth();
+    const tables = Object.values(template.findResources('AWS::DynamoDB::Table')) as any[];
+    const gsis = tables.flatMap((t) => t.Properties.GlobalSecondaryIndexes ?? []);
+    const index = gsis.find((g: any) => g.IndexName === 'OrgNameKeyIndex');
+    expect(index?.KeySchema).toEqual([{ AttributeName: 'org_name_key', KeyType: 'HASH' }]);
+  });
+});
+
 describe('the synthesised prod stack', () => {
   let prod: Template;
   beforeAll(() => { prod = synth(); });

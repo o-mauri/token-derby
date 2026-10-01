@@ -88,6 +88,12 @@ export class TokenDerbyStack extends cdk.Stack {
       partitionKey: { name: 'org_name', type: dynamodb.AttributeType.STRING },
     });
 
+    // Case-insensitive org lookup; OrgNameIndex stays until every org carries org_name_key.
+    table.addGlobalSecondaryIndex({
+      indexName: 'OrgNameKeyIndex',
+      partitionKey: { name: 'org_name_key', type: dynamodb.AttributeType.STRING },
+    });
+
     table.addGlobalSecondaryIndex({
       indexName: 'OrgJoinTokenIndex',
       partitionKey: { name: 'org_join_token', type: dynamodb.AttributeType.STRING },
