@@ -40,6 +40,12 @@ titles stay blank until the API returns the real name.
 To see it without an API, build and open `/preview-loader` (org page) or
 `/preview-loader?page=race`. Both keep every request pending.
 
+## Derbymarket
+
+The market is served on `market.tokenderby.co.uk` by host. Locally, add
+`?host=market` to any path to get market routing. `/preview-market` shows every
+market view with fixtures.
+
 ## Local dev
 
 ```bash

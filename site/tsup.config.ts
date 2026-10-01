@@ -14,6 +14,7 @@ export default defineConfig({
     'preview-league': 'src/preview-league.ts',
     'preview-toasts': 'src/preview-toasts.ts',
     'preview-loader': 'src/preview-loader.ts',
+    'preview-market': 'src/preview-market.ts',
   },
   format: ['esm'],
   target: 'es2022',
