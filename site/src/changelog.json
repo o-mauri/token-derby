@@ -1,5 +1,13 @@
 [
   {
+    "version": "0.17.0",
+    "date": "2026-09-29",
+    "component": "site",
+    "changes": [
+      "updated domain to tokenderby.co.uk"
+    ]
+  },
+  {
     "version": "0.16.1",
     "date": "2026-09-22",
     "component": "site",
