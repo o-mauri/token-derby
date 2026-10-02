@@ -18,6 +18,7 @@ import { claudeProjectsDir } from '../../../paths.js';
 import type { FileFold, ScanCache } from '../../scan-cache.js';
 import { readRoot } from '../../source-root.js';
 import { mapWithConcurrency, SCAN_CONCURRENCY } from '../../pool.js';
+import { logWarn } from '../../../log/logger.js';
 import { custom, type CustomReading, type Harness } from '../harness.js';
 
 // How deep to recurse below each project dir. Subagents and dynamic workflows
@@ -145,23 +146,35 @@ function sessionOf(file: string, root: string): string {
  *
  * Deleting the only copy of a request drops its hour's total; the tracker's
  * monotonic floor keeps what was already credited, so that can only under-count.
+ *
+ * One unreadable file is skipped and named rather than failing the whole tool.
+ * Its session is reported unreadable, but its requests would land in hour
+ * buckets once it reads again, so a file that recovers mid-race can credit
+ * whatever of it was never copied elsewhere — the same gap a recovering
+ * subagent file has under per-session grouping.
  */
 async function readAll(cache: ScanCache, files: string[], root: string): Promise<CustomReading> {
   const sorted = [...files].sort(); // deterministic winner for undated copies
   const states = await mapWithConcurrency(sorted, SCAN_CONCURRENCY, f =>
-    cache.readIncremental(f, CLAUDE_FOLD).catch((e: any) => {
+    cache.readIncremental(f, CLAUDE_FOLD).catch((err: any) => {
       // Deleted between discovery and read: SDK hosts prune sessions constantly.
-      // Its requests are either copied elsewhere or gone; neither is a stall.
-      if (e?.code === 'ENOENT') return null;
-      throw e;
+      // Its requests are either copied elsewhere or gone; neither is a failure.
+      if (err?.code === 'ENOENT') return null;
+      logWarn('scan.file.err', { harness: 'claude-code', file: f, message: err?.message ?? String(err) });
+      return { failed: true as const };
     }),
   );
 
   const byConversation: CustomReading['byConversation'] = new Map();
+  const unreadable = new Set<string>();
   const seen = new Set<string>();
   sorted.forEach((file, i) => {
     const state = states[i];
     if (!state) return;
+    if ('failed' in state) {
+      unreadable.add(sessionOf(file, root));
+      return;
+    }
     for (const r of state.responses) {
       if (r.id !== undefined) {
         if (seen.has(r.id)) continue;
@@ -174,7 +187,7 @@ async function readAll(cache: ScanCache, files: string[], root: string): Promise
       byConversation.set(conversation, { anthropic: totals });
     }
   });
-  return { byConversation };
+  return { byConversation, ...(unreadable.size > 0 ? { unreadable: [...unreadable] } : {}) };
 }
 
 /**
