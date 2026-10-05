@@ -52,3 +52,5 @@ export * from './lib/race/race-chart/race-chart';
 export * from './lib/dialog/dialog';
 export * from './lib/race/race-graphs/race-graphs';
 export * from './lib/dialog/dialog.service';
+export * from './lib/http/http';
+export * from './lib/http/poll-resource';
