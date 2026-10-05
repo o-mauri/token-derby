@@ -5,7 +5,7 @@ import { PREVIEW_JOIN_CODE, PREVIEW_SERIES, type PreviewRaceState, previewRace }
 
 const STATES: readonly PreviewRaceState[] = ['live', 'pending', 'finished'];
 
-/** Answers the race endpoints from fixtures. The path picks loading or not-found; ?state= picks the race state. */
+/** Answers the race endpoints from fixtures. The path picks loading or not-found; ?state= picks the race state and ?horses= the field size. */
 export const fixtureInterceptor: HttpInterceptorFn = (req, next) => {
   const location = inject(DOCUMENT).defaultView?.location;
   const base = `/api/races/${PREVIEW_JOIN_CODE}`;
@@ -18,8 +18,9 @@ export const fixtureInterceptor: HttpInterceptorFn = (req, next) => {
   }
   const asked = new URLSearchParams(location?.search ?? '').get('state') as PreviewRaceState | null;
   const state = asked && STATES.includes(asked) ? asked : 'live';
+  const field = Math.min(40, Math.max(6, Number(new URLSearchParams(location?.search ?? '').get('horses')) || 6));
   if (req.url === `${base}/series`) return of(new HttpResponse({ status: 200, body: PREVIEW_SERIES }));
-  if (req.url === base) return of(new HttpResponse({ status: 200, body: previewRace(state) }));
+  if (req.url === base) return of(new HttpResponse({ status: 200, body: previewRace(state, Date.now(), field) }));
   if (req.url.includes('/league/standings')) return of(new HttpResponse({ status: 200, body: { standings: null } }));
   return next(req);
 };

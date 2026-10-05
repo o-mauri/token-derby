@@ -32,6 +32,12 @@ describe('fixtureInterceptor', () => {
     expect(race.horses.every((h) => h.xp_awarded! > 0 && h.final_scored_tokens !== undefined)).toBe(true);
   });
 
+  it('pads the field to ?horses=, capped at 40', async () => {
+    expect((await getRace(http('/preview-race?horses=20'))).horses).toHaveLength(20);
+    TestBed.resetTestingModule();
+    expect((await getRace(http('/preview-race?horses=500'))).horses).toHaveLength(40);
+  });
+
   it('falls back to live for an unknown state', async () => {
     expect((await getRace(http('/preview-race?state=bogus'))).status).toBe('live');
   });

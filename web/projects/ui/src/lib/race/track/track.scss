@@ -13,3 +13,6 @@
 }
 
 :host::-webkit-scrollbar { display: none; }
+
+// Lanes scrolling up go under the crowd's edge rather than over it.
+:host(.scrolled) { clip-path: inset(var(--td-space-8) 0 0); }

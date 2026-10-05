@@ -48,4 +48,18 @@ describe('RaceTrack', () => {
     const lanes = [...(f.nativeElement as HTMLElement).querySelectorAll('.lane')];
     expect(lanes.map((l) => l.classList.contains('last'))).toEqual([false, false, true]);
   });
+
+  it('marks itself scrolled once it leaves the top, so lanes stop drawing over the crowd', async () => {
+    const f = await render([lane('a', 1)], {});
+    const host = f.nativeElement as HTMLElement;
+    expect(host.classList.contains('scrolled')).toBe(false);
+    host.scrollTop = 40;
+    host.dispatchEvent(new Event('scroll'));
+    await f.whenStable();
+    expect(host.classList.contains('scrolled')).toBe(true);
+    host.scrollTop = 0;
+    host.dispatchEvent(new Event('scroll'));
+    await f.whenStable();
+    expect(host.classList.contains('scrolled')).toBe(false);
+  });
 });

@@ -166,9 +166,25 @@ const EVENTS: Record<string, { at: number; name: 'Overtake!' | 'Stampede!' | 'To
 // XP awarded at the finish, as in the old finished preview: some level up, some don't.
 const AWARDED: Record<string, number> = { Stormbringer: 95, Pegasus: 79, Cloudrunner: 62, Thunderbolt: 35, Embers: 29, Misty: 26 };
 
-/** The preview race in the given state, as the API would return it at `now`. */
-export function previewRace(state: PreviewRaceState, now = Date.now()): GetRaceResponse {
-  const live = liveSnapshot(now);
+const FILLER_NAMES = ['Comet', 'Biscuit', 'Juniper', 'Rocket', 'Maple', 'Nimbus', 'Pepper', 'Quasar', 'Ripple', 'Saffron',
+  'Tango', 'Umber', 'Velvet', 'Willow', 'Xenon', 'Yarrow', 'Zephyr', 'Acorn', 'Bramble', 'Cinder', 'Dusk', 'Ember', 'Flint', 'Gale',
+  'Hazel', 'Indigo', 'Jasper', 'Kestrel', 'Lark', 'Moss', 'Nova', 'Onyx', 'Pippin', 'Quill'];
+const FILLER_COLORS = [COLORS_A, COLORS_B, COLORS_C, COLORS_D, COLORS_E, COLORS_F];
+const FILLER_HATS = ['cowboy_hat', 'sailor_hat', 'spartan_helmet', 'inferno_cap'] as const;
+
+// Extra runners for ?horses=N, trailing the six named ones so the field needs to scroll.
+function fillers(count: number): HorseView[] {
+  return Array.from({ length: count }, (_, i) => {
+    const hat = i % 3 === 0 ? { id: FILLER_HATS[i % FILLER_HATS.length], variant: 0, obtained_at: OBTAINED } as CollectedHat : undefined;
+    return horse(7 + i, FILLER_NAMES[i % FILLER_NAMES.length] + (i >= FILLER_NAMES.length ? ` ${i}` : ''), `Rider ${i + 1}`,
+      Math.round(3200 - i * 2900 / Math.max(count, 1)), 60 + i * 37, FILLER_COLORS[i % FILLER_COLORS.length], hat, 30 + (i * 17) % 70);
+  });
+}
+
+/** The preview race in the given state, as the API would return it at `now`, padded to `field` horses. */
+export function previewRace(state: PreviewRaceState, now = Date.now(), field = 6): GetRaceResponse {
+  const base = liveSnapshot(now);
+  const live = { ...base, horses: [...base.horses, ...fillers(Math.max(0, field - base.horses.length))] };
   if (state === 'live') {
     return { ...live, horses: live.horses.map((h) => ({ ...h, recent_events: EVENTS[h.horse_id] ?? [] }) as HorseView) };
   }
