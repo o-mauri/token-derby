@@ -1,4 +1,5 @@
 import type { CanMatchFn, Routes } from '@angular/router';
+import { previewRoutes } from './preview/preview.routes';
 
 const RACE_CODE = /^[A-Za-z0-9]+$/;
 
@@ -8,5 +9,6 @@ export const raceCodeGuard: CanMatchFn = (_route, segments) => RACE_CODE.test(se
 export const routes: Routes = [
   { path: '', pathMatch: 'full', loadComponent: () => import('./home/home.page').then((m) => m.HomePage) },
   { path: 'race/:code', canMatch: [raceCodeGuard], loadComponent: () => import('./race/race.page').then((m) => m.RacePage) },
+  ...previewRoutes,
   { path: '**', loadComponent: () => import('./not-found/not-found.page').then((m) => m.NotFoundPage) },
 ];

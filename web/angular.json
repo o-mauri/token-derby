@@ -107,7 +107,13 @@
                   "maximumError": "8kB"
                 }
               ],
-              "outputHashing": "all"
+              "outputHashing": "all",
+              "fileReplacements": [
+                {
+                  "replace": "projects/site/src/app/preview/preview.routes.ts",
+                  "with": "projects/site/src/app/preview/preview.routes.prod.ts"
+                }
+              ]
             },
             "development": {
               "optimization": false,
