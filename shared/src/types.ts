@@ -408,6 +408,9 @@ export type StandingRow = {
   points: number;
   season_tokens: number;
   zone: 'promote' | 'relegate' | null;
+  // The stable horse's look, for sprites; absent if the horse can't be found.
+  colors?: HorseColors;
+  hat?: CollectedHat;
 };
 export type DivisionStandings = { division: number; name: string; rows: StandingRow[] };
 export type SeasonStandings = {

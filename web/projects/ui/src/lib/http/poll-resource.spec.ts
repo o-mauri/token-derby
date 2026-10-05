@@ -100,4 +100,27 @@ describe('pollResource', () => {
     await vi.advanceTimersByTimeAsync(5000); await flush();
     expect(f.componentInstance.calls.length).toBe(1);
   });
+
+  it('can pick each wait from the latest value', async () => {
+    @Component({ template: '' })
+    class Paced {
+      calls = 0;
+      poll = pollResource({
+        params: () => 'X',
+        loader: () => Promise.resolve(++this.calls),
+        // Quick while the count is low, slow after.
+        intervalMs: (n: number | undefined) => ((n ?? 0) < 2 ? 1000 : 10_000),
+      });
+    }
+    const f = TestBed.createComponent(Paced);
+    f.detectChanges();
+    await vi.advanceTimersByTimeAsync(0); await flush();
+    expect(f.componentInstance.calls).toBe(1);
+    await vi.advanceTimersByTimeAsync(1000); await flush();
+    expect(f.componentInstance.calls).toBe(2);
+    await vi.advanceTimersByTimeAsync(9999); await flush();
+    expect(f.componentInstance.calls).toBe(2);
+    await vi.advanceTimersByTimeAsync(1); await flush();
+    expect(f.componentInstance.calls).toBe(3);
+  });
 });

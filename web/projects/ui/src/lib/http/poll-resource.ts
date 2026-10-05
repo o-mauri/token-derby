@@ -6,7 +6,8 @@ export type PollOptions<P, T> = {
   // Reactive params; the poll restarts when they change, and pauses while they are null.
   params: () => P | null;
   loader: (params: P) => Promise<T>;
-  intervalMs: number;
+  // A fixed wait, or one chosen from the latest value (undefined before the first success).
+  intervalMs: number | ((value: T | undefined) => number);
   // Stop polling once a value says so (a finished race).
   until?: (value: T) => boolean;
 };
@@ -26,6 +27,7 @@ export function pollResource<P, T>(opts: PollOptions<P, T>): PollResource<T> {
   const status = signal<PollStatus>('idle');
   let generation = 0;
   let timer: ReturnType<typeof setTimeout> | undefined;
+  const wait = () => (typeof opts.intervalMs === 'number' ? opts.intervalMs : opts.intervalMs(untracked(value)));
 
   const stop = () => {
     generation++;
@@ -40,13 +42,13 @@ export function pollResource<P, T>(opts: PollOptions<P, T>): PollResource<T> {
         value.set(v);
         error.set(undefined);
         status.set('resolved');
-        if (!opts.until?.(v)) timer = setTimeout(() => run(params, gen), opts.intervalMs);
+        if (!opts.until?.(v)) timer = setTimeout(() => run(params, gen), wait());
       },
       (e: unknown) => {
         if (gen !== generation) return;
         error.set(e);
         status.set('error');
-        timer = setTimeout(() => run(params, gen), opts.intervalMs);
+        timer = setTimeout(() => run(params, gen), wait());
       },
     );
   };
