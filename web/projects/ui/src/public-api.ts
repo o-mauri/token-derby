@@ -25,6 +25,8 @@ export * from './lib/race/models';
 export * from './lib/race/logic/progress';
 export * from './lib/race/logic/stamina';
 export * from './lib/race/logic/league';
+export * from './lib/race/division-results/division-results';
+export * from './lib/race/season-standings/season-standings';
 export * from './lib/race/stamina-bar/stamina-bar';
 export * from './lib/race/lane/lane';
 export * from './lib/race/track/track';

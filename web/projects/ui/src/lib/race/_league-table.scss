@@ -1,0 +1,44 @@
+// Shared by the Divisions and Season tabs: a titled column of compact result rows.
+.title-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding-bottom: var(--td-space-2);
+  margin-bottom: var(--td-space-2);
+  border-bottom: var(--td-line-thin) solid var(--td-border);
+}
+
+.title {
+  font-family: 'Bitcount Prop Single', var(--td-font-pixel);
+  font-size: var(--td-text-md);
+  letter-spacing: var(--td-tracking-wide);
+  text-transform: uppercase;
+  color: var(--td-highlight);
+}
+
+.count { color: var(--td-text-muted); font-size: var(--td-text-sm); }
+
+.row {
+  display: grid;
+  align-items: center;
+  gap: var(--td-space-3);
+  padding: var(--td-space-2) 0;
+  border-bottom: var(--td-line-thin) solid var(--td-border);
+}
+
+.sprite { width: min(2.2rem, 100%); aspect-ratio: 35 / 30; }
+.who { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.name { font-weight: bold; }
+.owner { color: var(--td-text-muted); font-size: var(--td-text-sm); }
+
+.led {
+  font-family: 'Bitcount Prop Single', var(--td-font-pixel);
+  color: var(--td-highlight);
+  text-shadow: 0 0 6px color-mix(in srgb, var(--td-highlight) 45%, transparent);
+}
+
+.plus { color: var(--td-level-up); font-size: var(--td-text-sm); white-space: nowrap; }
+
+.gold { color: var(--td-medal-gold); }
+.silver { color: var(--td-medal-silver); }
+.bronze { color: var(--td-medal-bronze); }

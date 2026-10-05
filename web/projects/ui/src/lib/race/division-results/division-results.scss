@@ -1,0 +1,8 @@
+@use '../league-table';
+
+:host { display: block; padding: var(--td-space-4) var(--td-space-6); }
+.row { grid-template-columns: 1.4rem 2.2rem minmax(0, 1fr) auto auto; }
+.place { font-size: var(--td-text-lg); color: var(--td-text-muted); }
+.place.gold { color: var(--td-medal-gold); }
+.place.silver { color: var(--td-medal-silver); }
+.place.bronze { color: var(--td-medal-bronze); }
