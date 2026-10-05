@@ -61,3 +61,4 @@ export * from './lib/http/http';
 export * from './lib/http/poll-resource';
 export * from './lib/format/compact-tokens';
 export * from './lib/horse-head/horse-head';
+export * from './lib/panel/panel';

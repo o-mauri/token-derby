@@ -1,0 +1,52 @@
+:host { display: block; min-width: 0; min-height: 0; container-type: inline-size; }
+
+.frame {
+  display: flex;
+  height: 100%;
+  box-sizing: border-box;
+  background: var(--td-surface-raised);
+  color: inherit;
+  text-decoration: none;
+  border: var(--td-line) solid var(--td-border);
+  border-radius: var(--td-radius);
+  overflow: hidden;
+}
+
+a.frame { cursor: pointer; }
+a.frame:hover, a.frame:focus-visible { border-color: var(--td-highlight); }
+a.frame:focus-visible { outline: var(--td-focus-width) solid var(--td-highlight); outline-offset: var(--td-focus-offset); }
+
+// Reads bottom-up, sized to dominate the panel's edge.
+.spine {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  flex: none;
+  display: grid;
+  place-items: center;
+  padding: 0 var(--td-space-4);
+  border-left: var(--td-line) solid var(--td-border);
+  font-family: 'Bitcount Prop Single', var(--td-font-pixel);
+  font-size: calc(var(--td-text-xl) * 1.8);
+  letter-spacing: var(--td-tracking-wide);
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.body { flex: 1; min-width: 0; min-height: 0; padding: var(--td-space-4) var(--td-space-5); }
+
+:host(.disabled) .frame { opacity: 0.45; }
+
+// Phones: the spine turns into a heading above the content.
+@container (width < 700px) {
+  .frame { flex-direction: column; }
+  .spine {
+    writing-mode: horizontal-tb;
+    transform: none;
+    place-items: start;
+    padding: var(--td-space-3) var(--td-space-5);
+    border-left: 0;
+    border-bottom: var(--td-line) solid var(--td-border);
+    font-size: var(--td-text-xl);
+  }
+}
