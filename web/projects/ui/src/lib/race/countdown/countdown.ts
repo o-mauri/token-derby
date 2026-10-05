@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, InjectionToken, computed, inject, input, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, InjectionToken, computed, effect, inject, input, linkedSignal, output, signal, untracked } from '@angular/core';
 import { type CountdownAnchor, formatDuration, predictTimeLeftSeconds } from '../logic/time';
 
 /** The current time in ms; a token so tests can move the clock. */
@@ -21,6 +21,8 @@ const BLANK = '--:--:--';
 })
 export class Countdown {
   readonly anchor = input.required<CountdownAnchor | null>();
+  // Fires once per anchor, when the time left reaches zero.
+  readonly done = output<void>();
 
   private readonly now = inject(NOW);
   private readonly tick = signal(this.now());
@@ -31,8 +33,19 @@ export class Countdown {
   });
   protected readonly chars = computed(() => [...this.text()]);
   protected readonly label = computed(() => (this.anchor() ? `${this.text()} left` : 'Time left unknown'));
+  private readonly secondsLeft = computed(() => {
+    const anchor = this.anchor();
+    this.tick();
+    return anchor ? predictTimeLeftSeconds(anchor, this.now()) : null;
+  });
+  private readonly announced = linkedSignal({ source: this.anchor, computation: () => false });
 
   constructor() {
+    effect(() => {
+      if (this.secondsLeft() !== 0 || untracked(this.announced)) return;
+      this.announced.set(true);
+      this.done.emit();
+    });
     const id = setInterval(() => this.tick.set(this.now()), TICK_MS);
     inject(DestroyRef).onDestroy(() => clearInterval(id));
   }

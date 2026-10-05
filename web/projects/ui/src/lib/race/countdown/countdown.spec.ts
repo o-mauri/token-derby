@@ -61,4 +61,17 @@ describe('Countdown', () => {
     f.destroy();
     expect(vi.getTimerCount()).toBe(0);
   });
+
+  it('emits done once when it reaches zero', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    const f = await render(2);
+    let done = 0;
+    f.componentInstance.done.subscribe(() => done++);
+    now += 1000; vi.advanceTimersByTime(1000); f.detectChanges();
+    expect(done).toBe(0);
+    now += 1000; vi.advanceTimersByTime(1000); f.detectChanges();
+    now += 1000; vi.advanceTimersByTime(1000); f.detectChanges();
+    expect(done).toBe(1);
+  });
 });
+
