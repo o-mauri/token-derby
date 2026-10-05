@@ -11,3 +11,5 @@ export default meta;
 
 export const Default: StoryObj = { render: () => ({ template: `<button td-button>Join race</button>` }) };
 export const AsLink: StoryObj = { render: () => ({ template: `<a td-button routerLink="/">← Home</a>` }) };
+/** Faded and inert, e.g. the division arrows at either end. */
+export const Disabled: StoryObj = { render: () => ({ template: `<button td-button disabled>Join race</button> <button td-button size="sm" disabled>‹</button>` }) };

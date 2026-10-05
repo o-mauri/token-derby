@@ -9,7 +9,8 @@ export class ColumnTemplate {
   readonly template = inject(TemplateRef);
 }
 
-/** Columns side by side, at most `max` at once; arrows step through the rest, wrapping. Narrow widths stack them all. */
+/** Columns side by side in order, at most `max` at once; arrows step through the rest, stopping at each end.
+ *  Narrow widths stack them all. */
 @Component({
   selector: 'td-column-window',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -17,17 +18,17 @@ export class ColumnTemplate {
   template: `
     <div class="frame" [class.paged]="paged()">
       @if (paged()) {
-        <button td-button size="sm" type="button" class="prev" [attr.aria-label]="'Show earlier ' + label()" (click)="step(-1)">‹</button>
+        <button td-button size="sm" type="button" class="prev" [attr.aria-label]="'Show earlier ' + label()" [disabled]="at() === 0" (click)="step(-1)">‹</button>
       }
       <div class="cols" [style.--cols]="paged() ? max() : columns().length">
         @for (c of columns(); track $index) {
-          <div class="column" [class.out]="slot($index) === null" [style.--slot]="slot($index)">
+          <div class="column" [class.out]="!inView($index)">
             <ng-container [ngTemplateOutlet]="c.template" />
           </div>
         }
       </div>
       @if (paged()) {
-        <button td-button size="sm" type="button" class="next" [attr.aria-label]="'Show later ' + label()" (click)="step(1)">›</button>
+        <button td-button size="sm" type="button" class="next" [attr.aria-label]="'Show later ' + label()" [disabled]="at() === last()" (click)="step(1)">›</button>
         <p class="caption">{{ caption() }}</p>
       }
     </div>
@@ -42,26 +43,22 @@ export class ColumnWindow {
   protected readonly columns = contentChildren(ColumnTemplate);
   private readonly start = signal(0);
   protected readonly paged = computed(() => this.columns().length > this.max());
-  // Kept in range if the column count shrinks while the window is moved along.
-  private readonly at = computed(() => this.start() % Math.max(this.columns().length, 1));
+  // The furthest the window can move; it's kept in range if the column count shrinks.
+  protected readonly last = computed(() => Math.max(0, this.columns().length - this.max()));
+  protected readonly at = computed(() => Math.min(this.start(), this.last()));
 
   protected readonly caption = computed(() => {
     const cols = this.columns();
     const first = cols[this.at()]!.header();
-    const last = cols[(this.at() + this.max() - 1) % cols.length]!.header();
-    return `${first} – ${last} · ${cols.length} ${this.label()}`.trimEnd();
+    const end = cols[Math.min(this.at() + this.max(), cols.length) - 1]!.header();
+    return `${first} – ${end} · ${cols.length} ${this.label()}`.trimEnd();
   });
 
-  /** Where column `i` sits in the window, or null when it's out of view. */
-  protected slot(i: number): number | null {
-    const n = this.columns().length;
-    if (!this.paged()) return i;
-    const offset = (i - this.at() + n) % n;
-    return offset < this.max() ? offset : null;
+  protected inView(i: number): boolean {
+    return !this.paged() || (i >= this.at() && i < this.at() + this.max());
   }
 
   protected step(by: number): void {
-    const n = this.columns().length;
-    this.start.set((this.at() + by + n) % n);
+    this.start.set(Math.min(Math.max(this.at() + by, 0), this.last()));
   }
 }

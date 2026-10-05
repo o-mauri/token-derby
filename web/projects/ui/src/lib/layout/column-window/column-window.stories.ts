@@ -25,6 +25,6 @@ const meta: Meta<Args> = {
 };
 export default meta;
 
-/** Up to three side by side; arrows step one at a time and wrap. On a phone every column stacks. */
+/** Up to three side by side, top division on the left; arrows step one at a time and stop at each end. On a phone every column stacks. */
 export const FiveColumns: StoryObj<Args> = {};
 export const FitsWithoutArrows: StoryObj<Args> = { args: { count: 2 } };

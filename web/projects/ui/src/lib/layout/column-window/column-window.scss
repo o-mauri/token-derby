@@ -5,8 +5,6 @@
 
 .cols { display: grid; grid-template-columns: repeat(var(--cols), minmax(0, 1fr)); gap: var(--td-space-6); align-self: start; }
 .out { display: none; }
-// The window's order applies only side by side, so stacked columns keep their natural order.
-.column { order: var(--slot); }
 
 .caption {
   grid-column: 1 / -1;
@@ -22,6 +20,5 @@
   .frame.paged { grid-template-columns: 1fr; }
   .cols { grid-template-columns: 1fr; }
   .out { display: block; }
-  .column { order: 0; }
   .prev, .next, .caption { display: none; }
 }
