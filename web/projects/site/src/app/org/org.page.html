@@ -19,7 +19,7 @@
         @if (data.racesFailed()) { <p class="failed">Couldn't load races. Try again later.</p> }
         @else { <td-org-live-panel [view]="live()" /> }
       </td-panel>
-      <td-panel class="league" spine="LEAGUE" [disabled]="data.standingsLoaded() && !league()">
+      <td-panel class="league" spine="LEAGUE" [disabled]="data.standingsLoaded() && !league()" [link]="league() ? ['league'] : null">
         @if (data.standingsFailed()) { <p class="failed">Couldn't load the league. Try again later.</p> }
         @else if (data.standingsLoaded()) { <td-org-league-panel [view]="league()" /> }
       </td-panel>

@@ -20,6 +20,7 @@ export const routes: Routes = [
     children: [
       { path: '', loadComponent: () => import('./org/org.page').then((m) => m.OrgPage) },
       { path: 'races', loadComponent: () => import('./org/races.page').then((m) => m.RacesPage) },
+      { path: 'league', loadComponent: () => import('./org/league.page').then((m) => m.LeaguePage) },
     ],
   },
   ...previewRoutes,

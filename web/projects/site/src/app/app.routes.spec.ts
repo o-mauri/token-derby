@@ -37,6 +37,8 @@ describe('site routes', () => {
     expect((await go('/org/Acme')).querySelector('[data-page]')?.getAttribute('data-page')).toBe('org');
     TestBed.resetTestingModule();
     expect((await go('/org/Acme/races')).querySelector('[data-page]')?.getAttribute('data-page')).toBe('org-races');
+    TestBed.resetTestingModule();
+    expect((await go('/org/Acme/league')).querySelector('[data-page]')?.getAttribute('data-page')).toBe('org-league');
   });
 
   it.each(['/org/bad-name!', '/org/WayTooLongOrgName', '/org/Acme/nope'])('renders not-found for %s', async (url) => {

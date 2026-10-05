@@ -3,7 +3,7 @@ import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter, withComponentInputBinding } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
-import type { ListOrgRacesResponse, RaceSummary } from '@token-derby/shared';
+import type { ListOrgRacesResponse, RaceSummary, SeasonStandings } from '@token-derby/shared';
 import { RESIZE_OBSERVER, apiErrors } from '@token-derby/ui';
 import { By } from '@angular/platform-browser';
 import { routes } from '../app.routes';
@@ -157,3 +157,83 @@ describe('RacesPage', () => {
     expect(el().querySelector('.empty')?.textContent).toContain('No races yet');
   });
 });
+
+describe('LeaguePage', () => {
+  const row = (rank: number, name: string, points: number) => ({ rank, stable_horse_id: `s-${name}`, horse_name: name, user_name: 'o', points, season_tokens: 0, zone: null });
+  const season = (n: number): SeasonStandings => ({
+    org_name: 'Acme', season: n, round: n === 3 ? 6 : 10, races_per_season: 10,
+    divisions: ['Premier', 'Championship', 'League One'].map((name, i) => ({ division: i + 1, name, rows: [row(1, `${name}-lead-${n}`, 40), row(2, `${name}-two-${n}`, 30)] })),
+  });
+
+  /** Answers the shared org requests: races, and the current season's standings (or no league). */
+  function answerOrg(http: HttpTestingController, current: SeasonStandings | null = season(3)) {
+    http.expectOne('/api/organisations/Acme/races').flush(RACES);
+    http.expectOne('/api/organisations/Acme/league/standings').flush({ standings: current });
+  }
+
+  it('shows the current season: progress and a column per division', async () => {
+    const { el, http, settle } = await open('/org/Acme/league');
+    expect(el().querySelector('td-loader')).not.toBeNull();
+    answerOrg(http);
+    await settle();
+    expect(el().querySelector('[data-page]')?.getAttribute('data-page') ?? el().getAttribute('data-page')).toBe('org-league');
+    expect(el().querySelector('td-season-pager .label')?.textContent?.trim()).toBe('SEASON 3');
+    expect(el().querySelector('td-season-pager .progress')?.textContent).toContain('Round 6 of 10');
+    expect(el().querySelectorAll('td-league-table')).toHaveLength(3);
+  });
+
+  it('fetches a past season named in the query string and shows it final, with its champion', async () => {
+    const { el, http, settle } = await open('/org/Acme/league?season=2');
+    answerOrg(http);
+    await settle();
+    http.expectOne('/api/organisations/Acme/league/standings?season=2').flush({ standings: season(2) });
+    await settle();
+    expect(el().querySelector('td-season-pager .final')).not.toBeNull();
+    expect(el().querySelector('td-season-pager .champion')?.textContent).toContain('Premier-lead-2');
+  });
+
+  it('shows the current season for a season it does not have, without asking for it', async () => {
+    const { el, http, settle } = await open('/org/Acme/league?season=abc');
+    answerOrg(http);
+    await settle();
+    http.expectNone((r) => r.url.includes('season='));
+    expect(el().querySelector('td-season-pager .label')?.textContent?.trim()).toBe('SEASON 3');
+  });
+
+  it('says so when the org runs no league, and never asks for an old season', async () => {
+    const { el, http, settle } = await open('/org/Acme/league?season=2');
+    answerOrg(http, null);
+    await settle();
+    http.expectNone((r) => r.url.includes('season='));
+    expect(el().querySelector('.message')?.textContent).toContain("Acme doesn't run a league.");
+    expect(el().querySelector('.message a')?.getAttribute('href')).toBe('/org/Acme');
+  });
+
+  it('keeps the season switcher when an old season fails to load', async () => {
+    const { el, http, settle } = await open('/org/Acme/league?season=2');
+    answerOrg(http);
+    await settle();
+    http.expectOne('/api/organisations/Acme/league/standings?season=2').flush({ code: 'INTERNAL', message: 'x' }, { status: 500, statusText: 'Error' });
+    await settle();
+    expect(el().querySelector('.message')?.textContent).toContain("Couldn't load the league");
+    expect(el().querySelector('td-season-pager')).not.toBeNull();
+  });
+
+  it('shows not-found for an unknown org', async () => {
+    const { el, http, settle } = await open('/org/Acme/league');
+    http.expectOne('/api/organisations/Acme/races').flush({ code: 'ORG_NOT_FOUND', message: 'x' }, { status: 404, statusText: 'Not Found' });
+    http.match('/api/organisations/Acme/league/standings').forEach((r) => r.flush({ standings: null }));
+    await settle();
+    expect(el().querySelector('td-not-found h2')?.textContent).toBe('Organisation not found');
+  });
+
+  it('is linked from the dashboard\u2019s LEAGUE panel', async () => {
+    const { el, http, settle } = await open('/org/Acme');
+    answerOrg(http);
+    await settle();
+    http.match('/api/races/K7QX').forEach((r) => r.flush({ join_code: 'K7QX', status: 'live', time_left_seconds: 3600, horses: [] }));
+    await settle();
+    expect(el().querySelector('td-panel.league a')?.getAttribute('href')).toBe('/org/Acme/league');
+  });
+});
+

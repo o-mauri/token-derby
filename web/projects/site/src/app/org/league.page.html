@@ -1,0 +1,41 @@
+@if (data.notFound()) {
+  <td-page>
+    <td-not-found title="Organisation not found" [message]="notFoundMessage()" backLabel="← Home" (back)="router.navigate(['/'])" />
+  </td-page>
+} @else {
+  <header class="top">
+    <span class="org">
+      <td-horse-face class="face" />
+      <span class="org-name">{{ orgName() }}</span><span class="sep">/</span><span class="crumb">LEAGUE</span>
+    </span>
+    <span class="actions">
+      <td-theme-picker compact />
+      <a td-button size="sm" class="back" routerLink="..">← {{ orgName() || 'Org' }}</a>
+      <a td-button size="sm" routerLink="/">← Home</a>
+    </span>
+  </header>
+
+  @if (noLeague()) {
+    <p class="message">{{ orgName() }} doesn't run a league. <a routerLink="..">Back to {{ orgName() }}</a></p>
+  } @else if (pagerView(); as p) {
+    <main class="body">
+      @if (view(); as v) {
+        <td-season-pager [label]="v.label" [progress]="v.progress" [champion]="v.champion" [prev]="v.prev" [next]="v.next" />
+        <td-column-window label="divisions">
+          @for (d of v.divisions; track d.name) {
+            <ng-template tdColumn [header]="d.name"><td-league-table [division]="d" /></ng-template>
+          }
+        </td-column-window>
+        <p class="legend"><span class="key promote">Promotion</span><span class="key relegate">Relegation</span></p>
+      } @else {
+        <td-season-pager [label]="p.label" [prev]="p.prev" [next]="p.next" />
+        @if (failed()) { <p class="message">Couldn't load the league. Try again later.</p> }
+        @else { <div class="loading"><td-loader /></div> }
+      }
+    </main>
+  } @else if (data.standingsFailed()) {
+    <p class="message">Couldn't load the league. Try again later.</p>
+  } @else {
+    <div class="loading"><td-loader /></div>
+  }
+}

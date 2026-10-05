@@ -3,7 +3,8 @@ import type { CollectedHat, GetRaceResponse, HorseColors, HorseView, ListOrgRace
 import { PREVIEW_JOIN_CODE, previewRace } from './race-fixture';
 
 export const PREVIEW_ORG = 'Stackone';
-export type OrgPreviewOptions = { state: 'live' | 'next' | 'none'; league: boolean; long: boolean };
+export type OrgPreviewOptions = { state: 'live' | 'next' | 'none'; league: boolean; long: boolean; divisions?: number };
+export const PREVIEW_SEASON = 3;
 
 const COLORS: HorseColors[] = [
   { body: '#8B4513', mane: '#000000', tail: '#000000', saddle: '#C0392B' },
@@ -88,21 +89,31 @@ export function previewLiveRace(opts: OrgPreviewOptions): GetRaceResponse {
   };
 }
 
-export function previewOrgStandings(opts: OrgPreviewOptions): SeasonStandings | null {
-  if (!opts.league) return null;
-  const division = (d: number, name: string, size: number) => ({
-    division: d, name,
-    rows: Array.from({ length: size }, (_, r) => {
-      const i = d * 4 + r;
-      const { colors, hat } = look(i);
-      return {
-        rank: r + 1, stable_horse_id: `s${i}`, horse_name: nameOf(i % STABLE.length, opts.long && d === 1), user_name: OWNERS[i % OWNERS.length]!,
-        points: 44 - r * 4 - d * 3, season_tokens: 90_000_000 - r * 6_000_000, zone: null, colors, ...(hat ? { hat } : {}),
-      };
-    }),
-  });
+const DIVISION_NAMES = ['Premier', 'Championship', 'League One', 'League Two', 'National'];
+const DIVISION_SIZES = [9, 7, 6, 5, 4];
+
+/** A season's standings: the current one (3) is in round 6 with three divisions (or ?divisions=N); earlier ones are
+ *  finished, with two divisions, and a reshuffled order so they look different. */
+export function previewOrgStandings(opts: OrgPreviewOptions, season = PREVIEW_SEASON): SeasonStandings | null {
+  if (!opts.league || season < 1 || season > PREVIEW_SEASON) return null;
+  const count = season === PREVIEW_SEASON ? Math.min(5, Math.max(1, opts.divisions ?? 3)) : 2;
+  const division = (d: number) => {
+    const size = DIVISION_SIZES[d]!;
+    return {
+      division: d + 1, name: DIVISION_NAMES[d]!,
+      rows: Array.from({ length: size }, (_, r) => {
+        const i = d * 4 + ((r + season * 3) % size);
+        const { colors, hat } = look(i);
+        const zone = d > 0 && r < 2 ? ('promote' as const) : d < count - 1 && r >= size - 2 ? ('relegate' as const) : null;
+        return {
+          rank: r + 1, stable_horse_id: `s${i}`, horse_name: nameOf(i % STABLE.length, opts.long && d === 0), user_name: OWNERS[i % OWNERS.length]!,
+          points: 44 - r * 4 - d * 3, season_tokens: 90_000_000 - r * 6_000_000, zone, colors, ...(hat ? { hat } : {}),
+        };
+      }),
+    };
+  };
   return {
-    org_name: PREVIEW_ORG, season: 3, round: 6, races_per_season: 10,
-    divisions: [division(0, 'Premier', 9), division(1, 'Championship', 7), division(2, 'League One', 5)].map((d, i) => ({ ...d, division: i + 1 })),
+    org_name: PREVIEW_ORG, season, round: season === PREVIEW_SEASON ? 6 : 10, races_per_season: 10,
+    divisions: Array.from({ length: count }, (_, d) => division(d)),
   };
 }
