@@ -28,9 +28,11 @@ export class Finished {
   readonly results = input.required<readonly FinishView[]>();
   readonly perPage = input(8);
   readonly interval = input(10_000);
+  // League races call it "Overall", beside the per-division tabs.
+  readonly boardLabel = input('Board');
 
   protected readonly extra = contentChildren(TimedTab);
   private readonly sorted = computed(() => [...this.results()].sort((a, b) => a.position - b.position));
   protected readonly top = computed(() => this.sorted().filter((h) => h.position <= 3));
-  protected readonly pages = computed(() => boardPages(this.sorted().filter((h) => h.position > 3), this.perPage()));
+  protected readonly pages = computed(() => boardPages(this.sorted().filter((h) => h.position > 3), this.perPage(), this.boardLabel()));
 }

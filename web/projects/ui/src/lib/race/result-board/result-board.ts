@@ -6,13 +6,13 @@ import type { FinishView } from '../models';
 export type BoardPage = { readonly label: string; readonly rows: readonly FinishView[] };
 
 /** Split the field below the podium into pages, labelled by the places they cover. */
-export function boardPages(rows: readonly FinishView[], perPage: number): BoardPage[] {
+export function boardPages(rows: readonly FinishView[], perPage: number, label = 'Board'): BoardPage[] {
   const pages: BoardPage[] = [];
   for (let i = 0; i < rows.length; i += perPage) {
     const slice = rows.slice(i, i + perPage);
-    pages.push({ label: `Board ${slice[0]!.position}–${slice.at(-1)!.position}`, rows: slice });
+    pages.push({ label: `${label} ${slice[0]!.position}–${slice.at(-1)!.position}`, rows: slice });
   }
-  if (pages.length === 1) return [{ label: 'Board', rows: pages[0]!.rows }];
+  if (pages.length === 1) return [{ label, rows: pages[0]!.rows }];
   return pages;
 }
 

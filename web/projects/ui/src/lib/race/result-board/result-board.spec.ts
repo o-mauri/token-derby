@@ -14,6 +14,12 @@ describe('boardPages', () => {
     expect(boardPages([finish(4, 'A', 1), finish(5, 'B', 1)], 8).map((p) => p.label)).toEqual(['Board']);
     expect(boardPages([], 8)).toEqual([]);
   });
+
+  it('uses the given label, as league races call the board "Overall"', () => {
+    const rows = Array.from({ length: 10 }, (_, i) => finish(i + 4, `H${i}`, 1));
+    expect(boardPages(rows, 8, 'Overall').map((p) => p.label)).toEqual(['Overall 4–11', 'Overall 12–13']);
+    expect(boardPages(rows.slice(0, 2), 8, 'Overall').map((p) => p.label)).toEqual(['Overall']);
+  });
 });
 
 describe('ResultBoard', () => {
