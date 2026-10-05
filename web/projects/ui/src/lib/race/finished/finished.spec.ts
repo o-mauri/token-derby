@@ -8,7 +8,7 @@ const FIELD = Array.from({ length: 19 }, (_, i) => finish(i + 1, `H${i + 1}`, 50
 
 @Component({
   imports: [Finished, TimedTab],
-  template: `<td-finished raceName="Preview Derby" [results]="results" [perPage]="8">
+  template: `<td-finished [results]="results" [perPage]="8">
     <ng-template tdTab label="Cumulative tokens"><p class="chart">chart</p></ng-template>
   </td-finished>`,
 })
@@ -16,16 +16,16 @@ class Host { results = FIELD; }
 
 @Component({
   imports: [Finished],
-  template: `<td-finished raceName="League" [results]="results" boardLabel="Overall" />`,
+  template: `<td-finished [results]="results" boardLabel="Overall" />`,
 })
 class LeagueHost { results = FIELD; }
 
 describe('Finished', () => {
-  it('titles the screen with the race and the size of the field', async () => {
+  it('titles the screen RESULT (the header names the race) with the size of the field', async () => {
     const f = TestBed.createComponent(Host);
     await f.whenStable();
     const el = f.nativeElement as HTMLElement;
-    expect(el.querySelector('.title .race')?.textContent).toBe('RESULT · Preview Derby');
+    expect(el.querySelector('.title .race')?.textContent).toBe('RESULT');
     expect(el.querySelector('.title .field')?.textContent).toBe('FINAL · 19 RUNNERS');
   });
 

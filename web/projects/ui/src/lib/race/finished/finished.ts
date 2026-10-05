@@ -13,7 +13,7 @@ import type { FinishView } from '../models';
   imports: [TimedTabs, TimedTab, Confetti, Podium, ResultBoard],
   template: `
     <td-confetti />
-    <header class="title"><span class="race">RESULT · {{ raceName() }}</span><span class="field">FINAL · {{ results().length }} RUNNERS</span></header>
+    <header class="title"><span class="race">RESULT</span><span class="field">FINAL · {{ results().length }} RUNNERS</span></header>
     <td-podium [top]="top()" />
     <td-timed-tabs class="tabs" [interval]="interval()" [extraTabs]="extra()">
       @for (page of pages(); track page.label) {
@@ -24,7 +24,6 @@ import type { FinishView } from '../models';
   styleUrl: './finished.scss',
 })
 export class Finished {
-  readonly raceName = input.required<string>();
   readonly results = input.required<readonly FinishView[]>();
   readonly perPage = input(8);
   readonly interval = input(10_000);

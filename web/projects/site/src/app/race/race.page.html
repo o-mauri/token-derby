@@ -12,7 +12,7 @@
   @if (!r) {
     <div class="loading"><td-loader /></div>
   } @else if (r.status === 'finished') {
-    <td-finished class="finished" [raceName]="r.name" [results]="results()" [boardLabel]="divisions() ? 'Overall' : 'Board'">
+    <td-finished class="finished" [results]="results()" [boardLabel]="divisions() ? 'Overall' : 'Board'">
       @if (divisions(); as d) {
         <ng-template tdTab label="Divisions"><td-division-results [results]="d" /></ng-template>
       }

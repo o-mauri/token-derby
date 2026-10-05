@@ -13,9 +13,9 @@
 .field { color: var(--td-text-muted); font-size: var(--td-text-sm); white-space: nowrap; }
 .tabs { flex: 1; }
 
-// Phones: the race name gets its own line instead of being cut to "RESULT · Pr…".
+// Phones: the runner count drops under the title.
 @container (max-width: 640px) {
   .title { flex-direction: column; align-items: flex-start; gap: var(--td-space-1); padding: var(--td-space-4) var(--td-space-5) var(--td-space-3); }
-  .race { font-size: var(--td-text-lg); white-space: normal; overflow-wrap: anywhere; }
+  .race { font-size: var(--td-text-lg); }
   .field { font-size: var(--td-text-xs); }
 }
