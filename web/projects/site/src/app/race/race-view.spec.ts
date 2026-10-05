@@ -116,6 +116,10 @@ describe('leagueResults', () => {
     expect(out[0]!.rows.map((x) => [x.id, x.points])).toEqual([['b', 20], ['a', 15]]);
   });
 
+  it('is null when no runner has a division, so no empty tab appears', () => {
+    expect(leagueResults(race([horse('a'), horse('b')], LEAGUE))).toBeNull();
+  });
+
   it('leaves out a horse with no division', () => {
     const out = leagueResults(race([horse('a', { division: 1 }), horse('x')], LEAGUE))!;
     expect(out.flatMap((d) => d.rows.map((x) => x.id))).toEqual(['a']);

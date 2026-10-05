@@ -215,6 +215,15 @@ describe('RacePage', () => {
       expect(tabs(el)).toEqual(['Overall', 'Divisions', 'Cumulative tokens', 'Pace']);
     });
 
+    it('leaves Season out once a later round exists, since the table no longer describes this race', async () => {
+      const { el, settle } = await setup((api) => {
+        api.standingsResult = () => Promise.resolve({ standings: { ...STANDINGS, round: 5 } });
+        api.next.push(() => Promise.resolve(race(LEAGUE)));
+      });
+      await settle();
+      expect(tabs(el)).toEqual(['Overall', 'Divisions', 'Cumulative tokens', 'Pace']);
+    });
+
     it('keeps a normal race to Board and the charts', async () => {
       const { el, api, settle } = await setup((api) => api.next.push(() => Promise.resolve(race({ status: 'finished', horses: FIELD }))));
       await settle();

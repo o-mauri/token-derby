@@ -56,7 +56,8 @@ export function leagueResults(race: GetRaceResponse): DivisionResult[] | null {
     hat: h.equipped_hat ? { id: h.equipped_hat.id, variant: h.equipped_hat.variant } : null,
     tokens: h.final_scored_tokens ?? scoredOf(h), joinedAt: Date.parse(h.joined_at), division: h.division ?? -1,
   }));
-  return divisionResults(runners, race.league_division_names ?? []);
+  const results = divisionResults(runners, race.league_division_names ?? []);
+  return results.length ? results : null;
 }
 
 export function finishViews(race: GetRaceResponse): FinishView[] {

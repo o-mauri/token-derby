@@ -130,7 +130,11 @@ export class RacePage {
     if (this.seasonRequested || !results || !race.organisation_name || race.league_season === undefined) return;
     this.seasonRequested = true;
     this.api.standings(race.organisation_name, race.league_season).then(
-      (res) => res.standings && this.season.set(seasonView(res.standings, results, race.league_round ?? res.standings.round)),
+      (res) => {
+        // A later fixture means the table has moved on and no longer describes this race.
+        const round = race.league_round ?? res.standings?.round;
+        if (res.standings && res.standings.round === round) this.season.set(seasonView(res.standings, results, round));
+      },
       () => undefined,
     );
   }

@@ -24,4 +24,4 @@
 :host(:focus-visible) { outline: var(--td-focus-width) solid var(--td-text); outline-offset: var(--td-focus-offset); }
 
 // Faded and inert, so it still reads as the same control but plainly can't be pressed.
-:host(:disabled) { opacity: 0.35; cursor: not-allowed; filter: none; }
+:host(:disabled), :host([aria-disabled='true']) { opacity: 0.35; cursor: not-allowed; filter: none; }

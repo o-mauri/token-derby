@@ -44,13 +44,13 @@ describe('ColumnWindow', () => {
     for (let i = 0; i < 4; i++) await w.click('.next');
     expect(w.visible()).toEqual(['League One', 'League Two', 'National']);
     expect(w.caption()).toBe('League One – National · 5 divisions');
-    expect(w.el.querySelector<HTMLButtonElement>('.next')!.disabled).toBe(true);
-    expect(w.el.querySelector<HTMLButtonElement>('.prev')!.disabled).toBe(false);
+    expect(w.el.querySelector('.next')!.getAttribute('aria-disabled')).toBe('true');
+    expect(w.el.querySelector('.prev')!.getAttribute('aria-disabled')).toBe('false');
   });
 
   it('starts at the top division with the back arrow disabled', async () => {
     const w = await render(FIVE);
-    expect(w.el.querySelector<HTMLButtonElement>('.prev')!.disabled).toBe(true);
+    expect(w.el.querySelector('.prev')!.getAttribute('aria-disabled')).toBe('true');
     await w.click('.next');
     await w.click('.prev');
     expect(w.visible()).toEqual(['Premier', 'Championship', 'League One']);
@@ -70,5 +70,15 @@ describe('ColumnWindow', () => {
     f.componentRef.setInput('names', FIVE.slice(0, 4));
     await f.whenStable();
     expect(el.querySelector('.caption')!.textContent!.trim()).toBe('Championship – League Two · 4 divisions');
+  });
+
+  it('keeps keyboard focus on an arrow that reaches its end', async () => {
+    const w = await render(FIVE);
+    const next = w.el.querySelector<HTMLButtonElement>('.next')!;
+    next.focus();
+    for (let i = 0; i < 3; i++) await w.click('.next');
+    expect(next.disabled).toBe(false);
+    expect(document.activeElement).toBe(next);
+    expect(w.caption()).toBe('League One – National · 5 divisions');
   });
 });

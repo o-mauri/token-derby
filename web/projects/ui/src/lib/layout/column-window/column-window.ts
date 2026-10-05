@@ -18,7 +18,7 @@ export class ColumnTemplate {
   template: `
     <div class="frame" [class.paged]="paged()">
       @if (paged()) {
-        <button td-button size="sm" type="button" class="prev" [attr.aria-label]="'Show earlier ' + label()" [disabled]="at() === 0" (click)="step(-1)">‹</button>
+        <button td-button size="sm" type="button" class="prev" [attr.aria-label]="'Show earlier ' + label()" [attr.aria-disabled]="at() === 0" (click)="step(-1)">‹</button>
       }
       <div class="cols" [style.--cols]="paged() ? max() : columns().length">
         @for (c of columns(); track $index) {
@@ -28,7 +28,7 @@ export class ColumnTemplate {
         }
       </div>
       @if (paged()) {
-        <button td-button size="sm" type="button" class="next" [attr.aria-label]="'Show later ' + label()" [disabled]="at() === last()" (click)="step(1)">›</button>
+        <button td-button size="sm" type="button" class="next" [attr.aria-label]="'Show later ' + label()" [attr.aria-disabled]="at() === last()" (click)="step(1)">›</button>
         <p class="caption">{{ caption() }}</p>
       }
     </div>
@@ -58,6 +58,7 @@ export class ColumnWindow {
     return !this.paged() || (i >= this.at() && i < this.at() + this.max());
   }
 
+  // aria-disabled rather than disabled at the ends, so a keyboard user's focus stays on the arrow.
   protected step(by: number): void {
     this.start.set(Math.min(Math.max(this.at() + by, 0), this.last()));
   }
