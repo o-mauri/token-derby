@@ -1,0 +1,14 @@
+:host {
+  display: inline-block;
+  flex: none;
+  width: var(--size);
+  height: var(--size);
+  border-radius: var(--td-radius-round);
+  overflow: hidden;
+  background: var(--td-head-disc-dark);
+  box-shadow: 0 0 0 var(--td-line) var(--td-head-disc-ring);
+}
+
+:host([data-tone="light"]) { background: var(--td-head-disc-light); }
+
+svg { display: block; width: 100%; height: 100%; }

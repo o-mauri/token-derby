@@ -111,3 +111,10 @@
   --td-zone-promote: var(--td-level-up);
   --td-zone-relegate: #ff6b6b;
 }
+
+/* Horse-head discs on the org pages, approved 2026-10-05: light behind dark horses, dark behind light ones. */
+:root {
+  --td-head-disc-light: #efe4cc;
+  --td-head-disc-dark: #22222b;
+  --td-head-disc-ring: #3a3a46;
+}

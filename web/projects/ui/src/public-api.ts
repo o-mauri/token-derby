@@ -59,3 +59,5 @@ export * from './lib/race/race-graphs/race-graphs';
 export * from './lib/dialog/dialog.service';
 export * from './lib/http/http';
 export * from './lib/http/poll-resource';
+export * from './lib/format/compact-tokens';
+export * from './lib/horse-head/horse-head';
