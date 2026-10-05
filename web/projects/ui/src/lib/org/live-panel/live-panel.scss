@@ -14,7 +14,8 @@
 }
 .hero.next, .hero:has(.waiting) { grid-template-columns: 1fr auto; }
 
-.lead-sprite { height: min(100%, 9rem); max-width: 100%; justify-self: center; }
+// Fills the hero row's height; the sprite keeps its proportions inside, so it always fits the panel.
+.lead-sprite { align-self: center; height: 100%; min-height: 0; max-height: 11rem; }
 .lead { display: grid; gap: var(--td-space-1); min-width: 0; }
 .label { font-size: var(--td-text-xs); letter-spacing: var(--td-tracking-wide); color: var(--td-text-muted); }
 .lead .name-row { overflow: hidden; white-space: nowrap; }
