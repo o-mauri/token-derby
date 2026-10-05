@@ -101,7 +101,12 @@ $fence-height: calc(var(--td-lane-height) * 36 / 128);
 // ── London: a wet road, with dashed markings between lanes and lamps along the near kerb ──
 :host-context([data-theme="london"]) {
   .strip { background: var(--td-track-lane); border-radius: 0; }
-  .top-fence { display: none; }
+  // No fence on a road: the surface runs on up to the crowd instead, through the track's top padding.
+  .top-fence { background: var(--td-track-lane); height: calc(#{$fence-height} + var(--td-space-5)); }
+  .top-fence::before { content: ''; position: absolute; inset: 0 auto 0 0; width: 4px; background: var(--td-track-rail); }
+
+  // Lanes are divided by the markings at each strip's top, so cards centre on the strip.
+  .chip { top: 50%; }
 
   .lane:not(.first) .strip {
     background-image: repeating-linear-gradient(90deg, var(--td-track-rail) 0 34px, transparent 34px 62px);
