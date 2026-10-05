@@ -81,4 +81,14 @@ describe('ColumnWindow', () => {
     expect(document.activeElement).toBe(next);
     expect(w.caption()).toBe('League One – National · 5 divisions');
   });
+
+  it('slides one track rather than swapping columns, marking the off-screen ones', async () => {
+    const w = await render(FIVE);
+    const track = w.el.querySelector<HTMLElement>('.track')!;
+    expect(track.style.getPropertyValue('--at')).toBe('0');
+    await w.click('.next');
+    expect(track.style.getPropertyValue('--at')).toBe('1');
+    const cols = [...w.el.querySelectorAll<HTMLElement>('.column')];
+    expect(cols.map((c) => c.classList.contains('out'))).toEqual([true, false, false, false, true]);
+  });
 });

@@ -1,10 +1,23 @@
-:host { display: block; container-type: inline-size; }
+:host { display: block; container-type: inline-size; --gap: var(--td-space-6); --slide: 400ms; }
 
 .frame { display: grid; grid-template-columns: 1fr; gap: var(--td-space-3) var(--td-space-4); align-items: center; }
 .frame.paged { grid-template-columns: auto minmax(0, 1fr) auto; }
 
-.cols { display: grid; grid-template-columns: repeat(var(--cols), minmax(0, 1fr)); gap: var(--td-space-6); align-self: start; }
-.out { display: none; }
+// A clipped viewport over one long row; stepping slides the row a column at a time.
+.cols { overflow: hidden; align-self: start; }
+.track {
+  display: flex;
+  gap: var(--gap);
+  transform: translateX(calc(-1 * var(--at) * ((100% - (var(--cols) - 1) * var(--gap)) / var(--cols) + var(--gap))));
+}
+.column { flex: 0 0 calc((100% - (var(--cols) - 1) * var(--gap)) / var(--cols)); min-width: 0; }
+// Hidden once it has slid out, so it can't be reached by keyboard or read out; shown at once when sliding in.
+.out { visibility: hidden; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .track { transition: transform var(--slide) ease-in-out; }
+  .out { transition: visibility 0s linear var(--slide); }
+}
 
 .caption {
   grid-column: 1 / -1;
@@ -18,7 +31,8 @@
 // Phones: every column stacked, nothing to page through.
 @container (width < 640px) {
   .frame.paged { grid-template-columns: 1fr; }
-  .cols { grid-template-columns: 1fr; }
-  .out { display: block; }
+  .track { flex-direction: column; transform: none; }
+  .column { flex-basis: auto; }
+  .out { visibility: visible; }
   .prev, .next, .caption { display: none; }
 }

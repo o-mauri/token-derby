@@ -9,7 +9,7 @@ export class ColumnTemplate {
   readonly template = inject(TemplateRef);
 }
 
-/** Columns side by side in order, at most `max` at once; arrows step through the rest, stopping at each end.
+/** Columns side by side in order, at most `max` at once; arrows slide the row along, stopping at each end.
  *  Narrow widths stack them all. */
 @Component({
   selector: 'td-column-window',
@@ -21,11 +21,13 @@ export class ColumnTemplate {
         <button td-button size="sm" type="button" class="prev" [attr.aria-label]="'Show earlier ' + label()" [attr.aria-disabled]="at() === 0" (click)="step(-1)">‹</button>
       }
       <div class="cols" [style.--cols]="paged() ? max() : columns().length">
+        <div class="track" [style.--at]="at()">
         @for (c of columns(); track $index) {
           <div class="column" [class.out]="!inView($index)">
             <ng-container [ngTemplateOutlet]="c.template" />
           </div>
         }
+        </div>
       </div>
       @if (paged()) {
         <button td-button size="sm" type="button" class="next" [attr.aria-label]="'Show later ' + label()" [attr.aria-disabled]="at() === last()" (click)="step(1)">›</button>
