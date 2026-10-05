@@ -41,3 +41,8 @@ export * from './lib/race/pending-banner/pending-banner';
 export * from './lib/race/logic/ticker';
 export * from './lib/race/logic/ticker-engine';
 export * from './lib/race/ticker/ticker';
+export * from './lib/timed-tabs/timed-tabs';
+export * from './lib/race/xp-bar/xp-bar.model';
+export * from './lib/race/xp-bar/xp-bar';
+export * from './lib/race/confetti/confetti';
+export * from './lib/race/finished/finished';

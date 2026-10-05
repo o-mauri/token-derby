@@ -1,0 +1,48 @@
+@use '../slant';
+
+:host { display: flex; flex-direction: column; min-height: 0; }
+
+// Scrolls sideways on narrow screens rather than wrapping.
+.tablist {
+  display: flex;
+  gap: var(--td-space-1);
+  padding: var(--td-space-2) var(--td-space-5) 0;
+  border-bottom: var(--td-line-thin) solid var(--td-border);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.tab {
+  @include slant.slant;
+
+  position: relative;
+  flex: none;
+  padding: var(--td-space-2) var(--td-space-5) var(--td-space-3);
+  font: inherit;
+  font-size: var(--td-text-sm);
+  color: var(--td-text-muted);
+  background: var(--td-surface);
+  border: var(--td-line-thin) solid var(--td-border);
+  border-bottom: none;
+  border-radius: var(--td-radius) var(--td-radius) 0 0;
+  cursor: pointer;
+
+  &:hover { color: var(--td-text); }
+  &:focus-visible { outline: var(--td-focus-width) solid var(--td-accent); outline-offset: var(--td-focus-offset); }
+}
+
+.tab[aria-selected="true"] { color: var(--td-highlight); background: var(--td-surface-raised); }
+.text { @include slant.upright; }
+
+// The active tab's timer: an underline that fills as its time runs out.
+.timer {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: var(--td-line);
+  width: calc(var(--progress, 0) * 100%);
+  background: var(--td-highlight);
+}
+
+:host(.still) .tab[aria-selected="true"] .timer { width: 100%; }
+.panel { flex: 1; min-height: 0; touch-action: pan-y; }

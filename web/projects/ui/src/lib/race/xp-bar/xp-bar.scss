@@ -1,0 +1,119 @@
+// Every 10s: old XP, the gain grows in a lighter blue inside the same capsule, two soft flashes,
+// then it merges into one blue. A level up fills to the end, ticks the pill over, and refills from zero.
+:host { display: grid; gap: var(--td-space-1); justify-items: stretch; }
+
+.line { display: flex; align-items: center; justify-content: center; gap: var(--td-space-3); font-size: var(--td-text-sm); }
+
+.pill {
+  position: relative;
+  display: inline-grid;
+  padding: 0 var(--td-space-3);
+  border-radius: var(--td-radius-pill);
+  background: var(--td-level);
+  color: var(--td-level-text);
+  font-family: 'Barlow Semi Condensed', var(--td-font-pixel);
+  font-weight: 600;
+  font-size: var(--td-text-xs);
+  line-height: 1.5;
+}
+
+// Before and after share one grid cell, so the pill keeps its size as the number ticks over.
+.before, .after { grid-area: 1 / 1; }
+.after { opacity: 0; }
+.gained { color: var(--td-xp); }
+
+.uptag {
+  font-family: 'Bitcount Prop Single', var(--td-font-pixel);
+  font-size: var(--td-text-2xs);
+  letter-spacing: var(--td-tracking-wide);
+  color: var(--td-level-up);
+  border: var(--td-line-thin) solid color-mix(in srgb, var(--td-level-up) 50%, transparent);
+  background: color-mix(in srgb, var(--td-level-up) 12%, transparent);
+  border-radius: var(--td-radius);
+  padding: 0 var(--td-space-2);
+}
+
+// One continuous capsule: the fill grows as a single rounded bar, the gain a lighter band inside it.
+.bar {
+  position: relative;
+  height: 7px;
+  background: var(--td-xp-track);
+  border-radius: var(--td-radius-pill);
+  overflow: hidden;
+  container-type: inline-size;
+}
+
+.capsule {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: calc(var(--o) * 1%);
+  border-radius: var(--td-radius-pill);
+  overflow: hidden;
+  background: var(--td-xp);
+}
+
+.gain { position: absolute; inset: 0 0 0 calc(var(--o) * 1cqw); background: var(--td-xp-gain); }
+.caption { text-align: center; font-size: var(--td-text-xs); color: var(--td-text-muted); }
+
+:host(.sm) {
+  .line { justify-content: flex-start; font-size: var(--td-text-xs); }
+  .bar { height: 4px; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  :host(.nolv) .capsule { animation: fill-same 10s ease-in-out infinite; }
+  :host(.nolv) .gain { animation: gain-same 10s ease-in-out infinite; }
+  :host(.lvup) .capsule { animation: fill-up 10s ease-in-out infinite; }
+  :host(.lvup) .gain { animation: gain-up 10s ease-in-out infinite; }
+  :host(.lvup) .pill { animation: pill-flash 10s ease-out infinite; }
+  :host(.lvup) .before { animation: tick-before 10s steps(1) infinite; }
+  :host(.lvup) .after { animation: tick-after 10s steps(1) infinite; }
+}
+
+// Without motion: the final state, all one colour.
+@media (prefers-reduced-motion: reduce) {
+  .capsule { width: calc(var(--n) * 1%); }
+  .gain { display: none; }
+  :host(.lvup) .before { opacity: 0; }
+  :host(.lvup) .after { opacity: 1; }
+}
+
+@keyframes fill-same {
+  0%, 10% { width: calc(var(--o) * 1%); }
+  30%, 100% { width: calc(var(--n) * 1%); }
+}
+
+@keyframes gain-same {
+  0%, 30% { background: var(--td-xp-gain); filter: none; }
+  33% { filter: brightness(1.35); }
+  36% { filter: none; }
+  39% { filter: brightness(1.35); }
+  42% { filter: none; background: var(--td-xp-gain); }
+  50%, 100% { background: var(--td-xp); }
+}
+
+@keyframes fill-up {
+  0%, 10% { width: calc(var(--o) * 1%); }
+  21.9% { width: 100%; }
+  22% { width: 0; }
+  33%, 100% { width: calc(var(--n) * 1%); }
+}
+
+@keyframes gain-up {
+  0%, 21.9% { left: calc(var(--o) * 1cqw); background: var(--td-xp-gain); filter: none; }
+  22%, 33% { left: 0; background: var(--td-xp-gain); filter: none; }
+  36% { filter: brightness(1.35); }
+  39% { filter: none; }
+  42% { filter: brightness(1.35); }
+  45% { filter: none; background: var(--td-xp-gain); left: 0; }
+  53%, 100% { background: var(--td-xp); left: 0; }
+}
+
+@keyframes pill-flash {
+  0%, 21.9% { box-shadow: none; filter: none; }
+  22% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--td-xp-gain) 85%, transparent), 0 0 14px var(--td-xp-gain); filter: brightness(1.5); }
+  27%, 100% { box-shadow: none; filter: none; }
+}
+
+@keyframes tick-before { 0%, 21.9% { opacity: 1; } 22%, 100% { opacity: 0; } }
+@keyframes tick-after { 0%, 21.9% { opacity: 0; } 22%, 100% { opacity: 1; } }

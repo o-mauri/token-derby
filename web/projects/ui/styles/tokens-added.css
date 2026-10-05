@@ -83,3 +83,17 @@
   --td-div-3: #a68bd8;
   --td-div-text: #0b0b0f;
 }
+
+/* Finished screen, approved with the redesign (2026-10-05). */
+:root {
+  --td-xp: #4db8ff;
+  --td-xp-gain: #9ad7ff;
+  --td-xp-track: #26262e;
+  --td-level-up: #7bed9f;
+  --td-confetti-1: #ffd166;
+  --td-confetti-2: #7bed9f;
+  --td-confetti-3: #a68bd8;
+  --td-confetti-4: #ff6b6b;
+  --td-confetti-5: #4db8ff;
+  --td-confetti-6: #ffffff;
+}

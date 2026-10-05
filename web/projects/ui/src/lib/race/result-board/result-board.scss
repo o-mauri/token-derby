@@ -1,0 +1,33 @@
+:host { display: block; container-type: inline-size; }
+
+.row {
+  display: grid;
+  grid-template-columns: 2.5rem 3rem minmax(0, 1fr) 7rem 6rem 13rem;
+  align-items: center;
+  gap: var(--td-space-4);
+  padding: var(--td-space-2) var(--td-space-6);
+  border-bottom: var(--td-line-thin) solid var(--td-border);
+}
+
+.head { color: var(--td-text-muted); font-size: var(--td-text-xs); letter-spacing: var(--td-tracking-wide); text-transform: uppercase; }
+.pos { font-size: var(--td-text-lg); color: var(--td-text-muted); }
+.sprite { width: 2.6rem; aspect-ratio: 35 / 30; }
+.who { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.name { font-weight: bold; }
+.owner { color: var(--td-text-muted); font-size: var(--td-text-sm); }
+
+.tokens {
+  font-family: 'Bitcount Prop Single', var(--td-font-pixel);
+  color: var(--td-highlight);
+  text-shadow: 0 0 6px color-mix(in srgb, var(--td-highlight) 45%, transparent);
+}
+
+.behind { color: var(--td-ticker-behind); font-size: var(--td-text-sm); }
+
+// Phones: drop "behind", and tuck the XP bar under the name.
+@container (max-width: 640px) {
+  .row { grid-template-columns: 1.6rem 2rem minmax(0, 1fr) auto; row-gap: var(--td-space-1); padding: var(--td-space-2) var(--td-space-4); }
+  .col-behind { display: none; }
+  .head span:last-child { display: none; }
+  .xp { grid-column: 3 / -1; }
+}

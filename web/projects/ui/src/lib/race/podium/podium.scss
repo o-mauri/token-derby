@@ -1,0 +1,49 @@
+// A soft spotlight behind the winner; on narrow screens the winner stacks first, 2nd and 3rd side by side below.
+// The host is the size container, so the layout lives on .stand (a container query can't restyle its own container).
+:host { display: block; container-type: inline-size; }
+
+.stand {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  gap: var(--td-space-8);
+  padding: var(--td-space-6) var(--td-space-6) var(--td-space-5);
+  background: radial-gradient(ellipse 40% 80% at 50% 60%, color-mix(in srgb, var(--td-medal-gold) 12%, transparent), transparent 70%);
+}
+
+.place { display: grid; justify-items: center; gap: var(--td-space-2); width: 14rem; text-align: center; }
+.place.winner { width: 20rem; }
+.sprite { width: 6rem; aspect-ratio: 35 / 30; }
+.winner .sprite { width: 11rem; }
+
+.name {
+  font-family: 'Bitcount Prop Single', var(--td-font-pixel);
+  font-weight: 600;
+  font-size: var(--td-text-lg);
+  line-height: 1;
+}
+
+.winner .name { font-size: var(--td-text-xl); }
+.gold .name { color: var(--td-medal-gold); }
+.silver .name { color: var(--td-medal-silver); }
+.bronze .name { color: var(--td-medal-bronze); }
+.meta { font-size: var(--td-text-sm); color: var(--td-text-muted); }
+
+.tokens {
+  font-family: 'Bitcount Prop Single', var(--td-font-pixel);
+  color: var(--td-highlight);
+  text-shadow: 0 0 6px color-mix(in srgb, var(--td-highlight) 50%, transparent);
+}
+
+.behind { color: var(--td-ticker-behind); }
+.xp { width: 100%; }
+
+@container (max-width: 640px) {
+  .stand { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--td-space-5); padding: var(--td-space-5) var(--td-space-4); }
+  .place, .place.winner { width: auto; min-width: 0; }
+  .name { font-size: var(--td-text-md); }
+  .winner .name { font-size: var(--td-text-lg); }
+  .winner { grid-column: 1 / -1; order: -1; }
+  .sprite { width: 4.5rem; }
+  .winner .sprite { width: 8rem; }
+}

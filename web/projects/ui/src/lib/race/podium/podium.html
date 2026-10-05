@@ -1,0 +1,13 @@
+<div class="stand">
+@for (h of places(); track h.id) {
+  <div class="place" [class]="'place ' + medal(h)" [class.winner]="h.position === 1">
+    <div class="sprite"><td-horse [colors]="h.colors" [hat]="h.hat" /></div>
+    <div class="name">{{ h.position }} · {{ h.name }}</div>
+    <div class="meta">
+      <span class="owner">{{ h.owner }}</span>&ngsp;·&ngsp;<span class="tokens">{{ fmt(h.tokens) }}</span>
+      @if (h.behind !== null) {&ngsp;<span class="behind">−{{ fmt(h.behind) }}</span>}
+    </div>
+    <td-xp-bar class="xp" [xpBefore]="h.xpBefore" [xpAwarded]="h.xpAwarded" caption />
+  </div>
+}
+</div>
