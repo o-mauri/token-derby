@@ -41,8 +41,9 @@
 @container (max-width: 640px) {
   .stand { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--td-space-5); padding: var(--td-space-5) var(--td-space-4); }
   .place, .place.winner { width: auto; min-width: 0; }
-  .name { font-size: var(--td-text-md); }
+  .name { font-size: var(--td-text-sm); overflow-wrap: anywhere; }
   .winner .name { font-size: var(--td-text-lg); }
+  .meta { font-size: var(--td-text-xs); }
   .winner { grid-column: 1 / -1; order: -1; }
   .sprite { width: 4.5rem; }
   .winner .sprite { width: 8rem; }

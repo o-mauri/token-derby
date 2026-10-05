@@ -11,7 +11,7 @@
 
 .head { color: var(--td-text-muted); font-size: var(--td-text-xs); letter-spacing: var(--td-tracking-wide); text-transform: uppercase; }
 .pos { font-size: var(--td-text-lg); color: var(--td-text-muted); }
-.sprite { width: 2.6rem; aspect-ratio: 35 / 30; }
+.sprite { width: min(2.6rem, 100%); aspect-ratio: 35 / 30; }
 .who { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .name { font-weight: bold; }
 .owner { color: var(--td-text-muted); font-size: var(--td-text-sm); }
@@ -26,8 +26,15 @@
 
 // Phones: drop "behind", and tuck the XP bar under the name.
 @container (max-width: 640px) {
-  .row { grid-template-columns: 1.6rem 2rem minmax(0, 1fr) auto; row-gap: var(--td-space-1); padding: var(--td-space-2) var(--td-space-4); }
+  .row {
+    grid-template-columns: 1.6rem 2.2rem minmax(0, 1fr) auto;
+    gap: var(--td-space-1) var(--td-space-3);
+    padding: var(--td-space-2) var(--td-space-4);
+  }
+
+  .pos { font-size: var(--td-text-md); }
+  .owner { font-size: var(--td-text-xs); }
   .col-behind { display: none; }
   .head span:last-child { display: none; }
-  .xp { grid-column: 3 / -1; }
+  .xp { grid-column: 2 / -1; }
 }

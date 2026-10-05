@@ -1,6 +1,7 @@
 // Every 10s: old XP, the gain grows in a lighter blue inside the same capsule, two soft flashes,
 // then it merges into one blue. A level up fills to the end, ticks the pill over, and refills from zero.
-:host { display: grid; gap: var(--td-space-1); justify-items: stretch; }
+:host { display: block; container-type: inline-size; }
+.wrap { display: grid; gap: var(--td-space-1); justify-items: stretch; }
 
 .line { display: flex; align-items: center; justify-content: center; gap: var(--td-space-3); font-size: var(--td-text-sm); }
 
@@ -58,6 +59,11 @@
 :host(.sm) {
   .line { justify-content: flex-start; font-size: var(--td-text-xs); }
   .bar { height: 4px; }
+}
+
+// Compact bars with room to spare put the level line beside the bar, keeping board rows to one line.
+@container (min-width: 250px) {
+  :host(.sm) .wrap { grid-template-columns: auto minmax(0, 1fr); align-items: center; column-gap: var(--td-space-4); }
 }
 
 @media (prefers-reduced-motion: no-preference) {

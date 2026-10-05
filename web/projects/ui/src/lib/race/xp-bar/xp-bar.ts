@@ -14,6 +14,7 @@ import { xpBarModel } from './xp-bar.model';
     '[class.sm]': "size() === 'sm'",
   },
   template: `
+    <div class="wrap">
     <div class="line">
       <span class="pill"><span class="before">Lvl. {{ m().levelBefore }}</span>@if (m().levelledUp) {<span class="after">Lvl. {{ m().levelAfter }}</span>}</span>
       <span class="gained">+{{ m().awarded }} XP</span>
@@ -21,6 +22,7 @@ import { xpBarModel } from './xp-bar.model';
     </div>
     <div class="bar"><div class="capsule" [style.--o]="m().oldPct" [style.--n]="m().newPct"><div class="gain"></div></div></div>
     @if (caption()) { <div class="caption">{{ captionText() }}</div> }
+    </div>
   `,
   styleUrl: './xp-bar.scss',
 })
