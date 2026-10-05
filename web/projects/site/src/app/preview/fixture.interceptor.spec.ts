@@ -33,7 +33,9 @@ describe('fixtureInterceptor', () => {
   });
 
   it('pads the field to ?horses=, capped at 40', async () => {
-    expect((await getRace(http('/preview-race?horses=20'))).horses).toHaveLength(20);
+    const big = await getRace(http('/preview-race?horses=20'));
+    expect(big.horses).toHaveLength(20);
+    expect([...big.horses.map((h) => h.rank)].sort((a, b) => a - b)).toEqual(Array.from({ length: 20 }, (_, i) => i + 1));
     TestBed.resetTestingModule();
     expect((await getRace(http('/preview-race?horses=500'))).horses).toHaveLength(40);
   });

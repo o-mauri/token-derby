@@ -184,7 +184,11 @@ function fillers(count: number): HorseView[] {
 /** The preview race in the given state, as the API would return it at `now`, padded to `field` horses. */
 export function previewRace(state: PreviewRaceState, now = Date.now(), field = 6): GetRaceResponse {
   const base = liveSnapshot(now);
-  const live = { ...base, horses: [...base.horses, ...fillers(Math.max(0, field - base.horses.length))] };
+  // The whole padded field is ranked on scored tokens, as the API would.
+  const padded = [...base.horses, ...fillers(Math.max(0, field - base.horses.length))]
+    .sort((a, b) => scoredOf(b) - scoredOf(a))
+    .map((h, i) => ({ ...h, rank: i + 1 }));
+  const live = { ...base, horses: padded };
   if (state === 'live') {
     return { ...live, horses: live.horses.map((h) => ({ ...h, recent_events: EVENTS[h.horse_id] ?? [] }) as HorseView) };
   }

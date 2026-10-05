@@ -15,6 +15,11 @@ describe('boardPages', () => {
     expect(boardPages([], 8)).toEqual([]);
   });
 
+  it('names a one-horse page by its single place', () => {
+    const rows = Array.from({ length: 9 }, (_, i) => finish(i + 4, `H${i}`, 1));
+    expect(boardPages(rows, 8).map((p) => p.label)).toEqual(['Board 4–11', 'Board 12']);
+  });
+
   it('uses the given label, as league races call the board "Overall"', () => {
     const rows = Array.from({ length: 10 }, (_, i) => finish(i + 4, `H${i}`, 1));
     expect(boardPages(rows, 8, 'Overall').map((p) => p.label)).toEqual(['Overall 4–11', 'Overall 12–13']);

@@ -1,5 +1,8 @@
 :host { display: block; container-type: inline-size; }
 
+// Centred and capped, so wide screens don't leave a gulf between the name and the numbers.
+.board { max-width: 64rem; margin-inline: auto; }
+
 .row {
   display: grid;
   grid-template-columns: 2.5rem 3rem minmax(0, 1fr) 7rem 6rem 13rem;
