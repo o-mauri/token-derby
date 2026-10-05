@@ -12,6 +12,7 @@
   border: var(--td-line) solid var(--td-border);
   border-radius: var(--td-radius);
 }
+:host(.wide) { width: 90vw; height: 88vh; }
 
 .top { display: flex; align-items: center; justify-content: space-between; gap: var(--td-space-5); }
 .heading { margin: 0; font-size: var(--td-text-lg); font-weight: 400; color: var(--td-highlight); letter-spacing: var(--td-tracking); }

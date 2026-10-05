@@ -16,7 +16,7 @@ const league = raceFixture(9, 120, 3);
   template: `
     <button td-button size="sm" type="button" (click)="open()">Graphs</button>
     <ng-template #graphs>
-      <td-dialog title="Race graphs">
+      <td-dialog title="Race graphs" size="wide">
         <td-race-graphs [series]="data().series" [horses]="data().horses" [divisionNames]="divisions()" [nowMs]="data().series.end_ms" />
       </td-dialog>
     </ng-template>

@@ -31,7 +31,7 @@
 }
 
 <ng-template #graphs>
-  <td-dialog title="Race graphs">
+  <td-dialog title="Race graphs" size="wide">
     <td-race-graphs [series]="graphsSeries()" [failed]="graphsFailed()" [horses]="race()?.horses ?? []"
       [divisionNames]="race()?.league_division_names ?? null" [nowMs]="now()" />
   </td-dialog>

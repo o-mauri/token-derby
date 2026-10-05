@@ -1,6 +1,7 @@
 export * from './lib/theme/themes';
 export * from './lib/theme/theme.service';
 export * from './lib/theme/theme-picker';
+export * from './lib/theme/theme-backdrop';
 export * from './lib/horse/horse';
 export * from './lib/page/page';
 export * from './lib/button/button';

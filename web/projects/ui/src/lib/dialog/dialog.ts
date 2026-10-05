@@ -8,6 +8,7 @@ let nextId = 0;
 @Component({
   selector: 'td-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { '[class.wide]': "size() === 'wide'" },
   template: `
     <header class="top">
       <h2 class="heading" [id]="titleId">{{ title() }}</h2>
@@ -19,6 +20,8 @@ let nextId = 0;
 })
 export class DialogFrame {
   readonly title = input.required<string>();
+  // 'wide' fills most of the screen, for charts and other big content.
+  readonly size = input<'default' | 'wide'>('default');
   // For frames shown outside a CDK dialog.
   readonly closed = output<void>();
 

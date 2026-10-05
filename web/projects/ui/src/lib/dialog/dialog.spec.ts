@@ -47,4 +47,13 @@ describe('DialogFrame', () => {
     await f.whenStable();
     expect(document.querySelector('td-dialog button.close')!.getAttribute('aria-label')).toBe('Close Race graphs');
   });
+
+  it('takes the wide size on request', async () => {
+    TestBed.overrideTemplate(Host, `<ng-template #tpl><td-dialog title="Race graphs" size="wide" /></ng-template>`);
+    const f = TestBed.createComponent(Host);
+    await f.whenStable();
+    f.componentInstance.open();
+    await f.whenStable();
+    expect(document.querySelector('td-dialog')!.classList.contains('wide')).toBe(true);
+  });
 });

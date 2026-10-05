@@ -16,7 +16,7 @@ const POLL_MS = 60_000;
   selector: 'site-race-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [Crowd, DialogFrame, Finished, Loader, NotFound, Page, PendingBanner, RaceChart, RaceGraphs, RaceHeader, RaceTrack, ThemePicker, Ticker, TimedTab],
-  host: { 'data-page': 'race' },
+  host: { 'data-page': 'race', '[attr.data-race-state]': 'race()?.status' },
   templateUrl: './race.page.html',
   styleUrl: './race.page.scss',
 })

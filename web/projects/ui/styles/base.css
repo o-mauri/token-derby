@@ -16,3 +16,5 @@ html, body {
 }
 
 .td-app-root { min-height: 100vh; display: flex; flex-direction: column; }
+/* Matrix's glyph rain sits behind the page, so the page content stacks above it. */
+:root[data-theme="matrix"] .td-app-root > :not(td-theme-backdrop) { position: relative; z-index: 1; }
