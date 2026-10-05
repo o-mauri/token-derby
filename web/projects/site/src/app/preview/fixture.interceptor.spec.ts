@@ -38,6 +38,15 @@ describe('fixtureInterceptor', () => {
     expect((await getRace(http('/preview-race?horses=500'))).horses).toHaveLength(40);
   });
 
+  it('serves a league fixture and its season standings under ?league', async () => {
+    const client = http('/preview-race?league&state=finished');
+    const race = await getRace(client);
+    expect(race.league_id).toBeTruthy();
+    expect(race.status).toBe('finished');
+    const res = await firstValueFrom(client.get<{ standings: { season: number } | null }>('/api/organisations/Anthropic/league/standings?season=2'));
+    expect(res.standings?.season).toBe(2);
+  });
+
   it('falls back to live for an unknown state', async () => {
     expect((await getRace(http('/preview-race?state=bogus'))).status).toBe('live');
   });
