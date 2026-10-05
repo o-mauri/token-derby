@@ -97,3 +97,11 @@
   --td-confetti-5: #4db8ff;
   --td-confetti-6: #ffffff;
 }
+
+/* Race charts, at the old fixed values (the same in every theme), per the race-port spec. */
+:root {
+  --td-chart-bg: #0c0c0c;
+  --td-chart-grid: #222222;
+  --td-chart-axis: #888888;
+  --td-chart-legend: #cccccc;
+}

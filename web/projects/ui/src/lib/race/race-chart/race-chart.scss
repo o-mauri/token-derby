@@ -1,0 +1,34 @@
+:host { display: flex; flex-direction: column; gap: var(--td-space-4); min-height: 0; }
+.title { color: var(--td-accent); letter-spacing: var(--td-tracking-wide); text-transform: uppercase; font-size: var(--td-text-md); text-align: center; }
+.svg { width: 100%; flex: 1; min-height: 12rem; background: var(--td-chart-bg); }
+.grid { stroke: var(--td-chart-grid); stroke-width: 1; }
+.line { stroke-linejoin: round; stroke-linecap: round; transition: opacity var(--td-duration-fast) ease, stroke-width var(--td-duration-fast) ease; }
+// A wide invisible band along each line, so a 2px line is easy to hover or tap.
+.hit { fill: none; stroke: transparent; stroke-width: 14; pointer-events: stroke; cursor: pointer; }
+.series.muted .line { opacity: 0.15; }
+.series.active .line { stroke-width: 3.2; }
+.axis { fill: var(--td-chart-axis); }
+.legend { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--td-space-4) var(--td-space-6); font-size: var(--td-text-sm); color: var(--td-chart-legend); }
+.item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--td-space-2);
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: opacity var(--td-duration-fast) ease;
+
+  &:focus-visible { outline: var(--td-focus-width) solid var(--td-accent); outline-offset: var(--td-focus-offset); }
+}
+
+.item.dim { opacity: 0.35; }
+.item.active { color: var(--td-text); text-decoration: underline; text-underline-offset: 3px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .line, .item { transition: none; }
+}
+.chip { width: 12px; height: 12px; display: inline-block; flex: none; }
+.empty { margin: auto; color: var(--td-text-muted); text-align: center; }

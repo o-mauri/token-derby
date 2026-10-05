@@ -1,0 +1,13 @@
+<td-segmented class="modes" label="Chart" [options]="modes" [value]="mode()" (valueChange)="mode.set($event ?? 'cumulative')" />
+<div class="body">
+  @if (message(); as text) {
+    <p class="message">{{ text }}</p>
+  } @else if (scoped(); as series) {
+    <td-race-chart class="chart" [mode]="mode()" [series]="series" [horses]="visible()" [endMs]="endMs()" [colourOf]="colourOf()" />
+  } @else {
+    <td-loader />
+  }
+</div>
+@if (divisionOptions(); as options) {
+  <td-segmented class="divisions" label="Division" [options]="options" [value]="division()" (valueChange)="division.set($event ?? 0)" />
+}

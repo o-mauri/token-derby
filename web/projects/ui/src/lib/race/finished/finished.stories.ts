@@ -1,24 +1,25 @@
 import type { Meta, StoryObj } from '@storybook/angular-vite';
 import { moduleMetadata } from '@storybook/angular-vite';
 import { TimedTab } from '../../timed-tabs/timed-tabs';
+import { RaceChart } from '../race-chart/race-chart';
+import { raceFixture } from '../race-chart/fixture';
 import { Finished } from './finished';
 import { finishedField } from './fixture';
 
-const placeholder = (text: string) =>
-  `<div style="display:grid;place-items:center;height:100%;min-height:180px;color:var(--td-text-muted)">${text}</div>`;
+const charts = raceFixture(10);
 
 const meta: Meta<Finished> = {
   title: 'Race/Finished/Screen',
   component: Finished,
-  decorators: [moduleMetadata({ imports: [TimedTab] })],
+  decorators: [moduleMetadata({ imports: [TimedTab, RaceChart] })],
   parameters: { layout: 'fullscreen' },
   args: { raceName: 'Preview Derby', results: finishedField(19), perPage: 8, interval: 10_000 },
   render: (args) => ({
-    props: args,
+    props: { ...args, charts },
     template: `<div style="height:100vh">
       <td-finished [raceName]="raceName" [results]="results" [perPage]="perPage" [interval]="interval">
-        <ng-template tdTab label="Cumulative tokens">${placeholder('Cumulative tokens chart: arrives with the race chart in phase 5')}</ng-template>
-        <ng-template tdTab label="Pace">${placeholder('Pace chart: arrives with the race chart in phase 5')}</ng-template>
+        <ng-template tdTab label="Cumulative tokens"><td-race-chart style="height:100%;padding:var(--td-space-5)" mode="cumulative" [series]="charts.series" [horses]="charts.horses" /></ng-template>
+        <ng-template tdTab label="Pace"><td-race-chart style="height:100%;padding:var(--td-space-5)" mode="throughput" [series]="charts.series" [horses]="charts.horses" /></ng-template>
       </td-finished></div>`,
   }),
 };
