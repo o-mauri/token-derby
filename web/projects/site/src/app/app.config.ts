@@ -1,7 +1,16 @@
 import { ApplicationConfig, provideBrowserGlobalErrorListeners, provideZonelessChangeDetection } from '@angular/core';
-import { provideRouter } from '@angular/router';
+import { provideHttpClient, withFetch, withInterceptors } from '@angular/common/http';
+import { provideRouter, withComponentInputBinding } from '@angular/router';
+import { apiBaseUrl, apiErrors } from '@token-derby/ui';
 import { routes } from './app.routes';
+import { provideTrailingSlashUrls } from './trailing-slash';
 
 export const appConfig: ApplicationConfig = {
-  providers: [provideZonelessChangeDetection(), provideBrowserGlobalErrorListeners(), provideRouter(routes)],
+  providers: [
+    provideZonelessChangeDetection(),
+    provideBrowserGlobalErrorListeners(),
+    provideHttpClient(withFetch(), withInterceptors([apiBaseUrl, apiErrors])),
+    provideRouter(routes, withComponentInputBinding()),
+    provideTrailingSlashUrls(),
+  ],
 };
