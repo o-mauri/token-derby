@@ -42,3 +42,10 @@ export type ResultRow = {
 };
 export type NextRace = { readonly code: string; readonly name: string; readonly startsAt: string; readonly anchor: CountdownAnchor };
 export type RacesPanelView = { readonly next: NextRace | null; readonly latest: readonly ResultRow[]; readonly count: number };
+
+export type LiveRow = {
+  readonly code: string; readonly name: string; readonly leader: OrgRunner | null;
+  readonly tokens: number | null; readonly runners: number | null; readonly anchor: CountdownAnchor;
+};
+export type UpcomingRow = { readonly code: string; readonly name: string; readonly startsAt: string; readonly date: string; readonly time: string; readonly startsIn: string; readonly anchor: CountdownAnchor };
+export type MonthLink = { readonly key: string; readonly label: string };

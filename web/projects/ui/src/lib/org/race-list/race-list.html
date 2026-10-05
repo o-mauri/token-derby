@@ -1,0 +1,55 @@
+<div class="cols head" aria-hidden="true"><span>Date</span><span>Race</span><span>Code</span><span>Winner</span><span>Tokens</span><span>Ran</span><span>Total</span><span></span></div>
+
+@if (live(); as l) {
+  <a class="row cols live" [routerLink]="['/race', l.code]">
+    <span class="date"><td-status-chip status="live" /></span>
+    <span class="cell"><span class="race" [tdMarquee]="l.name">{{ l.name }}</span></span>
+    <span class="code">{{ l.code }}</span>
+    <span class="winner">
+      @if (l.leader; as w) {
+        <td-horse-head [colors]="w.colors" [hat]="w.hat" />
+        <span class="cell"><span class="name" [tdMarquee]="w.name">{{ w.name }}</span></span>
+        <span class="note">leading</span>
+      } @else { — }
+    </span>
+    <span class="tokens">{{ compact(l.tokens) }}</span>
+    <span class="ran">{{ l.runners ?? '—' }}</span>
+    <span class="total"><td-countdown [anchor]="l.anchor" /></span>
+    <span class="go" aria-hidden="true">›</span>
+  </a>
+}
+
+@if (upcoming().length) {
+  <div class="group upcoming"><span>UPCOMING</span><span class="count">{{ upcoming().length }}</span></div>
+  @for (u of upcoming(); track u.code) {
+    <a class="row cols" [routerLink]="['/race', u.code]">
+      <span class="date">{{ u.date }} <span class="time">{{ u.time }}</span></span>
+      <span class="cell"><span class="race" [tdMarquee]="u.name">{{ u.name }}</span></span>
+      <span class="code">{{ u.code }}</span>
+      <span class="winner">—</span>
+      <span class="blank"></span><span class="blank"></span>
+      <span class="soon">{{ u.startsIn }}</span>
+      <span class="go" aria-hidden="true">›</span>
+    </a>
+  }
+}
+
+<ng-content select="td-month-pager" />
+
+@for (r of results(); track r.code) {
+  <a class="row cols" [routerLink]="['/race', r.code]">
+    <span class="date">{{ r.date }}</span>
+    <span class="cell"><span class="race" [tdMarquee]="r.name">{{ r.name }}</span></span>
+    <span class="code">{{ r.code }}</span>
+    <span class="winner">
+      @if (r.winner; as w) {
+        <td-horse-head [colors]="w.colors" [hat]="w.hat" />
+        <span class="cell"><span class="name" [tdMarquee]="w.name">{{ w.name }}</span></span>
+      } @else { — }
+    </span>
+    <span class="tokens">{{ compact(r.tokens) }}</span>
+    <span class="ran">{{ r.runners ?? '—' }}</span>
+    <span class="total">{{ compact(r.total) }}</span>
+    <span class="go" aria-hidden="true">›</span>
+  </a>
+}
