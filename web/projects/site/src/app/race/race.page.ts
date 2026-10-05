@@ -3,11 +3,11 @@ import { Router } from '@angular/router';
 import type { DialogRef } from '@angular/cdk/dialog';
 import type { GetRaceResponse, GetRaceSeriesResponse } from '@token-derby/shared';
 import {
-  ApiError, type CountdownAnchor, Crowd, DialogFrame, Finished, Loader, NotFound, Page, PendingBanner, RaceChart, RaceGraphs, RaceHeader,
-  RaceTrack, TdDialogService, ThemePicker, Ticker, type TickerCell, TimedTab, pollResource,
+  ApiError, type CountdownAnchor, Crowd, DialogFrame, DivisionResults, Finished, Loader, NotFound, Page, PendingBanner, RaceChart, RaceGraphs, RaceHeader,
+  RaceTrack, SeasonStandingsTable, type SeasonView, TdDialogService, ThemePicker, Ticker, type TickerCell, TimedTab, pollResource, seasonView,
 } from '@token-derby/ui';
 import { RaceApi } from './race-api';
-import { RaceTickerComposer, countdownAnchor, finishViews, raceLanes } from './race-view';
+import { RaceTickerComposer, countdownAnchor, finishViews, leagueResults, raceLanes } from './race-view';
 
 const POLL_MS = 60_000;
 
@@ -15,7 +15,7 @@ const POLL_MS = 60_000;
 @Component({
   selector: 'site-race-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Crowd, DialogFrame, Finished, Loader, NotFound, Page, PendingBanner, RaceChart, RaceGraphs, RaceHeader, RaceTrack, ThemePicker, Ticker, TimedTab],
+  imports: [Crowd, DialogFrame, DivisionResults, Finished, Loader, NotFound, Page, PendingBanner, RaceChart, RaceGraphs, RaceHeader, RaceTrack, SeasonStandingsTable, ThemePicker, Ticker, TimedTab],
   host: { 'data-page': 'race', '[attr.data-race-state]': 'race()?.status' },
   templateUrl: './race.page.html',
   styleUrl: './race.page.scss',
@@ -55,6 +55,12 @@ export class RacePage {
     return race?.status === 'finished' ? finishViews(race) : [];
   });
   protected readonly finishSeries = signal<GetRaceSeriesResponse | null>(null);
+  protected readonly divisions = computed(() => {
+    const r = this.race();
+    return r?.status === 'finished' ? leagueResults(r) : null;
+  });
+  protected readonly season = signal<SeasonView | null>(null);
+  private seasonRequested = false;
 
   protected readonly graphsSeries = signal<GetRaceSeriesResponse | null>(null);
   protected readonly graphsFailed = signal(false);
@@ -93,6 +99,7 @@ export class RacePage {
       // The results take over the view; a graphs dialog would be left floating over them.
       this.graphsRef?.close();
       this.loadFinishSeries();
+      this.loadSeason(race);
     } else if (this.graphsRef) {
       void this.loadGraphs();
     }
@@ -117,8 +124,20 @@ export class RacePage {
     this.api.series(this.joinCode()).then((s) => this.finishSeries.set(s), () => (this.finishSeriesRequested = false));
   }
 
+  // Finishing a league race adds its points to the standings, so the finished screen fetches them afresh.
+  private loadSeason(race: GetRaceResponse): void {
+    const results = leagueResults(race);
+    if (this.seasonRequested || !results || !race.organisation_name || race.league_season === undefined) return;
+    this.seasonRequested = true;
+    this.api.standings(race.organisation_name, race.league_season).then(
+      (res) => res.standings && this.season.set(seasonView(res.standings, results, race.league_round ?? res.standings.round)),
+      () => undefined,
+    );
+  }
+
   // League standings are the season before this fixture: fetched once, retried on a later poll if it fails.
   private loadStandings(race: GetRaceResponse): void {
+    if (race.status === 'finished') return;
     const wanted = this.composer.standingsWanted(race);
     if (!wanted) return;
     this.composer.standingsRequested();

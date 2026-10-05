@@ -47,6 +47,24 @@ describe('fixtureInterceptor', () => {
     expect(res.standings?.season).toBe(2);
   });
 
+  it('spreads the league over ?divisions= and plays the season finale under &finale', async () => {
+    const client = http('/preview-race?league&state=finished&divisions=5&finale');
+    const race = await getRace(client);
+    expect(race.league_division_names).toHaveLength(5);
+    expect(race.league_round).toBe(8);
+    const res = await firstValueFrom(client.get<{ standings: { divisions: unknown[]; round: number } }>('/api/organisations/Anthropic/league/standings?season=2'));
+    expect(res.standings.divisions).toHaveLength(5);
+    expect(res.standings.round).toBe(8);
+  });
+
+  it('serves standings with this race added once a league race has finished', async () => {
+    const before = await firstValueFrom(http('/preview-race?league').get<{ standings: { divisions: { rows: { horse_name: string; points: number }[] }[] } }>('/api/organisations/Anthropic/league/standings?season=2'));
+    TestBed.resetTestingModule();
+    const after = await firstValueFrom(http('/preview-race?league&state=finished').get<{ standings: { divisions: { rows: { horse_name: string; points: number }[] }[] } }>('/api/organisations/Anthropic/league/standings?season=2'));
+    const pts = (s: typeof before, name: string) => s.standings.divisions.flatMap((d) => d.rows).find((r) => r.horse_name === name)!.points;
+    expect(pts(after, 'Comet') - pts(before, 'Comet')).toBe(20);
+  });
+
   it('falls back to live for an unknown state', async () => {
     expect((await getRace(http('/preview-race?state=bogus'))).status).toBe('live');
   });

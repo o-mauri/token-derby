@@ -12,7 +12,13 @@
   @if (!r) {
     <div class="loading"><td-loader /></div>
   } @else if (r.status === 'finished') {
-    <td-finished class="finished" [raceName]="r.name" [results]="results()">
+    <td-finished class="finished" [raceName]="r.name" [results]="results()" [boardLabel]="divisions() ? 'Overall' : 'Board'">
+      @if (divisions(); as d) {
+        <ng-template tdTab label="Divisions"><td-division-results [results]="d" /></ng-template>
+      }
+      @if (season(); as s) {
+        <ng-template tdTab label="Season"><td-season-standings [view]="s" /></ng-template>
+      }
       <ng-template tdTab label="Cumulative tokens">
         <td-race-chart class="chart" mode="cumulative" [series]="finishSeries()" [horses]="r.horses" />
       </ng-template>

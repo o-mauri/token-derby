@@ -1,8 +1,8 @@
 import type { GetRaceResponse, HorseView, SeasonStandings } from '@token-derby/shared';
 import { levelFromXp, resolveStaminaConfig, runsModifier, scoredOf, staminaOf } from '@token-derby/shared';
 import {
-  type CountdownAnchor, type FinishView, type LaneState, type LaneView, type TickerCell,
-  collectFreshItems, elapsedPct, laneProgress, leaderTokens, leagueOrderCells, leagueStandingsCells, staminaBand,
+  type CountdownAnchor, type DivisionResult, type FinishView, type LaneState, type LaneView, type TickerCell,
+  collectFreshItems, divisionResults, elapsedPct, laneProgress, leaderTokens, leagueOrderCells, leagueStandingsCells, staminaBand,
 } from '@token-derby/ui';
 
 export function laneState(race: GetRaceResponse): LaneState {
@@ -48,6 +48,17 @@ export function raceLanes(race: GetRaceResponse, now: Date): { lanes: LaneView[]
 }
 
 /** The finished screen's results, in final rank order. */
+/** A league race's finish split by division, or null outside a league. Horses with no division can't score. */
+export function leagueResults(race: GetRaceResponse): DivisionResult[] | null {
+  if (race.league_id == null) return null;
+  const runners = race.horses.map((h) => ({
+    id: h.horse_id, stableId: h.stable_horse_id, name: h.name, owner: h.user_name ?? '', colors: h.colors,
+    hat: h.equipped_hat ? { id: h.equipped_hat.id, variant: h.equipped_hat.variant } : null,
+    tokens: h.final_scored_tokens ?? scoredOf(h), joinedAt: Date.parse(h.joined_at), division: h.division ?? -1,
+  }));
+  return divisionResults(runners, race.league_division_names ?? []);
+}
+
 export function finishViews(race: GetRaceResponse): FinishView[] {
   const ranked = [...race.horses].sort((a, b) => (a.rank ?? 99) - (b.rank ?? 99));
   const tokensOf = (h: HorseView) => h.final_scored_tokens ?? scoredOf(h);

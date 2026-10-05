@@ -1,5 +1,5 @@
 import type { GetRaceResponse, HorseView, SeasonStandings } from '@token-derby/shared';
-import { RaceTickerComposer, countdownAnchor, finishViews, laneState, raceLanes } from './race-view';
+import { RaceTickerComposer, countdownAnchor, finishViews, laneState, leagueResults, raceLanes } from './race-view';
 
 const T0 = '2026-04-22T09:00:00Z';
 const T1 = '2026-04-22T17:00:00Z';
@@ -96,6 +96,29 @@ describe('finishViews', () => {
     expect(finishViews(r).map((v) => [v.id, v.position, v.tokens, v.behind, v.xpBefore, v.xpAwarded])).toEqual([
       ['a', 1, 1000, null, 140, 40], ['b', 2, 700, 300, 60, 20],
     ]);
+  });
+});
+
+describe('leagueResults', () => {
+  const LEAGUE = { league_id: 'org', league_division_names: ['Premier', 'Championship'] } as Partial<GetRaceResponse>;
+
+  it('is null for a race outside a league', () => {
+    expect(leagueResults(race([horse('a', { division: 1 })]))).toBeNull();
+  });
+
+  it('splits the finish by division on final scored tokens, with league points', () => {
+    const r = race([
+      horse('a', { division: 1, final_scored_tokens: 300 }), horse('b', { division: 1, final_scored_tokens: 900 }),
+      horse('c', { division: 2, final_scored_tokens: 50 }),
+    ], { ...LEAGUE, status: 'finished' });
+    const out = leagueResults(r)!;
+    expect(out.map((d) => d.name)).toEqual(['Premier', 'Championship']);
+    expect(out[0]!.rows.map((x) => [x.id, x.points])).toEqual([['b', 20], ['a', 15]]);
+  });
+
+  it('leaves out a horse with no division', () => {
+    const out = leagueResults(race([horse('a', { division: 1 }), horse('x')], LEAGUE))!;
+    expect(out.flatMap((d) => d.rows.map((x) => x.id))).toEqual(['a']);
   });
 });
 

@@ -183,4 +183,44 @@ describe('RacePage', () => {
     expect(api.standingsCalls).toBe(1);
     expect(el.querySelector('td-ticker')).not.toBeNull();
   });
+
+  describe('on a finished league race', () => {
+    const LEAGUE = { status: 'finished', league_id: 'org', organisation_name: 'Acme', league_season: 2, league_round: 3,
+      league_division_names: ['Premier', 'Championship'],
+      horses: ['a', 'b', 'c', 'd', 'e'].map((id, i) => horse(id, { division: (i % 2) + 1, final_scored_tokens: 500 - i * 50, rank: i + 1 })) } as Partial<GetRaceResponse>;
+    // Five runners, so two sit below the podium and the board has a tab.
+    const FIELD = ['a', 'b', 'c', 'd', 'e'].map((id, i) => horse(id, { rank: i + 1 }));
+    const STANDINGS = { org_name: 'Acme', season: 2, round: 3, races_per_season: 8, divisions: [
+      { division: 1, name: 'Premier', rows: [{ rank: 1, stable_horse_id: 's-a', horse_name: 'Horse a', user_name: 'U', points: 30, season_tokens: 900, zone: null }] },
+      { division: 2, name: 'Championship', rows: [{ rank: 1, stable_horse_id: 's-b', horse_name: 'Horse b', user_name: 'V', points: 25, season_tokens: 700, zone: 'promote' }] },
+    ] } as SeasonStandings;
+    const tabs = (el: HTMLElement) => [...el.querySelectorAll('td-finished [role="tab"]')].map((t) => t.textContent?.trim());
+
+    it('calls the board Overall and adds Divisions and Season before the charts', async () => {
+      const { el, api, settle } = await setup((api) => {
+        api.standingsResult = () => Promise.resolve({ standings: STANDINGS });
+        api.next.push(() => Promise.resolve(race(LEAGUE)));
+      });
+      await settle();
+      expect(tabs(el)).toEqual(['Overall', 'Divisions', 'Season', 'Cumulative tokens', 'Pace']);
+      expect(api.standingsCalls).toBe(1);
+    });
+
+    it('leaves Season out when the standings fail to load', async () => {
+      const { el, settle } = await setup((api) => {
+        api.standingsResult = () => Promise.reject(new Error('down'));
+        api.next.push(() => Promise.resolve(race(LEAGUE)));
+      });
+      await settle();
+      expect(tabs(el)).toEqual(['Overall', 'Divisions', 'Cumulative tokens', 'Pace']);
+    });
+
+    it('keeps a normal race to Board and the charts', async () => {
+      const { el, api, settle } = await setup((api) => api.next.push(() => Promise.resolve(race({ status: 'finished', horses: FIELD }))));
+      await settle();
+      expect(tabs(el)).toEqual(['Board', 'Cumulative tokens', 'Pace']);
+      expect(api.standingsCalls).toBe(0);
+    });
+  });
 });
+

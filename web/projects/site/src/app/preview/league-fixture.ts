@@ -1,6 +1,7 @@
 // League preview data for /preview-race?league, ported from the old site's preview-league.ts.
 import type { GetRaceResponse, GetRaceSeriesResponse, HorseView, SeasonStandings, SeriesPoint } from '@token-derby/shared';
 import { scoredOf } from '@token-derby/shared';
+import { divisionResults } from '@token-derby/ui';
 import type { PreviewRaceState } from './race-fixture';
 
 const COLORS = [
@@ -30,6 +31,19 @@ const FIXTURE: Array<[string, string, number, number, number]> = [
   ['Fern', 'Grace', 2, 2600, 40],
   ['Gale', 'Heidi', 2, 900, 22],
 ];
+// Extra runners for ?divisions=N (N > 2), spread over the lower divisions.
+const EXTRA: Array<[string, string, number, number]> = [
+  ['Juniper', 'Ivan', 2750, 36], ['Maple', 'Judy', 2210, 30], ['Pepper', 'Ken', 1720, 28], ['Quill', 'Lin', 1400, 24],
+  ['Rocket', 'Mo', 3900, 40], ['Saffron', 'Nia', 3010, 34], ['Tango', 'Oli', 650, 20],
+];
+const DIVISION_NAMES = ['Premier', 'Championship', 'League One', 'League Two', 'National'];
+
+export type LeagueOptions = { divisions?: number; finale?: boolean };
+
+function field(divisions: number): (typeof FIXTURE)[number][] {
+  if (divisions <= 2) return FIXTURE;
+  return [...FIXTURE, ...EXTRA.map(([n, u, t, xp], i): (typeof FIXTURE)[number] => [n, u, 3 + (i % (divisions - 2)), t, xp])];
+}
 
 function horse([name, user, division, tokens]: (typeof FIXTURE)[number], i: number): HorseView {
   const id = name.toLowerCase();
@@ -43,18 +57,20 @@ function horse([name, user, division, tokens]: (typeof FIXTURE)[number], i: numb
 }
 
 /** The league fixture in the given state; pending isn't offered, so it falls back to live. */
-export function previewLeagueRace(state: PreviewRaceState, now = Date.now()): GetRaceResponse {
-  const ranked = FIXTURE.map(horse).sort((a, b) => b.current_tokens - a.current_tokens).map((h, i) => ({ ...h, rank: i + 1 }));
+export function previewLeagueRace(state: PreviewRaceState, now = Date.now(), opts: LeagueOptions = {}): GetRaceResponse {
+  const divisions = Math.min(5, Math.max(2, opts.divisions ?? 2));
+  const ranked = field(divisions).map(horse).sort((a, b) => b.current_tokens - a.current_tokens).map((h, i) => ({ ...h, rank: i + 1 }));
   const race = {
-    race_id: 'preview-league', name: 'Anthropic League (League Race (3/8))',
+    race_id: 'preview-league', name: `Anthropic League (League Race (${opts.finale ? 8 : 3}/8))`,
     start_time: new Date(RACE_START_MS).toISOString(), end_time: new Date(RACE_END_MS).toISOString(),
     tz: 'UTC', max_participants: 30, join_code: 'PRVRCE', created_at: new Date(RACE_START_MS - 3600_000).toISOString(),
     organisation_name: ORG_NAME, status: 'live', server_time: new Date(now).toISOString(),
     time_left_seconds: Math.max(0, Math.floor((RACE_END_MS - now) / 1000)), horses: ranked,
-    league_id: 'org-anthropic', league_season: SEASON, league_round: 3, league_division_names: ['Premier', 'Championship'],
+    league_id: 'org-anthropic', league_season: SEASON, league_round: opts.finale ? 8 : 3,
+    league_division_names: DIVISION_NAMES.slice(0, divisions),
   } as GetRaceResponse;
   if (state !== 'finished') return race;
-  const awarded = new Map(FIXTURE.map(([name, , , , xp]) => [name, xp]));
+  const awarded = new Map(field(divisions).map(([name, , , , xp]) => [name, xp]));
   return {
     ...race, status: 'finished', time_left_seconds: 0,
     horses: race.horses.map((h) => ({ ...h, final_scored_tokens: scoredOf(h), xp_awarded: awarded.get(h.name) ?? 20 }) as HorseView),
@@ -78,6 +94,40 @@ export const PREVIEW_STANDINGS: SeasonStandings = {
     ] },
   ],
 };
+
+/** Standings for the preview: as before the race while it runs, and with its points added once it has finished. */
+export function previewLeagueStandings(state: PreviewRaceState, opts: LeagueOptions = {}): SeasonStandings {
+  const round = opts.finale ? 8 : 3;
+  if (state !== 'finished' && (opts.divisions ?? 2) <= 2) return { ...PREVIEW_STANDINGS, round };
+  const race = previewLeagueRace(state, Date.now(), opts);
+  const before = new Map(PREVIEW_STANDINGS.divisions.flatMap((d) => d.rows).map((r) => [r.stable_horse_id, r]));
+  const results = divisionResults(race.horses.map((h) => ({
+    id: h.horse_id, stableId: h.stable_horse_id, name: h.name, owner: h.user_name ?? '', colors: h.colors, hat: null,
+    tokens: h.final_scored_tokens ?? scoredOf(h), joinedAt: Date.parse(h.joined_at), division: h.division ?? -1,
+  })), race.league_division_names ?? []);
+  const scored = state === 'finished';
+  return {
+    org_name: ORG_NAME, season: SEASON, round, races_per_season: 8,
+    divisions: results.map((d, di) => {
+      const rows = d.rows
+        .map((r, i) => {
+          const prior = before.get(r.stableId) ?? (r.name === 'Newbie' ? undefined : { points: 9 - i, season_tokens: 30000 - i * 1000 });
+          return {
+            stable_horse_id: r.stableId, horse_name: r.name, user_name: r.owner,
+            points: (prior?.points ?? 0) + (scored ? r.points : 0), season_tokens: (prior?.season_tokens ?? 0) + (scored ? r.tokens : 0),
+          };
+        })
+        .sort((a, b) => b.points - a.points || b.season_tokens - a.season_tokens);
+      return {
+        division: d.division, name: d.name,
+        rows: rows.map((r, i) => ({
+          ...r, rank: i + 1,
+          zone: di > 0 && i === 0 ? ('promote' as const) : di < results.length - 1 && i === rows.length - 1 ? ('relegate' as const) : null,
+        })),
+      };
+    }),
+  };
+}
 
 function seriesFor(h: HorseView, seed: number, nowMs: number): SeriesPoint[] {
   const minutes = Math.max(1, Math.floor((nowMs - RACE_START_MS) / 60_000));
