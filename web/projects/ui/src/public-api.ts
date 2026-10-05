@@ -38,3 +38,6 @@ export * from './lib/layout/resize-observer';
 export * from './lib/race/logic/crowd';
 export * from './lib/race/crowd/crowd';
 export * from './lib/race/pending-banner/pending-banner';
+export * from './lib/race/logic/ticker';
+export * from './lib/race/logic/ticker-engine';
+export * from './lib/race/ticker/ticker';

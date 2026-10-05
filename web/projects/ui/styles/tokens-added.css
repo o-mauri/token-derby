@@ -65,3 +65,21 @@
   --td-label-col: 168px;
   --td-sprite-scale: 3;
 }
+
+/* Race ticker, at the old site's fixed values (the same in every theme), per the race-port spec. */
+:root {
+  --td-ticker-h: 2.6rem;
+  --td-ticker-bg-top: rgba(12, 12, 12, 0.94);
+  --td-ticker-bg-bottom: rgba(20, 20, 20, 0.98);
+  --td-ticker-shadow: rgba(0, 0, 0, 0.45);
+  --td-ticker-text: #ffffff;
+  --td-ticker-dim: #aaaaaa;
+  --td-ticker-behind: #d98a8a;
+  --td-ticker-lead: #7bed9f;
+  --td-ticker-points-lead: #ffd166;
+  --td-ticker-groupsep: #6b4f95;
+  --td-div-1: #ffd166;
+  --td-div-2: #4db8ff;
+  --td-div-3: #a68bd8;
+  --td-div-text: #0b0b0f;
+}

@@ -1,0 +1,32 @@
+<div class="track" [style.transform]="'translateX(' + -offset() + 'px)'">
+  @for (s of slots(); track s.key) {
+    @if (s.emit.kind === 'seam') {
+      <div #slot class="seam" [attr.data-key]="s.key" [style.width.px]="s.width" aria-hidden="true"></div>
+    } @else {
+      @let c = s.emit.cell;
+      @switch (c.kind) {
+        @case ('order') {
+          <div #slot class="order" [attr.data-key]="s.key">
+            <span class="pos">{{ c.position }}.</span>&ngsp;<span class="name">{{ c.horseName }}</span>&ngsp;<span class="val" [class.lead]="c.isLeader">{{ c.valueText }}</span>
+          </div>
+        }
+        @case ('standing') {
+          <div #slot class="standing" [attr.data-key]="s.key">
+            <span class="pos">{{ c.position }}.</span>&ngsp;<span class="name">{{ c.horseName }}</span>&ngsp;<span class="total" [class.lead]="c.isLeader">{{ c.total.toLocaleString() }}</span>&ngsp;<span class="gain">(+{{ c.gain.toLocaleString() }})</span>
+          </div>
+        }
+        @case ('achievement') {
+          <div #slot class="achievement" [attr.data-key]="s.key">
+            <span class="xp">+{{ c.item.xp }} XP</span>&ngsp;<span class="horse">{{ c.item.horseName }}</span>&ngsp;<span class="ach">{{ c.item.name }}</span>&ngsp;<span class="desc">{{ c.item.description }}</span>
+          </div>
+        }
+        @case ('label') {
+          <span #slot class="label" [class]="'label ' + (c.groupClass ?? '')" [attr.data-key]="s.key">{{ c.text }}</span>
+        }
+        @case ('sep') { <div #slot class="sep" [attr.data-key]="s.key" aria-hidden="true">•</div> }
+        @case ('groupsep') { <span #slot class="groupsep" [attr.data-key]="s.key" aria-hidden="true">│</span> }
+        @case ('sectiongap') { <div #slot class="sectiongap" [class.wide]="c.wide" [attr.data-key]="s.key" aria-hidden="true"></div> }
+      }
+    }
+  }
+</div>

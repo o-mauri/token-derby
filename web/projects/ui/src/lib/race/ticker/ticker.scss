@@ -1,0 +1,69 @@
+// Ported from the old achievement ticker; the race frame decides where it sits.
+:host {
+  display: block;
+  height: var(--td-ticker-h);
+  overflow: hidden;
+  background: linear-gradient(180deg, var(--td-ticker-bg-top), var(--td-ticker-bg-bottom));
+  border-top: var(--td-line) solid var(--td-highlight);
+  box-shadow: 0 -4px 18px var(--td-ticker-shadow);
+  white-space: nowrap;
+  transition: opacity 0.3s ease;
+}
+
+:host(.is-empty) { opacity: 0; pointer-events: none; }
+
+// Wider than the screen; the component slides it left.
+.track {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  height: 100%;
+  width: max-content;
+  will-change: transform;
+}
+
+.order, .standing, .achievement { flex: 0 0 auto; display: inline-flex; align-items: baseline; gap: var(--td-space-3); }
+.order, .standing { padding: 0 var(--td-space-6); }
+.pos { color: var(--td-text-muted); }
+.name { color: var(--td-text); }
+.val, .total, .gain { font-variant-numeric: tabular-nums; }
+.val { color: var(--td-ticker-behind); }
+.val.lead { color: var(--td-ticker-lead); }
+.total { color: var(--td-text); font-weight: bold; }
+.total.lead { color: var(--td-ticker-points-lead); }
+.gain { color: var(--td-ticker-lead); }
+
+.achievement {
+  height: 100%;
+  gap: var(--td-space-4);
+  padding: 0 var(--td-space-7) 0 0;
+  font-size: var(--td-text-md);
+  line-height: var(--td-ticker-h);
+  color: var(--td-ticker-text);
+}
+
+.xp { font-weight: bold; color: var(--td-highlight); }
+.horse { font-weight: bold; }
+.ach { color: var(--td-highlight); }
+.desc { color: var(--td-ticker-dim); }
+
+.sep { flex: 0 0 auto; padding: 0 var(--td-space-7); color: var(--td-highlight); opacity: 0.55; }
+
+.label {
+  flex: 0 0 auto;
+  color: var(--td-surface);
+  background: var(--td-accent);
+  padding: 0 var(--td-space-3);
+  font-size: var(--td-text-sm);
+  letter-spacing: var(--td-tracking);
+  margin-right: var(--td-space-1);
+}
+
+.label.ticker-div-1 { background: var(--td-div-1); color: var(--td-div-text); }
+.label.ticker-div-2 { background: var(--td-div-2); color: var(--td-div-text); }
+.label.ticker-div-3 { background: var(--td-div-3); color: var(--td-div-text); }
+.groupsep { flex: 0 0 auto; color: var(--td-ticker-groupsep); padding: 0 calc(var(--td-space-7) * 2); }
+.sectiongap { flex: 0 0 auto; width: 150px; }
+// League tickers space the order block well away from the achievements.
+.sectiongap.wide { width: 600px; }
+.seam { flex: 0 0 auto; height: 100%; }
