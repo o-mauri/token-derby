@@ -37,6 +37,7 @@ export * from './lib/horse-face/horse-face';
 export * from './lib/race/header/header';
 export * from './lib/race/status-chip/status-chip';
 export * from './lib/layout/resize-observer';
+export * from './lib/layout/column-window/column-window';
 export * from './lib/race/logic/crowd';
 export * from './lib/race/crowd/crowd';
 export * from './lib/race/pending-banner/pending-banner';

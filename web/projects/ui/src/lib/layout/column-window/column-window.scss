@@ -1,0 +1,27 @@
+:host { display: block; container-type: inline-size; }
+
+.frame { display: grid; grid-template-columns: 1fr; gap: var(--td-space-3) var(--td-space-4); align-items: center; }
+.frame.paged { grid-template-columns: auto minmax(0, 1fr) auto; }
+
+.cols { display: grid; grid-template-columns: repeat(var(--cols), minmax(0, 1fr)); gap: var(--td-space-6); align-self: start; }
+.out { display: none; }
+// The window's order applies only side by side, so stacked columns keep their natural order.
+.column { order: var(--slot); }
+
+.caption {
+  grid-column: 1 / -1;
+  margin: 0;
+  text-align: center;
+  font-size: var(--td-text-xs);
+  letter-spacing: var(--td-tracking);
+  color: var(--td-text-muted);
+}
+
+// Phones: every column stacked, nothing to page through.
+@container (width < 640px) {
+  .frame.paged { grid-template-columns: 1fr; }
+  .cols { grid-template-columns: 1fr; }
+  .out { display: block; }
+  .column { order: 0; }
+  .prev, .next, .caption { display: none; }
+}
