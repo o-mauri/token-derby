@@ -1,6 +1,8 @@
 <div class="title">{{ title() }}</div>
-@if (data().hasData) {
-  @let g = geo();
+@if (!data()) {
+  <td-loader class="loading" />
+} @else if (data()!.hasData) {
+  @let g = geo()!;
   <svg #svg class="svg" role="img" [attr.aria-label]="label()" [attr.viewBox]="'0 0 ' + g.width + ' ' + height">
     @for (y of g.grid; track $index) {
       <svg:line class="grid" [attr.x1]="g.pad.l" [attr.y1]="y" [attr.x2]="g.width - g.pad.r" [attr.y2]="y" />
@@ -21,7 +23,7 @@
     <svg:text class="axis" font-size="10" x="2" [attr.y]="g.pad.t + 6">{{ g.peakLabel }}</svg:text>
   </svg>
   <div class="legend">
-    @for (l of data().lines; track l.id) {
+    @for (l of data()!.lines; track l.id) {
       <button type="button" class="item" [class.active]="active() === l.id" [class.dim]="active() !== null && active() !== l.id"
         (mouseenter)="pick(l.id)" (mouseleave)="pick(null)" (focus)="pick(l.id)" (blur)="pick(null)">
         <span class="chip" [style.background]="l.colour"></span>{{ l.name }}

@@ -35,3 +35,14 @@ export const Phone: StoryObj<Finished> = {
     template: `<div style="width:390px;height:844px;border:1px solid var(--td-border)"><td-finished [raceName]="raceName" [results]="results" [perPage]="perPage" /></div>`,
   }),
 };
+/** Charts still loading: the chart tabs show the loader until the series arrives. */
+export const ChartsLoading: StoryObj<Finished> = {
+  render: (args) => ({
+    props: { ...args, charts },
+    template: `<div style="height:100vh">
+      <td-finished [raceName]="raceName" [results]="results" [perPage]="perPage" [interval]="interval">
+        <ng-template tdTab label="Cumulative tokens"><td-race-chart style="height:100%;padding:var(--td-space-5)" mode="cumulative" [series]="null" [horses]="charts.horses" /></ng-template>
+        <ng-template tdTab label="Pace"><td-race-chart style="height:100%;padding:var(--td-space-5)" mode="throughput" [series]="null" [horses]="charts.horses" /></ng-template>
+      </td-finished></div>`,
+  }),
+};

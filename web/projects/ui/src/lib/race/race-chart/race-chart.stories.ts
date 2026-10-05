@@ -20,3 +20,5 @@ export const Pace: StoryObj<RaceChart> = { args: { mode: 'throughput' } };
 /** A live race charted up to "now" (an hour in), instead of running flat to the scheduled end. */
 export const LiveSoFar: StoryObj<RaceChart> = { args: { endMs: series.start_ms + 60 * 60_000 } };
 export const NoDataYet: StoryObj<RaceChart> = { args: { series: { ...series, horses: series.horses.map((h) => ({ ...h, points: [] })) } } };
+/** While the series loads, the chart shows the porthole loader (after its 250ms grace period). */
+export const Loading: StoryObj<RaceChart> = { args: { series: null } };

@@ -116,5 +116,14 @@ describe('RaceChart', () => {
       expect(el.querySelectorAll('.series.muted').length).toBe(0);
     });
   });
+
+  it('shows the loader while its series is still loading', async () => {
+    const { el } = await render('cumulative', null as never);
+    expect(el.querySelector('td-loader')).not.toBeNull();
+    // The loader draws its own horse sprites; what must be absent is the chart's drawing.
+    expect(el.querySelector('svg.svg')).toBeNull();
+    expect(el.querySelector('.empty')).toBeNull();
+    expect(el.querySelector('.title')?.textContent).toBe('Cumulative scored tokens');
+  });
 });
 

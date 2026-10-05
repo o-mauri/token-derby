@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, afterNextRender, computed, inject, input, signal, viewChild } from '@angular/core';
 import type { GetRaceSeriesResponse, HorseView } from '@token-derby/shared';
 import { RESIZE_OBSERVER } from '../../layout/resize-observer';
+import { Loader } from '../../loader/loader';
 import { CHART_H, CHART_W, type ChartMode, chartGeometry, chartLines, fitWidth } from '../logic/chart';
 
 const TITLES: Record<ChartMode, string> = {
@@ -13,12 +14,14 @@ const TITLES: Record<ChartMode, string> = {
 @Component({
   selector: 'td-race-chart',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [Loader],
   templateUrl: './race-chart.html',
   styleUrl: './race-chart.scss',
 })
 export class RaceChart {
   readonly mode = input.required<ChartMode>();
-  readonly series = input.required<GetRaceSeriesResponse>();
+  // Null while the series is still loading; the chart shows the loader meanwhile.
+  readonly series = input.required<GetRaceSeriesResponse | null>();
   readonly horses = input.required<readonly HorseView[]>();
   // Live races pass now, so lines don't run flat to the scheduled end.
   readonly endMs = input<number | null>(null);
@@ -29,16 +32,20 @@ export class RaceChart {
   private readonly width = signal(CHART_W);
   protected readonly height = CHART_H;
   protected readonly title = computed(() => TITLES[this.mode()]);
-  protected readonly data = computed(() =>
-    chartLines(this.mode(), this.series(), this.horses(), this.endMs() ?? this.series().end_ms, this.colourOf() ?? undefined),
-  );
-  protected readonly geo = computed(() => chartGeometry(this.data(), this.mode(), this.width()));
-  protected readonly label = computed(() => `${this.title()} for ${this.data().lines.length} horses`);
+  protected readonly data = computed(() => {
+    const series = this.series();
+    return series ? chartLines(this.mode(), series, this.horses(), this.endMs() ?? series.end_ms, this.colourOf() ?? undefined) : null;
+  });
+  protected readonly geo = computed(() => {
+    const data = this.data();
+    return data ? chartGeometry(data, this.mode(), this.width()) : null;
+  });
+  protected readonly label = computed(() => `${this.title()} for ${this.data()?.lines.length ?? 0} horses`);
   // The horse being picked out by hover, focus or tap; the rest of the lines are muted.
   protected readonly active = signal<string | null>(null);
   // Picked-out line drawn last, so it sits on top of the others.
   protected readonly ordered = computed(() => {
-    const lines = this.geo().lines;
+    const lines = this.geo()?.lines ?? [];
     const id = this.active();
     return id === null ? lines : [...lines.filter((l) => l.id !== id), ...lines.filter((l) => l.id === id)];
   });
