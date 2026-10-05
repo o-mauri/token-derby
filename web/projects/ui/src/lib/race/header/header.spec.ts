@@ -56,6 +56,14 @@ describe('RaceHeader', () => {
     expect(f.componentInstance.events).toEqual(['graphs', 'org', 'home']);
   });
 
+  it('greys out Graphs once the race has finished, since the results show the charts', async () => {
+    const { f, el } = await render({ status: 'finished' });
+    const graphs = [...el.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Graphs')!;
+    expect(graphs.disabled).toBe(true);
+    graphs.click();
+    expect(f.componentInstance.events).toEqual([]);
+  });
+
   it('only offers the org button when the race belongs to an org', async () => {
     const { el } = await render({ org: null });
     expect(buttons(el)).toEqual(['Graphs', '← Home']);
