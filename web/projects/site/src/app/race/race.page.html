@@ -1,0 +1,38 @@
+@if (notFound()) {
+  <td-page>
+    <td-not-found title="Race not found" [message]="notFoundMessage()" backLabel="← Home" (back)="router.navigate(['/'])" />
+  </td-page>
+} @else {
+  @let r = race();
+  <td-race-header [name]="r?.name ?? ''" [status]="r?.status ?? null" [anchor]="anchor()" [joinCode]="joinCode()"
+    [orgName]="r?.organisation_name ?? null" (home)="router.navigate(['/'])" (org)="goOrg()" (graphs)="openGraphs()">
+    <td-theme-picker compact />
+  </td-race-header>
+
+  @if (!r) {
+    <div class="loading"><td-loader /></div>
+  } @else if (r.status === 'finished') {
+    <td-finished class="finished" [raceName]="r.name" [results]="results()">
+      <ng-template tdTab label="Cumulative tokens">
+        <td-race-chart class="chart" mode="cumulative" [series]="finishSeries()" [horses]="r.horses" />
+      </ng-template>
+      <ng-template tdTab label="Pace">
+        <td-race-chart class="chart" mode="throughput" [series]="finishSeries()" [horses]="r.horses" />
+      </ng-template>
+    </td-finished>
+  } @else {
+    @if (r.status === 'pending') { <td-pending-banner [startsAt]="r.start_time" /> }
+    <td-crowd />
+    @if (track(); as t) {
+      <td-race-track class="track" [lanes]="t.lanes" [progressById]="t.progressById" [state]="r.status" />
+    }
+    @if (r.status === 'live') { <td-ticker class="ticker" [cells]="tickerCells()" /> }
+  }
+}
+
+<ng-template #graphs>
+  <td-dialog title="Race graphs">
+    <td-race-graphs [series]="graphsSeries()" [failed]="graphsFailed()" [horses]="race()?.horses ?? []"
+      [divisionNames]="race()?.league_division_names ?? null" [nowMs]="now()" />
+  </td-dialog>
+</ng-template>
