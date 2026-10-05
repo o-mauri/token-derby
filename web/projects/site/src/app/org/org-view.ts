@@ -1,7 +1,7 @@
 import type { GetRaceResponse, HorseColors, HorseView, RaceHighlight, RaceSummary, SeasonStandings, StandingRow } from '@token-derby/shared';
 import { scoredOf } from '@token-derby/shared';
 import {
-  type LeaguePanelView, type LivePanelView, type LiveRow, type MonthLink, type OrgRunner, type RacesPanelView,
+  type LeagueDivisionView, type LeaguePanelView, type LivePanelView, type SeasonLink, type LiveRow, type MonthLink, type OrgRunner, type RacesPanelView,
   type ResultRow, type StatsPanelView, type UpcomingRow, startsIn,
 } from '@token-derby/ui';
 
@@ -178,3 +178,38 @@ export function liveRow(races: readonly RaceSummary[], nowMs: number): LiveRow |
     anchor: { atMs: nowMs, timeLeftSeconds: r.time_left_seconds ?? secondsUntil(r.end_time, nowMs) },
   };
 }
+
+/** The season named in ?season=, if it's a whole number from 1 to the current season; otherwise the current one. */
+export function seasonToShow(requested: string | undefined, current: number): number {
+  const n = Number(requested);
+  return requested !== undefined && Number.isInteger(n) && n >= 1 && n <= current ? n : current;
+}
+
+export type LeaguePageView = {
+  season: number; label: string;
+  progress: { round: number; total: number } | null;
+  champion: { name: string; owner: string; division: string } | null;
+  prev: SeasonLink | null; next: SeasonLink | null;
+  divisions: LeagueDivisionView[];
+};
+
+/** One season of a league: its divisions, the switcher either side, and progress (current) or champion (past). */
+export function leaguePageView(standings: SeasonStandings, current: number): LeaguePageView {
+  const season = standings.season;
+  const past = season < current;
+  const top = standings.divisions.find((d) => d.rows.length > 0);
+  const lead = top?.rows[0];
+  const link = (n: number): SeasonLink => ({ key: n, label: `Season ${n}` });
+  return {
+    season, label: `SEASON ${season}`,
+    progress: past ? null : { round: standings.round, total: standings.races_per_season },
+    champion: past && top && lead ? { name: lead.horse_name, owner: lead.user_name, division: top.name } : null,
+    prev: season > 1 ? link(season - 1) : null,
+    next: season < current ? link(season + 1) : null,
+    divisions: standings.divisions.map((d) => ({
+      name: d.name,
+      rows: d.rows.map((r) => ({ ...standingRunner(r), place: r.rank, points: r.points, zone: r.zone })),
+    })),
+  };
+}
+

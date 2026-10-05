@@ -12,7 +12,8 @@ export class OrgApi {
     return firstValueFrom(this.http.get<ListOrgRacesResponse>(`/api/organisations/${encodeURIComponent(name)}/races`));
   }
 
-  standings(name: string): Promise<GetLeagueStandingsResponse> {
-    return firstValueFrom(this.http.get<GetLeagueStandingsResponse>(`/api/organisations/${encodeURIComponent(name)}/league/standings`));
+  standings(name: string, season?: number): Promise<GetLeagueStandingsResponse> {
+    const query = season === undefined ? '' : `?season=${season}`;
+    return firstValueFrom(this.http.get<GetLeagueStandingsResponse>(`/api/organisations/${encodeURIComponent(name)}/league/standings${query}`));
   }
 }

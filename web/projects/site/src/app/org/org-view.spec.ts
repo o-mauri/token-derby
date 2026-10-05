@@ -1,6 +1,6 @@
 import type { GetRaceResponse, HorseView, RaceSummary, SeasonStandings } from '@token-derby/shared';
 import {
-  currentLive, leaguePanelView, livePanelView, liveRow, monthKey, monthPage, racesPanelView, statsPanelView, upcomingRows,
+  currentLive, leaguePageView, leaguePanelView, seasonToShow, livePanelView, liveRow, monthKey, monthPage, racesPanelView, statsPanelView, upcomingRows,
 } from './org-view';
 
 const C = { body: '#8B4513', mane: '#000000', tail: '#000000', saddle: '#C0392B' };
@@ -201,3 +201,46 @@ describe('upcomingRows and liveRow', () => {
     expect(liveRow([], NOW)).toBeNull();
   });
 });
+
+describe('seasonToShow', () => {
+  it.each([['2', 2], ['3', 3], ['0', 3], ['99', 3], ['abc', 3], [undefined, 3], ['2.5', 3], ['-1', 3]])('reads %s as season %d of 3', (raw, out) => {
+    expect(seasonToShow(raw as string | undefined, 3)).toBe(out);
+  });
+});
+
+describe('leaguePageView', () => {
+  const row = (rank: number, name: string, points: number, zone: 'promote' | 'relegate' | null = null) =>
+    ({ rank, stable_horse_id: `s-${name}`, horse_name: name, user_name: `o-${name}`, points, season_tokens: 0, zone });
+  const standings = (season: number, divisions: { name: string; rows: ReturnType<typeof row>[] }[]): SeasonStandings => ({
+    org_name: 'Acme', season, round: season === 3 ? 6 : 10, races_per_season: 10,
+    divisions: divisions.map((d, i) => ({ division: i + 1, ...d })),
+  });
+
+  it('shows the current season with its progress and no champion', () => {
+    const v = leaguePageView(standings(3, [{ name: 'Premier', rows: [row(1, 'Gallopz', 44), row(2, 'Fern', 40, 'relegate')] }]), 3);
+    expect(v).toMatchObject({ season: 3, label: 'SEASON 3', progress: { round: 6, total: 10 }, champion: null, next: null });
+    expect(v.prev).toEqual({ key: 2, label: 'Season 2' });
+    expect(v.divisions[0]!.rows.map((r) => [r.place, r.name, r.owner, r.points, r.zone])).toEqual([
+      [1, 'Gallopz', 'o-Gallopz', 44, null], [2, 'Fern', 'o-Fern', 40, 'relegate'],
+    ]);
+  });
+
+  it('marks a past season final and crowns the top division leader', () => {
+    const v = leaguePageView(standings(2, [{ name: 'Premier', rows: [row(1, 'Gallopz', 44)] }, { name: 'Championship', rows: [row(1, 'Oak', 30)] }]), 3);
+    expect(v.progress).toBeNull();
+    expect(v.champion).toEqual({ name: 'Gallopz', owner: 'o-Gallopz', division: 'Premier' });
+    expect(v.next).toEqual({ key: 3, label: 'Season 3' });
+  });
+
+  it('takes the champion from the first division with horses', () => {
+    const v = leaguePageView(standings(1, [{ name: 'Premier', rows: [] }, { name: 'Championship', rows: [row(1, 'Oak', 30)] }]), 3);
+    expect(v.champion?.name).toBe('Oak');
+    expect(v.prev).toBeNull();
+  });
+
+  it('draws a horse without colours from the API as the neutral horse', () => {
+    const v = leaguePageView(standings(3, [{ name: 'Premier', rows: [row(1, 'Gallopz', 44)] }]), 3);
+    expect(v.divisions[0]!.rows[0]!.colors.body).toBe('#8a8a94');
+  });
+});
+
