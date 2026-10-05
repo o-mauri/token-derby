@@ -1,0 +1,51 @@
+@let v = view();
+@switch (v.kind) {
+  @case ('none') {
+    <p class="none">NO CURRENT RACE</p>
+  }
+  @case ('next') {
+    <div class="title"><span class="race" [tdMarquee]="v.name">{{ v.name }}</span></div>
+    <div class="hero next">
+      <p class="waiting">The field is gathering.</p>
+      <div class="side">
+        <span class="code">{{ v.code }}</span>
+        <span class="starts">STARTS IN</span>
+        <td-countdown [anchor]="v.anchor" />
+      </div>
+    </div>
+  }
+  @case ('live') {
+    <div class="title"><span class="race" [tdMarquee]="v.name">{{ v.name }}</span></div>
+    <div class="hero">
+      @if (v.leader; as l) {
+        <td-horse class="lead-sprite" [colors]="l.colors" [hat]="l.hat" running />
+        <div class="lead">
+          <span class="label">LEADING</span>
+          <span class="name-row"><span class="name" [tdMarquee]="l.name">{{ l.name }}</span></span>
+          <span class="meta">{{ l.owner }}@if (l.pace !== null) { · +{{ compact(l.pace) }}/min }</span>
+          <span class="tokens">{{ compact(l.tokens) }}</span>
+        </div>
+        <div class="chasers">
+          @for (c of v.chasers; track c.id) {
+            <div class="row">
+              <span class="place">{{ c.place }}</span>
+              <td-horse class="sprite" [colors]="c.colors" [hat]="c.hat" />
+              <span class="who"><span class="name" [tdMarquee]="c.name">{{ c.name }}</span><span class="owner">{{ c.owner }}</span></span>
+              <span class="tokens">{{ compact(c.tokens) }}</span>
+              <span class="gap">-{{ compact(c.gap) }}</span>
+            </div>
+          }
+        </div>
+      } @else {
+        <p class="waiting">The race is on.</p>
+      }
+      <div class="side">
+        <span class="code">{{ v.code }}@if (v.runners !== null) { · {{ v.runners }} runners }</span>
+        <td-status-chip status="live" />
+        <td-countdown [anchor]="v.anchor" />
+        <span class="bar" aria-hidden="true"><i [style.width.%]="v.elapsedPct"></i></span>
+        <span class="run">{{ v.elapsedPct }}% run</span>
+      </div>
+    </div>
+  }
+}

@@ -1,0 +1,23 @@
+@let v = view();
+@if (v.next; as n) {
+  <div class="next">
+    <span class="tag">NEXT</span>
+    <span class="name-row"><span class="name" [tdMarquee]="n.name">{{ n.name }}</span></span>
+    <td-countdown [anchor]="n.anchor" />
+  </div>
+}
+<div class="head"><span class="title">LATEST RESULTS</span><span class="count">{{ v.count }} races</span></div>
+@for (r of v.latest; track r.code) {
+  <div class="result">
+    <span class="date">{{ r.date }}</span>
+    <span class="name-row race"><span class="name" [tdMarquee]="r.name">{{ r.name }}</span></span>
+    <span class="winner">
+      @if (r.winner; as w) {
+        <td-horse class="sprite" [colors]="w.colors" [hat]="w.hat" />
+        <span class="name-row"><span class="name" [tdMarquee]="w.name">{{ w.name }}</span></span>
+      } @else { — }
+    </span>
+    <span class="tokens">{{ compact(r.tokens) }}</span>
+    <span class="ran">{{ r.runners === null ? '—' : r.runners + ' ran' }}</span>
+  </div>
+}

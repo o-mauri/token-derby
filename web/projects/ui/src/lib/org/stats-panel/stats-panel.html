@@ -1,0 +1,18 @@
+@let v = view();
+<div class="line races-run"><span class="k">Races run</span><span class="v led">{{ v.racesRun }}</span></div>
+<div class="line most-wins">
+  <span class="k">Most wins</span>
+  <span class="v">
+    @if (v.mostWins; as w) {
+      <td-horse class="sprite" [colors]="w.colors" [hat]="w.hat" />
+      <span class="name-row"><span class="name" [tdMarquee]="w.name">{{ w.name }}</span></span>&ngsp;<span class="led">×{{ w.wins }}</span>
+    } @else { — }
+  </span>
+</div>
+<div class="line total"><span class="k">Total tokens</span><span class="v led">{{ total() }}</span></div>
+<div class="chart">
+  <span class="k caption">TOTAL TOKENS · LAST 10 RACES</span>
+  <div class="bars" aria-hidden="true">
+    @for (h of bars(); track $index; let last = $last) { <i class="bar" [class.latest]="last" [style.height.%]="h"></i> }
+  </div>
+</div>
