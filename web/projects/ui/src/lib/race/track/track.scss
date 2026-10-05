@@ -2,7 +2,11 @@
 :host {
   display: flex;
   flex-direction: column;
-  padding: var(--td-space-5) var(--td-space-3);
+  padding: var(--td-space-8) var(--td-space-3) var(--td-space-5);
+  // Reaches up behind the crowd so the top horse's hat can draw over it, while the lanes stay put.
+  margin-top: calc(-1 * var(--td-space-8));
+  position: relative;
+  z-index: 1;
   overflow-y: auto;
   min-height: 0;
   scrollbar-width: none;
