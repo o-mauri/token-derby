@@ -24,6 +24,7 @@ export * from './lib/hat/hat-pixels';
 export * from './lib/race/models';
 export * from './lib/race/logic/progress';
 export * from './lib/race/logic/stamina';
+export * from './lib/race/logic/league';
 export * from './lib/race/stamina-bar/stamina-bar';
 export * from './lib/race/lane/lane';
 export * from './lib/race/track/track';
