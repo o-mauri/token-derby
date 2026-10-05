@@ -37,8 +37,9 @@ a.frame:focus-visible { outline: var(--td-focus-width) solid var(--td-highlight)
 
 :host(.disabled) .frame { opacity: 0.45; }
 
-// Phones: the spine turns into a heading above the content.
-@container (width < 700px) {
+// Phones: the spine turns into a heading above the content. Keyed to the screen, not the panel, so a narrow
+// panel in a desktop grid keeps its vertical spine.
+@media (width < 700px) {
   .frame { flex-direction: column; }
   .spine {
     writing-mode: horizontal-tb;

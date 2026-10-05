@@ -9,15 +9,15 @@ import type { MonthLink } from '../models';
   imports: [RouterLink],
   template: `
     @if (prev(); as p) {
-      <a class="prev" [routerLink]="[]" [queryParams]="{ month: p.key }">‹<span class="lbl"> {{ p.label }}</span></a>
+      <a class="prev" [routerLink]="[]" [queryParams]="{ month: p.key }" [attr.aria-label]="'Previous month, ' + p.label">‹<span class="lbl"> {{ p.label }}</span></a>
     } @else {
-      <span class="prev end" aria-disabled="true">‹</span>
+      <span class="prev end" role="link" aria-disabled="true" aria-label="No earlier month">‹</span>
     }
     <span class="month">{{ label() }} <span class="count">· {{ count() }} races</span></span>
     @if (next(); as n) {
-      <a class="next" [routerLink]="[]" [queryParams]="{ month: n.key }"><span class="lbl">{{ n.label }} </span>›</a>
+      <a class="next" [routerLink]="[]" [queryParams]="{ month: n.key }" [attr.aria-label]="'Next month, ' + n.label"><span class="lbl">{{ n.label }} </span>›</a>
     } @else {
-      <span class="next end" aria-disabled="true">›</span>
+      <span class="next end" role="link" aria-disabled="true" aria-label="No later month">›</span>
     }
   `,
   styleUrl: './month-pager.scss',

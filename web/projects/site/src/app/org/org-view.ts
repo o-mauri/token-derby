@@ -16,6 +16,10 @@ const shortDate = (d: Date) => `${d.getDate()} ${MONTHS[d.getMonth()]}`;
 const byStart = (a: RaceSummary, b: RaceSummary) => Date.parse(a.start_time) - Date.parse(b.start_time);
 const finished = (races: readonly RaceSummary[]) => races.filter((r) => r.status === 'finished').sort(byStart);
 const pending = (races: readonly RaceSummary[]) => races.filter((r) => r.status === 'pending').sort(byStart);
+/** The live race the org pages follow: the most recently started, if two overlap. */
+export function currentLive(races: readonly RaceSummary[]): RaceSummary | undefined {
+  return races.filter((r) => r.status === 'live').sort(byStart).at(-1);
+}
 const secondsUntil = (iso: string, nowMs: number) => Math.max(0, (Date.parse(iso) - nowMs) / 1000);
 
 function highlightRunner(h: RaceHighlight): OrgRunner {
@@ -40,7 +44,7 @@ function resultRow(r: RaceSummary): ResultRow {
 
 /** The LIVE panel: the live race (with its horses when loaded), else the next race, else none. */
 export function livePanelView(races: readonly RaceSummary[], detail: GetRaceResponse | null, nowMs: number): LivePanelView {
-  const live = races.filter((r) => r.status === 'live').sort(byStart)[0];
+  const live = currentLive(races);
   if (live) {
     const ranked = detail && detail.join_code === live.join_code ? [...detail.horses].sort((a, b) => scoredOf(b) - scoredOf(a)) : [];
     const lead = ranked[0];
@@ -166,7 +170,7 @@ export function upcomingRows(races: readonly RaceSummary[], nowMs: number): Upco
 
 /** The pinned row for the live race on the races page, from its summary. */
 export function liveRow(races: readonly RaceSummary[], nowMs: number): LiveRow | null {
-  const r = races.filter((x) => x.status === 'live').sort(byStart)[0];
+  const r = currentLive(races);
   if (!r) return null;
   return {
     code: r.join_code, name: r.name, leader: r.highlight ? highlightRunner(r.highlight) : null,

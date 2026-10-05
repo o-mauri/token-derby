@@ -1,7 +1,5 @@
 import type { CanMatchFn, Routes } from '@angular/router';
 import { ORG_NAME_PATTERN } from '@token-derby/shared';
-import { OrgApi } from './org/org-api';
-import { OrgData } from './org/org-data';
 import { previewRoutes } from './preview/preview.routes';
 
 const RACE_CODE = /^[A-Za-z0-9]+$/;
@@ -18,7 +16,6 @@ export const routes: Routes = [
   {
     path: 'org/:name',
     canMatch: [orgNameGuard],
-    providers: [OrgApi, OrgData],
     loadComponent: () => import('./org/org-shell').then((m) => m.OrgShell),
     children: [
       { path: '', loadComponent: () => import('./org/org.page').then((m) => m.OrgPage) },

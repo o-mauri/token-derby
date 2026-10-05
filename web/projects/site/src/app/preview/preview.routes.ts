@@ -3,8 +3,6 @@ import type { Route, Routes } from '@angular/router';
 import { apiErrors } from '@token-derby/ui';
 import { RaceApi } from '../race/race-api';
 import { fixtureInterceptor } from './fixture.interceptor';
-import { OrgApi } from '../org/org-api';
-import { OrgData } from '../org/org-data';
 import { orgFixtureInterceptor } from './org-fixture.interceptor';
 import { PREVIEW_ORG } from './org-fixture';
 import { PREVIEW_JOIN_CODE } from './race-fixture';
@@ -21,7 +19,7 @@ const race = (path: string): Route => ({
 // The org dashboard and races page over a fixture org, with their own HttpClient like the race previews.
 const org: Route = {
   path: 'preview-org',
-  providers: [provideHttpClient(withInterceptors([apiErrors, orgFixtureInterceptor])), RaceApi, OrgApi, OrgData],
+  providers: [provideHttpClient(withInterceptors([apiErrors, orgFixtureInterceptor])), RaceApi],
   data: { name: PREVIEW_ORG },
   loadComponent: () => import('../org/org-shell').then((m) => m.OrgShell),
   children: [

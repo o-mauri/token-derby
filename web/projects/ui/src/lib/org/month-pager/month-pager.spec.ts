@@ -34,4 +34,12 @@ describe('MonthPager', () => {
     expect(next.tagName).toBe('SPAN');
     expect(next.getAttribute('aria-disabled')).toBe('true');
   });
+
+  it('names the arrows for screen readers, including the disabled end', async () => {
+    const el = await render({ key: '2026-08', label: 'August' }, null);
+    expect(el.querySelector('a.prev')?.getAttribute('aria-label')).toBe('Previous month, August');
+    const next = el.querySelector('.next')!;
+    expect(next.getAttribute('role')).toBe('link');
+    expect(next.getAttribute('aria-label')).toBe('No later month');
+  });
 });

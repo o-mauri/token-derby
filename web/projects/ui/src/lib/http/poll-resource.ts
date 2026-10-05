@@ -57,6 +57,10 @@ export function pollResource<P, T>(opts: PollOptions<P, T>): PollResource<T> {
     const params = opts.params();
     untracked(() => {
       stop();
+      // New params: the old answer (and any error) belongs to something else now.
+      value.set(undefined);
+      error.set(undefined);
+      status.set('idle');
       if (params === null) return;
       const gen = generation;
       timer = setTimeout(() => run(params, gen), 0);

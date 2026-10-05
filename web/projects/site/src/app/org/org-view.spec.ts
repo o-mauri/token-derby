@@ -1,6 +1,6 @@
 import type { GetRaceResponse, HorseView, RaceSummary, SeasonStandings } from '@token-derby/shared';
 import {
-  leaguePanelView, livePanelView, liveRow, monthKey, monthPage, racesPanelView, statsPanelView, upcomingRows,
+  currentLive, leaguePanelView, livePanelView, liveRow, monthKey, monthPage, racesPanelView, statsPanelView, upcomingRows,
 } from './org-view';
 
 const C = { body: '#8B4513', mane: '#000000', tail: '#000000', saddle: '#C0392B' };
@@ -56,6 +56,16 @@ describe('livePanelView', () => {
 
   it('says none when nothing is live or coming', () => {
     expect(livePanelView([race({ code: 'OLD' })], null, NOW)).toEqual({ kind: 'none' });
+  });
+});
+
+describe('currentLive', () => {
+  it('picks the most recently started of two overlapping live races, everywhere', () => {
+    const older = race({ code: 'OLDER', status: 'live', start_time: local(2026, 10, 1, 8) });
+    const newer = race({ code: 'NEWER', status: 'live', start_time: local(2026, 10, 1, 10) });
+    expect(currentLive([older, newer])?.join_code).toBe('NEWER');
+    expect(livePanelView([older, newer], null, NOW)).toMatchObject({ kind: 'live', code: 'NEWER' });
+    expect(liveRow([older, newer], NOW)?.code).toBe('NEWER');
   });
 });
 

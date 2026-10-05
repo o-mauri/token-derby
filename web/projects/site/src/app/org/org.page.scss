@@ -1,5 +1,6 @@
-// One screen on desktop (no scrolling); stacked and scrolling on phones.
-:host { display: flex; flex-direction: column; height: 100vh; min-height: 0; padding: var(--td-space-4); gap: var(--td-space-4); box-sizing: border-box; }
+// One screen on desktop; stacked and scrolling on phones.
+// Exactly a screen tall, but never shorter than the panels need: in a short window the page scrolls instead.
+:host { display: flex; flex-direction: column; height: max(100vh, 46rem); padding: var(--td-space-4); gap: var(--td-space-4); box-sizing: border-box; }
 
 .top { display: flex; justify-content: space-between; align-items: center; gap: var(--td-space-5); padding: 0 var(--td-space-3); }
 .org { display: flex; align-items: center; gap: var(--td-space-4); min-width: 0; }
@@ -16,7 +17,7 @@
   min-height: 0;
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  grid-template-rows: repeat(3, minmax(0, 1fr));
+  grid-template-rows: repeat(3, minmax(13rem, 1fr));
   gap: var(--td-space-4);
 }
 .live { grid-column: 1 / -1; }

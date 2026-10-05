@@ -3,6 +3,7 @@ import type { ListOrgRacesResponse } from '@token-derby/shared';
 import { ApiError, pollResource } from '@token-derby/ui';
 import { RaceApi } from '../race/race-api';
 import { OrgApi } from './org-api';
+import { currentLive } from './org-view';
 
 const QUICK_MS = 60_000;
 const SLOW_MS = 10 * 60_000;
@@ -14,7 +15,8 @@ function busy(res: ListOrgRacesResponse | undefined): boolean {
   return !!res?.races.some((r) => r.status === 'live' || (r.status === 'pending' && Date.parse(r.start_time) - now < SOON_MS));
 }
 
-/** One org's races, league standings and live race, shared by its dashboard and races page. Set `name` to start. */
+/** One org's races, league standings and live race, shared by its dashboard and races page. Set `name` to start.
+ *  Provided by OrgShell, so it (and its polling) ends when the visitor leaves the org's pages. */
 @Injectable()
 export class OrgData {
   readonly name = signal<string | null>(null);
@@ -36,8 +38,9 @@ export class OrgData {
   readonly races = this.racesPoll.value;
   readonly standings = computed(() => this.standingsPoll.value()?.standings ?? null);
   readonly standingsLoaded = computed(() => this.standingsPoll.value() !== undefined);
+  readonly standingsFailed = computed(() => this.standingsPoll.error() !== undefined && !this.standingsLoaded());
 
-  private readonly liveCode = computed(() => this.races()?.races.find((r) => r.status === 'live')?.join_code ?? null);
+  private readonly liveCode = computed(() => currentLive(this.races()?.races ?? [])?.join_code ?? null);
   private readonly livePoll = pollResource({
     params: () => this.liveCode(),
     loader: (code: string) => this.raceApi.race(code),

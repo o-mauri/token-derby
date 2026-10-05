@@ -5,7 +5,10 @@ import { provideRouter, withComponentInputBinding } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import type { ListOrgRacesResponse, RaceSummary } from '@token-derby/shared';
 import { RESIZE_OBSERVER, apiErrors } from '@token-derby/ui';
+import { By } from '@angular/platform-browser';
 import { routes } from '../app.routes';
+import { OrgData } from './org-data';
+import { OrgShell } from './org-shell';
 
 const C = { body: '#8B4513', mane: '#000000', tail: '#000000', saddle: '#C0392B' };
 const at = (days: number, hour = 9) => { const d = new Date(); d.setDate(d.getDate() + days); d.setHours(hour, 0, 0, 0); return d.toISOString(); };
@@ -42,12 +45,14 @@ async function open(url: string) {
 }
 
 /** Answers the org's races and standings, and the live race if it's asked for. */
-function answer(http: HttpTestingController, races: ListOrgRacesResponse | 'missing' | 'down' = RACES) {
+function answer(http: HttpTestingController, races: ListOrgRacesResponse | 'missing' | 'down' = RACES, standings: 'none' | 'down' | 'later' = 'none') {
   const req = http.expectOne('/api/organisations/Acme/races');
   if (races === 'missing') req.flush({ code: 'ORG_NOT_FOUND', message: 'No organisation' }, { status: 404, statusText: 'Not Found' });
   else if (races === 'down') req.error(new ProgressEvent('error'));
   else req.flush(races);
-  http.match('/api/organisations/Acme/league/standings').forEach((r) => r.flush({ standings: null }));
+  if (standings === 'later') return;
+  http.match('/api/organisations/Acme/league/standings').forEach((r) =>
+    standings === 'down' ? r.flush({ code: 'INTERNAL', message: 'x' }, { status: 500, statusText: 'Error' }) : r.flush({ standings: null }));
 }
 
 describe('OrgPage', () => {
@@ -87,6 +92,34 @@ describe('OrgPage', () => {
     await settle();
     expect(el().querySelectorAll('.failed').length).toBe(3);
     expect(el().querySelector('td-panel.league td-org-league-panel')).not.toBeNull();
+  });
+});
+
+describe('OrgPage data lifetime and league states', () => {
+  it('gives each visit to an org its own data, so nothing polls or lingers after leaving', async () => {
+    const { harness, http, settle } = await open('/org/Acme');
+    answer(http);
+    await settle();
+    const shell = () => harness.fixture.debugElement.query(By.directive(OrgShell));
+    const first = shell().injector.get(OrgData);
+    await harness.navigateByUrl('/');
+    await harness.navigateByUrl('/org/Acme');
+    await settle();
+    expect(shell().injector.get(OrgData)).not.toBe(first);
+  });
+
+  it('shows nothing in LEAGUE while standings load, rather than "No league"', async () => {
+    const { el, http, settle } = await open('/org/Acme');
+    answer(http, RACES, 'later');
+    await settle();
+    expect(el().querySelector('td-panel.league')?.textContent).not.toContain('No league');
+  });
+
+  it('says so inside LEAGUE when the standings fail to load', async () => {
+    const { el, http, settle } = await open('/org/Acme');
+    answer(http, RACES, 'down');
+    await settle();
+    expect(el().querySelector('td-panel.league .failed')?.textContent).toContain("Couldn't load the league");
   });
 });
 

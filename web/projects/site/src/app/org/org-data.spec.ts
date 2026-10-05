@@ -87,4 +87,13 @@ describe('OrgData', () => {
     expect(data.races()?.races).toHaveLength(1);
     expect(data.liveRace()).toBeNull();
   });
+
+  it('drops the previous org\u2019s data the moment the name changes', async () => {
+    const { data } = await setup((o) => (o.racesResult = () => Promise.resolve({ org_name: 'Acme', races: [summary('LIVE', 'live')] })));
+    expect(data.races()?.org_name).toBe('Acme');
+    data.name.set('Other');
+    TestBed.tick();
+    expect(data.races()).toBeUndefined();
+    expect(data.loading()).toBe(true);
+  });
 });

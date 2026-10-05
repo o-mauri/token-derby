@@ -123,4 +123,14 @@ describe('pollResource', () => {
     await vi.advanceTimersByTimeAsync(1); await flush();
     expect(f.componentInstance.calls).toBe(3);
   });
+
+  it('forgets the old value and error as soon as the params change', async () => {
+    const f = await start();
+    expect(f.componentInstance.poll.value()?.code).toBe('ABC');
+    f.componentInstance.code.set('XYZ');
+    TestBed.tick();
+    expect(f.componentInstance.poll.value()).toBeUndefined();
+    expect(f.componentInstance.poll.error()).toBeUndefined();
+    expect(f.componentInstance.poll.status()).not.toBe('resolved');
+  });
 });
