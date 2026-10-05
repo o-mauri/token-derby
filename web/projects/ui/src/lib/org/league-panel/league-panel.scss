@@ -8,7 +8,8 @@
 .bar { flex: 1; height: var(--td-space-2); background: var(--td-xp-track); border-radius: var(--td-radius-pill); overflow: hidden; }
 .bar i { display: block; height: 100%; background: var(--td-highlight); }
 
-.cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--td-space-6); min-height: 0; overflow: hidden; align-items: start; }
+// Clipped with a small margin: the pixel font's first glyph sits right on the edge and would lose a dot.
+.cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--td-space-6); min-height: 0; overflow: clip; overflow-clip-margin: var(--td-space-2); align-items: start; }
 .division { display: grid; min-width: 0; padding-left: var(--td-space-5); border-left: var(--td-line-thin) solid var(--td-border); }
 .division:first-child { padding-left: 0; border-left: 0; }
 .div-name { font-family: 'Bitcount Prop Single', var(--td-font-pixel); font-size: var(--td-text-sm); letter-spacing: var(--td-tracking-wide); text-transform: uppercase; color: var(--td-highlight); }
