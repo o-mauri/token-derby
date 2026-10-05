@@ -49,3 +49,7 @@ export type LiveRow = {
 };
 export type UpcomingRow = { readonly code: string; readonly name: string; readonly startsAt: string; readonly date: string; readonly time: string; readonly startsIn: string; readonly anchor: CountdownAnchor };
 export type MonthLink = { readonly key: string; readonly label: string };
+
+export type SeasonLink = { readonly key: number; readonly label: string };
+export type LeagueRowView = OrgRunner & { readonly place: number; readonly points: number; readonly zone: 'promote' | 'relegate' | null };
+export type LeagueDivisionView = { readonly name: string; readonly rows: readonly LeagueRowView[] };

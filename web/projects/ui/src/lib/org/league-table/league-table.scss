@@ -1,0 +1,40 @@
+@use '../../marquee';
+
+:host { display: block; min-width: 0; }
+
+.head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding-bottom: var(--td-space-2);
+  margin-bottom: var(--td-space-1);
+  border-bottom: var(--td-line-thin) solid var(--td-border);
+}
+.name-head { font-family: 'Bitcount Prop Single', var(--td-font-pixel); font-size: var(--td-text-md); letter-spacing: var(--td-tracking-wide); text-transform: uppercase; color: var(--td-highlight); }
+.count { color: var(--td-text-muted); font-size: var(--td-text-sm); }
+
+.row {
+  display: grid;
+  grid-template-columns: 1.6rem 1.5rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--td-space-3);
+  padding: var(--td-space-2) var(--td-space-3);
+  border-bottom: var(--td-line-thin) solid var(--td-border);
+}
+.row.promote { box-shadow: inset calc(var(--td-line) * 1.5) 0 0 var(--td-zone-promote); }
+.row.relegate { box-shadow: inset calc(var(--td-line) * 1.5) 0 0 var(--td-zone-relegate); }
+
+.place { color: var(--td-text-muted); }
+.place.gold { color: var(--td-medal-gold); }
+.place.silver { color: var(--td-medal-silver); }
+.place.bronze { color: var(--td-medal-bronze); }
+
+// The owner shrinks and disappears before the horse's name has to scroll.
+.who { display: flex; align-items: baseline; gap: var(--td-space-3); min-width: 0; overflow: hidden; white-space: nowrap; }
+.name { flex: none; max-width: 100%; font-weight: bold; }
+.owner { flex: 0 100 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--td-text-muted); font-size: var(--td-text-sm); }
+
+.points { font-family: 'Bitcount Prop Single', var(--td-font-pixel); color: var(--td-highlight); text-shadow: 0 0 6px color-mix(in srgb, var(--td-highlight) 45%, transparent); }
+.empty { margin: var(--td-space-4) 0; color: var(--td-text-muted); }
+
+@include marquee.marquee('.name');

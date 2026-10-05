@@ -70,3 +70,5 @@ export * from './lib/org/stats-panel/stats-panel';
 export * from './lib/org/races-panel/races-panel';
 export * from './lib/org/race-list/race-list';
 export * from './lib/org/month-pager/month-pager';
+export * from './lib/org/season-pager/season-pager';
+export * from './lib/org/league-table/league-table';
