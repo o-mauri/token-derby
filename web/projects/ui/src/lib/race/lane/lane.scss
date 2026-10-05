@@ -35,6 +35,21 @@
   border-radius: var(--td-radius);
 }
 
+// Each lane's fence is the bottom 36 of the sprite's 128 rows, so the first lane gets a copy
+// on top, with room above for the top chip, horse and hat to clear the track's edge.
+$fence-height: calc(var(--td-lane-height) * 36 / 128);
+.lane.first { margin-top: $fence-height; }
+
+.top-fence {
+  position: absolute;
+  inset: auto 0 100%;
+  height: $fence-height;
+  background: var(--td-track-wash), var(--td-track-lane) url('/img/track-1.png') repeat-x center bottom / auto var(--td-lane-height);
+  background-blend-mode: var(--td-track-wash-blend), var(--td-track-blend);
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+
 // Start rail.
 .strip::before {
   content: "";
@@ -86,6 +101,7 @@
 // ── London: a wet road, with dashed markings between lanes and lamps along the near kerb ──
 :host-context([data-theme="london"]) {
   .strip { background: var(--td-track-lane); border-radius: 0; }
+  .top-fence { display: none; }
 
   .lane:not(.first) .strip {
     background-image: repeating-linear-gradient(90deg, var(--td-track-rail) 0 34px, transparent 34px 62px);

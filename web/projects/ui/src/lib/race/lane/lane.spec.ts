@@ -65,4 +65,9 @@ describe('RaceLane', () => {
     expect(lane.classList.contains('last')).toBe(true);
     expect(later.el.querySelector('.rain')!.classList.contains('rain-v2')).toBe(true);
   });
+
+  it("draws a fence above the first lane only, since every lane draws its fence at its foot", async () => {
+    expect((await render({ index: 0 })).el.querySelector('.strip > .top-fence')).not.toBeNull();
+    expect((await render({ index: 1 })).el.querySelector('.top-fence')).toBeNull();
+  });
 });

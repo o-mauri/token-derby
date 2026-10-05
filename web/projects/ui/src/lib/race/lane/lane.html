@@ -5,6 +5,7 @@
       [pace]="l.pace" [position]="l.position" [league]="l.league" />
   </div>
   <div class="strip">
+    @if (index() === 0) { <div class="top-fence"></div> }
     <div [class]="rainClass()"></div>
     <div class="runner" [class.running]="running()" [style.left.%]="progress()">
       <td-horse [colors]="l.colors" [hat]="l.hat" [running]="running()" [dust]="state() === 'live'" />
