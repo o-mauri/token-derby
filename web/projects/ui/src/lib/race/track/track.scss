@@ -1,0 +1,11 @@
+// TV layout: the track fills the remaining height and scrolls, with its scrollbar hidden.
+:host {
+  display: flex;
+  flex-direction: column;
+  padding: var(--td-space-5) var(--td-space-3);
+  overflow-y: auto;
+  min-height: 0;
+  scrollbar-width: none;
+}
+
+:host::-webkit-scrollbar { display: none; }

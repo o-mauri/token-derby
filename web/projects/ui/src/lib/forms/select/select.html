@@ -1,0 +1,20 @@
+@if (label()) { <span class="label" [class.sr-only]="hideLabel()" [id]="id">{{ label() }}</span> }
+<button #trigger type="button" class="trigger" cdkOverlayOrigin #origin="cdkOverlayOrigin" [id]="triggerId"
+  aria-haspopup="listbox" [attr.aria-expanded]="open()"
+  [attr.aria-labelledby]="label() ? id + ' ' + triggerId : null"
+  [attr.aria-invalid]="visibleErrors().length > 0" [disabled]="disabled()"
+  (click)="toggle()" (keydown)="onTriggerKey($event)">
+  <span class="current" [class.placeholder]="!selectedLabel()">{{ selectedLabel() ?? placeholder() }}</span>
+  <span class="caret" aria-hidden="true">▾</span>
+</button>
+<ng-template cdkConnectedOverlay [cdkConnectedOverlayOrigin]="origin" [cdkConnectedOverlayOpen]="open()"
+  [cdkConnectedOverlayPositions]="positions" cdkConnectedOverlayMatchWidth
+  (overlayOutsideClick)="dismiss()" (overlayKeydown)="onOverlayKey($event)">
+  <div class="menu" cdkListbox [cdkListboxValue]="selected()" [attr.aria-labelledby]="label() ? id : null"
+    (cdkListboxValueChange)="choose($event)">
+    @for (o of options(); track o.value) {
+      <div class="option" [cdkOption]="o.value">{{ o.label }}</div>
+    }
+  </div>
+</ng-template>
+@for (e of visibleErrors(); track $index) { <p class="error">{{ e }}</p> }

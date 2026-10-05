@@ -1,0 +1,19 @@
+// The round window onto a strip of track, shared by the loader and not-found.
+@mixin porthole {
+  width: 214px;
+  height: 214px;
+  border-radius: var(--td-radius-round);
+  overflow: hidden;
+  position: relative;
+}
+
+// Same layers as the race lane, so every theme's wash applies here too.
+@mixin track {
+  position: relative;
+  width: 100%;
+  height: 214px;
+  background: var(--td-track-wash),
+    var(--td-track-lane) url('/img/track-1.png') repeat-x 0 center / auto 100%;
+  background-blend-mode: var(--td-track-wash-blend), var(--td-track-blend);
+  image-rendering: pixelated;
+}

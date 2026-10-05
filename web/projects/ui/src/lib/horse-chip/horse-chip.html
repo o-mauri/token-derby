@@ -1,0 +1,11 @@
+<div class="row"><span class="name" [tdMarquee]="name()">{{ name() }}</span></div>
+<div class="row"><span class="tokens" [tdMarquee]="tokensText()">{{ tokensText() }}</span></div>
+<div class="stats" [class.league]="league()">
+  <div class="view row"><span class="owner" [tdMarquee]="owner()">{{ owner() }}</span></div>
+  <div class="view row"><span class="level">{{ levelText() }}</span></div>
+  <div class="view row"><span class="pace" [tdMarquee]="paceText()">{{ paceText() }}</span></div>
+  <div class="view row"><span class="position" [class]="'position ' + medal()">{{ positionText() }}</span></div>
+  @if (league()) {
+    <div class="view row"><span class="league-pos" [tdMarquee]="leagueText()">{{ leagueText() }}</span></div>
+  }
+</div>

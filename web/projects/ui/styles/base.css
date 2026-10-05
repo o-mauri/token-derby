@@ -1,0 +1,18 @@
+/* Reset and page defaults, carried over from the old site's styles.css. */
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--td-surface);
+  color: var(--td-text);
+  font-family: var(--td-font-pixel);
+  font-size: 18px; /* the old site's TV-mode size; v2 is TV-only */
+  line-height: 1.25;
+  min-height: 100vh;
+  image-rendering: pixelated;
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.td-app-root { min-height: 100vh; display: flex; flex-direction: column; }

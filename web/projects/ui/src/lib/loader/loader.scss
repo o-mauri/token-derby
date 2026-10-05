@@ -1,0 +1,96 @@
+@use '../porthole' as porthole;
+
+:host {
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--td-space-6);
+  animation: loader-appear var(--td-duration-appear) ease-out 250ms both;
+}
+
+@keyframes loader-appear { from { opacity: 0; } to { opacity: 1; } }
+
+.loader-ring {
+  position: relative;
+  isolation: isolate;
+  width: 250px;
+  height: 250px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.loader-ring::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: var(--td-radius-round);
+  background: conic-gradient(var(--td-highlight) 0 25%, transparent 25%);
+  /* stylelint-disable-next-line color-no-hex */
+  mask: radial-gradient(circle, transparent 113px, #000 114px);
+  animation: loader-spin 1.1s linear infinite;
+}
+
+.loader-ring::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: var(--td-radius-round);
+  border: var(--td-line-ring) solid var(--td-border);
+  z-index: -1;
+}
+
+@keyframes loader-spin { to { transform: rotate(360deg); } }
+
+.loader-porthole { @include porthole.porthole; }
+
+.loader-track {
+  @include porthole.track;
+
+  animation: loader-track-run 1s linear infinite;
+}
+
+@keyframes loader-track-run { to { background-position-x: 0, -214px; } }
+
+.loader-horse {
+  position: absolute;
+  aspect-ratio: 32 / 24;
+  transform: translate(-50%, 0);
+}
+
+.loader-horse.far {
+  height: 62px;
+  top: 24px;
+  left: 58%;
+  z-index: 1;
+  animation: body-bob 0.4s ease-in-out infinite, loader-lead-a 3.2s ease-in-out infinite alternate;
+}
+
+.loader-horse.near {
+  height: 70px;
+  top: 66px;
+  left: 44%;
+  z-index: 2;
+  animation: body-bob 0.4s ease-in-out -0.17s infinite, loader-lead-b 3.2s ease-in-out infinite alternate;
+}
+
+@keyframes loader-lead-a { from { left: 58%; } to { left: 44%; } }
+@keyframes loader-lead-b { from { left: 44%; } to { left: 58%; } }
+
+@keyframes body-bob {
+  0%, 100% { transform: translate(-50%, 0); }
+  25% { transform: translate(-50%, -1px); }
+  75% { transform: translate(-50%, 0.5px); }
+}
+
+.loader-caption {
+  font-family: var(--td-font-pixel);
+  color: var(--td-text-muted);
+  font-size: var(--td-text-lg);
+  letter-spacing: var(--td-tracking);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :host, :host *, :host *::before, :host *::after { animation: none !important; }
+}

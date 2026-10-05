@@ -1,0 +1,17 @@
+// Geometry settled against real screenshots on the old site: a 38×3 capsule.
+:host {
+  display: block;
+  width: 38px;
+  height: 3px;
+  background: var(--td-stamina-track);
+  border-radius: var(--td-radius-pill);
+  overflow: hidden;
+  // A rim, not an outline: outlines don't follow the capsule's rounding everywhere.
+  box-shadow: 0 0 0 var(--td-line-thin) var(--td-stamina-edge);
+  pointer-events: none;
+}
+
+.fill { height: 100%; border-radius: var(--td-radius-pill); }
+:host(.high) .fill { background: var(--td-stamina-high); }
+:host(.mid) .fill { background: var(--td-stamina-mid); }
+:host(.low) .fill { background: var(--td-stamina-low); }

@@ -1,0 +1,3 @@
+// The house slant: the box leans into a slight parallelogram, its label is skewed back upright.
+@mixin slant { transform: skewX(var(--td-slant)); }
+@mixin upright { display: inline-block; transform: skewX(calc(var(--td-slant) * -1)); }

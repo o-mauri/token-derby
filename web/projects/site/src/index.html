@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Token Derby</title>
+    <base href="/" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@600&family=Bitcount+Prop+Single:wght@100..900&family=Roboto:wght@500&family=VT323&display=swap" />
+    <!-- Applies the saved theme before first paint; mirrors ThemeService in projects/ui. -->
+    <script>
+      var eventTag = '2026-09-derby-reset';
+      var eventTheme = 'derby';
+      try {
+        var t = localStorage.getItem('td_theme');
+        if (eventTag && localStorage.getItem('td_theme_event') !== eventTag) {
+          t = eventTheme;
+          localStorage.setItem('td_theme_event', eventTag);
+          localStorage.setItem('td_theme', t);
+        }
+        if (['derby', 'midnight', 'turf', 'photo', 'london', 'chromatic', 'phosphor', 'matrix'].indexOf(t) !== -1) {
+          document.documentElement.dataset.theme = t;
+        }
+      } catch (e) { /* storage blocked — fall through to the :root default */ }
+    </script>
+  </head>
+  <body>
+    <app-root></app-root>
+  </body>
+</html>

@@ -1,0 +1,36 @@
+// Same height and frame as the countdown panel, so the two sit together in the header.
+:host {
+  --state: var(--td-text-muted);
+
+  display: inline-flex;
+  align-items: center;
+  gap: var(--td-space-3);
+  padding: var(--td-space-1) var(--td-space-3);
+  line-height: 1;
+  color: var(--state);
+  background: color-mix(in srgb, var(--state) 14%, transparent);
+  border: var(--td-line-thin) solid color-mix(in srgb, var(--state) 60%, transparent);
+  border-radius: var(--td-radius);
+  text-transform: uppercase;
+  letter-spacing: var(--td-tracking-wide);
+}
+
+:host(.pending) { --state: var(--td-accent); }
+:host(.live) { --state: var(--td-live); }
+
+.dot {
+  width: 0.5em;
+  height: 0.5em;
+  border-radius: var(--td-radius-round);
+  background: var(--state);
+  box-shadow: 0 0 6px var(--state);
+  animation: on-air 1.6s ease-in-out infinite;
+}
+
+@keyframes on-air {
+  50% { opacity: 0.35; box-shadow: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dot { animation: none; }
+}

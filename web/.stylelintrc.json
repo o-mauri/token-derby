@@ -1,0 +1,64 @@
+{
+  "extends": [
+    "stylelint-config-standard-scss"
+  ],
+  "ignoreFiles": [
+    "projects/ui/styles/**",
+    "dist/**",
+    "storybook-static/**"
+  ],
+  "rules": {
+    "color-no-hex": true,
+    "color-named": "never",
+    "function-disallowed-list": [
+      "rgb",
+      "rgba",
+      "hsl",
+      "hsla"
+    ],
+    "selector-class-pattern": null,
+    "custom-property-pattern": null,
+    "keyframes-name-pattern": null,
+    "declaration-block-single-line-max-declarations": null,
+    "color-function-notation": null,
+    "color-function-alias-notation": null,
+    "alpha-value-notation": null,
+    "rule-empty-line-before": null,
+    "scss/double-slash-comment-empty-line-before": null,
+    "comment-empty-line-before": null,
+    "at-rule-empty-line-before": null,
+    "declaration-property-unit-disallowed-list": [
+      {
+        "/^(gap|row-gap|column-gap|padding|margin)/": [
+          "px",
+          "rem",
+          "em"
+        ],
+        "border-radius": [
+          "px",
+          "rem",
+          "em"
+        ],
+        "/^border(-(top|right|bottom|left))?(-width)?$/": [
+          "px"
+        ],
+        "/^outline(-width|-offset)?$/": [
+          "px"
+        ],
+        "font-size": [
+          "px",
+          "rem",
+          "em"
+        ],
+        "letter-spacing": [
+          "px",
+          "rem",
+          "em"
+        ]
+      },
+      {
+        "message": "Use a --td-* scale token (see styles/tokens-added.css) instead of a raw size."
+      }
+    ]
+  }
+}

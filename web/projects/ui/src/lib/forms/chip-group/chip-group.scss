@@ -1,0 +1,27 @@
+@use '../control' as control;
+@use '../../slant';
+
+:host { @include control.field-layout; @include control.errors; }
+.label { @include control.label; }
+.chips { display: flex; flex-wrap: wrap; gap: var(--td-space-5); outline: none; }
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--td-space-3) var(--td-space-5);
+  background: var(--td-surface);
+  border: var(--td-line-thin) solid var(--td-border);
+  border-radius: var(--td-radius);
+  font-size: var(--td-text-sm);
+  color: var(--td-text);
+  cursor: pointer;
+  user-select: none;
+  @include slant.slant;
+}
+
+.text { @include slant.upright; }
+
+.chip[aria-selected="true"] { border-color: var(--td-accent); color: var(--td-accent); }
+.chip[aria-disabled="true"], .chips[aria-disabled="true"] .chip { opacity: 0.5; cursor: not-allowed; }
+// Only show the keyboard highlight while the group has focus; CDK keeps an active option after blur.
+.chips:focus-within .chip.cdk-option-active { outline: var(--td-focus-width) solid var(--td-accent); outline-offset: var(--td-focus-offset); }

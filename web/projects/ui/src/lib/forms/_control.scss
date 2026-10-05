@@ -1,0 +1,39 @@
+// Shared look for form controls, carried over from the old org-manager fields.
+@mixin field-layout {
+  display: flex;
+  flex-direction: column;
+  gap: var(--td-space-3);
+}
+
+@mixin label {
+  color: var(--td-text-muted);
+  text-transform: uppercase;
+  letter-spacing: var(--td-tracking-wide);
+  font-size: var(--td-text-xs);
+}
+
+@mixin box {
+  font-family: inherit;
+  font-size: var(--td-text-md);
+  color: var(--td-text);
+  background: var(--td-surface);
+  border: var(--td-line) solid var(--td-border);
+  border-radius: var(--td-radius);
+  padding: var(--td-space-4) var(--td-space-5);
+
+  &:focus, &:focus-visible { outline: none; border-color: var(--td-accent); }
+  &:disabled { opacity: 0.5; cursor: not-allowed; }
+}
+
+@mixin errors {
+  .error { margin: 0; color: var(--td-error); font-size: var(--td-text-sm); }
+}
+
+@mixin sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

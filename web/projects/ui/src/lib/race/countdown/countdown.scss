@@ -1,0 +1,33 @@
+// A small LED panel: lit dot-matrix digits over dim "8" ghosts, like an unlit segment display.
+:host {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--td-space-1) var(--td-space-3);
+  background: var(--td-surface);
+  border: var(--td-line-thin) solid var(--td-border);
+  border-radius: var(--td-radius);
+  font-family: 'Bitcount Prop Single', var(--td-font-pixel);
+  font-weight: 500;
+  line-height: 1;
+  color: var(--td-highlight);
+  text-shadow: 0 0 6px color-mix(in srgb, var(--td-highlight) 55%, transparent);
+}
+
+// Fixed-width cells, because Bitcount's digits aren't all the same width and the clock mustn't jiggle.
+.cell {
+  position: relative;
+  display: inline-block;
+  width: 0.62em;
+  text-align: center;
+}
+
+.cell:not(.colon)::before {
+  content: '8';
+  position: absolute;
+  inset: 0;
+  color: var(--td-highlight);
+  opacity: 0.12;
+  text-shadow: none;
+}
+
+.colon { width: 0.34em; }

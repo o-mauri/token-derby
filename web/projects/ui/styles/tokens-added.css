@@ -1,0 +1,67 @@
+/* v2 tokens approved by the owner (2026-10-04). Hand-written, not generated.
+   Race name-tag colours: the old site's fixed values, the same in every theme for now. */
+:root {
+  --td-coin: #fbbf24;
+  --td-level: #2563eb;
+  --td-level-text: #ffffff;
+  --td-medal-gold: #ffd700;
+  --td-medal-silver: #c8ccd2;
+  --td-medal-bronze: #cd7f32;
+  --td-place: #aab0b8;
+  --td-league: #a68bd8;
+}
+
+/* Scales, approved by the owner 2026-10-04. Values were snapped to the nearest step. */
+:root {
+  /* Spacing: 2px base, which suits the pixel art. */
+  --td-space-1: 2px;
+  --td-space-2: 4px;
+  --td-space-3: 6px;
+  --td-space-4: 8px;
+  --td-space-5: 12px;
+  --td-space-6: 16px;
+  --td-space-7: 24px;
+  --td-space-8: 32px;
+
+  --td-radius: 4px;
+  --td-radius-pill: 999px;
+  --td-radius-round: 50%;
+
+  --td-line-thin: 1px;
+  --td-line: 2px;
+  --td-line-ring: 11px;
+
+  --td-focus-width: 2px;
+  --td-focus-offset: 2px;
+
+  --td-text-2xs: 0.5rem;
+  --td-text-xs: 0.75rem;
+  --td-text-sm: 0.85rem;
+  --td-text-md: 1rem;
+  --td-text-lg: 1.3rem;
+  --td-text-xl: 1.6rem;
+
+  --td-tracking-tight: 0.02em;
+  --td-tracking: 0.05em;
+  --td-tracking-wide: 0.08em;
+
+  /* The house slant for clickable controls: a slight parallelogram (owner-approved 2026-10-05). */
+  --td-slant: -6deg;
+
+  --td-duration-fast: 120ms;
+  --td-duration-appear: 150ms;
+}
+
+/* Race page, approved with the race-port spec (2026-10-05). Old fixed values, the same in every theme. */
+:root {
+  --td-stamina-high: #7ee081;
+  --td-stamina-mid: #ff9f1c;
+  --td-stamina-low: #ff3b30;
+  --td-stamina-track: rgba(255, 255, 255, 0.34);
+  --td-stamina-edge: rgba(0, 0, 0, 0.85);
+
+  /* TV layout, since the site is TV-only. */
+  --td-lane-height: 66px;
+  --td-label-col: 168px;
+  --td-sprite-scale: 3;
+}

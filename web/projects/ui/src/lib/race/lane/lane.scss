@@ -1,0 +1,166 @@
+@use 'sass:list';
+
+:host { display: block; }
+
+// A crowded field never squashes lanes below sprite height; the track scrolls instead.
+.lane {
+  display: flex;
+  align-items: stretch;
+  height: var(--td-lane-height);
+}
+
+// Fixed name-tag column, so every chip lines up instead of riding the horse.
+.label {
+  flex: 0 0 var(--td-label-col);
+  position: relative;
+  pointer-events: none;
+}
+
+// Aligned with the horse's middle rather than the lane's centre line.
+.chip {
+  position: absolute;
+  top: 23%;
+  left: var(--td-space-2);
+  right: var(--td-space-3);
+  transform: translateY(-50%);
+}
+
+// The dirt sprite over --td-track-lane, then a wash; --td-track-blend re-tints the opaque sprite per theme.
+.strip {
+  position: relative;
+  flex: 1 1 auto;
+  background: var(--td-track-wash), var(--td-track-lane) url('/img/track-1.png') repeat-x center / auto 100%;
+  background-blend-mode: var(--td-track-wash-blend), var(--td-track-blend);
+  image-rendering: pixelated;
+  border-radius: var(--td-radius);
+}
+
+// Start rail.
+.strip::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: var(--td-track-rail);
+}
+
+// Chequered finish line: fixed art, the same in every theme.
+.strip::after {
+  content: "";
+  position: absolute;
+  inset: 0 0 0 auto;
+  width: 20px;
+  /* stylelint-disable-next-line color-no-hex */
+  background: conic-gradient(#fff 25%, #000 25% 50%, #fff 50% 75%, #000 75%) 0 0 / 10px 10px #fff;
+}
+
+// The hooves land on the lane's centre with the body above.
+.runner {
+  position: absolute;
+  top: -30%;
+  height: 80%;
+  aspect-ratio: 32 / 24;
+  transform: translate(-50%, 0);
+  transition: left 3s linear;
+  z-index: 1;
+}
+
+.runner.running { animation: body-bob 0.4s ease-in-out infinite; }
+
+@keyframes body-bob {
+  0%, 100% { transform: translate(-50%, 0); }
+  25% { transform: translate(-50%, -1px); }
+  75% { transform: translate(-50%, 0.5px); }
+}
+
+// Under the sprite, nudged back towards the hindquarters.
+.stamina {
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  transform: translate(calc(-50% - 10px), 3px);
+}
+
+.rain { display: none; }
+
+// ── London: a wet road, with dashed markings between lanes and lamps along the near kerb ──
+:host-context([data-theme="london"]) {
+  .strip { background: var(--td-track-lane); border-radius: 0; }
+
+  .lane:not(.first) .strip {
+    background-image: repeating-linear-gradient(90deg, var(--td-track-rail) 0 34px, transparent 34px 62px);
+    background-repeat: no-repeat;
+    background-size: 100% 3px;
+    background-position: left top;
+  }
+
+  .lane.last { position: relative; }
+
+  .lane.last::after {
+    content: '';
+    position: absolute;
+    left: var(--td-label-col);
+    right: 0;
+    bottom: -18px;
+    height: 116px;
+    z-index: 2;
+    pointer-events: none;
+    background: url('/img/london-lamp.svg') repeat-x left bottom / auto 116px;
+  }
+}
+
+// ── Chromatic: the spectrum wash drifts backwards past the horses, stepped like the pixel art ──
+:host-context([data-theme="chromatic"]) .strip { background-size: var(--td-track-wash-tile) 100%, auto 100%; }
+
+@media (prefers-reduced-motion: no-preference) {
+  :host-context([data-theme="chromatic"]) .strip { animation: chromatic-scroll 3s steps(24) infinite; }
+}
+
+@keyframes chromatic-scroll {
+  from { background-position: 0 0, center; }
+  to { background-position: calc(-1 * var(--td-track-wash-tile)) 0, center; }
+}
+
+// ── Matrix: glyph rain inside each lane, every lane on its own slice and beat ──
+:host-context([data-theme="matrix"]) {
+  .strip { z-index: 0; }
+
+  .rain {
+    display: block;
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    overflow: hidden;
+    border-radius: var(--td-radius);
+    pointer-events: none;
+  }
+
+  .rain::before {
+    content: '';
+    position: absolute;
+    inset: -180px 0 0;
+    background: url('/img/matrix-rain-lane.svg') repeat var(--rain-x, 0) 0 / 900px 180px;
+    image-rendering: auto;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  :host-context([data-theme="matrix"]) .rain::before { animation: matrix-lane-fall 1.8s linear infinite; }
+}
+
+@keyframes matrix-lane-fall { to { transform: translate3d(0, 180px, 0); } }
+
+$rain-offsets: (0, 0s) (-137px, -0.7s) (-311px, -1.3s) (-466px, -0.4s) (-703px, -1.1s);
+
+@each $offset in $rain-offsets {
+  $i: list.index($rain-offsets, $offset) - 1;
+  .rain-v#{$i}::before { --rain-x: #{list.nth($offset, 1)}; animation-delay: list.nth($offset, 2); }
+}
+
+// The spectacle stops once the race is over.
+.finished .strip, .finished .rain::before, .finished .runner { animation-play-state: paused; }
+
+@media (prefers-reduced-motion: reduce) {
+  .runner { transition: none; }
+  .runner.running { animation: none; }
+}

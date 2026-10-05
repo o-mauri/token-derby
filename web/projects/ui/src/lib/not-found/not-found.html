@@ -1,0 +1,15 @@
+<div class="not-found-ring">
+  <div class="not-found-porthole">
+    <div class="not-found-track">
+      <div class="not-found-horse"><td-horse [colors]="horse" /></div>
+      <svg class="not-found-bubble" viewBox="0 0 214 214" shape-rendering="crispEdges" aria-hidden="true">
+        @for (r of bubble; track $index) {
+          <rect [attr.x]="r.x" [attr.y]="r.y" [attr.width]="r.size" [attr.height]="r.size" [attr.fill]="r.fill" />
+        }
+      </svg>
+    </div>
+  </div>
+</div>
+<h2>{{ title() }}</h2>
+<p>@for (part of parts(); track $index) {@if (part.strong) {<strong>{{ part.text }}</strong>} @else {{{ part.text }}}}</p>
+<button td-button type="button" (click)="back.emit()">{{ backLabel() }}</button>

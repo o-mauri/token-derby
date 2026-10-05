@@ -1,0 +1,5 @@
+@use '../control' as control;
+
+:host { @include control.field-layout; @include control.errors; }
+.label { @include control.label; }
+.box { @include control.box; width: 100%; }
