@@ -153,6 +153,9 @@ export type RaceSummary = {
   highlight?: RaceHighlight;
   // Live races only, computed server-side at request time.
   time_left_seconds?: number;
+  // Live and finished races only: field size, and the sum of every horse's scored tokens.
+  runners?: number;
+  total_tokens?: number;
 };
 
 export type RaceView = Race & {
@@ -405,6 +408,9 @@ export type StandingRow = {
   points: number;
   season_tokens: number;
   zone: 'promote' | 'relegate' | null;
+  // The stable horse's look, for sprites; absent if the horse can't be found.
+  colors?: HorseColors;
+  hat?: CollectedHat;
 };
 export type DivisionStandings = { division: number; name: string; rows: StandingRow[] };
 export type SeasonStandings = {

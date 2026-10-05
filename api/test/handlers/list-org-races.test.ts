@@ -415,6 +415,51 @@ describe('listOrgRaces handler', () => {
     expect(summary.time_left_seconds).toBeUndefined();
   });
 
+  it('finished race: reports the field size and the total scored tokens', async () => {
+    const owner = await makeUser('LOR_TotOwner');
+    const orgRes: any = await createOrg(createOrgEvent('LorTot', owner));
+    const { org_join_token } = JSON.parse(orgRes.body);
+    const raceRes: any = await createRace(createRaceEvent({
+      name: 'Totals', start_time: '2020-01-01T00:00:00Z', end_time: '2099-01-01T00:00:00Z', tz: 'UTC', organisation_name: 'LorTot',
+    }, owner));
+    const { race_id, join_code } = JSON.parse(raceRes.body);
+    const other = await makeMember('LOR_TotOther', org_join_token);
+    const a = await joinHorse(join_code, owner, 'TotA');
+    const b = await joinHorse(join_code, other, 'TotB');
+    await setHorseFinalTokens(race_id, a.horse_id, 100, 100);
+    await setHorseFinalTokens(race_id, b.horse_id, 500, 500);
+    await setRaceEnded(race_id, '2020-01-01T01:00:00Z');
+
+    const res: any = await listOrgRaces(listEvent('LorTot'));
+    const summary = JSON.parse(res.body).races[0];
+    expect(summary.status).toBe('finished');
+    expect(summary.runners).toBe(2);
+    expect(summary.total_tokens).toBe(600);
+  });
+
+  it('race with zero horses: runners and total tokens are zero', async () => {
+    const owner = await makeUser('LOR_TotZeroOwner');
+    await createOrg(createOrgEvent('LorTotZero', owner));
+    await createRace(createRaceEvent({
+      name: 'Empty', start_time: '2020-01-01T00:00:00Z', end_time: '2099-01-01T00:00:00Z', tz: 'UTC', organisation_name: 'LorTotZero',
+    }, owner));
+    const res: any = await listOrgRaces(listEvent('LorTotZero'));
+    const summary = JSON.parse(res.body).races[0];
+    expect([summary.runners, summary.total_tokens]).toEqual([0, 0]);
+  });
+
+  it('pending race: no runners or total tokens', async () => {
+    const owner = await makeUser('LOR_TotPendOwner');
+    await createOrg(createOrgEvent('LorTotPend', owner));
+    await createRace(createRaceEvent({
+      name: 'Later', start_time: '2099-06-01T00:00:00Z', end_time: '2099-06-02T00:00:00Z', tz: 'UTC', organisation_name: 'LorTotPend',
+    }, owner));
+    const res: any = await listOrgRaces(listEvent('LorTotPend'));
+    const summary = JSON.parse(res.body).races[0];
+    expect(summary.runners).toBeUndefined();
+    expect(summary.total_tokens).toBeUndefined();
+  });
+
   it('highlight includes colors and hat when the leader has an equipped hat', async () => {
     const owner = await makeUser('LOR_HatOwner');
     await createOrg(createOrgEvent('LorHat', owner));

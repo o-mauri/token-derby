@@ -1,4 +1,6 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+import { BatchGetCommand } from '@aws-sdk/lib-dynamodb';
+import { ddb } from '../../src/db/client.js';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { handler as getStandings } from '../../src/handlers/get-org-league-standings.js';
 import { handler as createOrgHandler } from '../../src/handlers/create-organisation.js';
@@ -6,6 +8,7 @@ import { putLeague } from '../../src/db/leagues.js';
 import { ensureLeagueSeason } from '../../src/db/league-seasons.js';
 import { ensureStanding } from '../../src/db/league-standings.js';
 import { makeUser, type TestUser } from '../helpers/auth-helper.js';
+import { putStableHorse } from '../../src/db/stable.js';
 import { CURRENT_CLI_VERSION } from '../helpers/cli-version.js';
 import type { League } from '@token-derby/shared';
 
@@ -33,6 +36,11 @@ const ev = (org_name: string, season?: string): APIGatewayProxyEventV2 => ({
   requestContext: {} as any, isBase64Encoded: false,
 } as APIGatewayProxyEventV2);
 
+// Only the stable-horse look-up (the user-name BatchGet must still work).
+const isStableLookup = (cmd: unknown) =>
+  cmd instanceof BatchGetCommand &&
+  Object.values(cmd.input.RequestItems ?? {}).some((r) => r.Keys?.some((k) => String(k['sk']).startsWith('STABLE')));
+
 describe('get-org-league-standings', () => {
   it('returns per-division standings (public, no auth)', async () => {
     const owner = await makeUser('StandOwner');
@@ -52,6 +60,48 @@ describe('get-org-league-standings', () => {
     expect(bottom.map((r: any) => r.stable_horse_id)).toEqual(['a', 'b']); // 5pts before 2pts
     expect(bottom[0]).toMatchObject({ rank: 1, points: 5 });
     expect(standings).toMatchObject({ org_name: 'StandOrg', season: 1, races_per_season: 8 });
+  });
+
+  it('includes the colours and equipped hat of each horse, and leaves them out for unknown horses', async () => {
+    const owner = await makeUser('StandLooksOwner');
+    const org_id = await createOrg(owner, 'StandLooks');
+    await putLeague(league(org_id));
+    await ensureLeagueSeason(org_id, 1);
+    const colors = { body: '#8B4513', mane: '#000000', tail: '#000000', saddle: '#C0392B' };
+    await putStableHorse(owner.user_id, {
+      stable_horse_id: 'looks-a', name: 'Looks A', colors, created_at: 'c', xp: 0,
+      hats: [{ id: 'cowboy_hat', variant: 1, obtained_at: 'o' }], equipped_hat: 0,
+    });
+    const now = '2026-07-07T00:00:00Z';
+    await ensureStanding({ org_id, season: 1, division: 1, stable_horse_id: 'looks-a', horse_name: 'Looks A', user_id: owner.user_id, user_name: 'O', points: 5, season_tokens: 9, entered_at: now });
+    await ensureStanding({ org_id, season: 1, division: 1, stable_horse_id: 'gone', horse_name: 'Gone', user_id: owner.user_id, user_name: 'O', points: 1, season_tokens: 1, entered_at: now });
+
+    const res: any = await getStandings(ev('StandLooks'));
+    const rows = JSON.parse(res.body).standings.divisions[0].rows;
+    expect(rows[0].colors).toEqual(colors);
+    expect(rows[0].hat).toMatchObject({ id: 'cowboy_hat', variant: 1 });
+    expect(rows[1].colors).toBeUndefined();
+    expect(rows[1].hat).toBeUndefined();
+  });
+
+  it('still returns the standings, without looks, when the horse lookup fails', async () => {
+    const owner = await makeUser('StandLooksFailOwner');
+    const org_id = await createOrg(owner, 'StandLooksF');
+    await putLeague(league(org_id));
+    await ensureLeagueSeason(org_id, 1);
+    await ensureStanding({ org_id, season: 1, division: 1, stable_horse_id: 'x', horse_name: 'X', user_id: owner.user_id, user_name: 'O', points: 1, season_tokens: 1, entered_at: '2026-07-07T00:00:00Z' });
+    const send = ddb.send.bind(ddb);
+    const spy = vi.spyOn(ddb, 'send').mockImplementation(((cmd: unknown) =>
+      isStableLookup(cmd) ? Promise.reject(new Error('throttled')) : send(cmd as never)) as typeof ddb.send);
+    try {
+      const res: any = await getStandings(ev('StandLooksF'));
+      expect(res.statusCode).toBe(200);
+      const row = JSON.parse(res.body).standings.divisions[0].rows[0];
+      expect(row.horse_name).toBe('X');
+      expect(row.colors).toBeUndefined();
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it('returns null standings when the org has no league', async () => {

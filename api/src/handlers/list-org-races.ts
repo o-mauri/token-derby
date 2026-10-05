@@ -46,8 +46,13 @@ export const handler: ApiHandler = async (event) => {
         const horses = await listHorses(race.race_id);
         // rankHorses sorts by scored distance desc, joined_at asc. The top horse
         // is the winner (finished) or current leader (live).
+        const counted: RaceSummary = {
+          ...summary,
+          runners: horses.length,
+          total_tokens: horses.reduce((sum, h) => sum + (h.final_scored_tokens ?? scoredOf(h)), 0),
+        };
         const leader = rankHorses(horses)[0];
-        if (!leader) return summary; // zero-horse races have no leader
+        if (!leader) return counted; // zero-horse races have no leader
         const tokens =
           status === 'finished'
             ? leader.final_scored_tokens ?? scoredOf(leader)
@@ -58,7 +63,7 @@ export const handler: ApiHandler = async (event) => {
           colors: leader.colors,
           ...(leader.equipped_hat ? { hat: leader.equipped_hat } : {}),
         };
-        return { ...summary, highlight };
+        return { ...counted, highlight };
       } catch {
         // Tolerate a per-race lookup failure: omit highlight, keep the summary
         // (including time_left_seconds for live races).
