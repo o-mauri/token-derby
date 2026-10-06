@@ -1,0 +1,20 @@
+:host { display: inline-block; }
+
+// Google's light button: white, grey outline, Roboto-like system font. Brand colours, so never themed.
+/* stylelint-disable color-no-hex */
+.google {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--td-space-5);
+  padding: var(--td-space-4) var(--td-space-6);
+  background: #fff;
+  color: #1f1f1f;
+  border: var(--td-line-thin) solid #747775;
+  border-radius: var(--td-radius);
+  font: 500 var(--td-text-sm) / 1.2 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  text-decoration: none;
+}
+.google:hover { background: #f2f2f2; }
+.google:focus-visible { outline: var(--td-focus-width) solid var(--td-highlight); outline-offset: var(--td-focus-offset); }
+/* stylelint-enable color-no-hex */
+svg { flex: none; }

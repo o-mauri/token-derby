@@ -72,3 +72,8 @@ export * from './lib/org/race-list/race-list';
 export * from './lib/org/month-pager/month-pager';
 export * from './lib/org/season-pager/season-pager';
 export * from './lib/org/league-table/league-table';
+export * from './lib/home/models';
+export * from './lib/home/org-list/org-list';
+export * from './lib/home/you-card/you-card';
+export * from './lib/home/google-button/google-button';
+export * from './lib/home/go-box/go-box';

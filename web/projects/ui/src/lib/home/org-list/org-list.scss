@@ -1,0 +1,34 @@
+:host { display: flex; flex-direction: column; min-height: 0; }
+
+// At least three rows stay visible however short the space.
+.rows {
+  flex: 1;
+  min-height: calc(3 * (2.25rem + var(--td-space-2)));
+  overflow-y: auto;
+  display: grid;
+  align-content: start;
+  gap: var(--td-space-2);
+  scrollbar-gutter: stable;
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--td-space-4);
+  height: 2.25rem;
+  box-sizing: border-box;
+  padding: 0 var(--td-space-5);
+  background: var(--td-surface-raised);
+  border: var(--td-line-thin) solid var(--td-border);
+  color: inherit;
+  text-decoration: none;
+  font-family: 'Bitcount Prop Single', var(--td-font-pixel);
+  font-size: var(--td-text-lg);
+  letter-spacing: var(--td-tracking-wide);
+  text-transform: uppercase;
+}
+.row:hover, .row:focus-visible { border-color: var(--td-highlight); }
+.row:focus-visible { outline: var(--td-focus-width) solid var(--td-highlight); outline-offset: calc(-1 * var(--td-focus-width)); }
+.name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.go { color: var(--td-highlight); flex: none; }

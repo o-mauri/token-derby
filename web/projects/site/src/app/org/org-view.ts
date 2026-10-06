@@ -2,11 +2,10 @@ import type { GetRaceResponse, HorseColors, HorseView, RaceHighlight, RaceSummar
 import { scoredOf } from '@token-derby/shared';
 import {
   type LeagueDivisionView, type LeaguePanelView, type LivePanelView, type SeasonLink, type LiveRow, type MonthLink, type OrgRunner, type RacesPanelView,
-  type ResultRow, type StatsPanelView, type UpcomingRow, startsIn,
+  type ResultRow, type StatsPanelView, type UpcomingRow, startsIn, NEUTRAL_HORSE,
 } from '@token-derby/ui';
 
 // Stands in for a horse whose colours the API didn't send.
-const NEUTRAL: HorseColors = { body: '#8a8a94', mane: '#55555e', tail: '#55555e', saddle: '#6b6b75' };
 const LOCALE = 'en-GB';
 // Fixed short names: locales disagree ("Sep" vs "Sept"), and the design uses three letters.
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -101,7 +100,7 @@ export function racesPanelView(races: readonly RaceSummary[], nowMs: number): Ra
 
 function standingRunner(r: StandingRow): OrgRunner {
   return {
-    id: r.stable_horse_id, name: r.horse_name, owner: r.user_name, colors: r.colors ?? NEUTRAL,
+    id: r.stable_horse_id, name: r.horse_name, owner: r.user_name, colors: r.colors ?? NEUTRAL_HORSE,
     hat: r.hat ? { id: r.hat.id, variant: r.hat.variant } : null, tokens: r.season_tokens,
   };
 }
