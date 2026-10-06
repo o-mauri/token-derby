@@ -1,5 +1,5 @@
 // Route maps for fakeApi, built from the site's preview fixtures so tests and /preview-* pages share data.
-import type { DivisionConfig, GetOrganisationResponse, League, ListOrganisationsResponse, OrgMembersResponse } from '@token-derby/shared';
+import type { DeviceRecord, DivisionConfig, GetOrganisationResponse, League, ListDevicesResponse, ListOrganisationsResponse, OrgMembersResponse } from '@token-derby/shared';
 import { PREVIEW_ORG, previewLiveRace, previewOrgRaces, previewOrgStandings, type OrgPreviewOptions } from '../../projects/site/src/app/preview/org-fixture';
 import { PREVIEW_JOIN_CODE, PREVIEW_SERIES, previewRace, type PreviewRaceState } from '../../projects/site/src/app/preview/race-fixture';
 import type { Routes } from './fake-api';
@@ -71,5 +71,23 @@ export function settingsRoutes(owner = true): Routes {
     [`PUT ${base}/race-settings`]: (req) => ({ body: { settings: { org_id: 'o1', ...(req.body as object), updated_at: '', updated_by_user_id: 'u1' } } }),
     [`GET ${base}/webhook`]: { body: { webhook_url: null } },
     [`GET ${base}/slack`]: { body: { configured: false, channel_id: null, messages: null, digest: null } },
+  };
+}
+
+export const DEVICES: DeviceRecord[] = [
+  { device_id: 'd1', label: 'omar-mbp', created_at: '2026-09-12T10:00:00Z', last_seen_at: '2026-10-06T11:58:00Z' },
+  { device_id: 'd2', label: 'old-laptop', created_at: '2026-08-01T10:00:00Z', last_seen_at: '2026-09-01T10:00:00Z' },
+];
+
+/** The account page's endpoints: devices, rename and both sign-outs, plus home's orgs list to land on. */
+export function accountRoutes(): Routes {
+  const devices: ListDevicesResponse = { devices: DEVICES, has_legacy_credential: false };
+  return {
+    ...myOrgs(),
+    'GET /api/devices': { body: devices },
+    'DELETE /api/devices/d2': { status: 204 },
+    'PUT /api/jockey/me': (req) => ({ body: { user_id: 'u1', display_name: (req.body as { display_name: string }).display_name } }),
+    'DELETE /api/web-sessions': { status: 204 },
+    'DELETE /api/web-sessions/all': { body: { signed_out: 2 } },
   };
 }
