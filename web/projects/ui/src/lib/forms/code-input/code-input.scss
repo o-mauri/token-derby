@@ -1,0 +1,17 @@
+:host { display: inline-block; }
+
+.cells { display: flex; gap: var(--td-space-3); }
+
+.cell {
+  width: 2.4rem;
+  aspect-ratio: 5 / 6;
+  box-sizing: border-box;
+  text-align: center;
+  background: var(--td-surface);
+  color: var(--td-text);
+  border: var(--td-line-thin) solid var(--td-border);
+  font-family: var(--td-font-pixel);
+  font-size: var(--td-text-xl);
+  text-transform: uppercase;
+  &:focus-visible { outline: var(--td-focus-width) solid var(--td-highlight); outline-offset: var(--td-focus-offset); }
+}

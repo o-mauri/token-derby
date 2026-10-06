@@ -78,3 +78,8 @@ export * from './lib/home/you-card/you-card';
 export * from './lib/home/google-button/google-button';
 export * from './lib/home/go-box/go-box';
 export * from './lib/home/account-menu/account-menu';
+export * from './lib/format/relative-time';
+export * from './lib/layout/tabs/tabs';
+export * from './lib/dialog/confirm/confirm';
+export * from './lib/forms/code-input/code-input';
+export * from './lib/account/device-list/device-list';

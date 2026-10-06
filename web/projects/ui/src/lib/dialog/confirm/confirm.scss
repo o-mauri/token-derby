@@ -1,0 +1,40 @@
+@use '../../slant';
+
+:host { display: contents; }
+
+.backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  padding: var(--td-space-6);
+  background: color-mix(in srgb, var(--td-surface) 70%, transparent);
+}
+
+.box {
+  display: grid;
+  gap: var(--td-space-5);
+  max-width: 26rem;
+  padding: var(--td-space-6) var(--td-space-7);
+  background: var(--td-surface-raised);
+  border: var(--td-line) solid var(--td-highlight);
+  text-align: center;
+  font-family: var(--td-font-pixel);
+  &.danger { border-color: var(--td-error); }
+}
+.message { margin: 0; font-size: var(--td-text-lg); }
+.detail { margin: 0; color: var(--td-text-muted); }
+.actions { display: flex; gap: var(--td-space-5); justify-content: center; }
+
+button {
+  font: inherit;
+  font-size: var(--td-text-md);
+  padding: var(--td-space-2) var(--td-space-6);
+  cursor: pointer;
+  @include slant.slant;
+  &:focus-visible { outline: var(--td-focus-width) solid var(--td-highlight); outline-offset: var(--td-focus-offset); }
+}
+.confirm { background: var(--td-accent); color: var(--td-surface); border: var(--td-line) solid var(--td-accent); }
+.danger .confirm { background: none; color: var(--td-error); border-color: var(--td-error); }
+.cancel { background: none; color: var(--td-text-muted); border: var(--td-line-thin) solid var(--td-border); }
