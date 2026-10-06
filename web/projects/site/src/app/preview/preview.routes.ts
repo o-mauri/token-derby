@@ -6,6 +6,11 @@ import { fixtureInterceptor } from './fixture.interceptor';
 import { orgFixtureInterceptor } from './org-fixture.interceptor';
 import { PREVIEW_ORG } from './org-fixture';
 import { PREVIEW_JOIN_CODE } from './race-fixture';
+import { Session } from '../session/session';
+import { SESSION_STORAGE } from '../session/session-storage';
+import { sessionAuth } from '../session/session.interceptor';
+import { homeFixtureInterceptor } from './home-fixture.interceptor';
+import { previewSessionStorage } from './home-fixture';
 
 // Each preview gets its own HttpClient and RaceApi, so the fixtures never reach the real app's requests.
 const race = (path: string): Route => ({
@@ -29,4 +34,15 @@ const org: Route = {
   ],
 };
 
-export const previewRoutes: Routes = [race('preview-race'), race('preview-loader'), race('preview-not-found'), org];
+// The home page with a fake session and org list; its own Session so the real one is untouched.
+const home: Route = {
+  path: 'preview-home',
+  providers: [
+    { provide: SESSION_STORAGE, useFactory: previewSessionStorage },
+    Session,
+    provideHttpClient(withInterceptors([sessionAuth, apiErrors, homeFixtureInterceptor])),
+  ],
+  loadComponent: () => import('../home/home.page').then((m) => m.HomePage),
+};
+
+export const previewRoutes: Routes = [race('preview-race'), race('preview-loader'), race('preview-not-found'), org, home];

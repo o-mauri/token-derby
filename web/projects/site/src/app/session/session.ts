@@ -10,7 +10,7 @@ export type SessionUser = { readonly user_id: string; readonly display_name: str
 type State = { readonly token: string; readonly user: SessionUser };
 
 /** The signed-in web session: held in storage, set from the sign-in code, cleared on sign-out or a 401. */
-@Injectable()
+@Injectable({ providedIn: 'root' })
 export class Session {
   private readonly storage = inject(SESSION_STORAGE);
   private readonly http = inject(HttpClient);
@@ -95,7 +95,7 @@ export class Session {
   }
 }
 
-/** The app's session, with the sign-in code exchanged before the first page renders. */
+/** Exchanges a sign-in code in the URL before the first page renders. */
 export function provideSession(): EnvironmentProviders {
-  return makeEnvironmentProviders([Session, provideAppInitializer(() => inject(Session).exchangeFromUrl())]);
+  return makeEnvironmentProviders([provideAppInitializer(() => inject(Session).exchangeFromUrl())]);
 }

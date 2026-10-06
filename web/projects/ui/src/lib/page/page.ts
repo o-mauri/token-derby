@@ -12,7 +12,7 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
   styles: `
     :host { flex: 1; display: flex; flex-direction: column; min-height: 0; }
     .header:empty { display: none; }
-    .body { flex: 1; display: flex; flex-direction: column; }
+    .body { flex: 1; display: flex; flex-direction: column; min-height: 0; }
   `,
 })
 export class Page {}
