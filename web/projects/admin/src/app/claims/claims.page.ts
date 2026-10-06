@@ -9,9 +9,11 @@ import { claimStatus, claimSummary, hatOptions, redemptionText, variantOptions }
 type Entry = { key: number; hatId: string; variant: string };
 type Detail = { status: 'loading' | 'ready' | 'error'; lines: string[] };
 
-const clamp = (v: unknown, lo: number, hi: number, fallback: number) => {
-  const n = Math.round(Number(v));
-  return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : fallback;
+/** A whole number within [lo, hi], or null when blank or out of range. */
+const within = (v: unknown, lo: number, hi: number): number | null => {
+  if (v === null || v === '') return null;
+  const n = Number(v);
+  return Number.isInteger(n) && n >= lo && n <= hi ? n : null;
 };
 const message = (e: unknown) => (e instanceof ApiError && e.code !== 'NETWORK_ERROR' ? e.message : "Couldn't generate a token. Try again.");
 
@@ -40,6 +42,12 @@ export class ClaimsPage {
   protected readonly created = signal<string | null>(null);
   protected readonly details = signal<Record<string, Detail>>({});
 
+  private readonly maxValue = computed(() => within(this.maxClaims(), 1, MAX_CLAIM_REDEMPTIONS));
+  private readonly daysValue = computed(() => within(this.days(), 1, MAX_CLAIM_EXPIRY_DAYS));
+  protected readonly limitError = computed(() =>
+    this.maxValue() === null ? `Max claims must be 1–${MAX_CLAIM_REDEMPTIONS}.`
+      : this.daysValue() === null ? `Expires must be 1–${MAX_CLAIM_EXPIRY_DAYS} days.` : null);
+
   protected readonly rows = computed(() => (this.claims.value()?.claims ?? []).map((c) => ({
     code: c.code, token: formatClaimCode(c.code), what: claimSummary(c), created: c.created_at.slice(0, 10),
     expires: c.expires_at.slice(0, 10), status: claimStatus(c, Date.now()), redeemed: c.redeemed_count > 0,
@@ -66,15 +74,17 @@ export class ClaimsPage {
   }
 
   protected async generate(): Promise<void> {
-    if (this.busy()) return;
+    const max = this.maxValue();
+    const days = this.daysValue();
+    if (this.busy() || max === null || days === null) return;
     this.busy.set(true);
     this.error.set(null);
     const entries: ClaimEntry[] = this.entries().map((e) =>
       e.variant === '' || !variantOptions(e.hatId) ? { hat_id: e.hatId } : { hat_id: e.hatId, variant: Number(e.variant) });
     const body: CreateClaimRequest = {
       item_type: 'hat', entries,
-      max_redemptions: clamp(this.maxClaims(), 1, MAX_CLAIM_REDEMPTIONS, 1),
-      expires_in_days: clamp(this.days(), 1, MAX_CLAIM_EXPIRY_DAYS, DEFAULT_CLAIM_EXPIRY_DAYS),
+      max_redemptions: max,
+      expires_in_days: days,
     };
     try {
       const res = await this.api.createClaim(body);

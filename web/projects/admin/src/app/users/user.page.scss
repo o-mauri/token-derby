@@ -50,3 +50,5 @@
 @media (width < 700px) {
   .column { padding: var(--td-space-4); overflow-y: visible; }
 }
+
+.confirm-layer { position: fixed; inset: 0; z-index: 2; }

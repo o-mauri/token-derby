@@ -12,7 +12,7 @@
 .num { width: 8rem; }
 .result { display: grid; gap: var(--td-space-3); padding: var(--td-space-4); border: var(--td-line) solid var(--td-highlight); }
 .warning { margin: 0; color: var(--td-text-muted); font-size: var(--td-text-sm); }
-.error { margin: 0; color: var(--td-error); }
+.error, .limit { margin: 0; color: var(--td-error); }
 
 .link { justify-self: start; background: none; border: 0; padding: 0; font: inherit; color: var(--td-text-muted); cursor: pointer; text-decoration: underline; text-underline-offset: 0.2em; }
 .link:hover:not(:disabled), .link:focus-visible { color: var(--td-highlight); }

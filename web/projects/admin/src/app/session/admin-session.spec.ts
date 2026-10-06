@@ -120,3 +120,28 @@ describe('adminGuard', () => {
     expect(TestBed.inject(Router).url).toBe('/users');
   });
 });
+
+describe('signing in again', () => {
+  it('loads the lists afresh after a 401 and a new sign-in', async () => {
+    const { openAdmin } = await import('../testing/harness');
+    const { answerLists } = await import('../testing/answer');
+    TestBed.resetTestingModule();
+    const p = await openAdmin('/users');
+    p.http.expectOne('/api/admin/users').flush({ code: 'UNAUTHENTICATED', message: 'x' }, { status: 401, statusText: 'No' });
+    p.http.match('/api/admin/organisations').forEach((r) => r.flush({ code: 'UNAUTHENTICATED', message: 'x' }, { status: 401, statusText: 'No' }));
+    await p.settle();
+    expect(p.router().url).toBe('/login?return_to=%2Fusers');
+    for (const [label, value] of [['Username', 'admin'], ['Password', 'pw']]) {
+      const input = [...p.el().querySelectorAll('td-text-input')].find((t) => t.textContent?.includes(label))!.querySelector('input')!;
+      await p.type(input, value);
+    }
+    p.el().querySelector<HTMLFormElement>('form')!.dispatchEvent(new Event('submit', { cancelable: true }));
+    await p.settle();
+    p.http.expectOne('/api/admin/login').flush({ token: 'new', expires_at: new Date(Date.now() + 3_600_000).toISOString() });
+    await p.settle();
+    expect(p.router().url).toBe('/users');
+    answerLists(p.http);
+    await p.settle();
+    expect(p.el().querySelectorAll('[data-page="users"] tbody tr').length).toBe(2);
+  });
+});

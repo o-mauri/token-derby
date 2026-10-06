@@ -111,3 +111,22 @@ describe('Claims page', () => {
     expect(p.page().querySelector('.redemptions')).toBeNull();
   });
 });
+
+describe('Claims limits', () => {
+  it('refuses a blank or out-of-range count instead of changing it', async () => {
+    const p = await openClaims();
+    p.http.expectOne('/api/admin/claims').flush({ claims: [] });
+    await p.settle();
+    const field = (label: string) => [...p.page().querySelectorAll('td-text-input')].find((t) => t.textContent?.includes(label))!.querySelector('input')!;
+    await p.type(field('Expires (days)'), '');
+    expect(p.page().querySelector<HTMLButtonElement>('button.generate')!.disabled).toBe(true);
+    expect(p.page().querySelector('.generator .limit')?.textContent).toContain('Expires must be 1–365 days.');
+    await p.type(field('Expires (days)'), '30');
+    await p.type(field('Max claims'), '1000');
+    expect(p.page().querySelector<HTMLButtonElement>('button.generate')!.disabled).toBe(true);
+    expect(p.page().querySelector('.generator .limit')?.textContent).toContain('Max claims must be 1–500.');
+    p.page().querySelector<HTMLButtonElement>('button.generate')!.click();
+    await p.settle();
+    p.http.expectNone((r) => r.method === 'POST');
+  });
+});

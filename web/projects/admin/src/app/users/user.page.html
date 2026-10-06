@@ -68,9 +68,14 @@
     }
   </main>
 
-  <td-confirm [open]="!!pending()" [message]="pending()?.message ?? ''"
-    [detail]="pending()?.kind === 'horse' ? 'Its hats and stats go with it. This can\'t be undone.' : 'This can\'t be undone.'"
-    [confirmLabel]="pending()?.kind === 'horse' ? 'Delete' : 'Remove'" tone="danger" (confirm)="confirm()" (cancel)="pending.set(null)" />
+  <!-- A screen-sized layer, so on a long phone page the confirm covers what you see and focusing it doesn't scroll. -->
+  @if (pending(); as p) {
+    <div class="confirm-layer">
+      <td-confirm [open]="true" [message]="p.message"
+        [detail]="p.kind === 'horse' ? 'Its hats and stats go with it. This can\'t be undone.' : 'This can\'t be undone.'"
+        [confirmLabel]="p.kind === 'horse' ? 'Delete' : 'Remove'" tone="danger" (confirm)="confirm()" (cancel)="pending.set(null)" />
+    </div>
+  }
 } @else if (data.users.status() === 'error') {
   <main class="column"><div class="failed"><p>Couldn't load users.</p><button td-button size="sm" type="button" (click)="data.users.reload()">Retry</button></div></main>
 } @else if (data.users.value()) {

@@ -14,8 +14,9 @@
     <div class="settings">
       <td-text-input class="num" label="Max claims" type="number" [(value)]="maxClaims" />
       <td-text-input class="num" label="Expires (days)" type="number" [(value)]="days" />
-      <button td-button type="button" class="generate" [disabled]="busy()" (click)="generate()">Generate</button>
+      <button td-button type="button" class="generate" [disabled]="busy() || !!limitError()" (click)="generate()">Generate</button>
     </div>
+    @if (limitError(); as limit) { <p class="limit" role="status">{{ limit }}</p> }
     @if (error(); as message) { <p class="error" role="alert">{{ message }}</p> }
     @if (created(); as code) {
       <div class="result" role="status">
