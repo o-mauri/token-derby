@@ -13,6 +13,7 @@ import { homeFixtureInterceptor } from './home-fixture.interceptor';
 import { previewSessionStorage } from './home-fixture';
 import { previewAccountStorage } from './account-fixture';
 import { accountFixtureInterceptor } from './account-fixture.interceptor';
+import { cliFixtureInterceptor, previewCliLabel, previewCliStep } from './cli-fixture.interceptor';
 
 // Each preview gets its own HttpClient and RaceApi, so the fixtures never reach the real app's requests.
 const race = (path: string): Route => ({
@@ -62,4 +63,17 @@ const account: Route = {
   ],
 };
 
-export const previewRoutes: Routes = [race('preview-race'), race('preview-loader'), race('preview-not-found'), org, home, account];
+// The CLI approve page, signed in (unless ?signed=out), answering from a fixture.
+const cli: Route = {
+  path: 'preview-cli',
+  providers: [
+    { provide: SESSION_STORAGE, useFactory: previewAccountStorage },
+    Session,
+    provideHttpClient(withInterceptors([sessionAuth, apiErrors, cliFixtureInterceptor])),
+  ],
+  resolve: { initialStep: previewCliStep, initialLabel: previewCliLabel },
+  runGuardsAndResolvers: 'always',
+  loadComponent: () => import('../cli/cli-approve.page').then((m) => m.CliApprovePage),
+};
+
+export const previewRoutes: Routes = [race('preview-race'), race('preview-loader'), race('preview-not-found'), org, home, account, cli];
