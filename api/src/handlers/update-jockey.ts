@@ -3,8 +3,7 @@ import type { UpdateJockeyRequest, UpdateJockeyResponse } from '@token-derby/sha
 import { USER_NAME_MAX_LENGTH } from '@token-derby/shared';
 import { resolveCaller } from '../lib/auth.js';
 import { updateUserDisplayName } from '../db/users.js';
-import { setWebSessionDisplayName } from '../db/web-sessions.js';
-import { bearerToken } from '../lib/admin-auth.js';
+import { setUserWebSessionsDisplayName } from '../db/web-sessions.js';
 import { ok, err, parseJson } from '../lib/http.js';
 
 export const handler: ApiHandler = async (event) => {
@@ -21,9 +20,8 @@ export const handler: ApiHandler = async (event) => {
   }
 
   await updateUserDisplayName(auth.user_id, display_name);
-  // The web session carries the name it was signed in with; later requests in it stamp that name.
-  const token = auth.source === 'web' ? bearerToken(event) : null;
-  if (token) await setWebSessionDisplayName(token, display_name);
+  // Web sessions carry the name they were signed in with; later requests in them stamp that name.
+  await setUserWebSessionsDisplayName(auth.user_id, display_name);
   const response: UpdateJockeyResponse = { user_id: auth.user_id, display_name };
   return ok(response);
 };

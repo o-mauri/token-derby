@@ -28,6 +28,15 @@ describe('exchange-web-session handler', () => {
     expect(session?.user_id).toBe('u1');
   });
 
+  it('issues a session that lasts 7 days', async () => {
+    const code = generateWebSessionCode();
+    await putWebGrant(code, 'u1', 'Alice', 60);
+    const body = JSON.parse(((await handler(event({ code }))) as any).body);
+    const days = (Date.parse(body.expires_at) - Date.now()) / 86_400_000;
+    expect(days).toBeGreaterThan(6.99);
+    expect(days).toBeLessThanOrEqual(7);
+  });
+
   it('rejects a second exchange of the same code (single-use)', async () => {
     const code = generateWebSessionCode();
     await putWebGrant(code, 'u1', 'Alice', 60);

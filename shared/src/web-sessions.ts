@@ -12,6 +12,11 @@ export type WebSessionExchangeResponse = {
   user: { user_id: string; display_name: string; email?: string };
 };
 
+/** DELETE /api/web-sessions/all: how many browser sign-ins were ended. */
+export type WebSessionsDeleteAllResponse = {
+  signed_out: number;
+};
+
 export type AuthLinkStartResponse = {
   authorize_url: string;
 };

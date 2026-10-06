@@ -114,6 +114,13 @@ export function webSessionKey(token: string) {
   return { pk: `${WEB_SESSION_PK_PREFIX}${token}`, sk: 'META' };
 }
 
+export const USER_WEB_SESSION_SK_PREFIX = 'WEB_SESSION#';
+
+/** Marker under the user, so all of a user's web sessions can be found. */
+export function userWebSessionKey(user_id: string, token: string) {
+  return { pk: `${USER_PK_PREFIX}${user_id}`, sk: `${USER_WEB_SESSION_SK_PREFIX}${token}` };
+}
+
 export const RELEASE_PK_PREFIX = 'RELEASE#';
 
 export function releaseKey(component: string, version: string) {

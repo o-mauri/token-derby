@@ -211,6 +211,7 @@ export class TokenDerbyStack extends cdk.Stack {
     const createWebSessionFn = makeFn('CreateWebSessionFn', 'create-web-session');
     const exchangeWebSessionFn = makeFn('ExchangeWebSessionFn', 'exchange-web-session');
     const deleteWebSessionFn = makeFn('DeleteWebSessionFn', 'delete-web-session');
+    const deleteAllWebSessionsFn = makeFn('DeleteAllWebSessionsFn', 'delete-all-web-sessions');
     const authGoogleStartFn = makeFn('AuthGoogleStartFn', 'auth-google-start');
     const authLinkStartFn = makeFn('AuthLinkStartFn', 'auth-link-start');
     const authGoogleCallbackFn = makeFn('AuthGoogleCallbackFn', 'auth-google-callback');
@@ -394,6 +395,7 @@ export class TokenDerbyStack extends cdk.Stack {
     httpApi.addRoutes({ path: '/api/web-sessions', methods: [HttpMethod.POST], integration: new HttpLambdaIntegration('CreateWebSessionInt', createWebSessionFn) });
     httpApi.addRoutes({ path: '/api/web-sessions/exchange', methods: [HttpMethod.POST], integration: new HttpLambdaIntegration('ExchangeWebSessionInt', exchangeWebSessionFn) });
     httpApi.addRoutes({ path: '/api/web-sessions', methods: [HttpMethod.DELETE], integration: new HttpLambdaIntegration('DeleteWebSessionInt', deleteWebSessionFn) });
+    httpApi.addRoutes({ path: '/api/web-sessions/all', methods: [HttpMethod.DELETE], integration: new HttpLambdaIntegration('DeleteAllWebSessionsInt', deleteAllWebSessionsFn) });
     httpApi.addRoutes({ path: '/api/auth/google/start', methods: [HttpMethod.GET], integration: new HttpLambdaIntegration('AuthGoogleStartInt', authGoogleStartFn) });
     httpApi.addRoutes({ path: '/api/auth/link/start', methods: [HttpMethod.POST], integration: new HttpLambdaIntegration('AuthLinkStartInt', authLinkStartFn) });
     httpApi.addRoutes({ path: '/api/auth/google/callback', methods: [HttpMethod.GET], integration: new HttpLambdaIntegration('AuthGoogleCallbackInt', authGoogleCallbackFn) });

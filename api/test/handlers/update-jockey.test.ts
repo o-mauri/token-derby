@@ -31,6 +31,22 @@ describe('update-jockey', () => {
     expect((await getWebSession(token))!.display_name).toBe('Omar');
   });
 
+  it('renames the user in their other browsers too', async () => {
+    const user_id = await user();
+    const [here, there] = [`web-${user_id}-a`, `web-${user_id}-b`];
+    for (const t of [here, there]) await putWebSession(t, user_id, 'Before', new Date(Date.now() + 3_600_000).toISOString(), 3600);
+    await updateJockey(ev({ authorization: `Bearer ${here}` }, { display_name: 'Omar' }));
+    expect((await getWebSession(there))!.display_name).toBe('Omar');
+  });
+
+  it('renames web sessions when renamed from the CLI', async () => {
+    const user_id = await user();
+    await putDevice({ user_id, token: `dev-${user_id}`, label: 'laptop' });
+    await putWebSession(`web-${user_id}`, user_id, 'Before', new Date(Date.now() + 3_600_000).toISOString(), 3600);
+    await updateJockey(ev({ 'x-user-id': user_id, 'x-user-token': `dev-${user_id}` }, { display_name: 'Cli' }));
+    expect((await getWebSession(`web-${user_id}`))!.display_name).toBe('Cli');
+  });
+
   it('still renames with CLI credentials', async () => {
     const user_id = await user();
     await putDevice({ user_id, token: `dev-${user_id}`, label: 'laptop' });

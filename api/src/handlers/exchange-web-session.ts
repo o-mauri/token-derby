@@ -5,7 +5,7 @@ import { getUserById } from '../db/users.js';
 import { generateWebSessionToken } from '../lib/codes.js';
 import { ok, err, parseJson } from '../lib/http.js';
 
-const SESSION_TTL_SECONDS = 24 * 60 * 60; // 24 hours
+const SESSION_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days, not extended by use
 
 export const handler: ApiHandler = async (event) => {
   const body = parseJson<WebSessionExchangeRequest>(event.body);

@@ -45,6 +45,8 @@ const ROUTES: Route[] = [
   // how a legacy user obtains a web session before linking.
   { method: 'POST', pattern: '/api/jockey/init',          load: () => import('../api/src/handlers/init-jockey.js') },
   { method: 'POST', pattern: '/api/web-sessions',         load: () => import('../api/src/handlers/create-web-session.js') },
+  { method: 'DELETE', pattern: '/api/web-sessions',       load: () => import('../api/src/handlers/delete-web-session.js') },
+  { method: 'DELETE', pattern: '/api/web-sessions/all',   load: () => import('../api/src/handlers/delete-all-web-sessions.js') },
   // `token-derby link` reads this to check whether the account is already linked,
   // and polls it to detect that the browser leg finished.
   { method: 'GET',  pattern: '/api/jockey/me',            load: () => import('../api/src/handlers/get-jockey.js') },
