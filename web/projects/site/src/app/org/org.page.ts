@@ -4,6 +4,7 @@ import {
   Button, Crumbs, LeaguePanel, LivePanel, Loader, NotFound, Page, Panel, RacesPanel, StatsPanel, ThemePicker,
 } from '@token-derby/ui';
 import { OrgData } from './org-data';
+import { OrgOwner } from './settings/org-owner';
 import { leaguePanelView, livePanelView, racesPanelView, statsPanelView } from './org-view';
 
 /** /org/:name — the org's dashboard: the live race, league, stats and recent races on one screen. */
@@ -17,6 +18,7 @@ import { leaguePanelView, livePanelView, racesPanelView, statsPanelView } from '
 })
 export class OrgPage {
   protected readonly data = inject(OrgData);
+  protected readonly owner = inject(OrgOwner);
   protected readonly router = inject(Router);
 
   private readonly races = computed(() => this.data.races()?.races ?? []);

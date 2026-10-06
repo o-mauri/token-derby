@@ -4,6 +4,7 @@ import { apiErrors } from '@token-derby/ui';
 import { RaceApi } from '../race/race-api';
 import { fixtureInterceptor } from './fixture.interceptor';
 import { orgFixtureInterceptor } from './org-fixture.interceptor';
+import { settingsFixtureInterceptor } from './settings-fixture.interceptor';
 import { PREVIEW_ORG } from './org-fixture';
 import { PREVIEW_JOIN_CODE } from './race-fixture';
 import { Session } from '../session/session';
@@ -28,13 +29,19 @@ const race = (path: string): Route => ({
 // The org dashboard and races page over a fixture org, with their own HttpClient like the race previews.
 const org: Route = {
   path: 'preview-org',
-  providers: [provideHttpClient(withInterceptors([apiErrors, orgFixtureInterceptor])), RaceApi],
+  providers: [
+    { provide: SESSION_STORAGE, useFactory: previewAccountStorage },
+    Session,
+    provideHttpClient(withInterceptors([sessionAuth, apiErrors, orgFixtureInterceptor, settingsFixtureInterceptor])),
+    RaceApi,
+  ],
   data: { name: PREVIEW_ORG },
   loadComponent: () => import('../org/org-shell').then((m) => m.OrgShell),
   children: [
     { path: '', loadComponent: () => import('../org/org.page').then((m) => m.OrgPage) },
     { path: 'races', loadComponent: () => import('../org/races.page').then((m) => m.RacesPage) },
     { path: 'league', loadComponent: () => import('../org/league.page').then((m) => m.LeaguePage) },
+    { path: 'settings', loadChildren: () => import('../org/settings/settings.routes').then((m) => m.SETTINGS_ROUTES) },
   ],
 };
 
