@@ -1,0 +1,40 @@
+@use '../../../../../ui/src/lib/slant';
+
+.modes { align-self: start; }
+.idle { display: grid; gap: var(--td-space-4); justify-items: start; padding: var(--td-space-6) 0; }
+.idle p { margin: 0; }
+
+// Weekly schedule: the fields in one centred column.
+.schedule { width: min(100%, 30rem); align-self: center; display: grid; gap: var(--td-space-5); }
+
+// League: the ladder beside the season fields; stacked on phones.
+.league { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: var(--td-space-7); align-items: start; }
+.side { display: grid; gap: var(--td-space-5); }
+.hours { display: grid; grid-template-columns: 1fr 1fr; gap: var(--td-space-5); }
+.summary { margin: 0; color: var(--td-text-muted); }
+.next-season {
+  margin: 0;
+  padding: var(--td-space-3) var(--td-space-5);
+  border: var(--td-line-thin) solid var(--td-highlight);
+  background: color-mix(in srgb, var(--td-highlight) 8%, var(--td-surface));
+  color: var(--td-highlight);
+  font-size: var(--td-text-md);
+}
+.bar { display: flex; justify-content: flex-end; gap: var(--td-space-5); border-top: var(--td-line-thin) solid var(--td-border); padding-top: var(--td-space-5); }
+.danger-btn {
+  background: none;
+  color: var(--td-error);
+  border: var(--td-line) solid var(--td-error);
+  padding: var(--td-space-2) var(--td-space-6);
+  font: inherit;
+  font-size: var(--td-text-md);
+  cursor: pointer;
+  @include slant.slant;
+  &:hover:not(:disabled) { background: var(--td-error-wash); }
+  &:disabled { opacity: .5; cursor: default; }
+  &:focus-visible { outline: var(--td-focus-width) solid var(--td-highlight); outline-offset: var(--td-focus-offset); }
+}
+
+@media (width < 700px) {
+  .league { grid-template-columns: 1fr; }
+}
