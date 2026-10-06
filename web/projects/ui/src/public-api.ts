@@ -77,3 +77,4 @@ export * from './lib/home/org-list/org-list';
 export * from './lib/home/you-card/you-card';
 export * from './lib/home/google-button/google-button';
 export * from './lib/home/go-box/go-box';
+export * from './lib/home/account-menu/account-menu';
