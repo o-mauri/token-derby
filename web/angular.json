@@ -133,7 +133,10 @@
               "buildTarget": "site:build:development"
             }
           },
-          "defaultConfiguration": "development"
+          "defaultConfiguration": "development",
+          "options": {
+            "proxyConfig": "projects/site/proxy.conf.json"
+          }
         },
         "test": {
           "builder": "@angular/build:unit-test"

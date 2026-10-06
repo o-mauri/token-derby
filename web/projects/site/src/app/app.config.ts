@@ -4,13 +4,16 @@ import { provideRouter, withComponentInputBinding } from '@angular/router';
 import { apiBaseUrl, apiErrors } from '@token-derby/ui';
 import { routes } from './app.routes';
 import { provideTrailingSlashUrls } from './trailing-slash';
+import { provideSession } from './session/session';
+import { sessionAuth } from './session/session.interceptor';
 
 export const appConfig: ApplicationConfig = {
   providers: [
     provideZonelessChangeDetection(),
     provideBrowserGlobalErrorListeners(),
-    provideHttpClient(withFetch(), withInterceptors([apiBaseUrl, apiErrors])),
+    provideHttpClient(withFetch(), withInterceptors([sessionAuth, apiBaseUrl, apiErrors])),
     provideRouter(routes, withComponentInputBinding()),
     provideTrailingSlashUrls(),
+    provideSession(),
   ],
 };
