@@ -59,7 +59,7 @@ describe('Slider', () => {
 });
 
 @Component({ imports: [Slider, FormField], template: `<td-slider label="Rate" [formField]="f.rate" />` })
-class RuleHost { model = signal({ rate: 3 }); f = form(this.model, (p) => { min(p.rate, 1); max(p.rate, 5); }); }
+class RuleHost { readonly model = signal({ rate: 3 }); f = form(this.model, (p) => { min(p.rate, 1); max(p.rate, 5); }); }
 
 describe('Slider in a Signal Form', () => {
   it('takes its bounds from the form schema', async () => {

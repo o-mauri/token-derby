@@ -25,7 +25,7 @@ const FACE_Y = 2;
   template: `
     <svg viewBox="21.5 -2.5 13 13" shape-rendering="crispEdges">
       @for (p of face(); track $index) { <svg:rect [attr.x]="p.x" [attr.y]="p.y" width="1" height="1" [attr.fill]="p.fill" /> }
-      @if (hatDef(); as h) { <svg:g tdHatPixels [hat]="h" [variant]="hat()?.variant ?? 0" /> }
+      @if (hatDef(); as h) { <svg:g td-hat-pixels [hat]="h" [variant]="hat()?.variant ?? 0" /> }
     </svg>
   `,
   styleUrl: './horse-head.scss',

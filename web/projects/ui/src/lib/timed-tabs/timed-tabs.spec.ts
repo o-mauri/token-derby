@@ -14,7 +14,7 @@ import { TimedTab, TimedTabs } from './timed-tabs';
       <ng-template tdTab label="Pace"><p class="panel-c">Pace panel</p></ng-template>
     </td-timed-tabs>`,
 })
-class Host { selected = 0; paused = signal(false); }
+class Host { selected = 0; readonly paused = signal(false); }
 
 function setup(reducedMotion = false) {
   let now = 0;

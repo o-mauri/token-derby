@@ -22,8 +22,8 @@ const SERIES: GetRaceSeriesResponse = { start_ms: Date.parse(T0), end_ms: Date.p
 /** A RaceApi whose responses the test hands out one at a time. */
 class FakeRaceApi {
   raceCalls = 0; seriesCalls = 0; standingsCalls = 0;
-  next: Array<() => Promise<GetRaceResponse>> = [];
-  seriesNext: Array<() => Promise<GetRaceSeriesResponse>> = [];
+  next: (() => Promise<GetRaceResponse>)[] = [];
+  seriesNext: (() => Promise<GetRaceSeriesResponse>)[] = [];
   standingsResult: () => Promise<{ standings: SeasonStandings | null }> = () => Promise.resolve({ standings: null });
   race(): Promise<GetRaceResponse> { this.raceCalls++; return (this.next.shift() ?? (() => Promise.resolve(race())))(); }
   series(): Promise<GetRaceSeriesResponse> { this.seriesCalls++; return (this.seriesNext.shift() ?? (() => Promise.resolve(SERIES)))(); }

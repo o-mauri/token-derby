@@ -10,7 +10,7 @@ import { HatPixels, hatPixels } from './hat-pixels';
   template: `
     @if (hat(); as h) {
       <svg class="hat-sprite" [attr.viewBox]="viewBox()" shape-rendering="crispEdges" role="img" [attr.aria-label]="h.name">
-        <g tdHatPixels [hat]="h" [variant]="variant()" />
+        <g td-hat-pixels [hat]="h" [variant]="variant()" />
       </svg>
     }
   `,

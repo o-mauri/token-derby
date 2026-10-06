@@ -42,7 +42,7 @@ describe('ChipGroup', () => {
 });
 
 @Component({ imports: [ChipGroup, FormField], template: `<td-chip-group label="Days" [options]="days" [formField]="f.days" />` })
-class Host { days = DAYS; model = signal({ days: [3] as number[] }); f = form(this.model); }
+class Host { days = DAYS; readonly model = signal({ days: [3] as number[] }); f = form(this.model); }
 
 describe('ChipGroup in a Signal Form', () => {
   it('binds an array field', async () => {

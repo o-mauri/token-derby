@@ -59,7 +59,7 @@ describe('/cli', () => {
   });
 
   it('approves the code it looked up, even if the boxes change meanwhile', async () => {
-    const { el, enter, click, http, settle } = await open('/cli');
+    const { enter, click, http, settle } = await open('/cli');
     await enter('K7QX2M');
     await click('button.lookup');
     await enter('ABCDEF');

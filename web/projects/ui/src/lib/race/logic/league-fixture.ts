@@ -11,7 +11,7 @@ const COLORS: HorseColors[] = [
   { body: '#1E40AF', mane: '#000000', tail: '#000000', saddle: '#DC2626' },
   { body: '#16A34A', mane: '#FFFFFF', tail: '#FFFFFF', saddle: '#A16207' },
 ];
-const FIELD: Array<[string, string, number]> = [
+const FIELD: [string, string, number][] = [
   ['Comet', 'Alice', 4820], ['Oak', 'Eve', 4550], ['Bolt', 'Bob', 4310], ['Newbie', 'Frank', 3400],
   ['Dash', 'Carol', 3120], ['Fern', 'Grace', 2600], ['Ada', 'Dan', 1980], ['Gale', 'Heidi', 900],
   ['Juniper', 'Ivan', 2750], ['Maple', 'Judy', 2210], ['Pepper', 'Ken', 1720], ['Quill', 'Lin', 1400],

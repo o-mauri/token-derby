@@ -5,12 +5,12 @@ export function scale(value: number, dMin: number, dMax: number, rMin: number, r
   return rMin + ((value - dMin) / (dMax - dMin)) * (rMax - rMin);
 }
 
-export function linePath(pts: ReadonlyArray<Pt>): string {
+export function linePath(pts: readonly Pt[]): string {
   if (pts.length === 0) return '';
   return 'M' + pts.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' L');
 }
 
-export function smoothPath(pts: ReadonlyArray<Pt>): string {
+export function smoothPath(pts: readonly Pt[]): string {
   if (pts.length < 2) return linePath(pts);
   let d = `M${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`;
   for (let i = 0; i < pts.length - 1; i++) {

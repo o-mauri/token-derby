@@ -33,7 +33,7 @@ describe('Toggle', () => {
 });
 
 @Component({ imports: [Toggle, FormField], template: `<td-toggle label="On" [formField]="f.on" />` })
-class Host { model = signal({ on: true }); f = form(this.model); }
+class Host { readonly model = signal({ on: true }); f = form(this.model); }
 
 describe('Toggle in a Signal Form', () => {
   it('binds a boolean field both ways', async () => {

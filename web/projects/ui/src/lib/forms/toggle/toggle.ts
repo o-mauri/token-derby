@@ -6,6 +6,7 @@ import { ControlBase } from '../control-base';
   selector: 'td-toggle',
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
+    <!-- eslint-disable-next-line @angular-eslint/template/elements-content -- named by the label via aria-labelledby -->
     <button type="button" class="switch" role="switch" [attr.aria-checked]="checked()"
       [attr.aria-labelledby]="label() ? id : null" [disabled]="disabled()"
       (click)="checked.set(!checked())" (blur)="touch.emit()"></button>

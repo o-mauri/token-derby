@@ -1,5 +1,5 @@
 import type { League } from '@token-derby/shared';
-import { openSettings, orgRecord } from './settings-test-kit';
+import { openSettings } from './settings-test-kit';
 
 async function access() {
   const s = await openSettings('/org/Acme/settings/access');

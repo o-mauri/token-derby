@@ -21,7 +21,7 @@ const RACE_START_MS = Date.now() - 2 * 60 * 60 * 1000;
 const RACE_END_MS = Date.now() + 6 * 60 * 60 * 1000;
 
 // [name, user, division, tokens, xp awarded at the finish]
-const FIXTURE: Array<[string, string, number, number, number]> = [
+const FIXTURE: [string, string, number, number, number][] = [
   ['Comet', 'Alice', 1, 4820, 95],
   ['Bolt', 'Bob', 1, 4310, 70],
   ['Dash', 'Carol', 1, 3120, 48],
@@ -32,7 +32,7 @@ const FIXTURE: Array<[string, string, number, number, number]> = [
   ['Gale', 'Heidi', 2, 900, 22],
 ];
 // Extra runners for ?divisions=N (N > 2), spread over the lower divisions.
-const EXTRA: Array<[string, string, number, number]> = [
+const EXTRA: [string, string, number, number][] = [
   ['Juniper', 'Ivan', 2750, 36], ['Maple', 'Judy', 2210, 30], ['Pepper', 'Ken', 1720, 28], ['Quill', 'Lin', 1400, 24],
   ['Rocket', 'Mo', 3900, 40], ['Saffron', 'Nia', 3010, 34], ['Tango', 'Oli', 650, 20],
 ];

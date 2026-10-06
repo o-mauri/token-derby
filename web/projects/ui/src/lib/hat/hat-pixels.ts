@@ -20,7 +20,7 @@ export function hatPixels(hat: HatDef, variant = 0): HatPixel[] {
 
 /** The hat as an SVG group, so it can be drawn inside the horse sprite or on its own. */
 @Component({
-  selector: 'g[tdHatPixels]',
+  selector: 'g[td-hat-pixels]',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { '[attr.class]': '"horse-hat horse-hat-" + hat().id' },
   template: `

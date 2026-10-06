@@ -19,5 +19,5 @@
   <g class="horse-body">
     @for (c of parts.body; track $index) { <rect [attr.x]="c.x" [attr.y]="c.y" width="1" height="1" [attr.fill]="c.fill" /> }
   </g>
-  @if (hatDef(); as h) { <g tdHatPixels [hat]="h" [variant]="hat()?.variant ?? 0" /> }
+  @if (hatDef(); as h) { <g td-hat-pixels [hat]="h" [variant]="hat()?.variant ?? 0" /> }
 </svg>

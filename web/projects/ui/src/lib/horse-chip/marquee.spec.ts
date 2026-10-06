@@ -6,7 +6,7 @@ import { Marquee } from './marquee';
   imports: [Marquee],
   template: `<div class="row" style="width:50px;overflow:hidden"><span [tdMarquee]="label()">{{ label() }}</span></div>`,
 })
-class Host { label = signal('short'); }
+class Host { readonly label = signal('short'); }
 
 describe('Marquee', () => {
   it('scrolls only when the content overflows its row, by exactly the overflow', async () => {

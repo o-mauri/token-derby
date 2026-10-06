@@ -6,9 +6,9 @@ type Race = { code: string; n: number; finished?: boolean };
 
 @Component({ template: '' })
 class Host {
-  code = signal<string | null>('ABC');
+  readonly code = signal<string | null>('ABC');
   calls: string[] = [];
-  responses: Array<(code: string) => Promise<Race>> = [];
+  responses: ((code: string) => Promise<Race>)[] = [];
   poll = pollResource({
     params: () => this.code(),
     loader: (code: string) => {

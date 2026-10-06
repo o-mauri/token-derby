@@ -32,6 +32,8 @@ export class Confirm {
   readonly confirmLabel = input('Confirm');
   readonly tone = input<'danger' | 'normal'>('danger');
   readonly confirm = output<void>();
+  // Public API name; the host is a plain element, so no native `cancel` event reaches it.
+  // eslint-disable-next-line @angular-eslint/no-output-native
   readonly cancel = output<void>();
 
   protected readonly id = `td-confirm-${++nextId}`;

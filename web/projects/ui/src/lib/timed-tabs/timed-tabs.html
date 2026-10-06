@@ -1,3 +1,4 @@
+<!-- eslint-disable-next-line @angular-eslint/template/interactive-supports-focus -- ARIA tablist: arrow keys bubble up from the focusable tabs (roving tabindex) -->
 <div class="tablist" role="tablist" (keydown)="onKey($event)">
   @for (tab of tabs(); track $index; let i = $index) {
     <button #tab type="button" role="tab" class="tab" [id]="id + '-tab-' + i"

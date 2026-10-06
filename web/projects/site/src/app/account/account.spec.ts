@@ -115,7 +115,8 @@ describe('Account page', () => {
   });
 
   it('offers to link Google when there is no email', async () => {
-    const { [SESSION_KEYS.email]: _, ...noEmail } = SIGNED_IN;
+    const noEmail = { ...SIGNED_IN };
+    delete noEmail[SESSION_KEYS.email];
     const { click, http, settle, redirects } = await open('/account', noEmail);
     await click('button.link');
     http.expectOne('/api/auth/link/start').flush({ authorize_url: 'https://accounts.google.com/x' });

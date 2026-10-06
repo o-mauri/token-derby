@@ -9,7 +9,8 @@
     "lint:styles": "stylelint \"projects/**/*.{css,scss}\" --allow-empty-input",
     "pretest": "npm run build --workspace=@token-derby/shared",
     "storybook": "ng run ui:storybook",
-    "build-storybook": "ng run ui:build-storybook"
+    "build-storybook": "ng run ui:build-storybook",
+    "lint": "ng lint ui && ng lint site && ng lint admin && npm run lint:styles"
   },
   "private": true,
   "packageManager": "npm@11.19.1",
@@ -27,13 +28,17 @@
   },
   "devDependencies": {
     "@analogjs/vite-plugin-angular": "^2.8.0",
+    "@angular-eslint/builder": "22.5.0",
     "@angular/build": "^22.2.1",
     "@angular/cli": "^22.2.1",
     "@angular/compiler-cli": "^22.2.0",
+    "@eslint/js": "^10.0.1",
     "@storybook/addon-a11y": "^10.6.1",
     "@storybook/addon-docs": "^10.6.1",
     "@storybook/angular-vite": "^10.6.1",
     "@types/node": "^22.7.0",
+    "angular-eslint": "22.5.0",
+    "eslint": "^10.9.1",
     "jsdom": "^30.0.0",
     "ng-packagr": "^22.2.0",
     "prettier": "^3.8.1",
@@ -41,6 +46,7 @@
     "stylelint": "^17.16.0",
     "stylelint-config-standard-scss": "^17.0.0",
     "typescript": "~6.0.2",
+    "typescript-eslint": "8.69.0",
     "vite": "^8.3.2",
     "vitest": "^5.0.0"
   }

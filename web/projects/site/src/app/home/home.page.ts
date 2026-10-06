@@ -24,6 +24,8 @@ export class HomePage {
   private readonly router = inject(Router);
   protected readonly session = inject(Session);
 
+  // Bound from the `?auth_error=` query parameter the sign-in callback sets.
+  // eslint-disable-next-line @angular-eslint/no-input-rename
   readonly authError = input<string | undefined>(undefined, { alias: 'auth_error' });
 
   protected readonly orgPattern = ORG_NAME_PATTERN;

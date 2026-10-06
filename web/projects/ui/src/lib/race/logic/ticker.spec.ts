@@ -177,7 +177,7 @@ describe('liveOrderCells', () => {
     const two = horse({ horse_id: 't', name: 'Ada' }); two.rank = 2; two.current_tokens = 600;
     const cells = liveOrderCells(race([two, lead]));
     expect(cells.every(c => c.kind === 'order')).toBe(true);
-    expect(cells.map(c => (c as any).horseName)).toEqual(['Bolt', 'Ada']);
+    expect(cells.map((c) => (c.kind === 'order' ? c.horseName : ''))).toEqual(['Bolt', 'Ada']);
   });
 });
 
@@ -195,19 +195,19 @@ describe('leagueOrderCells', () => {
       horse({ horse_id: 'a', name: 'Bolt', division: 1, rank: 1, current_tokens: 900 }),
       horse({ horse_id: 'c', name: 'Oak', division: 2, rank: 1, current_tokens: 500 }),
       horse({ horse_id: 'b', name: 'Ada', division: 1, rank: 2, current_tokens: 700 }),
-    ] } as any;
+    ] } as GetRaceResponse;
     const cells = leagueOrderCells(race);
-    const labels = cells.filter((c) => c.kind === 'label').map((c: any) => c.text);
+    const labels = cells.flatMap((c) => (c.kind === 'label' ? [c.text] : []));
     expect(labels).toEqual(['Premier', 'Championship']);
     // a group separator appears between the two divisions
     expect(cells.some((c) => c.kind === 'groupsep')).toBe(true);
     // within Premier, Bolt (rank 1) precedes Ada (rank 2)
-    const orderNames = cells.filter((c) => c.kind === 'order').map((c: any) => c.horseName);
+    const orderNames = cells.flatMap((c) => (c.kind === 'order' ? [c.horseName] : []));
     expect(orderNames.slice(0, 2)).toEqual(['Bolt', 'Ada']);
   });
 
   it('falls back to a single flat group for a non-league race', () => {
-    const race = { horses: [horse({ horse_id: 'a', rank: 1 }), horse({ horse_id: 'b', rank: 2 })] } as any;
+    const race = { horses: [horse({ horse_id: 'a', rank: 1 }), horse({ horse_id: 'b', rank: 2 })] } as GetRaceResponse;
     const cells = leagueOrderCells(race);
     expect(cells.some((c) => c.kind === 'label')).toBe(false);
     expect(cells.some((c) => c.kind === 'groupsep')).toBe(false);
@@ -215,8 +215,8 @@ describe('leagueOrderCells', () => {
 
   it('skips empty divisions', () => {
     const race = { league_id: 'o1', league_division_names: ['Premier', 'Championship', 'League One'],
-      horses: [horse({ horse_id: 'a', division: 1, rank: 1 })] } as any;
-    expect(leagueOrderCells(race).filter((c) => c.kind === 'label').map((c: any) => c.text)).toEqual(['Premier']);
+      horses: [horse({ horse_id: 'a', division: 1, rank: 1 })] } as GetRaceResponse;
+    expect(leagueOrderCells(race).flatMap((c) => (c.kind === 'label' ? [c.text] : []))).toEqual(['Premier']);
   });
 });
 

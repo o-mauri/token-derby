@@ -7,7 +7,7 @@ import { By } from '@angular/platform-browser';
 import { HATS, variantCount } from '@token-derby/shared';
 import { Horse, RESIZE_OBSERVER } from '@token-derby/ui';
 import { routes } from '../app.routes';
-import { PALETTES, RARITIES, collectibles, hatsOf, paletteFor } from './catalog-model';
+import { RARITIES, collectibles, hatsOf, paletteFor } from './catalog-model';
 
 const tick = () => new Promise<void>((r) => setTimeout(r, 0));
 

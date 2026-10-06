@@ -56,7 +56,7 @@ describe('TextInput', () => {
   template: `<td-text-input label="Name" [formField]="f.name" />`,
 })
 class FormHost {
-  model = signal({ name: '' });
+  readonly model = signal({ name: '' });
   f = form(this.model, (p) => required(p.name, { message: 'Name is required' }));
 }
 

@@ -40,7 +40,7 @@ describe('Segmented', () => {
 });
 
 @Component({ imports: [Segmented, FormField], template: `<td-segmented label="Racing" [options]="modes" [formField]="f.mode" />` })
-class Host { modes = MODES; model = signal({ mode: 'off' }); f = form(this.model); }
+class Host { modes = MODES; readonly model = signal({ mode: 'off' }); f = form(this.model); }
 
 describe('Segmented in a Signal Form', () => {
   it('binds a single-value field', async () => {

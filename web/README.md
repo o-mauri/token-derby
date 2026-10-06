@@ -44,6 +44,23 @@ To execute unit tests with the [Vitest](https://vitest.dev/) test runner, use th
 ng test
 ```
 
+## Linting
+
+```bash
+npm run lint
+```
+
+Runs Angular ESLint on `ui`, `site` and `admin`, then stylelint. The rules live in `eslint.config.js`; each project's own `eslint.config.js` only sets its selector prefix (`td`, `site`, `admin`).
+
+House rules enforced as errors:
+
+- Components stay OnPush (Angular 22's default); opting out with `ChangeDetectionStrategy.Eager` fails.
+- Signal properties are `readonly`.
+- No `document`, `window`, `localStorage`, `sessionStorage` or `location` globals in app code. Inject `DOCUMENT` or the app's tokens instead. Specs, stories, Storybook config, `preview/` fixtures and `e2e/` are exempt.
+- Shapes are declared with `type`, not `interface`.
+
+When a rule genuinely doesn't fit one line, disable it for that line only and say why in the same comment.
+
 ## Running end-to-end tests
 
 For end-to-end (e2e) testing, run:

@@ -75,7 +75,7 @@ describe('Select', () => {
 });
 
 @Component({ imports: [Select, FormField], template: `<td-select label="League" [options]="leagues" [formField]="f.league" />` })
-class Host { leagues = LEAGUES; model = signal({ league: 'spring' }); f = form(this.model); }
+class Host { leagues = LEAGUES; readonly model = signal({ league: 'spring' }); f = form(this.model); }
 
 describe('Select in a Signal Form', () => {
   it('binds the field', async () => {

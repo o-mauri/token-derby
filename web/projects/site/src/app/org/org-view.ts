@@ -1,4 +1,4 @@
-import type { GetRaceResponse, HorseColors, HorseView, RaceHighlight, RaceSummary, SeasonStandings, StandingRow } from '@token-derby/shared';
+import type { GetRaceResponse, HorseView, RaceHighlight, RaceSummary, SeasonStandings, StandingRow } from '@token-derby/shared';
 import { scoredOf } from '@token-derby/shared';
 import {
   type LeagueDivisionView, type LeaguePanelView, type LivePanelView, type SeasonLink, type LiveRow, type MonthLink, type OrgRunner, type RacesPanelView,

@@ -25,7 +25,7 @@ describe('Horse', () => {
   it('puts lower back-leg cells under the back knee group', async () => {
     const el = await render();
     const knee = el.querySelector('.leg-back > .leg-back-lower')!;
-    const expected = GRID.slice(18).flatMap((row, dy) => row.slice(0, 14).filter((c) => c !== null)).length;
+    const expected = GRID.slice(18).flatMap((row) => row.slice(0, 14).filter((c) => c !== null)).length;
     expect(knee.querySelectorAll('rect').length).toBe(expected);
   });
 
