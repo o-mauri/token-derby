@@ -1,4 +1,4 @@
-import { PutCommand, GetCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb';
+import { PutCommand, GetCommand, DeleteCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { ddb, TABLE } from './client.js';
 import { webGrantKey, webSessionKey } from './keys.js';
 
@@ -78,4 +78,19 @@ export async function getWebSession(
 
 export async function deleteWebSession(token: string): Promise<void> {
   await ddb.send(new DeleteCommand({ TableName: TABLE, Key: webSessionKey(token) }));
+}
+
+/** Keeps a live session's name in step with a rename; a missing (expired) session is left alone. */
+export async function setWebSessionDisplayName(token: string, display_name: string): Promise<void> {
+  try {
+    await ddb.send(new UpdateCommand({
+      TableName: TABLE,
+      Key: webSessionKey(token),
+      UpdateExpression: 'SET display_name = :n',
+      ConditionExpression: 'attribute_exists(pk)',
+      ExpressionAttributeValues: { ':n': display_name },
+    }));
+  } catch (e) {
+    if ((e as { name?: string }).name !== 'ConditionalCheckFailedException') throw e;
+  }
 }

@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { handler as updateJockey } from '../../src/handlers/update-jockey.js';
 import { createUserWithEmail } from '../../src/db/identities.js';
 import { putDevice } from '../../src/db/devices.js';
-import { putWebSession } from '../../src/db/web-sessions.js';
+import { getWebSession, putWebSession } from '../../src/db/web-sessions.js';
 import { getUserById } from '../../src/db/users.js';
 
 const ev = (headers: Record<string, string>, body: unknown): APIGatewayProxyEventV2 => ({
@@ -27,6 +27,8 @@ describe('update-jockey', () => {
     expect(res.statusCode).toBe(200);
     expect(JSON.parse(res.body)).toEqual({ user_id, display_name: 'Omar' });
     expect((await getUserById(user_id))!.display_name).toBe('Omar');
+    // Later requests in the same session stamp the new name, not the one from sign-in.
+    expect((await getWebSession(token))!.display_name).toBe('Omar');
   });
 
   it('still renames with CLI credentials', async () => {
