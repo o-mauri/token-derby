@@ -2,7 +2,7 @@ import { EnvironmentProviders, Injectable, computed, inject, makeEnvironmentProv
 import { Location } from '@angular/common';
 import { HttpClient, HttpContext } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
-import type { WebSessionExchangeResponse } from '@token-derby/shared';
+import type { UpdateJockeyResponse, WebSessionExchangeResponse } from '@token-derby/shared';
 import { SESSION_KEYS, SESSION_STORAGE } from './session-storage';
 import { WITH_SESSION } from './session.interceptor';
 
@@ -53,6 +53,15 @@ export class Session {
       this.exchangeFailed.set(true);
       return 'failed';
     }
+  }
+
+  /** Renames you on the server, then everywhere the name shows. Errors reach the caller unchanged. */
+  async rename(name: string): Promise<void> {
+    const res = await firstValueFrom(
+      this.http.put<UpdateJockeyResponse>('/api/jockey/me', { display_name: name }, { context: new HttpContext().set(WITH_SESSION, true) }),
+    );
+    this.write(SESSION_KEYS.name, res.display_name);
+    this.state.update((s) => (s ? { ...s, user: { ...s.user, display_name: res.display_name } } : s));
   }
 
   async signOut(): Promise<void> {

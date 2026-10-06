@@ -25,6 +25,14 @@ export const routes: Routes = [
       { path: 'league', loadComponent: () => import('./org/league.page').then((m) => m.LeaguePage) },
     ],
   },
+  {
+    path: 'account',
+    loadComponent: () => import('./account/account.shell').then((m) => m.AccountShell),
+    children: [
+      { path: '', loadComponent: () => import('./account/profile.tab').then((m) => m.ProfileTab) },
+      { path: 'devices', loadComponent: () => import('./account/devices.tab').then((m) => m.DevicesTab) },
+    ],
+  },
   ...previewRoutes,
   { path: '**', loadComponent: () => import('./not-found/not-found.page').then((m) => m.NotFoundPage) },
 ];

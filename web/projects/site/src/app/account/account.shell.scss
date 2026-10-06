@@ -1,0 +1,18 @@
+// One viewport tall on desktop: the tab fills what's left and scrolls inside itself.
+:host { display: flex; flex-direction: column; height: max(100dvh, 32rem); }
+
+.top { display: flex; justify-content: space-between; align-items: center; gap: var(--td-space-5); flex-wrap: wrap; padding: var(--td-space-5); }
+.crumb { display: flex; align-items: center; gap: var(--td-space-4); font-family: var(--td-font-pixel); font-size: var(--td-text-xl); letter-spacing: var(--td-tracking-wide); text-transform: uppercase; min-width: 0; }
+.who { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sep { color: var(--td-text-muted); }
+.here { color: var(--td-highlight); }
+.actions { display: flex; align-items: center; gap: var(--td-space-4); }
+
+.tab { flex: 1; min-height: 0; display: flex; flex-direction: column; position: relative; }
+.signin { flex: 1; display: grid; place-content: center; justify-items: center; gap: var(--td-space-5); font-family: var(--td-font-pixel); font-size: var(--td-text-lg); }
+.signin p { margin: 0; }
+
+@media (width < 700px) {
+  :host { height: auto; min-height: 100dvh; }
+  .crumb { font-size: var(--td-text-lg); }
+}

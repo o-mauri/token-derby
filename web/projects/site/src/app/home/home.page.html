@@ -1,7 +1,7 @@
 <td-page>
   <div tdPageHeader class="top">
     @if (session.signedIn()) {
-      <td-account-menu [name]="name()" (signOut)="signOut()" />
+      <td-account-menu [name]="name()" [accountLink]="['/account']" (signOut)="signOut()" />
     }
     <td-theme-picker compact />
   </div>

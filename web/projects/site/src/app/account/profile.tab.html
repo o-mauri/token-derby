@@ -1,0 +1,26 @@
+<div class="column">
+  <form class="section" (submit)="save($event)" novalidate>
+    <label class="heading" for="display-name">DISPLAY NAME</label>
+    <div class="field">
+      <input #box id="display-name" class="name" [value]="draft()" [attr.maxlength]="max" autocomplete="nickname"
+        [attr.aria-invalid]="error() ? 'true' : null" [attr.aria-describedby]="error() ? 'name-error' : null" (input)="edit(box.value)" />
+      <button td-button type="submit" class="save" [disabled]="!canSave()">Save</button>
+    </div>
+    @if (saved()) { <p class="saved" role="status">Saved.</p> }
+    @if (error(); as message) { <p class="error" id="name-error" role="alert">{{ message }}</p> }
+  </form>
+
+  <section class="section">
+    <h2 class="heading">GOOGLE ACCOUNT</h2>
+    @if (session.user()?.email; as email) {
+      <p class="google"><span class="mark" aria-hidden="true"></span>{{ email }}</p>
+    } @else {
+      <p class="muted">No Google account linked.</p>
+      <button td-button type="button" class="link" [disabled]="linking()" (click)="link()">Link Google account</button>
+    }
+  </section>
+
+  <section class="section">
+    <button type="button" class="signout" (click)="signOut()">Sign out</button>
+  </section>
+</div>

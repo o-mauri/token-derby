@@ -11,6 +11,8 @@ import { SESSION_STORAGE } from '../session/session-storage';
 import { sessionAuth } from '../session/session.interceptor';
 import { homeFixtureInterceptor } from './home-fixture.interceptor';
 import { previewSessionStorage } from './home-fixture';
+import { previewAccountStorage } from './account-fixture';
+import { accountFixtureInterceptor } from './account-fixture.interceptor';
 
 // Each preview gets its own HttpClient and RaceApi, so the fixtures never reach the real app's requests.
 const race = (path: string): Route => ({
@@ -45,4 +47,19 @@ const home: Route = {
   loadComponent: () => import('../home/home.page').then((m) => m.HomePage),
 };
 
-export const previewRoutes: Routes = [race('preview-race'), race('preview-loader'), race('preview-not-found'), org, home];
+// The account page over a fake session and device list.
+const account: Route = {
+  path: 'preview-account',
+  providers: [
+    { provide: SESSION_STORAGE, useFactory: previewAccountStorage },
+    Session,
+    provideHttpClient(withInterceptors([sessionAuth, apiErrors, accountFixtureInterceptor])),
+  ],
+  loadComponent: () => import('../account/account.shell').then((m) => m.AccountShell),
+  children: [
+    { path: '', loadComponent: () => import('../account/profile.tab').then((m) => m.ProfileTab) },
+    { path: 'devices', loadComponent: () => import('../account/devices.tab').then((m) => m.DevicesTab) },
+  ],
+};
+
+export const previewRoutes: Routes = [race('preview-race'), race('preview-loader'), race('preview-not-found'), org, home, account];

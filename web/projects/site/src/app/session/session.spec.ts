@@ -96,4 +96,24 @@ describe('Session', () => {
     await expect(done).resolves.toBeUndefined();
     expect(session().signedIn()).toBe(false);
   });
+
+  it('renames you, updating the stored name', async () => {
+    const { session, http, storage } = setup(SIGNED_IN());
+    const done = session().rename('Ada');
+    const req = http.expectOne('/api/jockey/me');
+    expect(req.request.method).toBe('PUT');
+    req.flush({ user_id: 'u1', display_name: 'Ada' });
+    await done;
+    expect(session().user()?.display_name).toBe('Ada');
+    expect(storage.getItem(SESSION_KEYS.name)).toBe('Ada');
+  });
+
+  it('changes nothing when a rename fails', async () => {
+    const { session, http, storage } = setup(SIGNED_IN());
+    const done = session().rename('Ada');
+    http.expectOne('/api/jockey/me').flush({ code: 'BAD_REQUEST', message: 'x' }, { status: 400, statusText: 'Bad' });
+    await expect(done).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    expect(session().user()?.display_name).toBe('Omar');
+    expect(storage.getItem(SESSION_KEYS.name)).toBe('Omar');
+  });
 });
