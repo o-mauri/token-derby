@@ -87,3 +87,4 @@ export * from './lib/layout/crumbs/crumbs';
 export * from './lib/forms/domain-list/domain-list';
 export * from './lib/org/modifier-card/modifier-card';
 export * from './lib/org/division-ladder/division-ladder';
+export * from './lib/hat/hat-card/hat-card';
