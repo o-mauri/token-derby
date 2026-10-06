@@ -26,8 +26,10 @@ const buttons = (el: HTMLElement) => [...el.querySelectorAll('button')].map((b) 
 describe('RaceHeader', () => {
   it('shows the race name (full name on hover), status, countdown and join code', async () => {
     const { el } = await render();
-    const name = el.querySelector('h1 .name')!;
+    const name = el.querySelector('td-crumbs .here .name')!;
     expect(name.textContent).toBe('Friday Derby');
+    expect(name.getAttribute('role')).toBe('heading');
+    expect(el.querySelector('td-crumbs .part')?.textContent?.trim()).toBe('Race');
     expect(name.getAttribute('title')).toBe('Friday Derby');
     expect(el.querySelector('.status')!.textContent?.trim()).toBe('live');
     expect(el.querySelector('.status')!.classList.contains('live')).toBe(true);
@@ -71,7 +73,7 @@ describe('RaceHeader', () => {
 
   it('shows dashes until the first poll arrives, with a blank title', async () => {
     const { el } = await render({ name: '', status: null, anchor: null as never });
-    expect(el.querySelector('h1 .name')!.textContent).toBe('');
+    expect(el.querySelector('td-crumbs .here .name')!.textContent).toBe('');
     expect(el.querySelector('.status')!.textContent?.trim()).toBe('—');
     expect(el.querySelector('td-countdown')!.textContent?.trim()).toBe('--:--:--');
   });

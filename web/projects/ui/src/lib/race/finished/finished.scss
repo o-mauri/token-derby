@@ -9,7 +9,7 @@
   border-bottom: var(--td-line) solid var(--td-highlight);
 }
 
-.race { font-family: 'Bitcount Prop Single', var(--td-font-pixel); font-size: var(--td-text-xl); color: var(--td-highlight); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.race { font-size: var(--td-text-xl); color: var(--td-highlight); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .field { color: var(--td-text-muted); font-size: var(--td-text-sm); white-space: nowrap; }
 .tabs { flex: 1; }
 

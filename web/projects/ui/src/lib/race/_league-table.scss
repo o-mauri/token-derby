@@ -9,7 +9,6 @@
 }
 
 .title {
-  font-family: 'Bitcount Prop Single', var(--td-font-pixel);
   font-size: var(--td-text-md);
   letter-spacing: var(--td-tracking-wide);
   text-transform: uppercase;
@@ -32,7 +31,6 @@
 .owner { color: var(--td-text-muted); font-size: var(--td-text-sm); }
 
 .led {
-  font-family: 'Bitcount Prop Single', var(--td-font-pixel);
   color: var(--td-highlight);
   text-shadow: 0 0 6px color-mix(in srgb, var(--td-highlight) 45%, transparent);
 }

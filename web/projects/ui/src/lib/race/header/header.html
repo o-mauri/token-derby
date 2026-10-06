@@ -1,8 +1,7 @@
 <header class="bar">
-  <h1 class="title">
-    <td-horse-face class="face" />
-    <span class="name-row"><span class="name" [tdMarquee]="name()" [attr.title]="name() || null">{{ name() }}</span></span>
-  </h1>
+  <td-crumbs class="title" [parts]="[{ label: 'Race' }]" tail>
+    <span class="name-row"><span class="name" role="heading" aria-level="1" [tdMarquee]="name()" [attr.title]="name() || null">{{ name() }}</span></span>
+  </td-crumbs>
   <div class="meta">
     @if (showGraphs()) { <button td-button size="sm" type="button" [disabled]="status() === 'finished'" [attr.title]="status() === 'finished' ? 'The results show the charts' : null" (click)="graphs.emit()">Graphs</button> }
     <span class="item status-item"><span class="sr-only">Status:</span><td-status-chip class="status" [status]="status()" /></span>

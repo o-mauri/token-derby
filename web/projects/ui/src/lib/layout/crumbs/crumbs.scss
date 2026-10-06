@@ -39,6 +39,9 @@
 a.seg { background: var(--td-border); }
 a.seg:hover, a.seg:focus-visible { background: var(--td-accent); color: var(--td-surface); outline: none; }
 .seg.here { flex: none; background: var(--td-highlight); color: var(--td-surface); }
+// A projected tail (a race name) can be any length, so it shrinks and lets its content handle the overflow.
+.seg.tail { flex: 0 1 auto; }
+.crumbs { flex: 1 1 auto; }
 
 @media (width < 700px) {
   .crumbs { font-size: var(--td-text-lg); }

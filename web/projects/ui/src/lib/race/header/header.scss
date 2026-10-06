@@ -15,22 +15,13 @@
 }
 
 .title {
-  margin: 0;
-  color: var(--td-accent);
-  font-size: var(--td-text-xl);
-  letter-spacing: var(--td-tracking);
-  display: flex;
-  align-items: center;
-  gap: var(--td-space-3);
   min-width: 16rem;
   max-width: 100%;
   flex: 1 1 0;
 }
 
-.face { flex: none; }
-
 // Race names are unbounded, so the row clips and marquees rather than sizing the header.
-.name-row { min-width: 0; overflow: hidden; white-space: nowrap; }
+.name-row { display: block; min-width: 0; overflow: hidden; white-space: nowrap; }
 .name.scrolling { animation: name-marquee 9s ease-in-out infinite; }
 
 @keyframes name-marquee {

@@ -17,7 +17,6 @@
 .winner .sprite { width: 11rem; }
 
 .name {
-  font-family: 'Bitcount Prop Single', var(--td-font-pixel);
   font-weight: 600;
   font-size: var(--td-text-lg);
   line-height: 1;
@@ -30,7 +29,6 @@
 .meta { font-size: var(--td-text-sm); color: var(--td-text-muted); }
 
 .tokens {
-  font-family: 'Bitcount Prop Single', var(--td-font-pixel);
   color: var(--td-highlight);
   text-shadow: 0 0 6px color-mix(in srgb, var(--td-highlight) 50%, transparent);
 }

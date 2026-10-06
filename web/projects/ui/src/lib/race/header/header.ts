@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 import { Button } from '../../button/button';
-import { HorseFace } from '../../horse-face/horse-face';
+import { Crumbs } from '../../layout/crumbs/crumbs';
 import { Marquee } from '../../horse-chip/marquee';
 import { Countdown } from '../countdown/countdown';
 import { StatusChip } from '../status-chip/status-chip';
@@ -12,7 +12,7 @@ import type { LaneState } from '../models';
 @Component({
   selector: 'td-race-header',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Button, HorseFace, Marquee, Countdown, StatusChip],
+  imports: [Button, Crumbs, Marquee, Countdown, StatusChip],
   templateUrl: './header.html',
   styleUrl: './header.scss',
 })
