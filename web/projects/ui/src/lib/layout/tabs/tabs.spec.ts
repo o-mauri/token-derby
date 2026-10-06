@@ -26,4 +26,18 @@ describe('Tabs', () => {
     const tabs = [...(harness.routeNativeElement as HTMLElement).querySelectorAll('nav a.tab')];
     expect(tabs[1]!.classList.contains('on')).toBe(true);
   });
+
+  it('scrolls the current tab into view, for rows wider than a phone', async () => {
+    const seen: string[] = [];
+    const original = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = function (this: Element) { seen.push(this.textContent?.trim() ?? ''); };
+    try {
+      TestBed.configureTestingModule({ providers: [provideRouter([{ path: 'account', component: Host }, { path: 'account/devices', component: Host }])] });
+      await RouterTestingHarness.create('/account/devices');
+      await new Promise((r) => setTimeout(r, 0));
+      expect(seen).toContain('Devices');
+    } finally {
+      Element.prototype.scrollIntoView = original;
+    }
+  });
 });

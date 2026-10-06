@@ -1,10 +1,21 @@
 @use '../../slant';
 
-:host { display: block; }
+:host { display: block; min-width: 0; }
 
-.tabs { display: flex; gap: var(--td-space-3); border-bottom: var(--td-line-thin) solid var(--td-border); padding: 0 var(--td-space-5); }
+.tabs {
+  display: flex;
+  gap: var(--td-space-3);
+  border-bottom: var(--td-line-thin) solid var(--td-border);
+  padding: 0 var(--td-space-5);
+  // Wider than the screen, the row scrolls sideways instead of widening the page.
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.tabs::-webkit-scrollbar { display: none; }
 
 .tab {
+  flex: none;
+  white-space: nowrap;
   padding: var(--td-space-2) var(--td-space-6);
   border: var(--td-line-thin) solid var(--td-border);
   border-bottom: 0;

@@ -11,8 +11,8 @@ export type TabLink = { readonly label: string; readonly link: readonly unknown[
   template: `
     <nav class="tabs" [attr.aria-label]="label()">
       @for (tab of tabs(); track tab.label) {
-        <a class="tab" [routerLink]="tab.link" routerLinkActive="on" ariaCurrentWhenActive="page"
-          [routerLinkActiveOptions]="match"><span class="text">{{ tab.label }}</span></a>
+        <a #link class="tab" [routerLink]="tab.link" routerLinkActive="on" ariaCurrentWhenActive="page"
+          [routerLinkActiveOptions]="match" (isActiveChange)="$event && reveal(link)"><span class="text">{{ tab.label }}</span></a>
       }
     </nav>
   `,
@@ -23,5 +23,10 @@ export class Tabs {
   readonly label = input.required<string>();
 
   // The path must match exactly, but query strings (filters, previews) don't change which tab you're on.
+  // On a narrow screen the row scrolls sideways, so bring the current tab into view.
+  protected reveal(link: HTMLElement): void {
+    link.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+  }
+
   protected readonly match: IsActiveMatchOptions = { paths: 'exact', queryParams: 'ignored', matrixParams: 'ignored', fragment: 'ignored' };
 }
