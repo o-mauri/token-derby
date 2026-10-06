@@ -86,4 +86,12 @@ describe('TextInput in a Signal Form', () => {
     box.dispatchEvent(new Event('input'));
     expect(f.componentInstance.value()).toBe('09:30');
   });
+
+  it('can keep its label for screen readers only', async () => {
+    const f = TestBed.createComponent(TextInput);
+    f.componentRef.setInput('label', 'Division 1 name');
+    f.componentRef.setInput('hideLabel', true);
+    await f.whenStable();
+    expect((f.nativeElement as HTMLElement).querySelector('label')?.classList.contains('sr-only')).toBe(true);
+  });
 });

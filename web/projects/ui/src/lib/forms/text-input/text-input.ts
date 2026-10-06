@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, input, model } from '@angular/core';
+import { ChangeDetectionStrategy, Component, booleanAttribute, input, model } from '@angular/core';
 import { ControlBase } from '../control-base';
 
 export type TextInputType = 'text' | 'number' | 'password' | 'time';
@@ -7,7 +7,7 @@ export type TextInputType = 'text' | 'number' | 'password' | 'time';
   selector: 'td-text-input',
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    @if (label()) { <label class="label" [for]="id">{{ label() }}</label> }
+    @if (label()) { <label class="label" [class.sr-only]="hideLabel()" [for]="id">{{ label() }}</label> }
     <input #box class="box" [id]="id" [type]="type()" [value]="value() ?? ''" [placeholder]="placeholder()"
       [disabled]="disabled()" [required]="required()" [attr.aria-invalid]="visibleErrors().length > 0"
       (input)="onInput(box.value)" (blur)="touch.emit()" />
@@ -19,6 +19,7 @@ export class TextInput extends ControlBase {
   readonly value = model<string | number | null>(null);
   readonly type = input<TextInputType>('text');
   readonly placeholder = input('');
+  readonly hideLabel = input(false, { transform: booleanAttribute });
 
   protected onInput(raw: string): void {
     if (this.type() !== 'number') return this.value.set(raw);
