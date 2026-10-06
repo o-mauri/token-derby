@@ -1,14 +1,13 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Button, Crumbs, ThemePicker } from '@token-derby/ui';
-import { hostScale } from '../home/home-scale';
 
 /** /privacy: what Token Derby keeps about you, and what it doesn't. */
 @Component({
   selector: 'site-privacy-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [RouterLink, Button, Crumbs, ThemePicker],
-  host: { 'data-page': 'privacy', '[style.--home-scale]': 'scale()' },
+  host: { 'data-page': 'privacy' },
   template: `
     <header class="top">
       <td-crumbs [parts]="[{ label: 'Token Derby', link: ['/'] }, { label: 'Privacy' }]" />
@@ -37,6 +36,4 @@ import { hostScale } from '../home/home-scale';
   `,
   styleUrl: './info-page.scss',
 })
-export class PrivacyPage {
-  protected readonly scale = hostScale();
-}
+export class PrivacyPage {}

@@ -1,7 +1,6 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Button, Crumbs, ThemePicker } from '@token-derby/ui';
-import { hostScale } from '../home/home-scale';
 import { CHANGELOG, CLI_VERSION, SITE_VERSION, changeLines } from './release-data';
 
 /** /about: the current versions and every release, newest first. */
@@ -9,7 +8,7 @@ import { CHANGELOG, CLI_VERSION, SITE_VERSION, changeLines } from './release-dat
   selector: 'site-about-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [RouterLink, Button, Crumbs, ThemePicker],
-  host: { 'data-page': 'about', '[style.--home-scale]': 'scale()' },
+  host: { 'data-page': 'about' },
   template: `
     <header class="top">
       <td-crumbs [parts]="[{ label: 'Token Derby', link: ['/'] }, { label: 'About' }]" />
@@ -38,5 +37,4 @@ export class AboutPage {
   protected readonly cli = CLI_VERSION;
   protected readonly releases = CHANGELOG;
   protected readonly lines = changeLines;
-  protected readonly scale = hostScale();
 }
