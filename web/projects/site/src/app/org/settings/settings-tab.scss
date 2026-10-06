@@ -57,3 +57,5 @@ code { color: var(--td-live); font-family: inherit; }
 }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .danger { color: var(--td-error); }
+.digest { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); gap: var(--td-space-5); }
+.once { margin: 0; color: var(--td-highlight); }

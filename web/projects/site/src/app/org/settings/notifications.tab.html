@@ -1,0 +1,49 @@
+<div class="column">
+  @if (!loaded()) {
+    <div class="loading"><td-loader /></div>
+  } @else {
+    @if (error(); as message) { <p class="error" role="alert">{{ message }}</p> }
+
+    <section class="section">
+      <h2>WEBHOOK</h2>
+      <p class="hint">Token Derby posts each race event to this address, signed with a secret.</p>
+      <td-text-input class="webhook-url" label="HTTPS URL" placeholder="https://example.com/hook" [value]="webhookUrl()"
+        (valueChange)="webhookUrl.set('' + ($event ?? '')); webhookSaved.set(false)" />
+      @if (secret(); as s) {
+        <td-copy-field label="Webhook secret" [value]="s" />
+        <p class="once" role="status">Shown once. Copy it now.</p>
+      }
+      <div class="row">
+        <button td-button type="button" class="save-webhook" [disabled]="!canSaveWebhook()" (click)="saveWebhook()">Save webhook</button>
+        @if (webhookSaved() && !secret()) { <span class="saved">Saved.</span> }
+        @if (webhookUrl() && !canSaveWebhook()) { <button type="button" class="remove" (click)="removeWebhook()">Remove</button> }
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>SLACK BOT</h2>
+      <td-text-input class="slack-token" type="password" label="Bot token" [value]="slack().token"
+        [placeholder]="configured() ? 'configured, leave blank to keep' : 'xoxb-…'" (valueChange)="patchSlack({ token: '' + ($event ?? '') })" />
+      <td-text-input class="slack-channel" label="Channel ID" placeholder="C0123456789" [value]="slack().channel"
+        (valueChange)="patchSlack({ channel: '' + ($event ?? '') })" />
+      <h3>POST WHEN</h3>
+      @for (m of messages; track m.key) {
+        <td-toggle [class]="m.key" [label]="m.label" [checked]="slack().messages[m.key]" (checkedChange)="setMessage(m.key, $event)" />
+      }
+      @if (slack().messages.weekly_digest) {
+        <div class="digest">
+          <td-select label="Digest day" [options]="days" [value]="slack().digest.weekday" (valueChange)="setDigest({ weekday: $event ?? 5 })" />
+          <td-text-input type="time" label="Digest time" [value]="slack().digest.time_local" (valueChange)="setDigest({ time_local: '' + ($event ?? '') })" />
+          <td-select label="Digest time zone" [options]="zones" [value]="slack().digest.tz" (valueChange)="setDigest({ tz: $event ?? slack().digest.tz })" />
+        </div>
+      }
+      <div class="row">
+        <button td-button type="button" class="save-slack" [disabled]="!canSaveSlack()" (click)="saveSlack()">Save Slack bot</button>
+        @if (slackSaved()) { <span class="saved">Saved.</span> }
+        @if (configured()) { <button type="button" class="remove remove-slack" (click)="removeSlack()">Remove</button> }
+      </div>
+    </section>
+  }
+</div>
+<td-confirm [open]="!!ask()" [message]="ask()?.message ?? ''" [detail]="ask()?.detail ?? ''" confirmLabel="Remove" tone="danger"
+  (confirm)="confirmed()" (cancel)="ask.set(null)" />
