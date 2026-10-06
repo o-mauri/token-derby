@@ -1,0 +1,52 @@
+@use '../../../../ui/src/lib/slant';
+
+:host { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+
+.column { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: var(--td-space-6); padding: var(--td-space-5) var(--td-space-6) var(--td-space-7); font-size: var(--td-text-md); }
+
+.jockey { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--td-space-3) var(--td-space-5); }
+.jockey .name { margin: 0; font-weight: normal; font-size: var(--td-text-xl); }
+.meta { margin: 0; flex-basis: 100%; color: var(--td-text-muted); }
+.rename { display: flex; align-items: center; gap: var(--td-space-3); flex-wrap: wrap; }
+
+.horses { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 18rem), 1fr)); gap: var(--td-space-5); align-items: start; }
+.horse { display: grid; gap: var(--td-space-3); padding: var(--td-space-5); background: var(--td-surface); border: var(--td-line) solid var(--td-border); justify-items: start; }
+.sprite { width: 6rem; justify-self: center; }
+.head { display: flex; align-items: baseline; gap: var(--td-space-3); }
+.head .name { margin: 0; font-weight: normal; font-size: var(--td-text-lg); }
+.stats { display: flex; flex-wrap: wrap; gap: var(--td-space-2); }
+.stat { padding: var(--td-space-1) var(--td-space-3); border: var(--td-line-thin) solid var(--td-border); color: var(--td-text-muted); font-size: var(--td-text-sm); }
+.stat b { color: var(--td-highlight); font-weight: normal; }
+
+.hats { list-style: none; margin: 0; padding: 0; width: 100%; display: grid; gap: var(--td-space-2); }
+.hat { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--td-space-3); font-size: var(--td-text-sm); }
+.equipped { color: var(--td-live); }
+.when, .none { color: var(--td-text-muted); }
+.hat .remove { margin-left: auto; }
+
+.link { background: none; border: 0; padding: 0; font: inherit; color: var(--td-text-muted); cursor: pointer; text-decoration: underline; text-underline-offset: 0.2em; }
+.link:hover:not(:disabled), .link:focus-visible { color: var(--td-highlight); }
+.link:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.delete {
+  background: none;
+  color: var(--td-error);
+  border: var(--td-line) solid var(--td-error);
+  padding: var(--td-space-1) var(--td-space-5);
+  font: inherit;
+  font-size: var(--td-text-sm);
+  cursor: pointer;
+  @include slant.slant;
+  &:hover:not(:disabled) { background: var(--td-error-wash); }
+  &:disabled { opacity: 0.35; cursor: not-allowed; }
+  &:focus-visible { outline: var(--td-focus-width) solid var(--td-highlight); outline-offset: var(--td-focus-offset); }
+}
+
+.error { margin: 0; color: var(--td-error); }
+.no-horses { margin: 0; color: var(--td-text-muted); }
+.failed { margin: auto; display: grid; gap: var(--td-space-4); justify-items: center; }
+.failed p { margin: 0; color: var(--td-text-muted); }
+
+@media (width < 700px) {
+  .column { padding: var(--td-space-4); overflow-y: visible; }
+}

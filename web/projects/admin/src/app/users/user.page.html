@@ -1,0 +1,82 @@
+@if (user(); as u) {
+  <main class="column">
+    <section class="jockey">
+      @if (isEditing('user')) {
+        <div class="rename">
+          <td-text-input label="Jockey name" hideLabel [(value)]="draft" />
+          <button td-button size="sm" type="button" class="save" [disabled]="!canSave(u.display_name, userMax)" (click)="saveUser(u)">Save</button>
+          <button type="button" class="link cancel" (click)="editing.set(null)">Cancel</button>
+        </div>
+      } @else {
+        <h1 class="name">{{ u.display_name }}</h1>
+        <button type="button" class="link edit" aria-label="Rename jockey" (click)="edit('user', u.display_name)">✎ Rename</button>
+      }
+      <p class="meta">{{ u.email || 'No email' }} · joined {{ u.created_at.slice(0, 10) }}</p>
+      @if (errors()['user']; as e) { <p class="error" role="alert">{{ e }}</p> }
+    </section>
+
+    @if (u.horses.length) {
+      <div class="horses">
+        @for (h of u.horses; track h.stable_horse_id) {
+          <article class="horse">
+            <td-horse class="sprite" [colors]="h.colors" [hat]="worn(h)" />
+            <div class="head">
+              @if (isEditing('horse', h.stable_horse_id)) {
+                <div class="rename">
+                  <td-text-input label="Horse name" hideLabel [(value)]="draft" />
+                  <button td-button size="sm" type="button" class="save" [disabled]="!canSave(h.name, horseMax)" (click)="saveHorse(u, h)">Save</button>
+                  <button type="button" class="link cancel" (click)="editing.set(null)">Cancel</button>
+                </div>
+              } @else {
+                <h2 class="name">{{ h.name }}</h2>
+                <button type="button" class="link edit" [attr.aria-label]="'Rename ' + h.name" (click)="edit('horse', h.name, h.stable_horse_id)">✎</button>
+              }
+            </div>
+            <div class="stats">
+              <span class="stat">Races <b>{{ h.races_entered ?? 0 }}</b></span>
+              <span class="stat">Wins <b>{{ h.wins ?? 0 }}</b></span>
+              <span class="stat">Podiums <b>{{ h.podiums ?? 0 }}</b></span>
+              <span class="stat">Tokens <b>{{ tokens(h) }}</b></span>
+              <span class="stat">Avg finish <b>{{ avgFinish(h) }}</b></span>
+              <span class="stat">XP <b>{{ h.xp ?? 0 }}</b></span>
+            </div>
+            <button type="button" class="link hats-toggle" [attr.aria-expanded]="openHats().has(h.stable_horse_id)" (click)="toggleHats(h.stable_horse_id)">
+              Hats ({{ h.hats?.length ?? 0 }}) {{ openHats().has(h.stable_horse_id) ? '▾' : '▸' }}
+            </button>
+            @if (openHats().has(h.stable_horse_id)) {
+              <ul class="hats">
+                @for (row of hatRows(h); track row.index) {
+                  <li class="hat">
+                    <span class="hat-name">{{ row.name }}</span>
+                    <span class="rarity" [style.color]="'var(--td-rarity-' + row.rarity + ')'">{{ row.rarity }}</span>
+                    @if (row.equipped) { <span class="equipped">equipped</span> }
+                    <span class="when">{{ row.when }}</span>
+                    <button type="button" class="link remove" [disabled]="busy()" (click)="askRemoveHat(h, row)">Remove</button>
+                  </li>
+                } @empty {
+                  <li class="none">No hats.</li>
+                }
+              </ul>
+            }
+            <button type="button" class="delete" [disabled]="busy()" (click)="askDeleteHorse(h)">Delete horse</button>
+            @if (errors()['horse:' + h.stable_horse_id]; as e) { <p class="error" role="alert">{{ e }}</p> }
+          </article>
+        }
+      </div>
+    } @else {
+      <p class="no-horses">No horses.</p>
+    }
+  </main>
+
+  <td-confirm [open]="!!pending()" [message]="pending()?.message ?? ''"
+    [detail]="pending()?.kind === 'horse' ? 'Its hats and stats go with it. This can\'t be undone.' : 'This can\'t be undone.'"
+    [confirmLabel]="pending()?.kind === 'horse' ? 'Delete' : 'Remove'" tone="danger" (confirm)="confirm()" (cancel)="pending.set(null)" />
+} @else if (data.users.status() === 'error') {
+  <main class="column"><div class="failed"><p>Couldn't load users.</p><button td-button size="sm" type="button" (click)="data.users.reload()">Retry</button></div></main>
+} @else if (data.users.value()) {
+  <main class="column">
+    <td-not-found title="User not found" [message]="notFoundMessage()" backLabel="← Users" (back)="back()" />
+  </main>
+} @else {
+  <main class="column"><td-loader /></main>
+}

@@ -1,0 +1,14 @@
+// Shared frame for the admin list pages: a column filling the tab, its table scrolling inside on desktop.
+:host { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+
+.column { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: var(--td-space-5); padding: var(--td-space-5) var(--td-space-6) var(--td-space-6); font-size: var(--td-text-md); }
+.bar { display: flex; gap: var(--td-space-4); align-items: center; }
+.filter { width: min(100%, 22rem); }
+.list { flex: 1; min-height: 0; overflow-y: auto; }
+.empty, .failed p { margin: 0; color: var(--td-text-muted); }
+.failed { margin: auto; display: grid; gap: var(--td-space-4); justify-items: center; }
+
+@media (width < 700px) {
+  .column { padding: var(--td-space-4); }
+  .list { overflow-y: visible; }
+}

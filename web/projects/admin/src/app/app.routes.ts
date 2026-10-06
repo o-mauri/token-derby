@@ -11,8 +11,8 @@ export const routes: Routes = [
     loadComponent: () => import('./shell/admin.shell').then((m) => m.AdminShell),
     children: [
       { path: '', pathMatch: 'full', redirectTo: 'users' },
-      { path: 'users', data: { section: 'Users' }, loadComponent: placeholder },
-      { path: 'users/:id', data: { section: 'Users' }, loadComponent: placeholder },
+      { path: 'users', data: { section: 'Users' }, loadComponent: () => import('./users/users.page').then((m) => m.UsersPage) },
+      { path: 'users/:id', data: { section: 'Users' }, loadComponent: () => import('./users/user.page').then((m) => m.UserPage) },
       { path: 'organisations', data: { section: 'Organisations' }, loadComponent: placeholder },
       { path: 'claims', data: { section: 'Claims' }, loadComponent: placeholder },
       { path: '**', loadComponent: placeholder },
