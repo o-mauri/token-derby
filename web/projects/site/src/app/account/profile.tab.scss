@@ -26,6 +26,7 @@
 .google { margin: 0; display: flex; align-items: center; gap: var(--td-space-4); font-size: var(--td-text-lg); overflow-wrap: anywhere; }
 .mark { width: 0.9em; height: 0.9em; flex: none; border-radius: var(--td-radius-round); background: conic-gradient(var(--td-error) 0 25%, var(--td-highlight) 0 50%, var(--td-live) 0 75%, var(--td-rarity-rare) 0); }
 
+.signouts { display: flex; flex-wrap: wrap; gap: var(--td-space-4); }
 .signout {
   background: none;
   color: var(--td-error);
@@ -35,6 +36,7 @@
   font-size: var(--td-text-md);
   cursor: pointer;
   @include slant.slant;
-  &:hover { background: var(--td-error-wash); }
+  &:hover:not(:disabled) { background: var(--td-error-wash); }
+  &:disabled { opacity: 0.35; cursor: not-allowed; }
   &:focus-visible { outline: var(--td-focus-width) solid var(--td-highlight); outline-offset: var(--td-focus-offset); }
 }

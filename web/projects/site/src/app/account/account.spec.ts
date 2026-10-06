@@ -130,6 +130,35 @@ describe('Account page', () => {
     await settle();
     expect(el().getAttribute('data-page') ?? el().querySelector('[data-page]')?.getAttribute('data-page')).toBe('home');
   });
+
+  it('signs out of all browsers after confirming, then goes home', async () => {
+    const { click, http, settle, el } = await open('/account');
+    await click('button.signout-all');
+    expect(el().querySelector('td-confirm .box')?.textContent).toContain('every other browser');
+    http.expectNone('/api/web-sessions/all');
+    await click('td-confirm button.confirm');
+    http.expectOne('/api/web-sessions/all').flush({ signed_out: 2 });
+    await settle();
+    expect(el().getAttribute('data-page') ?? el().querySelector('[data-page]')?.getAttribute('data-page')).toBe('home');
+  });
+
+  it('keeps you signed in and says so when signing out everywhere fails', async () => {
+    const { click, http, settle, el } = await open('/account');
+    await click('button.signout-all');
+    await click('td-confirm button.confirm');
+    http.expectOne('/api/web-sessions/all').flush({ code: 'INTERNAL', message: 'x' }, { status: 500, statusText: 'Error' });
+    await settle();
+    expect(el().querySelector('[data-tab="profile"] .signout-error')?.textContent).toContain("Couldn't sign out everywhere");
+    expect(el().querySelector('td-confirm .box')).toBeNull();
+  });
+
+  it('cancelling the sign out of all browsers sends nothing', async () => {
+    const { click, http, el } = await open('/account');
+    await click('button.signout-all');
+    await click('td-confirm button.cancel');
+    http.expectNone('/api/web-sessions/all');
+    expect(el().querySelector('td-confirm .box')).toBeNull();
+  });
 });
 
 describe('Account devices', () => {

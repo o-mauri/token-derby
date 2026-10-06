@@ -97,6 +97,26 @@ describe('Session', () => {
     expect(session().signedIn()).toBe(false);
   });
 
+  it('signs out of every browser, then locally', async () => {
+    const { session, http, storage } = setup(SIGNED_IN());
+    const done = session().signOutEverywhere();
+    const req = http.expectOne('/api/web-sessions/all');
+    expect(req.request.method).toBe('DELETE');
+    expect(req.request.headers.get('Authorization')).toBe('Bearer tok');
+    req.flush({ signed_out: 3 });
+    await done;
+    expect(session().signedIn()).toBe(false);
+    expect(storage.length).toBe(0);
+  });
+
+  it('stays signed in when signing out everywhere fails', async () => {
+    const { session, http } = setup(SIGNED_IN());
+    const done = session().signOutEverywhere();
+    http.expectOne('/api/web-sessions/all').flush({ code: 'INTERNAL', message: 'x' }, { status: 500, statusText: 'Error' });
+    await expect(done).rejects.toBeTruthy();
+    expect(session().signedIn()).toBe(true);
+  });
+
   it('renames you, updating the stored name', async () => {
     const { session, http, storage } = setup(SIGNED_IN());
     const done = session().rename('Ada');

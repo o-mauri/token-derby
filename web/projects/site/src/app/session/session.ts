@@ -74,6 +74,12 @@ export class Session {
     }
   }
 
+  /** Ends every browser sign-in, this one included; on failure you stay signed in and the error reaches the caller. */
+  async signOutEverywhere(): Promise<void> {
+    await firstValueFrom(this.http.delete<{ signed_out: number }>('/api/web-sessions/all', { context: new HttpContext().set(WITH_SESSION, true) }));
+    this.clear();
+  }
+
   private load(): State | null {
     const token = this.read(SESSION_KEYS.token);
     if (!token) return null;

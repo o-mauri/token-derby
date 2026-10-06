@@ -21,6 +21,14 @@
   </section>
 
   <section class="section">
-    <button type="button" class="signout" (click)="signOut()">Sign out</button>
+    <div class="signouts">
+      <button type="button" class="signout" (click)="signOut()">Sign out</button>
+      <button type="button" class="signout signout-all" [disabled]="signingOutAll()" (click)="confirmAll.set(true)">Sign out of all browsers</button>
+    </div>
+    @if (signOutError(); as message) { <p class="error signout-error" role="alert">{{ message }}</p> }
   </section>
 </div>
+
+<td-confirm [open]="confirmAll()" message="Sign out of all browsers?"
+  detail="This signs you out here and in every other browser. The CLI stays signed in." confirmLabel="Sign out everywhere" tone="danger"
+  (confirm)="signOutAll()" (cancel)="confirmAll.set(false)" />

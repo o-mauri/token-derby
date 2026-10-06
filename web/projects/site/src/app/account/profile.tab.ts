@@ -1,16 +1,16 @@
 import { ChangeDetectionStrategy, Component, computed, inject, linkedSignal, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { USER_NAME_MAX_LENGTH } from '@token-derby/shared';
-import { ApiError, Button } from '@token-derby/ui';
+import { ApiError, Button, Confirm } from '@token-derby/ui';
 import { REDIRECT } from '../session/redirect';
 import { Session } from '../session/session';
 import { AccountApi } from './account-api';
 
-/** Your display name, linked Google email and sign out. */
+/** Your display name, linked Google email, and signing out here or in every browser. */
 @Component({
   selector: 'site-profile-tab',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Button],
+  imports: [Button, Confirm],
   host: { 'data-tab': 'profile' },
   templateUrl: './profile.tab.html',
   styleUrl: './profile.tab.scss',
@@ -31,6 +31,9 @@ export class ProfileTab {
   protected readonly canSave = computed(() =>
     this.clean().length >= 1 && this.clean().length <= this.max && this.clean() !== this.current() && !this.saving());
   protected readonly linking = signal(false);
+  protected readonly confirmAll = signal(false);
+  protected readonly signingOutAll = signal(false);
+  protected readonly signOutError = signal<string | null>(null);
 
   protected edit(value: string): void {
     this.draft.set(value);
@@ -65,5 +68,18 @@ export class ProfileTab {
   protected async signOut(): Promise<void> {
     await this.session.signOut();
     await this.router.navigate(['/']);
+  }
+
+  protected async signOutAll(): Promise<void> {
+    this.confirmAll.set(false);
+    this.signingOutAll.set(true);
+    this.signOutError.set(null);
+    try {
+      await this.session.signOutEverywhere();
+      await this.router.navigate(['/']);
+    } catch {
+      this.signOutError.set("Couldn't sign out everywhere. Try again.");
+      this.signingOutAll.set(false);
+    }
   }
 }
