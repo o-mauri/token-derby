@@ -21,7 +21,8 @@
 
 .text { @include slant.upright; }
 
-.chip[aria-selected="true"] { border-color: var(--td-accent); color: var(--td-accent); }
+// Selected chips fill with the highlight, the same yellow as the current tab and breadcrumb step.
+.chip[aria-selected="true"] { background: var(--td-highlight); border-color: var(--td-highlight); color: var(--td-surface); }
 .chip[aria-disabled="true"], .chips[aria-disabled="true"] .chip { opacity: 0.5; cursor: not-allowed; }
 // Only show the keyboard highlight while the group has focus; CDK keeps an active option after blur.
 .chips:focus-within .chip.cdk-option-active { outline: var(--td-focus-width) solid var(--td-accent); outline-offset: var(--td-focus-offset); }
