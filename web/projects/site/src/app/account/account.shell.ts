@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { Router, RouterLink, RouterOutlet } from '@angular/router';
 import { AccountMenu, Button, GoogleButton, HorseFace, ThemePicker, type TabLink, Tabs } from '@token-derby/ui';
+import { hostScale } from '../home/home-scale';
 import { Session } from '../session/session';
 import { AccountApi } from './account-api';
 
@@ -13,7 +14,7 @@ const TABS: TabLink[] = [{ label: 'Profile', link: ['.'] }, { label: 'Devices', 
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [RouterOutlet, RouterLink, AccountMenu, Button, GoogleButton, HorseFace, ThemePicker, Tabs],
   providers: [AccountApi],
-  host: { 'data-page': 'account' },
+  host: { 'data-page': 'account', '[style.--home-scale]': 'scale()' },
   templateUrl: './account.shell.html',
   styleUrl: './account.shell.scss',
 })
@@ -22,6 +23,8 @@ export class AccountShell {
   private readonly router = inject(Router);
 
   protected readonly tabs = TABS;
+  // Grows the tab content with the window, like the home page.
+  protected readonly scale = hostScale();
   protected readonly name = computed(() => this.session.user()?.display_name ?? 'Account');
   protected readonly signInHref = computed(() => `/api/auth/google/start?return_to=${encodeURIComponent(this.router.url)}`);
 

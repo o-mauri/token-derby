@@ -19,4 +19,11 @@ describe('Tabs', () => {
     expect(profile!.classList.contains('on')).toBe(false);
     expect(profile!.getAttribute('href')).toBe('/account');
   });
+
+  it('still marks the tab when the address has a query string', async () => {
+    TestBed.configureTestingModule({ providers: [provideRouter([{ path: 'account', component: Host }, { path: 'account/devices', component: Host }])] });
+    const harness = await RouterTestingHarness.create('/account/devices?devices=many');
+    const tabs = [...(harness.routeNativeElement as HTMLElement).querySelectorAll('nav a.tab')];
+    expect(tabs[1]!.classList.contains('on')).toBe(true);
+  });
 });
