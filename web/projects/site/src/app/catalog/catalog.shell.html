@@ -6,7 +6,7 @@
   </span>
 </header>
 <div class="controls">
-  <td-chip-group class="horses" label="Horse" [options]="palettes" [value]="picked()" (valueChange)="pick($event)" />
+  <td-chip-group class="horses" label="Horse" single [options]="palettes" [value]="picked()" (valueChange)="pick($event)" />
   <span class="total">{{ total }} collectibles</span>
 </div>
 <td-tabs label="Rarity" [tabs]="tabs" queryParamsHandling="preserve" />

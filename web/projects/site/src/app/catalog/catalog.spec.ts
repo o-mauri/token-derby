@@ -61,6 +61,15 @@ describe('/catalog', () => {
     expect(horse.colors()).toEqual(paletteFor('black').colors);
   });
 
+  it('keeps the chosen horse marked when it is clicked again', async () => {
+    const { el, settle, router } = await open('/catalog?horse=grey');
+    const grey = () => [...el().querySelectorAll<HTMLElement>('td-chip-group .chip')].find((c) => c.textContent?.trim() === 'Grey')!;
+    grey().click();
+    await settle();
+    expect(router().url).toBe('/catalog?horse=grey');
+    expect(grey().getAttribute('aria-selected')).toBe('true');
+  });
+
   it('keeps the horse colour when switching tabs', async () => {
     const { el, settle, router } = await open('/catalog/rare?horse=grey');
     [...el().querySelectorAll<HTMLElement>('td-tabs a.tab')].find((a) => a.textContent?.includes('Epic'))!.click();

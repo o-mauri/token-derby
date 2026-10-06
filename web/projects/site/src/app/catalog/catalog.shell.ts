@@ -26,10 +26,8 @@ export class CatalogShell {
   protected readonly palettes: TdOption<string>[] = PALETTES.map((p) => ({ value: p.key, label: p.name }));
   protected readonly picked = computed(() => [paletteFor(this.horse()).key]);
 
-  // The chip group allows several; the catalog wants one, so the newest pick wins.
   protected pick(keys: readonly string[]): void {
-    const current = this.picked()[0];
-    const next = keys.find((k) => k !== current) ?? current;
+    const next = keys[0] ?? this.picked()[0];
     void this.router.navigate([], { queryParams: { horse: next }, queryParamsHandling: 'merge', replaceUrl: true });
   }
 }

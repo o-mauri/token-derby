@@ -40,7 +40,7 @@ export class HatCard {
 
   protected readonly variants = computed(() => {
     const hat = this.hat();
-    if (isAnimatedHat(hat)) return [{ index: 0, caption: 'one of a kind', light: false, solo: true }];
+    if (isAnimatedHat(hat)) return [{ index: 0, caption: 'one of a kind', light: needsLightBg(hat, 0), solo: true }];
     return Array.from({ length: variantCount(hat) }, (_, index) => ({ index, caption: `#${index + 1}`, light: needsLightBg(hat, index), solo: false }));
   });
 }

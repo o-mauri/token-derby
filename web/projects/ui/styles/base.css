@@ -19,9 +19,9 @@ html, body {
 /* Matrix's glyph rain sits behind the page, so the page content stacks above it. */
 :root[data-theme="matrix"] .td-app-root > :not(td-theme-backdrop) { position: relative; z-index: 1; }
 
-/* Scrollbars follow the theme everywhere: a slim square thumb on a clear track, with no light box in the corner. */
-* { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--td-text-muted) 50%, var(--td-border)) transparent; }
+/* Scrollbars follow the theme everywhere: a slim square thumb in the highlight colour on a clear track, with no light box in the corner. */
+* { scrollbar-width: thin; scrollbar-color: var(--td-highlight) transparent; }
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
-::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--td-text-muted) 50%, var(--td-border)); border: 2px solid transparent; background-clip: padding-box; }
-::-webkit-scrollbar-thumb:hover { background-color: var(--td-text-muted); }
+::-webkit-scrollbar-thumb { background: var(--td-highlight); border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background-color: var(--td-text); }

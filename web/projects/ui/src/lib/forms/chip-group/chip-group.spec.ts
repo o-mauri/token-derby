@@ -54,4 +54,16 @@ describe('ChipGroup in a Signal Form', () => {
     await fx.whenStable();
     expect([...fx.componentInstance.model().days].sort()).toEqual([1, 3]);
   });
+
+  it('can pick just one, and never ends up with none picked', async () => {
+    const { f, el, chips } = await render({ value: [2], single: true });
+    expect(el.querySelector('[role="listbox"]')!.getAttribute('aria-multiselectable')).toBe('false');
+    chips[0]!.click();
+    await f.whenStable();
+    expect(f.componentInstance.value()).toEqual([1]);
+    chips[0]!.click();
+    await f.whenStable();
+    expect(f.componentInstance.value()).toEqual([1]);
+    expect(chips[0]!.getAttribute('aria-selected')).toBe('true');
+  });
 });

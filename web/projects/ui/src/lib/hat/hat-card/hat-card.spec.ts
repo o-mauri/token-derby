@@ -46,4 +46,10 @@ describe('HatCard', () => {
     const bright = HATS.find((h) => !isAnimatedHat(h) && relativeLuminance(hatColors(h, 0).A) > 0.5)!;
     expect(needsLightBg(bright, 0)).toBe(false);
   });
+
+  it('gives a dark animated hat a light backing too', async () => {
+    const dark = HATS.find((h) => isAnimatedHat(h) && relativeLuminance(hatColors(h, 0).A) < 0.18)!;
+    const el = await render(dark);
+    expect(el.querySelector('figure.variant')?.classList.contains('light')).toBe(true);
+  });
 });
