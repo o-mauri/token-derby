@@ -1,11 +1,6 @@
 :host { display: flex; flex-direction: column; min-height: 100vh; padding: var(--td-space-4) var(--td-space-5); gap: var(--td-space-5); box-sizing: border-box; }
 
 .top { display: flex; justify-content: space-between; align-items: center; gap: var(--td-space-5); flex-wrap: wrap; }
-.org { display: flex; align-items: baseline; gap: var(--td-space-3); min-width: 0; }
-.face { height: 1.6em; align-self: center; }
-.org-name, .crumb { font-family: 'Bitcount Prop Single', var(--td-font-pixel); font-size: var(--td-text-xl); letter-spacing: var(--td-tracking-wide); text-transform: uppercase; }
-.sep { color: var(--td-text-muted); }
-.crumb { color: var(--td-highlight); }
 .actions { display: flex; align-items: center; gap: var(--td-space-4); }
 .actions a { white-space: nowrap; }
 .actions td-theme-picker { width: 10rem; }
@@ -21,7 +16,6 @@
 .key.relegate::before { background: var(--td-zone-relegate); }
 
 @media (width < 700px) {
-  .org-name, .crumb { font-size: var(--td-text-md); }
   .actions { gap: var(--td-space-3); }
   .actions td-theme-picker { width: 6rem; }
 }

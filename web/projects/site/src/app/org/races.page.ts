@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
-import { Button, HorseFace, Loader, MonthPager, NotFound, Page, RaceList, ThemePicker } from '@token-derby/ui';
+import { Button, Crumbs, Loader, MonthPager, NotFound, Page, RaceList, ThemePicker } from '@token-derby/ui';
 import { OrgData } from './org-data';
 import { liveRow, monthPage, upcomingRows } from './org-view';
 
@@ -8,7 +8,7 @@ import { liveRow, monthPage, upcomingRows } from './org-view';
 @Component({
   selector: 'site-org-races-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Button, HorseFace, Loader, MonthPager, NotFound, Page, RaceList, ThemePicker, RouterLink],
+  imports: [Button, Crumbs, Loader, MonthPager, NotFound, Page, RaceList, ThemePicker, RouterLink],
   host: { 'data-page': 'org-races' },
   templateUrl: './races.page.html',
   styleUrl: './races.page.scss',

@@ -3,9 +3,6 @@
 :host { display: flex; flex-direction: column; height: max(100vh, 46rem); padding: var(--td-space-4); gap: var(--td-space-4); box-sizing: border-box; }
 
 .top { display: flex; justify-content: space-between; align-items: center; gap: var(--td-space-5); padding: 0 var(--td-space-3); }
-.org { display: flex; align-items: center; gap: var(--td-space-4); min-width: 0; }
-.face { height: 1.6em; }
-.org-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: 'Bitcount Prop Single', var(--td-font-pixel); font-size: var(--td-text-xl); letter-spacing: var(--td-tracking-wide); text-transform: uppercase; }
 .actions { display: flex; align-items: center; gap: var(--td-space-4); }
 .actions a { white-space: nowrap; }
 .actions td-theme-picker { width: 10rem; }
@@ -35,5 +32,4 @@
   .actions td-theme-picker { width: 6rem; }
   .actions { gap: var(--td-space-3); }
   .top { flex-wrap: wrap; }
-  .org-name { font-size: var(--td-text-md); }
 }

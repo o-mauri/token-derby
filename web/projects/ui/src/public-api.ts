@@ -83,3 +83,4 @@ export * from './lib/layout/tabs/tabs';
 export * from './lib/dialog/confirm/confirm';
 export * from './lib/forms/code-input/code-input';
 export * from './lib/account/device-list/device-list';
+export * from './lib/layout/crumbs/crumbs';

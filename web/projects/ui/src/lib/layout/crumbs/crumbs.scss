@@ -1,0 +1,42 @@
+:host { display: block; min-width: 0; }
+
+.crumbs {
+  --tip: 0.6em;
+
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  font-family: var(--td-font-pixel);
+  font-size: var(--td-text-xl);
+  letter-spacing: var(--td-tracking-wide);
+  text-transform: uppercase;
+}
+.face { height: 1.3em; flex: none; margin-right: var(--td-space-4); }
+
+// Arrow-shaped steps: each overlaps the one before so the notch meets the point.
+.seg {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  height: 1.5em;
+  padding: 0 calc(var(--tip) + var(--td-space-4)) 0 calc(var(--tip) + var(--td-space-5));
+  margin-left: calc(-1 * var(--tip) + var(--td-space-1));
+  background: var(--td-surface-raised);
+  color: var(--td-text);
+  text-decoration: none;
+  clip-path: polygon(0 0, calc(100% - var(--tip)) 0, 100% 50%, calc(100% - var(--tip)) 100%, 0 100%, var(--tip) 50%);
+}
+.face + .seg {
+  margin-left: 0;
+  padding-left: var(--td-space-5);
+  clip-path: polygon(0 0, calc(100% - var(--tip)) 0, 100% 50%, calc(100% - var(--tip)) 100%, 0 100%);
+}
+.text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+a.seg { background: var(--td-border); }
+a.seg:hover, a.seg:focus-visible { background: var(--td-accent); color: var(--td-surface); outline: none; }
+.seg.here { flex: none; background: var(--td-highlight); color: var(--td-surface); }
+
+@media (width < 700px) {
+  .crumbs { font-size: var(--td-text-lg); }
+}

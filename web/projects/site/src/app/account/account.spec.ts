@@ -61,6 +61,7 @@ describe('Account page', () => {
   it('opens on Profile with your name and Save greyed', async () => {
     const { el } = await open('/account');
     expect(el().querySelector('td-tabs a.on')?.textContent?.trim()).toBe('Profile');
+    expect([...el().querySelectorAll('td-crumbs .part')].map((p) => p.textContent?.trim())).toEqual(['Omar', 'Account']);
     expect(el().querySelector<HTMLInputElement>('input.name')?.value).toBe('Omar');
     expect(el().querySelector<HTMLButtonElement>('button.save')?.disabled).toBe(true);
   });

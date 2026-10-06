@@ -71,6 +71,7 @@ describe('/cli', () => {
 
   it('warns about phishing while you enter a code', async () => {
     const { el } = await open('/cli');
+    expect(el().querySelector('td-crumbs .here')?.textContent?.trim()).toBe('Approve a device');
     expect(el().querySelector('.warning')?.textContent).toContain('Only enter a code from a terminal you started yourself.');
   });
 

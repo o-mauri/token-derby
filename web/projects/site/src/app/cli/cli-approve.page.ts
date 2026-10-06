@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { normaliseUserCode } from '@token-derby/shared';
-import { ApiError, Button, CodeInput, GoogleButton, HorseFace } from '@token-derby/ui';
+import { ApiError, Button, CodeInput, Crumbs, GoogleButton } from '@token-derby/ui';
 import { hostScale } from '../home/home-scale';
 import { Session } from '../session/session';
 import { CLI_ERROR_FALLBACK, CLI_ERROR_TEXT, CliApi } from './cli-api';
@@ -13,7 +13,7 @@ type Step = 'enter' | 'confirm' | 'done';
 @Component({
   selector: 'site-cli-approve-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, Button, CodeInput, GoogleButton, HorseFace],
+  imports: [RouterLink, Button, CodeInput, Crumbs, GoogleButton],
   providers: [CliApi],
   host: { 'data-page': 'cli', '[style.--home-scale]': 'scale()' },
   templateUrl: './cli-approve.page.html',

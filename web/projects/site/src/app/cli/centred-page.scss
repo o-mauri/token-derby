@@ -4,9 +4,6 @@
 :host { display: flex; flex-direction: column; height: max(100dvh, 32rem); font-family: var(--td-font-pixel); }
 
 .top { display: flex; justify-content: space-between; align-items: center; gap: var(--td-space-5); flex-wrap: wrap; padding: var(--td-space-5); }
-.crumb { display: flex; align-items: center; gap: var(--td-space-4); font-size: var(--td-text-xl); letter-spacing: var(--td-tracking-wide); }
-.sep { color: var(--td-text-muted); }
-.here { color: var(--td-highlight); }
 
 .column {
   flex: 1;
@@ -53,5 +50,4 @@ code { color: var(--td-live); font-family: inherit; }
 
 @media (width < 700px) {
   :host { height: auto; min-height: 100dvh; }
-  .crumb { font-size: var(--td-text-lg); }
 }

@@ -70,7 +70,7 @@ describe('OrgPage', () => {
     http.match('/api/races/K7QX').forEach((r) => r.flush({ join_code: 'K7QX', status: 'live', time_left_seconds: 3600, horses: [] }));
     await settle();
     const page = el();
-    expect(page.querySelector('.org-name')?.textContent?.trim()).toBe('Acme');
+    expect(page.querySelector('td-crumbs .org-name.here')?.textContent?.trim()).toBe('Acme');
     expect(page.querySelector('td-panel.live a')?.getAttribute('href')).toBe('/race/K7QX');
     expect(page.querySelector('td-panel.races a')?.getAttribute('href')).toBe('/org/Acme/races');
     expect(page.querySelector('td-panel.league a')).toBeNull();
@@ -130,7 +130,10 @@ describe('RacesPage', () => {
     await settle();
     const hrefs = [...el().querySelectorAll('td-race-list a.row')].map((a) => a.getAttribute('href'));
     expect(hrefs).toEqual(['/race/K7QX', '/race/NEXT', '/race/OLD1']);
-    expect(el().querySelector('a.back')?.getAttribute('href')).toBe('/org/Acme');
+    // The org's chevron in the breadcrumb is the way back to the dashboard.
+    expect(el().querySelector('td-crumbs a.part.org-name')?.getAttribute('href')).toBe('/org/Acme');
+    expect(el().querySelector('td-crumbs .here')?.textContent?.trim()).toBe('Races');
+    expect(el().querySelector('a.back')).toBeNull();
   });
 
   it('falls back to the latest month for a month it does not have', async () => {
@@ -179,6 +182,7 @@ describe('LeaguePage', () => {
     expect(el().querySelector('[data-page]')?.getAttribute('data-page') ?? el().getAttribute('data-page')).toBe('org-league');
     expect(el().querySelector('td-season-pager .label')?.textContent?.trim()).toBe('SEASON 3');
     expect(el().querySelector('td-season-pager .progress')?.textContent).toContain('Round 6 of 10');
+    expect(el().querySelector('td-crumbs a.part.org-name')?.getAttribute('href')).toBe('/org/Acme');
     expect(el().querySelectorAll('td-league-table')).toHaveLength(3);
   });
 

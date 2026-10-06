@@ -4,13 +4,9 @@
   </td-page>
 } @else {
   <header class="top">
-    <span class="org">
-      <td-horse-face class="face" />
-      <span class="org-name">{{ orgName() }}</span><span class="sep">/</span><span class="crumb">RACES</span>
-    </span>
+    <td-crumbs [parts]="[{ label: orgName(), link: ['..'], key: 'org-name' }, { label: 'Races' }]" />
     <span class="actions">
       <td-theme-picker compact />
-      <a td-button size="sm" class="back" routerLink="..">← {{ orgName() || 'Org' }}</a>
       <a td-button size="sm" routerLink="/">← Home</a>
     </span>
   </header>

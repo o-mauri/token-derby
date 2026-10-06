@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import {
-  Button, ColumnTemplate, ColumnWindow, HorseFace, LeagueTable, Loader, NotFound, Page, SeasonPager, ThemePicker, pollResource,
+  Button, ColumnTemplate, ColumnWindow, Crumbs, LeagueTable, Loader, NotFound, Page, SeasonPager, ThemePicker, pollResource,
 } from '@token-derby/ui';
 import { OrgApi } from './org-api';
 import { OrgData } from './org-data';
@@ -11,7 +11,7 @@ import { leaguePageView, seasonToShow } from './org-view';
 @Component({
   selector: 'site-org-league-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Button, ColumnTemplate, ColumnWindow, HorseFace, LeagueTable, Loader, NotFound, Page, SeasonPager, ThemePicker, RouterLink],
+  imports: [Button, ColumnTemplate, ColumnWindow, Crumbs, LeagueTable, Loader, NotFound, Page, SeasonPager, ThemePicker, RouterLink],
   host: { 'data-page': 'org-league' },
   templateUrl: './league.page.html',
   styleUrl: './league.page.scss',

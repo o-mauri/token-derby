@@ -4,7 +4,7 @@
   </td-page>
 } @else {
   <header class="top">
-    <span class="org"><td-horse-face class="face" /><span class="org-name">{{ orgName() }}</span></span>
+    <td-crumbs [parts]="[{ label: orgName(), key: 'org-name' }]" />
     <span class="actions">
       <td-theme-picker compact />
       <a td-button size="sm" routerLink="/">← Home</a>

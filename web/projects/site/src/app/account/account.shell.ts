@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { Router, RouterLink, RouterOutlet } from '@angular/router';
-import { AccountMenu, Button, GoogleButton, HorseFace, ThemePicker, type TabLink, Tabs } from '@token-derby/ui';
+import { AccountMenu, Button, Crumbs, GoogleButton, ThemePicker, type TabLink, Tabs } from '@token-derby/ui';
 import { hostScale } from '../home/home-scale';
 import { Session } from '../session/session';
 import { AccountApi } from './account-api';
@@ -12,7 +12,7 @@ const TABS: TabLink[] = [{ label: 'Profile', link: ['.'] }, { label: 'Devices', 
 @Component({
   selector: 'site-account-shell',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterOutlet, RouterLink, AccountMenu, Button, GoogleButton, HorseFace, ThemePicker, Tabs],
+  imports: [RouterOutlet, RouterLink, AccountMenu, Button, Crumbs, GoogleButton, ThemePicker, Tabs],
   providers: [AccountApi],
   host: { 'data-page': 'account', '[style.--home-scale]': 'scale()' },
   templateUrl: './account.shell.html',

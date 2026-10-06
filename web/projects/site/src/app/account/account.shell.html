@@ -1,8 +1,5 @@
 <header class="top">
-  <span class="crumb">
-    <td-horse-face class="face" />
-    <span class="who">{{ session.signedIn() ? name() : 'TOKEN DERBY' }}</span><span class="sep">/</span><span class="here">ACCOUNT</span>
-  </span>
+  <td-crumbs class="crumbs" [parts]="[{ label: session.signedIn() ? name() : 'Token Derby', link: session.signedIn() ? null : ['/'] }, { label: 'Account' }]" />
   <span class="actions">
     @if (session.signedIn()) {
       <td-account-menu [name]="name()" [accountLink]="['/account']" (signOut)="signOut()" />
