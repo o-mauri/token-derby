@@ -91,6 +91,18 @@ describe('auth-google-start', () => {
     expect(a.cookies[0]).toBe(stateCookie(sa));
     expect(b.cookies[0]).toBe(stateCookie(sb));
   });
+
+  it('stores a same-site return_to on the pending request', async () => {
+    const res: any = await googleStart(ev({ queryStringParameters: { return_to: '/' } }));
+    const state = verifyState('a'.repeat(64), stateFromUrl(res.headers.location))!;
+    expect((await consumeAuthRequest(state))!.return_to).toBe('/');
+  });
+
+  it('ignores a return_to that would leave the site', async () => {
+    const res: any = await googleStart(ev({ queryStringParameters: { return_to: '//evil.com' } }));
+    const state = verifyState('a'.repeat(64), stateFromUrl(res.headers.location))!;
+    expect((await consumeAuthRequest(state))!.return_to).toBeUndefined();
+  });
 });
 
 describe('auth-link-start', () => {

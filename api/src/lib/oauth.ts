@@ -41,6 +41,26 @@ export function originOf(event: APIGatewayProxyEventV2): string {
   return `${scheme}://${host}`;
 }
 
+const DEFAULT_RETURN = '/org-manager';
+
+/** A same-site path to come back to after sign-in, or undefined for anything that could leave the site.
+ *  Control characters and backslashes are refused: URL parsing drops or rewrites them, turning `/\t/x` into `//x`. */
+export function safeReturnTo(raw: string | undefined): string | undefined {
+  if (!raw || raw.length > 512 || !raw.startsWith('/') || raw.startsWith('//')) return undefined;
+  if (/[\x00-\x20\x7f\\]/.test(raw)) return undefined;
+  return raw;
+}
+
+/** The site URL to land on: the code goes in the fragment, an error in the query. */
+export function siteUrl(origin: string, returnTo: string | undefined, out: { hash?: string; error?: string }): string {
+  let url = new URL(returnTo ?? DEFAULT_RETURN, `${origin}/`);
+  // Belt and braces: whatever the path says, never send the code to another origin.
+  if (url.origin !== new URL(origin).origin) url = new URL(DEFAULT_RETURN, `${origin}/`);
+  url.hash = out.hash ?? '';
+  if (out.error) url.searchParams.set('auth_error', out.error);
+  return url.toString();
+}
+
 export const STATE_COOKIE_PREFIX = 'td_auth_state_';
 const STATE_COOKIE_VALUE = '1';
 

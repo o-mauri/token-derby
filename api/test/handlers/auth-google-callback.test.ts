@@ -61,7 +61,7 @@ function cookieJar() {
   };
 }
 
-async function seedRequest(over: { link_to_user_id?: string } = {}) {
+async function seedRequest(over: { link_to_user_id?: string; return_to?: string } = {}) {
   const state = randomUUID();
   const nonce = randomUUID();
   await putAuthRequest({
@@ -348,5 +348,20 @@ describe('auth-google-callback', () => {
 
     expect(errOf(res.headers.location)).toBe('sso_failed');
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('sends you back to return_to with the grant code', async () => {
+    const { nonce, signed } = await seedRequest({ return_to: '/' });
+    const res: any = await handleCallback(ev('auth-code', signed), deps(claimsFor(`rt-${randomUUID()}@example.com`, nonce)));
+    expect((res.headers.location as string).startsWith('https://app.tokenderby.co.uk/#code=')).toBe(true);
+  });
+
+  it('brings a cancelled sign-in back to return_to, using up the pending request', async () => {
+    const { state, signed } = await seedRequest({ return_to: '/' });
+    const e = ev('', signed);
+    (e as any).queryStringParameters = { error: 'access_denied', state: signed };
+    const res: any = await handleCallback(e, deps(claimsFor('x@y.com', 'n')));
+    expect(res.headers.location).toBe('https://app.tokenderby.co.uk/?auth_error=sso_failed');
+    expect(await authRequests.consumeAuthRequest(state)).toBeNull();
   });
 });
