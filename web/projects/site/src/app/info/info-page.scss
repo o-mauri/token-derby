@@ -1,0 +1,46 @@
+// The shared frame for text pages: header, then a centred column that scrolls inside on desktop.
+:host { display: flex; flex-direction: column; height: max(100dvh, 32rem); font-family: var(--td-font-pixel); }
+
+.top { display: flex; justify-content: space-between; align-items: center; gap: var(--td-space-5); flex-wrap: wrap; padding: var(--td-space-5); }
+.actions { display: flex; align-items: center; gap: var(--td-space-4); }
+.column {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  width: min(100%, 44rem);
+  margin: 0 auto;
+  padding: var(--td-space-5) var(--td-space-6) var(--td-space-7);
+  box-sizing: border-box;
+  font-size: var(--td-text-lg);
+  zoom: var(--home-scale, 1);
+}
+
+.versions { margin: 0 0 var(--td-space-6); color: var(--td-text-muted); }
+.versions b { color: var(--td-text); font-weight: normal; }
+
+.timeline { list-style: none; margin: 0; padding: 0 0 0 var(--td-space-6); border-left: var(--td-line) solid var(--td-border); display: grid; gap: var(--td-space-6); }
+.entry { position: relative; }
+.entry::before {
+  content: '';
+  position: absolute;
+  left: calc(-1 * var(--td-space-6) - 0.3rem);
+  top: 0.45em;
+  width: 0.6rem;
+  aspect-ratio: 1;
+  border-radius: var(--td-radius-round);
+  background: var(--td-text);
+}
+.head { display: flex; gap: var(--td-space-4); align-items: baseline; flex-wrap: wrap; }
+.tag { padding: 0 var(--td-space-3); border: var(--td-line-thin) solid currentcolor; font-size: var(--td-text-sm); letter-spacing: var(--td-tracking-wide); }
+.tag.site { color: var(--td-rarity-rare); }
+.tag.cli { color: var(--td-live); }
+.date { margin-left: auto; color: var(--td-text-muted); font-size: var(--td-text-md); }
+.entry ul { margin: var(--td-space-3) 0 0; padding-left: var(--td-space-6); color: var(--td-text-muted); display: grid; gap: var(--td-space-1); }
+
+.prose p { margin: 0 0 var(--td-space-5); }
+.prose h2 { margin: var(--td-space-6) 0 var(--td-space-3); font-weight: normal; font-size: var(--td-text-md); letter-spacing: var(--td-tracking-wide); text-transform: uppercase; color: var(--td-highlight); }
+.prose ul { margin: 0; padding-left: var(--td-space-6); display: grid; gap: var(--td-space-3); color: var(--td-text-muted); }
+
+@media (width < 700px) {
+  :host { height: auto; min-height: 100dvh; }
+}

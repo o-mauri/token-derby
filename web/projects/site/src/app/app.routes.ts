@@ -45,6 +45,8 @@ export const routes: Routes = [
       { path: 'limited', loadComponent: () => import('./catalog/catalog.tab').then((m) => m.CatalogTab), data: { rarity: 'limited' } },
     ],
   },
+  { path: 'about', loadComponent: () => import('./info/about.page').then((m) => m.AboutPage) },
+  { path: 'privacy', loadComponent: () => import('./info/privacy.page').then((m) => m.PrivacyPage) },
   { path: 'cli', loadComponent: () => import('./cli/cli-approve.page').then((m) => m.CliApprovePage) },
   { path: 'link-google', loadComponent: () => import('./cli/link-google.page').then((m) => m.LinkGooglePage) },
   ...previewRoutes,
