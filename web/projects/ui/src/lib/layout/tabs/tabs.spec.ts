@@ -40,4 +40,22 @@ describe('Tabs', () => {
       Element.prototype.scrollIntoView = original;
     }
   });
+
+  it('can keep the query string on its links', async () => {
+    @Component({ imports: [Tabs], template: `<td-tabs label="Hats" [tabs]="tabs" queryParamsHandling="preserve" />` })
+    class Keeps { tabs = [{ label: 'Common', link: ['/catalog'] }, { label: 'Rare', link: ['/catalog/rare'] }]; }
+    TestBed.configureTestingModule({ providers: [provideRouter([{ path: 'catalog', component: Keeps }, { path: 'catalog/rare', component: Keeps }])] });
+    const harness = await RouterTestingHarness.create('/catalog?horse=grey');
+    const rare = (harness.routeNativeElement as HTMLElement).querySelectorAll('nav a.tab')[1]!;
+    expect(rare.getAttribute('href')).toBe('/catalog/rare?horse=grey');
+  });
+
+  it('colours a tab when given a colour', async () => {
+    @Component({ imports: [Tabs], template: `<td-tabs label="Hats" [tabs]="tabs" />` })
+    class Coloured { tabs = [{ label: 'Rare', link: ['/x'], color: 'var(--td-rarity-rare)' }]; }
+    TestBed.configureTestingModule({ providers: [provideRouter([{ path: 'x', component: Coloured }])] });
+    const harness = await RouterTestingHarness.create('/x');
+    const tab = (harness.routeNativeElement as HTMLElement).querySelector<HTMLElement>('nav a.tab')!;
+    expect(tab.style.getPropertyValue('--tab-color')).toBe('var(--td-rarity-rare)');
+  });
 });

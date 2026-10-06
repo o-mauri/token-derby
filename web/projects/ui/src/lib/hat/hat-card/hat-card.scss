@@ -23,4 +23,6 @@
 .variant.light { background: var(--td-text-muted); }
 .variant.light figcaption { color: var(--td-surface); }
 .horse { width: 4rem; }
-figcaption { font-size: var(--td-text-sm); color: var(--td-text-muted); }
+figcaption { font-size: var(--td-text-sm); color: var(--td-text-muted); white-space: nowrap; }
+// A one-of-a-kind hat has the card to itself, with room for its caption.
+.variant.solo { grid-column: span 2; }

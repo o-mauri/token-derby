@@ -34,6 +34,17 @@ export const routes: Routes = [
       { path: 'devices', loadComponent: () => import('./account/devices.tab').then((m) => m.DevicesTab) },
     ],
   },
+  {
+    path: 'catalog',
+    loadComponent: () => import('./catalog/catalog.shell').then((m) => m.CatalogShell),
+    children: [
+      { path: '', loadComponent: () => import('./catalog/catalog.tab').then((m) => m.CatalogTab), data: { rarity: 'common' } },
+      { path: 'rare', loadComponent: () => import('./catalog/catalog.tab').then((m) => m.CatalogTab), data: { rarity: 'rare' } },
+      { path: 'epic', loadComponent: () => import('./catalog/catalog.tab').then((m) => m.CatalogTab), data: { rarity: 'epic' } },
+      { path: 'legendary', loadComponent: () => import('./catalog/catalog.tab').then((m) => m.CatalogTab), data: { rarity: 'legendary' } },
+      { path: 'limited', loadComponent: () => import('./catalog/catalog.tab').then((m) => m.CatalogTab), data: { rarity: 'limited' } },
+    ],
+  },
   { path: 'cli', loadComponent: () => import('./cli/cli-approve.page').then((m) => m.CliApprovePage) },
   { path: 'link-google', loadComponent: () => import('./cli/link-google.page').then((m) => m.LinkGooglePage) },
   ...previewRoutes,

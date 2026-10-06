@@ -25,7 +25,7 @@ export function needsLightBg(hat: Hat, variant: number): boolean {
     <h3 class="name">{{ hat().name }} @if (!hat().rollable) { <span class="exclusive">Exclusive</span> }</h3>
     <div class="variants">
       @for (v of variants(); track v.index) {
-        <figure class="variant" [class.light]="v.light">
+        <figure class="variant" [class.light]="v.light" [class.solo]="v.solo">
           <td-horse class="horse" [colors]="colors()" [hat]="{ id: hat().id, variant: v.index }" />
           <figcaption>{{ v.caption }}</figcaption>
         </figure>
@@ -40,7 +40,7 @@ export class HatCard {
 
   protected readonly variants = computed(() => {
     const hat = this.hat();
-    if (isAnimatedHat(hat)) return [{ index: 0, caption: 'one of a kind', light: false }];
-    return Array.from({ length: variantCount(hat) }, (_, index) => ({ index, caption: `#${index + 1}`, light: needsLightBg(hat, index) }));
+    if (isAnimatedHat(hat)) return [{ index: 0, caption: 'one of a kind', light: false, solo: true }];
+    return Array.from({ length: variantCount(hat) }, (_, index) => ({ index, caption: `#${index + 1}`, light: needsLightBg(hat, index), solo: false }));
   });
 }

@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
-import { type IsActiveMatchOptions, RouterLink, RouterLinkActive } from '@angular/router';
+import { type IsActiveMatchOptions, type QueryParamsHandling, RouterLink, RouterLinkActive } from '@angular/router';
 
-export type TabLink = { readonly label: string; readonly link: readonly unknown[] };
+export type TabLink = { readonly label: string; readonly link: readonly unknown[]; readonly color?: string };
 
 /** A row of tabs that are real links, one per child route; the current one is marked. */
 @Component({
@@ -11,8 +11,8 @@ export type TabLink = { readonly label: string; readonly link: readonly unknown[
   template: `
     <nav class="tabs" [attr.aria-label]="label()">
       @for (tab of tabs(); track tab.label) {
-        <a #link class="tab" [routerLink]="tab.link" routerLinkActive="on" ariaCurrentWhenActive="page"
-          [routerLinkActiveOptions]="match" (isActiveChange)="$event && reveal(link)"><span class="text">{{ tab.label }}</span></a>
+        <a #link class="tab" [style.--tab-color]="tab.color ?? null" [routerLink]="tab.link" routerLinkActive="on" ariaCurrentWhenActive="page"
+          [routerLinkActiveOptions]="match" [queryParamsHandling]="queryParamsHandling()" (isActiveChange)="$event && reveal(link)"><span class="text">{{ tab.label }}</span></a>
       }
     </nav>
   `,
@@ -21,6 +21,8 @@ export type TabLink = { readonly label: string; readonly link: readonly unknown[
 export class Tabs {
   readonly tabs = input.required<readonly TabLink[]>();
   readonly label = input.required<string>();
+  /** 'preserve' keeps the current query string (a filter, say) when switching tabs. */
+  readonly queryParamsHandling = input<QueryParamsHandling | null>(null);
 
   // The path must match exactly, but query strings (filters, previews) don't change which tab you're on.
   // On a narrow screen the row scrolls sideways, so bring the current tab into view.

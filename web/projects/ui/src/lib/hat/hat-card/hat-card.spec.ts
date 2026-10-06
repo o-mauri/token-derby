@@ -35,6 +35,7 @@ describe('HatCard', () => {
     const el = await render(animated);
     expect(el.querySelectorAll('figure.variant')).toHaveLength(1);
     expect(el.querySelector('figcaption')?.textContent?.trim()).toBe('one of a kind');
+    expect(el.querySelector('figure.variant')?.classList.contains('solo')).toBe(true);
   });
 
   it('puts a light backing behind a hat too dark to see', () => {
