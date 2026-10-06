@@ -1,0 +1,30 @@
+@use '../control' as control;
+
+:host { @include control.field-layout; }
+.label { @include control.label; }
+.chips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--td-space-3); }
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--td-space-3);
+  padding: var(--td-space-1) var(--td-space-4);
+  background: var(--td-surface-raised);
+  border: var(--td-line-thin) solid var(--td-border);
+  font-size: var(--td-text-md);
+}
+.remove { background: none; border: 0; padding: 0; color: var(--td-text-muted); cursor: pointer; font: inherit; }
+.remove:hover, .remove:focus-visible { color: var(--td-error); }
+.remove:focus-visible { outline: var(--td-focus-width) solid var(--td-highlight); outline-offset: var(--td-focus-offset); }
+.row { display: flex; gap: var(--td-space-4); }
+.add { @include control.box; flex: 1; min-width: 0; }
+.add[aria-invalid='true'] { border-color: var(--td-error); }
+.add-btn {
+  background: var(--td-surface-raised);
+  color: var(--td-text);
+  border: var(--td-line-thin) solid var(--td-border);
+  padding: 0 var(--td-space-5);
+  font: inherit;
+  cursor: pointer;
+  &:hover, &:focus-visible { border-color: var(--td-accent); outline: none; }
+}
+.error { margin: 0; color: var(--td-error); font-size: var(--td-text-sm); }

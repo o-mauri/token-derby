@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, input, model } from '@angular/core';
 import { ControlBase } from '../control-base';
 
-export type TextInputType = 'text' | 'number' | 'password';
+export type TextInputType = 'text' | 'number' | 'password' | 'time';
 
 @Component({
   selector: 'td-text-input',

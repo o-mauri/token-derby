@@ -75,4 +75,15 @@ describe('TextInput in a Signal Form', () => {
     expect(fx.componentInstance.model().name).toBe('Acme');
     expect(el.querySelector('.error')).toBeNull();
   });
+
+  it('takes a time and keeps it as text', async () => {
+    const f = TestBed.createComponent(TextInput);
+    f.componentRef.setInput('type', 'time');
+    await f.whenStable();
+    const box = (f.nativeElement as HTMLElement).querySelector('input')!;
+    expect(box.type).toBe('time');
+    box.value = '09:30';
+    box.dispatchEvent(new Event('input'));
+    expect(f.componentInstance.value()).toBe('09:30');
+  });
 });
