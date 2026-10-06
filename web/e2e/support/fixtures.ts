@@ -1,8 +1,12 @@
 // Route maps for fakeApi, built from the site's preview fixtures so tests and /preview-* pages share data.
-import type { DeviceRecord, DivisionConfig, GetOrganisationResponse, League, ListDevicesResponse, ListOrganisationsResponse, OrgMembersResponse } from '@token-derby/shared';
+import type {
+  CliAuthApproveResponse, DeleteDeviceResponse, DeviceRecord, DivisionConfig, GetLeagueStandingsResponse, GetOrgLeagueResponse, GetOrgRaceSettingsResponse,
+  GetOrgScheduleResponse, GetOrgSlackResponse, GetOrgWebhookResponse, GetOrganisationResponse, GetRaceResponse, GetRaceSeriesResponse, League,
+  ListDevicesResponse, ListOrgRacesResponse, ListOrganisationsResponse, OrgMembersResponse, SetOrgRaceSettingsResponse, UpdateJockeyResponse,
+} from '@token-derby/shared';
 import { PREVIEW_ORG, previewLiveRace, previewOrgRaces, previewOrgStandings, type OrgPreviewOptions } from '../../projects/site/src/app/preview/org-fixture';
 import { PREVIEW_JOIN_CODE, PREVIEW_SERIES, previewRace, type PreviewRaceState } from '../../projects/site/src/app/preview/race-fixture';
-import type { Routes } from './fake-api';
+import { ok, type Routes } from './fake-api';
 
 export { PREVIEW_JOIN_CODE, PREVIEW_ORG };
 
@@ -10,7 +14,7 @@ export const notFound = (code: string, message = 'Not found') => ({ status: 404,
 
 export function myOrgs(names: string[] = ['Stackone', 'acme', 'NightOwls']): Routes {
   const body: ListOrganisationsResponse = { organisations: names.map((org_name, i) => ({ org_id: `o${i}`, org_name })) };
-  return { 'GET /api/organisations': { body } };
+  return { 'GET /api/organisations': ok<ListOrganisationsResponse>(body) };
 }
 
 /** The public org pages (dashboard, races, league) for `PREVIEW_ORG`, with a live race by default. */
@@ -18,18 +22,18 @@ export function orgRoutes(opts: Partial<OrgPreviewOptions> = {}): Routes {
   const o: OrgPreviewOptions = { state: 'live', league: true, long: false, ...opts };
   const base = `/api/organisations/${PREVIEW_ORG}`;
   return {
-    [`GET ${base}/races`]: { body: previewOrgRaces(o) },
-    [`GET ${base}/league/standings`]: { body: { standings: previewOrgStandings(o) } },
-    [`GET /api/races/${PREVIEW_JOIN_CODE}`]: { body: previewLiveRace(o) },
-    [`GET /api/races/${PREVIEW_JOIN_CODE}/series`]: { body: PREVIEW_SERIES },
+    [`GET ${base}/races`]: ok<ListOrgRacesResponse>(previewOrgRaces(o)),
+    [`GET ${base}/league/standings`]: ok<GetLeagueStandingsResponse>({ standings: previewOrgStandings(o) }),
+    [`GET /api/races/${PREVIEW_JOIN_CODE}`]: ok<GetRaceResponse>(previewLiveRace(o)),
+    [`GET /api/races/${PREVIEW_JOIN_CODE}/series`]: ok<GetRaceSeriesResponse>(PREVIEW_SERIES),
   };
 }
 
 /** One race at `PREVIEW_JOIN_CODE` in the given state. */
 export function raceRoutes(state: PreviewRaceState): Routes {
   return {
-    [`GET /api/races/${PREVIEW_JOIN_CODE}`]: { body: previewRace(state) },
-    [`GET /api/races/${PREVIEW_JOIN_CODE}/series`]: { body: PREVIEW_SERIES },
+    [`GET /api/races/${PREVIEW_JOIN_CODE}`]: ok<GetRaceResponse>(previewRace(state)),
+    [`GET /api/races/${PREVIEW_JOIN_CODE}/series`]: ok<GetRaceSeriesResponse>(PREVIEW_SERIES),
   };
 }
 
@@ -44,7 +48,7 @@ export function orgRecord(owner = true): GetOrganisationResponse {
 
 /** The org pages as a signed-in member sees them: the public routes plus the org record. */
 export function memberOrgRoutes(owner = true): Routes {
-  return { ...orgRoutes(), [`GET /api/organisations/${PREVIEW_ORG}`]: { body: orgRecord(owner) } };
+  return { ...orgRoutes(), [`GET /api/organisations/${PREVIEW_ORG}`]: ok<GetOrganisationResponse>(orgRecord(owner)) };
 }
 
 const members: OrgMembersResponse = { members: [
@@ -53,24 +57,26 @@ const members: OrgMembersResponse = { members: [
   { user_id: 'u3', user_name: 'Sam', joined_at: '2026-06-01T10:00:00Z', linked_email: false, matches_domain: 'n/a' },
 ] };
 const divisions: DivisionConfig[] = [{ name: 'Premier', cap: 8 }, { name: 'Championship', cap: 8 }];
-const league = {
+const league: League = {
   weekdays: [1, 2, 3, 4, 5], start_local: '09:00', end_local: '17:30', tz: 'Europe/London', race_name: 'Daily Derby', max_participants: 20,
   org_id: 'o1', created_at: '2026-05-14T10:00:00Z', creator_user_id: 'u1', creator_user_name: 'Omar',
   divisions, boundaries: [2], races_per_season: 10, current_season: 3, status: 'active',
-} as League;
+};
 
 /** Every org settings endpoint, as an owner with a running league and nothing else configured. */
 export function settingsRoutes(owner = true): Routes {
   const base = `/api/organisations/${PREVIEW_ORG}`;
   return {
     ...memberOrgRoutes(owner),
-    [`GET ${base}/members`]: { body: members },
-    [`GET ${base}/schedule`]: { body: { schedule: null } },
-    [`GET ${base}/league`]: { body: { league } },
-    [`GET ${base}/race-settings`]: { body: { settings: null } },
-    [`PUT ${base}/race-settings`]: (req) => ({ body: { settings: { org_id: 'o1', ...(req.body as object), updated_at: '', updated_by_user_id: 'u1' } } }),
-    [`GET ${base}/webhook`]: { body: { webhook_url: null } },
-    [`GET ${base}/slack`]: { body: { configured: false, channel_id: null, messages: null, digest: null } },
+    [`GET ${base}/members`]: ok<OrgMembersResponse>(members),
+    [`GET ${base}/schedule`]: ok<GetOrgScheduleResponse>({ schedule: null }),
+    [`GET ${base}/league`]: ok<GetOrgLeagueResponse>({ league }),
+    [`GET ${base}/race-settings`]: ok<GetOrgRaceSettingsResponse>({ settings: null }),
+    [`PUT ${base}/race-settings`]: (req) => ok<SetOrgRaceSettingsResponse>({
+      settings: { org_id: 'o1', ...(req.body as Omit<SetOrgRaceSettingsResponse['settings'], 'org_id' | 'updated_at' | 'updated_by_user_id'>), updated_at: '', updated_by_user_id: 'u1' },
+    }),
+    [`GET ${base}/webhook`]: ok<GetOrgWebhookResponse>({ webhook_url: null }),
+    [`GET ${base}/slack`]: ok<GetOrgSlackResponse>({ configured: false, channel_id: null, messages: null, digest: null }),
   };
 }
 
@@ -84,10 +90,13 @@ export function accountRoutes(): Routes {
   const devices: ListDevicesResponse = { devices: DEVICES, has_legacy_credential: false };
   return {
     ...myOrgs(),
-    'GET /api/devices': { body: devices },
-    'DELETE /api/devices/d2': { status: 204 },
-    'PUT /api/jockey/me': (req) => ({ body: { user_id: 'u1', display_name: (req.body as { display_name: string }).display_name } }),
-    'DELETE /api/web-sessions': { status: 204 },
-    'DELETE /api/web-sessions/all': { body: { signed_out: 2 } },
+    'GET /api/devices': ok<ListDevicesResponse>(devices),
+    'DELETE /api/devices/d2': ok<DeleteDeviceResponse>({ ok: true }),
+    'PUT /api/jockey/me': (req) => ok<UpdateJockeyResponse>({ user_id: 'u1', display_name: (req.body as { display_name: string }).display_name }),
+    'DELETE /api/web-sessions': ok<{ deleted: boolean }>({ deleted: true }),
+    // WebSessionsDeleteAllResponse in @token-derby/shared once this branch has main's API change.
+    'DELETE /api/web-sessions/all': ok<{ signed_out: number }>({ signed_out: 2 }),
   };
 }
+
+export const cliApproved = (label: string) => ok<CliAuthApproveResponse>({ label });

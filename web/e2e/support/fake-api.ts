@@ -6,6 +6,9 @@ export type Fake = { status?: number; body?: unknown; delayMs?: number };
 export type Routes = Record<string, Fake | ((req: ApiRequest) => Fake)>;
 export type FakeApi = { requests: ApiRequest[]; unmatched: string[] };
 
+/** A 200 whose body is checked against the API's response type, e.g. `ok<GetOrgScheduleResponse>({ schedule: null })`. */
+export const ok = <T>(body: T): Fake => ({ body });
+
 const apis = new WeakMap<Page, FakeApi>();
 
 /** Answers same-origin `/api/**` from `routes`; anything else 500s and is recorded in `unmatched`. */
@@ -38,14 +41,20 @@ export async function fakeApi(page: Page, routes: Routes): Promise<FakeApi> {
 export const test = base.extend<{ guard: void }>({
   guard: [async ({ page }, use) => {
     const errors: string[] = [];
-    page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+    page.on('console', (m) => {
+      if (m.type() !== 'error') return;
+      // A failed /api/ response is often the point of the test; any other failed load is a real error.
+      const url = m.location().url;
+      if (/Failed to load resource/.test(m.text()) && url && new URL(url).pathname.startsWith('/api/')) return;
+      errors.push(`${m.text()}${url ? ` (${url})` : ''}`);
+    });
     page.on('pageerror', (e) => errors.push(e.message));
     // Web fonts load for real: the layout depends on VT323's narrow metrics.
+    // A default fake catches API calls in specs that never set one up; a spec's own fakeApi takes precedence.
+    await fakeApi(page, {});
     await use();
     const api = apis.get(page);
     if (api?.unmatched.length) throw new Error(`API calls with no fixture: ${api.unmatched.join(', ')}`);
-    // Expected API failures surface as console errors from the browser's network log.
-    const real = errors.filter((e) => !/Failed to load resource: the server responded with a status of (4|5)\d\d/.test(e));
-    if (real.length) throw new Error(`Console errors:\n${real.join('\n')}`);
+    if (errors.length) throw new Error(`Console errors:\n${errors.join('\n')}`);
   }, { auto: true }],
 });

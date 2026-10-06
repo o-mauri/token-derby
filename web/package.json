@@ -12,7 +12,8 @@
     "build-storybook": "ng run ui:build-storybook",
     "lint": "ng lint ui && ng lint site && ng lint admin && npm run lint:styles",
     "e2e": "ng build site && tsc --noEmit -p e2e/tsconfig.json && playwright test -c e2e",
-    "e2e:ui": "playwright test -c e2e --ui"
+    "e2e:ui": "playwright test -c e2e --ui",
+    "pree2e": "npm run build --workspace=@token-derby/shared"
   },
   "private": true,
   "packageManager": "npm@11.19.1",

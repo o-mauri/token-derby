@@ -1,5 +1,6 @@
 import { expect } from '@playwright/test';
 import { fakeApi, test } from './support/fake-api';
+import { cliApproved } from './support/fixtures';
 import { signIn } from './support/session';
 
 test.beforeEach(({ isMobile }) => test.skip(isMobile, 'behaviour runs on desktop'));
@@ -12,7 +13,7 @@ async function enterCode(page: import('@playwright/test').Page, code: string) {
 
 test('looks up a code, then approves that device', async ({ page }) => {
   await signIn(page);
-  const api = await fakeApi(page, { 'POST /api/auth/cli/approve': { body: { label: 'omar-mbp' } } });
+  const api = await fakeApi(page, { 'POST /api/auth/cli/approve': cliApproved('omar-mbp') });
   await page.goto('/cli');
   await enterCode(page, 'K7QX2M');
   await expect(page.locator('.confirm-label')).toHaveText('"omar-mbp"');

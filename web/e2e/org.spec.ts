@@ -31,7 +31,9 @@ test('an unknown org shows not-found naming it', async ({ page }) => {
 test('a slow org shows the loader, then the dashboard', async ({ page }) => {
   const routes = orgRoutes();
   const races = `GET /api/organisations/${PREVIEW_ORG}/races`;
-  await fakeApi(page, { ...routes, [races]: { ...(routes[races] as object), delayMs: 1500 } });
+  const answer = routes[races];
+  if (!answer || typeof answer === 'function') throw new Error(`${races} must be a plain fixture`);
+  await fakeApi(page, { ...routes, [races]: { ...answer, delayMs: 1500 } });
   await page.goto(`/org/${PREVIEW_ORG}`);
   await expect(page.locator('td-loader')).toBeVisible();
   await expect(page.locator('td-loader')).toHaveCount(0, { timeout: 5000 });
