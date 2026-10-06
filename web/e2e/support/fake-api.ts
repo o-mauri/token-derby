@@ -40,8 +40,7 @@ export const test = base.extend<{ guard: void }>({
     const errors: string[] = [];
     page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
     page.on('pageerror', (e) => errors.push(e.message));
-    // Keep runs hermetic: web fonts are not part of what's under test.
-    await page.route(/fonts\.(googleapis|gstatic)\.com/, (r) => r.fulfill({ status: 200, body: '' }));
+    // Web fonts load for real: the layout depends on VT323's narrow metrics.
     await use();
     const api = apis.get(page);
     if (api?.unmatched.length) throw new Error(`API calls with no fixture: ${api.unmatched.join(', ')}`);

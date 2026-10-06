@@ -61,15 +61,20 @@ House rules enforced as errors:
 
 When a rule genuinely doesn't fit one line, disable it for that line only and say why in the same comment.
 
-## Running end-to-end tests
+## Browser tests (Playwright)
 
-For end-to-end (e2e) testing, run:
+One-off setup: `npx playwright install chromium`.
 
 ```bash
-ng e2e
+npm run e2e      # builds the site, type-checks e2e/, runs every spec
+npm run e2e:ui   # Playwright's UI mode, against the last build
 ```
 
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
+- The tests run the **production** `site` build, served by `e2e/serve.mjs` like CloudFront: real files as they are, app routes fall back to `index.html`, and a missing `.js`/`.css` 404s.
+- The API is faked. `fakeApi(page, routes)` in `e2e/support/fake-api.ts` answers `/api/**` from route maps keyed `'METHOD /api/path'`. Route maps are built in `e2e/support/fixtures.ts`, mostly from the `/preview-*` fixtures. Any API call without a route fails the test, naming the call, and so does any console error.
+- `signIn(page)` in `e2e/support/session.ts` seeds the session a real sign-in leaves behind.
+- Three projects: `desktop` (1366×768), `phone` (390×844) and `phone-small` (360×780). Behaviour specs run on desktop; `layout.spec.ts` checks every page on all three for sideways scroll, and for page scroll on desktop.
+- Web fonts load from Google Fonts for real, since VT323's narrow metrics are what keep pages within a phone's width. The run needs network access.
 
 ## Additional Resources
 
