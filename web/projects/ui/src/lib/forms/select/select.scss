@@ -1,7 +1,7 @@
 @use '../control' as control;
 @use '../../slant';
 
-:host { @include control.field-layout; @include control.errors; min-width: 0; }
+:host { @include control.field-layout; @include control.errors; min-width: max-content; }
 .label { @include control.label; }
 .label.sr-only { @include control.sr-only; }
 
@@ -11,8 +11,8 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--td-space-5);
-  // Fills whatever room its container gives it, down to nothing.
-  min-width: 0;
+  // Fills the room its container gives it, but never narrower than its longest option.
+  min-width: max-content;
   width: 100%;
   background: var(--td-surface-raised);
   color: var(--td-text);
@@ -31,7 +31,12 @@
 }
 
 .current, .caret { @include slant.upright; }
-.current { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.current { white-space: nowrap; }
+// Stacks every option label in one grid cell: invisible, but it sets the trigger's width.
+.labels { display: grid; text-align: left; }
+.labels > * { grid-area: 1 / 1; }
+.sizer { display: grid; visibility: hidden; height: 0; overflow: hidden; }
+.sizer > span { grid-area: 1 / 1; white-space: nowrap; }
 .caret { flex: none; }
 .placeholder { color: var(--td-text-muted); }
 .caret { color: var(--td-text-muted); }
@@ -52,6 +57,7 @@
 }
 
 .option {
+  white-space: nowrap;
   padding: var(--td-space-3) var(--td-space-5);
   font-size: var(--td-text-sm);
   letter-spacing: var(--td-tracking);

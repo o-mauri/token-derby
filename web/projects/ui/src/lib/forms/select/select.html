@@ -4,7 +4,11 @@
   [attr.aria-labelledby]="label() ? id + ' ' + triggerId : null"
   [attr.aria-invalid]="visibleErrors().length > 0" [disabled]="disabled()"
   (click)="toggle()" (keydown)="onTriggerKey($event)">
-  <span class="current" [class.placeholder]="!selectedLabel()">{{ selectedLabel() ?? placeholder() }}</span>
+  <span class="labels">
+    <span class="current" [class.placeholder]="!selectedLabel()">{{ selectedLabel() ?? placeholder() }}</span>
+    <!-- Every label in the same cell, unseen, so the trigger is always as wide as the longest. -->
+    <span class="sizer" aria-hidden="true">@for (o of options(); track o.value) { <span>{{ o.label }}</span> }</span>
+  </span>
   <span class="caret" aria-hidden="true">▾</span>
 </button>
 <ng-template cdkConnectedOverlay [cdkConnectedOverlayOrigin]="origin" [cdkConnectedOverlayOpen]="open()"

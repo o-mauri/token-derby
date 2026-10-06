@@ -3,7 +3,6 @@
 .top { display: flex; justify-content: space-between; align-items: center; gap: var(--td-space-5); flex-wrap: wrap; }
 .actions { display: flex; align-items: center; gap: var(--td-space-4); }
 .actions a { white-space: nowrap; }
-.actions td-theme-picker { width: 10rem; }
 
 .body { display: grid; gap: var(--td-space-5); width: 100%; max-width: 90rem; margin: 0 auto; }
 .loading { flex: 1; display: flex; min-height: 12rem; }
@@ -17,5 +16,4 @@
 
 @media (width < 700px) {
   .actions { gap: var(--td-space-3); }
-  .actions td-theme-picker { width: 6rem; }
 }

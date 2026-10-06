@@ -3,13 +3,11 @@
 .top { display: flex; justify-content: space-between; align-items: center; gap: var(--td-space-5); flex-wrap: wrap; }
 .actions { display: flex; align-items: center; gap: var(--td-space-4); }
 .actions a { white-space: nowrap; }
-.actions td-theme-picker { width: 10rem; }
 
 .loading { flex: 1; display: flex; }
 .message { margin: auto; color: var(--td-text-muted); }
 .list { width: 100%; max-width: 80rem; margin: 0 auto; }
 
 @media (width < 700px) {
-  .actions td-theme-picker { width: 6rem; }
   .actions { gap: var(--td-space-3); }
 }

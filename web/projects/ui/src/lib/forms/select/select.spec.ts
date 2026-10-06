@@ -96,5 +96,15 @@ describe('Select in a Signal Form', () => {
     expect(label.classList.contains('sr-only')).toBe(true);
     expect(label.textContent).toBe('League');
   });
-});
 
+  it('is always as wide as its longest option, whichever is picked', async () => {
+    const f = TestBed.createComponent(Select<string>);
+    f.componentRef.setInput('label', 'Theme');
+    f.componentRef.setInput('options', [{ value: 'a', label: 'Derby' }, { value: 'b', label: 'Chromatic Circuit' }]);
+    f.componentRef.setInput('value', 'a');
+    await f.whenStable();
+    const sizer = (f.nativeElement as HTMLElement).querySelector('.trigger .sizer')!;
+    expect(sizer.getAttribute('aria-hidden')).toBe('true');
+    expect([...sizer.querySelectorAll('span')].map((s) => s.textContent)).toEqual(['Derby', 'Chromatic Circuit']);
+  });
+});
