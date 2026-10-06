@@ -1,6 +1,6 @@
 import { DOCUMENT, inject } from '@angular/core';
 import { HttpErrorResponse, HttpResponse, type HttpInterceptorFn } from '@angular/common/http';
-import type { ResolveFn } from '@angular/router';
+import type { CliStart } from '../cli/cli-preview';
 import { of, throwError } from 'rxjs';
 
 const ERRORS: Record<string, [string, number]> = {
@@ -20,8 +20,7 @@ export const cliFixtureInterceptor: HttpInterceptorFn = (req, next) => {
 };
 
 /** ?step=confirm|done opens the preview part-way through. */
-export const previewCliStep: ResolveFn<string | undefined> = (route) => {
-  const step = route.queryParamMap.get('step');
-  return step === 'confirm' || step === 'done' ? step : undefined;
-};
-export const previewCliLabel: ResolveFn<string | undefined> = (route) => (route.queryParamMap.get('step') === 'confirm' ? 'omar-mbp' : undefined);
+export function previewCliStart(): CliStart | null {
+  const step = query().get('step');
+  return step === 'confirm' || step === 'done' ? { step, code: 'K7QX2M', label: 'omar-mbp' } : null;
+}

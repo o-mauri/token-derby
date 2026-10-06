@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, ElementRef, computed, input, model, viewChildren } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, input, linkedSignal, model, viewChildren } from '@angular/core';
 import { JOIN_CODE_ALPHABET, JOIN_CODE_LENGTH } from '@token-derby/shared';
 
 /** One box per character of a CLI code: upper-cases, keeps only the code alphabet, and spreads a paste across the boxes. */
@@ -9,8 +9,8 @@ import { JOIN_CODE_ALPHABET, JOIN_CODE_LENGTH } from '@token-derby/shared';
     <div class="cells" role="group" [attr.aria-label]="label()">
       @for (i of slots; track i) {
         <input #cell class="cell" maxlength="1" autocomplete="one-time-code" autocapitalize="characters" spellcheck="false"
-          [attr.aria-label]="'Character ' + (i + 1) + ' of ' + slots.length" [value]="chars()[i] ?? ''"
-          (input)="typed(i, cell)" (keydown.backspace)="back(i, cell)" (paste)="pasted($event)" />
+          [attr.aria-label]="'Character ' + (i + 1) + ' of ' + slots.length" [value]="boxes()[i]"
+          (input)="typed(i, cell)" (keydown.backspace)="back(i, cell)" (focus)="cell.select()" (paste)="pasted($event)" />
       }
     </div>
   `,
@@ -21,16 +21,22 @@ export class CodeInput {
   readonly label = input.required<string>();
 
   protected readonly slots = Array.from({ length: JOIN_CODE_LENGTH }, (_, i) => i);
-  protected readonly chars = computed(() => [...this.value()]);
+  // One entry per box, so clearing a middle box leaves a gap instead of shifting the rest left.
+  // A value set from outside refills the boxes; the value this component emitted leaves them alone.
+  protected readonly boxes = linkedSignal<string, string[]>({
+    source: this.value,
+    computation: (value, prev) =>
+      prev && prev.value.join('') === value ? prev.value : Array.from({ length: JOIN_CODE_LENGTH }, (_, i) => value[i] ?? ''),
+  });
   private readonly cells = viewChildren<ElementRef<HTMLInputElement>>('cell');
 
   protected typed(i: number, cell: HTMLInputElement): void {
     const ch = clean(cell.value).slice(-1);
     cell.value = ch;
-    const next = this.chars().slice(0, JOIN_CODE_LENGTH);
-    while (next.length < i) next.push('');
+    const next = [...this.boxes()];
     next[i] = ch;
-    this.value.set(next.join('').slice(0, JOIN_CODE_LENGTH));
+    this.boxes.set(next);
+    this.value.set(next.join(''));
     if (ch) this.focus(i + 1);
   }
 
@@ -41,6 +47,7 @@ export class CodeInput {
   protected pasted(event: ClipboardEvent): void {
     event.preventDefault();
     const code = clean(event.clipboardData?.getData('text') ?? '').slice(0, JOIN_CODE_LENGTH);
+    this.boxes.set(Array.from({ length: JOIN_CODE_LENGTH }, (_, i) => code[i] ?? ''));
     this.value.set(code);
     this.focus(Math.min(code.length, JOIN_CODE_LENGTH - 1));
   }

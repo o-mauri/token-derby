@@ -46,4 +46,34 @@ describe('CodeInput', () => {
     await f.whenStable();
     expect(document.activeElement).toBe(cells()[1]);
   });
+
+  it('keeps the other characters in place when a middle box is cleared', async () => {
+    const { cells, paste, value, f } = await render();
+    await paste('K7QX2M');
+    cells()[2]!.value = '';
+    cells()[2]!.dispatchEvent(new Event('input'));
+    await f.whenStable();
+    expect(cells().map((c) => c.value)).toEqual(['K', '7', '', 'X', '2', 'M']);
+    expect(value()).toBe('K7X2M');
+    cells()[2]!.value = 'Q';
+    cells()[2]!.dispatchEvent(new Event('input'));
+    await f.whenStable();
+    expect(value()).toBe('K7QX2M');
+  });
+
+  it('puts a character in the box you typed it in', async () => {
+    const { cells, f } = await render();
+    cells()[3]!.value = 'x';
+    cells()[3]!.dispatchEvent(new Event('input'));
+    await f.whenStable();
+    expect(cells().map((c) => c.value)).toEqual(['', '', '', 'X', '', '']);
+  });
+
+  it('selects a box when it gets focus, so typing replaces it', async () => {
+    const { cells, paste } = await render();
+    await paste('K7QX2M');
+    cells()[1]!.focus();
+    cells()[1]!.dispatchEvent(new FocusEvent('focus'));
+    expect([cells()[1]!.selectionStart, cells()[1]!.selectionEnd]).toEqual([0, 1]);
+  });
 });

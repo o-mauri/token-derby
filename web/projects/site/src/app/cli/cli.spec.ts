@@ -52,6 +52,23 @@ describe('/cli', () => {
     expect(el().querySelector('td-code-input')).toBeNull();
   });
 
+  it('ignores preview settings in the address of the real page', async () => {
+    const { el } = await open('/cli?initialStep=confirm&initialLabel=Your%20MacBook');
+    expect(el().querySelector('td-code-input')).not.toBeNull();
+    expect(el().textContent).not.toContain('Your MacBook');
+  });
+
+  it('approves the code it looked up, even if the boxes change meanwhile', async () => {
+    const { el, enter, click, http, settle } = await open('/cli');
+    await enter('K7QX2M');
+    await click('button.lookup');
+    await enter('ABCDEF');
+    http.expectOne('/api/auth/cli/approve').flush({ label: 'omar-mbp' });
+    await settle();
+    await click('button.approve');
+    expect(http.expectOne('/api/auth/cli/approve').request.body).toEqual({ user_code: 'K7QX2M' });
+  });
+
   it('warns about phishing while you enter a code', async () => {
     const { el } = await open('/cli');
     expect(el().querySelector('.warning')?.textContent).toContain('Only enter a code from a terminal you started yourself.');

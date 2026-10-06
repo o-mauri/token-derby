@@ -1,10 +1,11 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, linkedSignal, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { normaliseUserCode } from '@token-derby/shared';
 import { ApiError, Button, CodeInput, GoogleButton, HorseFace } from '@token-derby/ui';
 import { hostScale } from '../home/home-scale';
 import { Session } from '../session/session';
 import { CLI_ERROR_FALLBACK, CLI_ERROR_TEXT, CliApi } from './cli-api';
+import { CLI_PREVIEW_START } from './cli-preview';
 
 type Step = 'enter' | 'confirm' | 'done';
 
@@ -22,14 +23,12 @@ export class CliApprovePage {
   private readonly api = inject(CliApi);
   protected readonly session = inject(Session);
 
-  /** Only the preview sets this, to open on a later step. */
-  // Route binding sets this to undefined when absent, so the default has to be applied here.
-  readonly initialStep = input<Step | undefined>(undefined);
-  protected readonly step = linkedSignal<Step>(() => this.initialStep() ?? 'enter');
-  protected readonly code = linkedSignal(() => (this.initialStep() && this.initialStep() !== 'enter' ? 'K7QX2M' : ''));
-  /** Only the preview sets this, alongside initialStep. */
-  readonly initialLabel = input<string | undefined>(undefined);
-  protected readonly label = linkedSignal(() => this.initialLabel() ?? '');
+  private readonly start = inject(CLI_PREVIEW_START);
+  protected readonly step = signal<Step>(this.start?.step ?? 'enter');
+  protected readonly code = signal('');
+  // The code whose label is on screen; Approve sends this one, whatever the boxes say now.
+  private readonly lookedUp = signal(this.start?.code ?? '');
+  protected readonly label = signal(this.start?.label ?? '');
   protected readonly error = signal<string | null>(null);
   protected readonly busy = signal(false);
   protected readonly scale = hostScale();
@@ -44,7 +43,7 @@ export class CliApprovePage {
   }
 
   protected async approve(): Promise<void> {
-    const code = this.clean();
+    const code = this.lookedUp();
     if (code) await this.call(code, false);
   }
 
@@ -59,6 +58,7 @@ export class CliApprovePage {
     try {
       const res = await this.api.approve(code, preview);
       this.label.set(res.label);
+      if (preview) this.lookedUp.set(code);
       this.step.set(preview ? 'confirm' : 'done');
     } catch (e) {
       this.error.set((e instanceof ApiError && CLI_ERROR_TEXT[e.code]) || CLI_ERROR_FALLBACK);
