@@ -1,0 +1,31 @@
+<div class="column">
+  @if (list.value() === undefined && list.status() !== 'error') {
+    <div class="loading"><td-loader /></div>
+  } @else if (list.value() === undefined) {
+    <p class="failed">Couldn't load members.</p>
+  } @else {
+    <h2 class="count">{{ members().length }} MEMBERS</h2>
+    @if (error(); as message) { <p class="error" role="alert">{{ message }}</p> }
+    <div class="scroll">
+      <table class="table">
+        <thead><tr><th scope="col">Member</th><th scope="col">Joined</th><th scope="col">Email matches domain</th><th><span class="sr-only">Actions</span></th></tr></thead>
+        <tbody>
+          @for (m of members(); track m.user_id) {
+            <tr>
+              <td>{{ m.user_name }} @if (m.user_id === ownerId()) { <span class="owner">owner</span> }</td>
+              <td class="muted">{{ joined(m.joined_at) }}</td>
+              <td><span class="match" [attr.aria-label]="match(m).label" [attr.title]="match(m).label">{{ match(m).mark }}</span></td>
+              <td class="actions">
+                @if (m.user_id !== ownerId()) {
+                  <button type="button" class="remove" [attr.aria-label]="'Remove ' + m.user_name" (click)="ask(m)">Remove</button>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</div>
+<td-confirm [open]="!!pending()" [message]="'Remove ' + (pending()?.user_name ?? '') + '?'" [detail]="confirmText()"
+  confirmLabel="Remove" tone="danger" (confirm)="remove()" (cancel)="pending.set(null)" />
