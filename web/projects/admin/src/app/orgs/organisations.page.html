@@ -1,0 +1,27 @@
+<main class="column">
+  @if (data.orgs.value()) {
+    @if (rows().length) {
+      <div class="td-table-scroll list">
+        <table class="td-table">
+          <thead><tr><th>Organisation</th><th>Members</th><th>Created by</th><th>Created</th></tr></thead>
+          <tbody>
+            @for (o of rows(); track o.id) {
+              <tr>
+                <td><a [href]="o.href" target="_blank" rel="noopener noreferrer">{{ o.name }}</a></td>
+                <td class="muted">{{ o.members }} ({{ o.count }})</td>
+                <td>{{ o.creator }}</td>
+                <td class="muted">{{ o.created }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    } @else {
+      <p class="empty">No organisations yet.</p>
+    }
+  } @else if (data.orgs.status() === 'error') {
+    <div class="failed"><p>Couldn't load organisations.</p><button td-button size="sm" type="button" (click)="data.orgs.reload()">Retry</button></div>
+  } @else {
+    <td-loader />
+  }
+</main>

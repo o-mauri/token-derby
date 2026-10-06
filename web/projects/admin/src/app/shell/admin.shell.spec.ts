@@ -23,3 +23,12 @@ describe('Admin shell', () => {
     expect(p.router().url).toBe('/login');
   });
 });
+
+describe('Admin unknown pages', () => {
+  it('shows not-found with a way back to Users', async () => {
+    const p = await openAdmin('/nope');
+    expect(p.el().querySelector('td-not-found')?.textContent).toContain('nope');
+    await p.click('td-not-found button');
+    expect(p.router().url).toBe('/users');
+  });
+});

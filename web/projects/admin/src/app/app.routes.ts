@@ -1,8 +1,6 @@
 import { Routes } from '@angular/router';
 import { adminGuard, signedOutGuard } from './session/admin-auth';
 
-const placeholder = () => import('./placeholder').then((m) => m.Placeholder);
-
 export const routes: Routes = [
   { path: 'login', canActivate: [signedOutGuard], loadComponent: () => import('./login/login.page').then((m) => m.LoginPage) },
   {
@@ -13,9 +11,9 @@ export const routes: Routes = [
       { path: '', pathMatch: 'full', redirectTo: 'users' },
       { path: 'users', data: { section: 'Users' }, loadComponent: () => import('./users/users.page').then((m) => m.UsersPage) },
       { path: 'users/:id', data: { section: 'Users' }, loadComponent: () => import('./users/user.page').then((m) => m.UserPage) },
-      { path: 'organisations', data: { section: 'Organisations' }, loadComponent: placeholder },
-      { path: 'claims', data: { section: 'Claims' }, loadComponent: placeholder },
-      { path: '**', loadComponent: placeholder },
+      { path: 'organisations', data: { section: 'Organisations' }, loadComponent: () => import('./orgs/organisations.page').then((m) => m.OrganisationsPage) },
+      { path: 'claims', data: { section: 'Claims' }, loadComponent: () => import('./claims/claims.page').then((m) => m.ClaimsPage) },
+      { path: '**', loadComponent: () => import('./shell/not-found.page').then((m) => m.NotFoundPage) },
     ],
   },
 ];

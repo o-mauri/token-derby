@@ -1,0 +1,66 @@
+<main class="column">
+  <section class="generator" aria-labelledby="new-claim">
+    <h2 class="heading" id="new-claim">NEW CLAIM TOKEN</h2>
+    @for (e of entries(); track e.key; let i = $index) {
+      <div class="entry">
+        <td-select class="hat" [label]="'Hat ' + (i + 1)" hideLabel [options]="hats" [value]="e.hatId" (valueChange)="setHat(e.key, $event)" />
+        @if (variants(e.hatId); as opts) {
+          <td-select class="variant" [label]="'Variant for hat ' + (i + 1)" hideLabel [options]="opts" [value]="e.variant" (valueChange)="setVariant(e.key, $event)" />
+        }
+        <button type="button" class="link remove" [disabled]="entries().length === 1" [attr.aria-label]="'Remove hat ' + (i + 1)" (click)="remove(e.key)">✕</button>
+      </div>
+    }
+    <button type="button" class="link add" [disabled]="entries().length >= maxEntries" (click)="add()">+ Add hat</button>
+    <div class="settings">
+      <td-text-input class="num" label="Max claims" type="number" [(value)]="maxClaims" />
+      <td-text-input class="num" label="Expires (days)" type="number" [(value)]="days" />
+      <button td-button type="button" class="generate" [disabled]="busy()" (click)="generate()">Generate</button>
+    </div>
+    @if (error(); as message) { <p class="error" role="alert">{{ message }}</p> }
+    @if (created(); as code) {
+      <div class="result" role="status">
+        <td-copy-field label="Claim token" [value]="code" />
+        <p class="warning">Shown once. Send it to the player — anyone holding it can redeem it.</p>
+      </div>
+    }
+  </section>
+
+  <section class="past" aria-labelledby="past-claims">
+    <h2 class="heading" id="past-claims">CLAIM TOKENS</h2>
+    @if (claims.value()) {
+      @if (rows().length) {
+        <div class="td-table-scroll">
+          <table class="td-table">
+            <thead><tr><th>Token</th><th>Hat</th><th>Created</th><th>Expires</th><th>Status</th></tr></thead>
+            <tbody>
+              @for (r of rows(); track r.code) {
+                <tr>
+                  <td><code>{{ r.token }}</code></td>
+                  <td>{{ r.what }}</td>
+                  <td class="muted">{{ r.created }}</td>
+                  <td class="muted">{{ r.expires }}</td>
+                  <td>{{ r.status }} @if (r.redeemed) { <button type="button" class="link who" [attr.aria-expanded]="!!details()[r.code]" (click)="toggleWho(r.code)">who?</button> }</td>
+                </tr>
+                @if (details()[r.code]; as d) {
+                  <tr class="detail"><td colspan="5">
+                    @switch (d.status) {
+                      @case ('loading') { <td-loader /> }
+                      @case ('error') { <p class="muted">Couldn't load redemptions.</p> }
+                      @default { <ul class="redemptions">@for (line of d.lines; track $index) { <li>{{ line }}</li> }</ul> }
+                    }
+                  </td></tr>
+                }
+              }
+            </tbody>
+          </table>
+        </div>
+      } @else {
+        <p class="empty">No claim tokens yet.</p>
+      }
+    } @else if (claims.status() === 'error') {
+      <div class="failed"><p>Couldn't load claim tokens.</p><button td-button size="sm" type="button" (click)="claims.reload()">Retry</button></div>
+    } @else {
+      <td-loader />
+    }
+  </section>
+</main>
