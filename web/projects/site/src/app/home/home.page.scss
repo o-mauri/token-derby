@@ -1,5 +1,5 @@
 // One viewport tall on desktop: only the org list flexes, and it scrolls inside.
-:host { display: flex; flex-direction: column; height: max(100dvh, 40rem); }
+:host { display: flex; flex-direction: column; height: max(100dvh, 32rem); }
 
 .top { display: flex; justify-content: flex-end; align-items: center; gap: var(--td-space-5); padding: var(--td-space-5); }
 
@@ -91,9 +91,8 @@
 @keyframes blink { to { visibility: hidden; } }
 @media (prefers-reduced-motion: reduce) { .cursor { animation: none; } }
 
-// Bigger screens get a bigger page: everything in the column scales together.
-@media (width >= 1400px) and (height >= 860px) { .column { zoom: 1.35; } }
-@media (width >= 1800px) and (height >= 1000px) { .column { zoom: 1.6; } }
+// Bigger windows get a bigger page: the whole column scales together (see homeScale).
+.column { zoom: var(--home-scale, 1); }
 
 @media (width < 700px) {
   :host { height: auto; min-height: 100dvh; }

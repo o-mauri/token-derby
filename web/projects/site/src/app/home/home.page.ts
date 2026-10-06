@@ -1,10 +1,11 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, input, linkedSignal, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, afterNextRender, computed, effect, inject, input, linkedSignal, signal } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 import { ORG_NAME_PATTERN } from '@token-derby/shared';
-import { AccountMenu, GoBox, GoogleButton, HorseFace, Loader, OrgList, Page, ThemePicker, YouCard, pollResource } from '@token-derby/ui';
+import { AccountMenu, GoBox, GoogleButton, HorseFace, Loader, OrgList, Page, RESIZE_OBSERVER, ThemePicker, YouCard, pollResource } from '@token-derby/ui';
 import { Session } from '../session/session';
 import { AUTH_ERROR_TEXT, HomeApi, sortOrgs } from './home-api';
+import { homeScale } from './home-scale';
 
 const RACE_CODE = /^[A-Za-z0-9]{6}$/;
 
@@ -14,7 +15,7 @@ const RACE_CODE = /^[A-Za-z0-9]{6}$/;
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [Page, ThemePicker, HorseFace, Loader, AccountMenu, GoogleButton, GoBox, OrgList, YouCard, RouterLink, NgTemplateOutlet],
   providers: [HomeApi],
-  host: { 'data-page': 'home' },
+  host: { 'data-page': 'home', '[style.--home-scale]': 'scale()' },
   templateUrl: './home.page.html',
   styleUrl: './home.page.scss',
 })
@@ -49,7 +50,20 @@ export class HomePage {
   protected readonly findOpen = signal(false);
   protected readonly showFind = computed(() => this.findOpen() || (this.orgsLoaded() && this.orgLinks().length === 0));
 
+  // The page's own size, so the column can grow with the window.
+  private readonly size = signal({ width: 0, height: 0 });
+  protected readonly scale = computed(() => homeScale(this.size().width, this.size().height));
+
   constructor() {
+    const Observer = inject(RESIZE_OBSERVER);
+    const host = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
+    const destroyRef = inject(DestroyRef);
+    afterNextRender(() => {
+      if (!Observer) return;
+      const ro = new Observer(([entry]) => this.size.set({ width: entry?.contentRect.width ?? 0, height: entry?.contentRect.height ?? 0 }));
+      ro.observe(host);
+      destroyRef.onDestroy(() => ro.disconnect());
+    });
     effect(() => {
       if (this.authError()) void this.router.navigate([], { queryParams: { auth_error: null }, queryParamsHandling: 'merge', replaceUrl: true });
     });
