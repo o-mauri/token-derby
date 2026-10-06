@@ -7,6 +7,7 @@
     <td-segmented class="modes" label="How {{ org() }} races" [options]="modes" [value]="mode()" (valueChange)="mode.set($event ?? 'off')" />
     @if (error(); as message) { <p class="error" role="alert">{{ message }}</p> }
     @if (saved()) { <p class="saved" role="status">Saved.</p> }
+    @if (lostMode(); as lost) { <p class="mode-lost error" role="alert">{{ lost }}</p> }
 
     @switch (mode()) {
       @case ('off') {
@@ -39,8 +40,8 @@
           </div>
           <div class="side">
             <h2>SEASON AND SCHEDULE</h2>
-            <td-text-input class="races" type="number" label="Races per season" [value]="league().races_per_season"
-              (valueChange)="patchLeague({ races_per_season: num($event) ?? 0 })" />
+            <td-text-input class="races" type="number" label="Races per season" [value]="shownCount(league().races_per_season)"
+              (valueChange)="patchLeague({ races_per_season: count($event) })" />
             <ng-container *ngTemplateOutlet="when" />
           </div>
         </div>

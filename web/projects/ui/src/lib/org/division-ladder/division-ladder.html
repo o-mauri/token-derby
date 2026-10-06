@@ -6,7 +6,7 @@
       @if (last) {
         <span class="no-cap">no cap</span>
       } @else {
-        <td-text-input class="cap" type="number" hideLabel [label]="d.name + ' cap'" [value]="d.cap" (valueChange)="setCap(i, $event)" />
+        <td-text-input class="cap" type="number" hideLabel [label]="d.name + ' cap'" [value]="shown(d.cap)" (valueChange)="setCap(i, $event)" />
       }
       <button type="button" class="remove" [attr.aria-label]="'Remove ' + d.name" [disabled]="value().divisions.length < 2" (click)="remove(i)">✕</button>
     </li>
@@ -14,7 +14,7 @@
       <li class="swap" aria-label="Swap between divisions">
         <span class="up" aria-hidden="true">▲</span> swap
         <td-text-input class="boundary" type="number" hideLabel [label]="'Horses swapping between ' + d.name + ' and the division below'"
-          [value]="value().boundaries[i] ?? null" (valueChange)="setSwap(i, $event)" />
+          [value]="shown(value().boundaries[i])" (valueChange)="setSwap(i, $event)" />
         each season <span class="down" aria-hidden="true">▼</span>
       </li>
     }

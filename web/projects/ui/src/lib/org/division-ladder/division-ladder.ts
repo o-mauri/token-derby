@@ -5,7 +5,8 @@ import { TextInput } from '../../forms/text-input/text-input';
 export type LadderValue = { readonly divisions: readonly DivisionConfig[]; readonly boundaries: readonly number[] };
 
 const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
-const asCount = (v: string | number | null) => Math.trunc(Number(v));
+// A cleared box stays cleared (NaN fails validation) instead of jumping to 0 mid-edit.
+const asCount = (v: string | number | null) => (v === null || v === '' ? NaN : Math.trunc(Number(v)));
 
 /** A league's divisions top to bottom, with how many horses swap between each pair every season. The bottom one has no cap. */
 @Component({
@@ -28,6 +29,10 @@ export class DivisionLadder {
     const count = WORDS[top.length] ?? String(top.length);
     return `${fit} horses fit in the top ${top.length === 1 ? 'one' : count}; everyone else starts in ${last.name}.`;
   });
+
+  protected shown(n: number | undefined): number | null {
+    return n !== undefined && Number.isFinite(n) ? n : null;
+  }
 
   protected rename(i: number, name: string | number | null): void {
     this.patchDivision(i, { name: String(name ?? '') });

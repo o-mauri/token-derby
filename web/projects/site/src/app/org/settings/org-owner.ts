@@ -33,6 +33,11 @@ export class OrgOwner {
     if (name && this.session.signedIn()) void this.load(name);
   }
 
+  /** Keeps the shared record in step after a tab saves, so every tab (and a later visit) sees the change. */
+  patch(change: Partial<GetOrganisationResponse>): void {
+    this.org.update((o) => (o ? { ...o, ...change } : o));
+  }
+
   private reset(): void {
     this.generation++;
     this.org.set(null);
@@ -49,6 +54,8 @@ export class OrgOwner {
       this.status.set(org.creator_user_id === this.session.user()?.user_id ? 'owner' : 'not-owner');
     } catch (e) {
       if (run !== this.generation) return;
+      // A failed refresh keeps the page we already have rather than swapping it for an error.
+      if (this.org()) return;
       const code = e instanceof ApiError ? e.code : '';
       this.status.set(code === 'NOT_ORG_MEMBER' ? 'not-owner' : code === 'ORG_NOT_FOUND' ? 'not-found' : 'error');
     }

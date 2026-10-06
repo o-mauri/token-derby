@@ -41,6 +41,8 @@ export class NotificationsTab {
   protected readonly days = DAYS;
   protected readonly zones: TdOption<string>[] = timeZones(this.browserTz).map((z) => ({ value: z, label: z.replace(/_/g, ' ') }));
   protected readonly loaded = signal(false);
+  protected readonly loadFailed = signal(false);
+  protected readonly org = () => this.owner.org()?.org_name ?? '';
   protected readonly error = signal<string | null>(null);
   protected readonly ask = signal<Ask | null>(null);
 
@@ -155,8 +157,9 @@ export class NotificationsTab {
       this.webhookUrl.set(w.webhook_url ?? '');
       this.slackServer.set(s);
       this.slack.set(this.slackForm(s));
-    } catch (e) {
-      this.error.set(settingsErrorText(e, this.owner.org()?.org_name ?? ''));
+    } catch {
+      // No form on a failed load: saving over an unseen webhook would mint a new secret.
+      this.loadFailed.set(true);
     } finally {
       this.loaded.set(true);
     }

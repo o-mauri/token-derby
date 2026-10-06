@@ -62,6 +62,7 @@ export class RacingTab {
   protected readonly nextSeason = computed(() => {
     const l = this.serverLeague();
     if (!l || this.mode() !== 'league') return false;
+    if (l.pending_structural) return true;
     const now = leagueFormFrom(l, this.browserTz);
     const f = this.league();
     return !same([f.divisions, f.boundaries, f.races_per_season], [now.divisions, now.boundaries, now.races_per_season]);
@@ -71,6 +72,8 @@ export class RacingTab {
   protected readonly error = signal<string | null>(null);
   protected readonly saved = signal(false);
   protected readonly ask = signal<Ask | null>(null);
+  // Set when a switch deleted the old mode but the new one didn't save.
+  protected readonly lostMode = signal<string | null>(null);
   protected readonly org = computed(() => this.owner.org()?.org_name ?? '');
 
   constructor() {
@@ -100,6 +103,15 @@ export class RacingTab {
 
   protected num(v: string | number | null): number | null {
     return v === null || v === '' ? null : Math.trunc(Number(v));
+  }
+
+  /** A cleared box stays cleared (NaN fails validation) instead of jumping to 0 mid-edit. */
+  protected count(v: string | number | null): number {
+    return v === null || v === '' ? NaN : Math.trunc(Number(v));
+  }
+
+  protected shownCount(n: number): number | null {
+    return Number.isFinite(n) ? n : null;
   }
 
   protected saveSchedule(): void {
@@ -161,9 +173,11 @@ export class RacingTab {
 
   // Every change reloads both, so the page always shows what the server really has, even after a half-done switch.
   private async run(step: () => Promise<unknown>): Promise<void> {
+    const before = this.serverMode();
     this.busy.set(true);
     this.error.set(null);
     this.saved.set(false);
+    this.lostMode.set(null);
     try {
       await step();
       this.saved.set(true);
@@ -172,6 +186,10 @@ export class RacingTab {
     } finally {
       this.busy.set(false);
       await this.load(this.error() === null);
+      const now = this.serverMode();
+      if (this.error() && before !== 'off' && now !== before) {
+        this.lostMode.set(`${this.org()}'s ${LABEL[before]} was removed; racing is off until this saves.`);
+      }
     }
   }
 

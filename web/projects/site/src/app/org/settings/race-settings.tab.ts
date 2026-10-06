@@ -19,6 +19,8 @@ import { settingsErrorText } from './settings-errors';
     <div class="column">
       @if (!loaded()) {
         <div class="loading"><td-loader /></div>
+      } @else if (loadFailed()) {
+        <p class="failed">Couldn't load {{ org() }}'s race settings. Try again later.</p>
       } @else {
         @if (error(); as message) { <p class="error" role="alert">{{ message }}</p> }
         @for (m of modifiers; track m.id) {
@@ -47,6 +49,8 @@ export class RaceSettingsTab {
   private readonly stored = signal<ModifierSettings>({});
   protected readonly draft = signal<ModifierSettings>({});
   protected readonly loaded = signal(false);
+  protected readonly loadFailed = signal(false);
+  protected readonly org = () => this.owner.org()?.org_name ?? '';
   protected readonly busy = signal(false);
   protected readonly saved = signal(false);
   protected readonly error = signal<string | null>(null);
@@ -95,8 +99,9 @@ export class RaceSettingsTab {
   private async load(): Promise<void> {
     try {
       this.adopt(storedModifiers((await this.api.raceSettings(this.name()!)).settings));
-    } catch (e) {
-      this.error.set(settingsErrorText(e, this.owner.org()?.org_name ?? ''));
+    } catch {
+      // No form on a failed load: saving defaults over the real settings would lose them.
+      this.loadFailed.set(true);
     } finally {
       this.loaded.set(true);
     }

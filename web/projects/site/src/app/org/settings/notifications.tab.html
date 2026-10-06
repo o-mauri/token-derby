@@ -1,6 +1,8 @@
 <div class="column">
   @if (!loaded()) {
     <div class="loading"><td-loader /></div>
+  } @else if (loadFailed()) {
+    <p class="failed">Couldn't load {{ org() }}'s notification settings. Try again later.</p>
   } @else {
     @if (error(); as message) { <p class="error" role="alert">{{ message }}</p> }
 

@@ -33,6 +33,7 @@ export class AccessTab {
   protected readonly confirmRotate = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly saved = signal(false);
+  protected readonly busy = signal(false);
   protected readonly domainsDirty = computed(() => (this.server()?.allowed_domains ?? []).join() !== this.domains().join());
 
   constructor() {
@@ -40,11 +41,13 @@ export class AccessTab {
     inject(DestroyRef).onDestroy(() => this.drafts.set('Access', false));
   }
 
+  // Built on what's on screen, including unsaved domains, as the old page did.
   protected async flip(key: Switch, on: boolean): Promise<void> {
-    const before = this.server();
-    if (!before) return;
-    this.shown.set({ ...before, [key]: on });
-    await this.save({ ...before, [key]: on });
+    const current = this.shown();
+    if (!current) return;
+    const next = { ...current, [key]: on, allowed_domains: [...this.domains()] };
+    this.shown.set(next);
+    await this.save(next);
   }
 
   protected async saveDomains(): Promise<void> {
@@ -56,7 +59,8 @@ export class AccessTab {
     this.confirmRotate.set(false);
     this.error.set(null);
     try {
-      this.token.set((await this.api.rotateToken(this.name()!)).org_join_token);
+      const { org_join_token } = await this.api.rotateToken(this.name()!);
+      this.owner.patch({ org_join_token });
       this.rotated.set(true);
     } catch (e) {
       this.error.set(settingsErrorText(e, this.orgName()));
@@ -70,15 +74,18 @@ export class AccessTab {
   private async save(next: OrgAccessSettings): Promise<void> {
     this.error.set(null);
     this.saved.set(false);
+    this.busy.set(true);
     try {
       const res = await this.api.setAccess(this.name()!, next);
-      this.server.set(res.access);
+      this.owner.patch({ access: res.access });
       this.saved.set(true);
     } catch (e) {
       this.error.set(settingsErrorText(e, this.orgName()));
       // Snap back to what the server has; on a conflict, to what it has now.
       this.shown.set({ ...this.server()! });
       if (e instanceof ApiError && e.code === 'ACCESS_CONFLICT') this.owner.reload();
+    } finally {
+      this.busy.set(false);
     }
   }
 }
