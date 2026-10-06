@@ -37,6 +37,12 @@ describe('TextInput', () => {
     expect(f.componentInstance.value()).toBeNull();
   });
 
+  it('passes an autocomplete hint to the native input, and none by default', async () => {
+    expect((await render()).input.hasAttribute('autocomplete')).toBe(false);
+    const { input } = await render((f) => f.componentRef.setInput('autocomplete', 'current-password'));
+    expect(input.getAttribute('autocomplete')).toBe('current-password');
+  });
+
   it('disables the native input', async () => {
     const { input } = await render((f) => f.componentRef.setInput('disabled', true));
     expect(input.disabled).toBe(true);

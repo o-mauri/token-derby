@@ -1,11 +1,11 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
-import { Page, ThemePicker, ThemeService } from '@token-derby/ui';
+import { ThemeBackdrop, ThemeService } from '@token-derby/ui';
 
 @Component({
   selector: 'app-root',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterOutlet, Page, ThemePicker],
+  imports: [RouterOutlet, ThemeBackdrop],
   host: { class: 'td-app-root' },
   templateUrl: './app.html',
 })

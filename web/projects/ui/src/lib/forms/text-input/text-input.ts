@@ -9,7 +9,7 @@ export type TextInputType = 'text' | 'number' | 'password' | 'time';
   template: `
     @if (label()) { <label class="label" [class.sr-only]="hideLabel()" [for]="id">{{ label() }}</label> }
     <input #box class="box" [id]="id" [type]="type()" [value]="value() ?? ''" [placeholder]="placeholder()"
-      [disabled]="disabled()" [required]="required()" [attr.aria-invalid]="visibleErrors().length > 0"
+      [attr.autocomplete]="autocomplete()" [disabled]="disabled()" [required]="required()" [attr.aria-invalid]="visibleErrors().length > 0"
       (input)="onInput(box.value)" (blur)="touch.emit()" />
     @for (e of visibleErrors(); track $index) { <p class="error">{{ e }}</p> }
   `,
@@ -19,6 +19,8 @@ export class TextInput extends ControlBase {
   readonly value = model<string | number | null>(null);
   readonly type = input<TextInputType>('text');
   readonly placeholder = input('');
+  /** The browser's autofill hint, e.g. `username` or `current-password`. */
+  readonly autocomplete = input<string | null>(null);
   readonly hideLabel = input(false, { transform: booleanAttribute });
 
   protected onInput(raw: string): void {
