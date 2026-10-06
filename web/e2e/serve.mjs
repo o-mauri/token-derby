@@ -1,10 +1,10 @@
 // Serves the production site build like CloudFront: real files as-is, app routes fall back to index.html.
 import { createReadStream, existsSync, statSync } from 'node:fs';
 import { createServer } from 'node:http';
-import { extname, join, normalize } from 'node:path';
+import { extname, join, normalize, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const ROOT = process.env.ROOT ?? fileURLToPath(new URL('../dist/site/browser', import.meta.url));
+const ROOT = process.env.ROOT ? resolve(process.env.ROOT) : fileURLToPath(new URL('../dist/site/browser', import.meta.url));
 const PORT = Number(process.env.PORT ?? 4300);
 const TYPES = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json',

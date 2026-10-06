@@ -3,9 +3,11 @@
 .column { flex: 1; min-height: 0; overflow-y: auto; display: grid; grid-template-columns: minmax(0, 26rem) minmax(0, 1fr); gap: var(--td-space-7); align-content: start; padding: var(--td-space-5) var(--td-space-6) var(--td-space-7); font-size: var(--td-text-md); }
 .heading { margin: 0; font-weight: normal; font-size: var(--td-text-md); letter-spacing: var(--td-tracking-wide); color: var(--td-highlight); }
 
-.generator, .past { display: grid; gap: var(--td-space-4); align-content: start; min-width: 0; }
+.generator, .past { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--td-space-4); align-content: start; min-width: 0; }
 .entry { display: flex; align-items: center; gap: var(--td-space-3); }
 .entry .hat { flex: 1; min-width: 0; }
+// Hat labels are long; on narrow screens the select shrinks to its row and clips its label.
+.entry td-select.hat { min-width: 0; overflow: hidden; }
 .settings { display: flex; align-items: flex-end; gap: var(--td-space-4); flex-wrap: wrap; }
 .num { width: 8rem; }
 .result { display: grid; gap: var(--td-space-3); padding: var(--td-space-4); border: var(--td-line) solid var(--td-highlight); }
