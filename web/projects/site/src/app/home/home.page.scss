@@ -74,11 +74,26 @@
 .find { align-self: center; }
 .links { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--td-space-6); margin-top: var(--td-space-4); }
 
-.install { margin: 0; font-size: var(--td-text-sm); color: var(--td-live); }
-.prompt { color: var(--td-text-muted); }
-.cursor { animation: blink 1s steps(1) infinite; }
-@keyframes blink { 50% { opacity: 0; } }
+.install {
+  margin: var(--td-space-4) 0 0;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--td-space-4);
+  padding: var(--td-space-4) var(--td-space-5);
+  background: color-mix(in srgb, var(--td-live) 4%, var(--td-surface));
+  border: var(--td-line) solid color-mix(in srgb, var(--td-live) 35%, var(--td-surface));
+  box-shadow: inset 0 0 0.75rem color-mix(in srgb, var(--td-live) 18%, transparent);
+  color: var(--td-live);
+  font-size: var(--td-text-md);
+}
+.prompt { opacity: .7; }
+.cursor { animation: blink 1s steps(2, start) infinite; }
+@keyframes blink { to { visibility: hidden; } }
 @media (prefers-reduced-motion: reduce) { .cursor { animation: none; } }
+
+// Bigger screens get a bigger page: everything in the column scales together.
+@media (width >= 1400px) and (height >= 860px) { .column { zoom: 1.35; } }
+@media (width >= 1800px) and (height >= 1000px) { .column { zoom: 1.6; } }
 
 @media (width < 700px) {
   :host { height: auto; min-height: 100dvh; }
