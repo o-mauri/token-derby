@@ -1,0 +1,9 @@
+<header class="top">
+  <td-crumbs class="crumbs" [parts]="crumbs()" />
+  <span class="actions">
+    <td-theme-picker compact />
+    <button td-button size="sm" type="button" class="signout" (click)="signOut()">Sign out</button>
+  </span>
+</header>
+<td-tabs label="Admin" [tabs]="tabs()" />
+<main class="body"><router-outlet /></main>

@@ -1,0 +1,34 @@
+/* Plain data tables (admin lists and the like): `.td-table`, wrapped in `.td-table-scroll` so wide ones scroll on their own. */
+.td-table-scroll { overflow-x: auto; max-width: 100%; }
+
+.td-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--td-font-pixel);
+  font-size: var(--td-text-md);
+  color: var(--td-text);
+}
+
+.td-table th {
+  text-align: left;
+  font-weight: normal;
+  font-size: var(--td-text-sm);
+  letter-spacing: var(--td-tracking-wide);
+  text-transform: uppercase;
+  color: var(--td-text-muted);
+  padding: var(--td-space-3) var(--td-space-4);
+  border-bottom: var(--td-line) solid var(--td-border);
+  white-space: nowrap;
+}
+
+.td-table td {
+  padding: var(--td-space-3) var(--td-space-4);
+  border-bottom: var(--td-line-thin) solid var(--td-border);
+  vertical-align: baseline;
+}
+
+.td-table tbody tr:hover { background: var(--td-surface); }
+.td-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+.td-table .muted { color: var(--td-text-muted); }
+.td-table a { color: inherit; text-decoration-color: var(--td-highlight); text-underline-offset: 0.2em; }
+.td-table a:hover, .td-table a:focus-visible { color: var(--td-highlight); }
