@@ -1,3 +1,5 @@
+@use '../../slant';
+
 :host { display: block; min-width: 0; }
 
 .crumbs {
@@ -25,13 +27,14 @@
   color: var(--td-text);
   text-decoration: none;
   clip-path: polygon(0 0, calc(100% - var(--tip)) 0, 100% 50%, calc(100% - var(--tip)) 100%, 0 100%, var(--tip) 50%);
+  @include slant.slant;
 }
 .face + .seg {
   margin-left: 0;
   padding-left: var(--td-space-5);
   clip-path: polygon(0 0, calc(100% - var(--tip)) 0, 100% 50%, calc(100% - var(--tip)) 100%, 0 100%);
 }
-.text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; @include slant.upright; }
 
 a.seg { background: var(--td-border); }
 a.seg:hover, a.seg:focus-visible { background: var(--td-accent); color: var(--td-surface); outline: none; }
