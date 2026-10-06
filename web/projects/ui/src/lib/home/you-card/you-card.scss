@@ -20,9 +20,9 @@ a.card:focus-visible { outline: var(--td-focus-width) solid var(--td-highlight);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-family: 'Bitcount Prop Single', var(--td-font-pixel);
-  font-size: var(--td-text-lg);
-  letter-spacing: var(--td-tracking-wide);
+  font-family: var(--td-font-pixel);
+  font-size: var(--td-text-xl);
+  letter-spacing: var(--td-tracking);
   text-transform: uppercase;
   color: var(--td-highlight);
 }

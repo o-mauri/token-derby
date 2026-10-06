@@ -6,7 +6,8 @@ import { RouterTestingHarness } from '@angular/router/testing';
 import { RESIZE_OBSERVER, apiErrors } from '@token-derby/ui';
 import { routes } from '../app.routes';
 import { MemoryStorage } from '../session/memory-storage';
-import { provideSession } from '../session/session';
+import { Session, provideSession } from '../session/session';
+import { Location } from '@angular/common';
 import { SESSION_KEYS, SESSION_STORAGE } from '../session/session-storage';
 import { sessionAuth } from '../session/session.interceptor';
 
@@ -69,6 +70,26 @@ describe('HomePage signed out', () => {
     const { el, router } = await open('/?auth_error=expired');
     expect(router().url).toBe('/');
     expect(el().querySelector('.auth-error')?.textContent?.trim()).toBe('That sign-in took too long. Try again.');
+  });
+
+  it('says so when the sign-in code could not be exchanged', async () => {
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter(routes, withComponentInputBinding()),
+        provideHttpClient(withInterceptors([sessionAuth, apiErrors])),
+        provideHttpClientTesting(),
+        { provide: SESSION_STORAGE, useValue: new MemoryStorage() },
+      ],
+    });
+    TestBed.inject(Location).replaceState('/#code=OLD');
+    const done = TestBed.inject(Session).exchangeFromUrl();
+    TestBed.inject(HttpTestingController).expectOne('/api/web-sessions/exchange')
+      .flush({ code: 'INVALID_CODE', message: 'x' }, { status: 400, statusText: 'Bad' });
+    await done;
+    const harness = await RouterTestingHarness.create('/');
+    await harness.fixture.whenStable();
+    expect((harness.routeNativeElement as HTMLElement).querySelector('.auth-error')?.textContent?.trim())
+      .toBe("Couldn't sign you in with Google. Try again.");
   });
 
   it('falls back to the general message for an unknown error', async () => {

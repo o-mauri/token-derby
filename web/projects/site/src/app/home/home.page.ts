@@ -33,7 +33,9 @@ export class HomePage {
   // Latches the message so tidying the URL doesn't take it away.
   protected readonly errorText = linkedSignal<string | undefined, string | null>({
     source: this.authError,
-    computation: (code, prev) => (code ? (AUTH_ERROR_TEXT[code] ?? AUTH_ERROR_TEXT['sso_failed']!) : (prev?.value ?? null)),
+    computation: (code, prev) =>
+      code ? (AUTH_ERROR_TEXT[code] ?? AUTH_ERROR_TEXT['sso_failed']!)
+        : (prev?.value ?? (this.session.exchangeFailed() ? AUTH_ERROR_TEXT['sso_failed']! : null)),
   });
 
   protected readonly orgs = pollResource({

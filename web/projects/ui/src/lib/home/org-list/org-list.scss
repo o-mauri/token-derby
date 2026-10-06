@@ -23,9 +23,9 @@
   border: var(--td-line-thin) solid var(--td-border);
   color: inherit;
   text-decoration: none;
-  font-family: 'Bitcount Prop Single', var(--td-font-pixel);
-  font-size: var(--td-text-lg);
-  letter-spacing: var(--td-tracking-wide);
+  font-family: var(--td-font-pixel);
+  font-size: var(--td-text-xl);
+  letter-spacing: var(--td-tracking);
   text-transform: uppercase;
 }
 .row:hover, .row:focus-visible { border-color: var(--td-highlight); }

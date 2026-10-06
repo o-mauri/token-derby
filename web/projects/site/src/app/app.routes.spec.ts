@@ -20,6 +20,12 @@ describe('site routes', () => {
     expect((await go('/')).getAttribute('data-page')).toBe('home');
   });
 
+  it('sends the old /org-manager sign-in landing home, keeping its error', async () => {
+    const el = await go('/org-manager?auth_error=expired');
+    expect(el.getAttribute('data-page')).toBe('home');
+    expect(el.querySelector('.auth-error')?.textContent?.trim()).toBe('That sign-in took too long. Try again.');
+  });
+
   it('maps /race/ABC123 to the race page', async () => {
     expect((await go('/race/ABC123')).getAttribute('data-page')).toBe('race');
   });

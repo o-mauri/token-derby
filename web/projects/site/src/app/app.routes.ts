@@ -12,6 +12,8 @@ export const orgNameGuard: CanMatchFn = (_route, segments) => ORG_NAME_PATTERN.t
 
 export const routes: Routes = [
   { path: '', pathMatch: 'full', loadComponent: () => import('./home/home.page').then((m) => m.HomePage) },
+  // Sign-in failures the API can't trace back to a page still land here; the query (auth_error) carries over.
+  { path: 'org-manager', redirectTo: '' },
   { path: 'race/:code', canMatch: [raceCodeGuard], loadComponent: () => import('./race/race.page').then((m) => m.RacePage) },
   {
     path: 'org/:name',

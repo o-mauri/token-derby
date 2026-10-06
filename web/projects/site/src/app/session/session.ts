@@ -20,6 +20,8 @@ export class Session {
   readonly token = computed(() => this.state()?.token ?? null);
   readonly user = computed(() => this.state()?.user ?? null);
   readonly signedIn = computed(() => this.state() !== null);
+  // True when a sign-in code arrived but couldn't be swapped for a session (expired or reused).
+  readonly exchangeFailed = signal(false);
 
   adopt(res: WebSessionExchangeResponse): void {
     const { user } = res;
@@ -48,6 +50,7 @@ export class Session {
       this.adopt(await firstValueFrom(this.http.post<WebSessionExchangeResponse>('/api/web-sessions/exchange', { code })));
       return 'ok';
     } catch {
+      this.exchangeFailed.set(true);
       return 'failed';
     }
   }

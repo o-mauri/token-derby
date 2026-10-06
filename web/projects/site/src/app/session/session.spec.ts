@@ -73,6 +73,7 @@ describe('Session', () => {
     http.expectOne('/api/web-sessions/exchange').flush({ code: 'INVALID_CODE', message: 'x' }, { status: 400, statusText: 'Bad' });
     expect(await done).toBe('failed');
     expect(session().signedIn()).toBe(false);
+    expect(session().exchangeFailed()).toBe(true);
     expect(location.path(true)).not.toContain('#');
   });
 

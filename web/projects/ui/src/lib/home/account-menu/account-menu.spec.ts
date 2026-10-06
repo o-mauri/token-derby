@@ -37,7 +37,9 @@ describe('AccountMenu', () => {
     await m.open();
     const me = m.item('My page');
     expect(me.tagName).toBe('BUTTON');
-    expect(me.hasAttribute('disabled') || me.getAttribute('aria-disabled') === 'true').toBe(true);
+    // Greyed but still focusable, so arrow keys can move past it.
+    expect(me.hasAttribute('disabled')).toBe(false);
+    expect(me.getAttribute('aria-disabled')).toBe('true');
     expect(me.textContent).toContain('Soon');
   });
 
@@ -45,6 +47,25 @@ describe('AccountMenu', () => {
     const m = await render(['/me']);
     await m.open();
     expect(m.item('My page').getAttribute('href')).toBe('/me');
+  });
+
+  it('reaches Sign out from the keyboard past the greyed items', async () => {
+    const m = await render();
+    await m.open();
+    m.item('My page').focus();
+    const down = () => document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', keyCode: 40, bubbles: true } as KeyboardEventInit));
+    down();
+    down();
+    expect(document.activeElement?.textContent?.trim()).toBe('Sign out');
+    (document.activeElement as HTMLElement).click();
+    expect(m.signedOut()).toBe(1);
+  });
+
+  it('does nothing when a greyed item is clicked', async () => {
+    const m = await render();
+    await m.open();
+    m.item('My page').click();
+    expect(m.signedOut()).toBe(0);
   });
 
   it('emits sign out', async () => {

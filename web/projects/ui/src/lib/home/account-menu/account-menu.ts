@@ -19,7 +19,7 @@ import { RouterLink } from '@angular/router';
           @if (page.link) {
             <a class="item" cdkMenuItem [routerLink]="page.link">{{ page.label }}</a>
           } @else {
-            <button type="button" class="item soon" cdkMenuItem disabled>{{ page.label }} <span class="badge">Soon</span></button>
+            <button type="button" class="item soon" cdkMenuItem [cdkMenuItemDisabled]="true">{{ page.label }} <span class="badge">Soon</span></button>
           }
         }
         <button type="button" class="item" cdkMenuItem (cdkMenuItemTriggered)="signOut.emit()">Sign out</button>
