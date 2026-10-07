@@ -76,7 +76,7 @@ export async function initCommand(reset = false, deps: InitDeps = {}): Promise<n
           const me = await apiGetJockey();
           if (me.device_label) {
             console.log(`  This machine's credential, "${me.device_label}", will stay live on the`);
-            console.log('  abandoned account and can only be revoked from the Account view in the org manager.');
+            console.log('  abandoned account and can only be revoked from Account on the website.');
           }
           if (me.email) {
             console.log('  This account has a Google account linked — `token-derby login` would recover');

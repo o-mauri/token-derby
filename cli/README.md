@@ -58,8 +58,8 @@ token-derby web
 Organisation names aren't case-sensitive: `StackOne`, `stackone` and `STACKONE` all
 refer to the same organisation, which keeps the casing it was created with.
 
-This opens `app.tokenderby.co.uk/org-manager` with a one-time login
-link, signed in as your CLI identity.
+This opens the Token Derby home page with a one-time login link, signed in as
+your CLI identity.
 
 ## What's tracked
 

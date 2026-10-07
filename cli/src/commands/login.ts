@@ -95,7 +95,7 @@ export async function loginCommand(argv: string[] = [], deps: LoginDeps = {}): P
     console.log('');
     console.log(`  This machine is already signed in as ${existing.display_name}.`);
     console.log('  Signing in again adds a second credential; the current one stays active');
-    console.log('  until you revoke it under Account in the org manager (`token-derby web`).');
+    console.log('  until you revoke it under Account on the website (`token-derby web`).');
     if (isTTY) {
       if (!await promptYesNo('  Sign in again anyway? [Y/n] ')) {
         console.log('Login cancelled.');

@@ -220,7 +220,7 @@ describe('initCommand', () => {
       expect(deleteIdentity).not.toHaveBeenCalled();
       const out = con.logs.join('\n');
       expect(out).toContain('omars-laptop');
-      expect(out).toMatch(/Account view.*org manager|org manager.*Account view/);
+      expect(out).toContain('revoked from Account on the website');
     });
 
     it('mentions login as recovery when getJockey reports an email', async () => {
