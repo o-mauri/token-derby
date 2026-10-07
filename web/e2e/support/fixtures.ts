@@ -1,8 +1,8 @@
 // Route maps for fakeApi, built from the site's preview fixtures so tests and /preview-* pages share data.
 import type {
   CliAuthApproveResponse, DeleteDeviceResponse, DeviceRecord, DivisionConfig, GetLeagueStandingsResponse, GetOrgLeagueResponse, GetOrgRaceSettingsResponse,
-  GetOrgScheduleResponse, GetOrgSlackResponse, GetOrgWebhookResponse, GetOrganisationResponse, GetRaceResponse, GetRaceSeriesResponse, League,
-  ListDevicesResponse, ListOrgRacesResponse, ListOrganisationsResponse, OrgMembersResponse, SetOrgRaceSettingsResponse, UpdateJockeyResponse,
+  GetJockeyResponse, GetOrgScheduleResponse, GetOrgSlackResponse, GetOrgWebhookResponse, GetOrganisationResponse, GetRaceResponse, GetRaceSeriesResponse, League,
+  ListDevicesResponse, ListOrgRacesResponse, ListOrganisationsResponse, ListStableResponse, OrgMembersResponse, SetOrgRaceSettingsResponse, StableHorse, UpdateJockeyResponse,
 } from '@token-derby/shared';
 import { PREVIEW_ORG, previewLiveRace, previewOrgRaces, previewOrgStandings, type OrgPreviewOptions } from '../../projects/site/src/app/preview/org-fixture';
 import { PREVIEW_JOIN_CODE, PREVIEW_SERIES, previewRace, type PreviewRaceState } from '../../projects/site/src/app/preview/race-fixture';
@@ -12,9 +12,31 @@ export { PREVIEW_JOIN_CODE, PREVIEW_ORG };
 
 export const notFound = (code: string, message = 'Not found') => ({ status: 404, body: { code, message } });
 
+export const STABLE: StableHorse[] = [
+  { stable_horse_id: 'h1', name: 'Gallopz', colors: { body: '#8B4513', mane: '#000000', tail: '#000000', saddle: '#C0392B' }, created_at: '2026-05-14T10:00:00Z',
+    xp: 900, races_entered: 30, wins: 4, podiums: 9, total_tokens: 1_234_000, total_finishing_position: 75,
+    hats: [{ id: 'party_hat', obtained_at: '2026-01-02T10:00:00Z' }, { id: 'cowboy_hat', obtained_at: '2026-05-01T10:00:00Z' }], equipped_hat: 1 },
+  { stable_horse_id: 'h2', name: 'Comet', colors: { body: '#FFFFFF', mane: '#000000', tail: '#000000', saddle: '#1B4F72' }, created_at: '2026-06-01T10:00:00Z',
+    xp: 420, races_entered: 12, wins: 1, podiums: 4, total_tokens: 900_000, total_finishing_position: 42, hats: [], equipped_hat: null },
+];
+
+/** Your stable, as the signed-in home card and /me read it. */
+export function stableRoutes(horses: StableHorse[] = STABLE): Routes {
+  return { 'GET /api/stable': ok<ListStableResponse>({ horses }) };
+}
+
+/** Everything /me loads: your jockey and your stable. */
+export function meRoutes(horses: StableHorse[] = STABLE): Routes {
+  return {
+    'GET /api/jockey/me': ok<GetJockeyResponse>({ user_id: 'u1', display_name: 'Omar', created_at: '2026-05-14T10:00:00Z', email: 'omar@example.com' }),
+    ...stableRoutes(horses),
+  };
+}
+
 export function myOrgs(names: string[] = ['Stackone', 'acme', 'NightOwls']): Routes {
   const body: ListOrganisationsResponse = { organisations: names.map((org_name, i) => ({ org_id: `o${i}`, org_name })) };
-  return { 'GET /api/organisations': ok<ListOrganisationsResponse>(body) };
+  // The signed-in home also reads your stable to dress your card.
+  return { 'GET /api/organisations': ok<ListOrganisationsResponse>(body), ...stableRoutes() };
 }
 
 /** The public org pages (dashboard, races, league) for `PREVIEW_ORG`, with a live race by default. */

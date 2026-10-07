@@ -3,6 +3,9 @@ import { NgTemplateOutlet } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 import { ORG_NAME_PATTERN } from '@token-derby/shared';
 import { AccountMenu, GoBox, GoogleButton, HorseFace, Loader, OrgList, Page, ThemePicker, YouCard, pollResource } from '@token-derby/ui';
+import type { StableHorse } from '@token-derby/shared';
+import { MeApi } from '../me/me-api';
+import { bestHorse, wornHat } from '../me/me-model';
 import { Session } from '../session/session';
 import { AUTH_ERROR_TEXT, HomeApi, sortOrgs } from './home-api';
 import { hostScale } from './home-scale';
@@ -55,7 +58,18 @@ export class HomePage {
   // Grows the column with the window.
   protected readonly scale = hostScale();
 
+  // Your best horse dresses your card; if the stable can't load, the card keeps its plain look.
+  private readonly me = inject(MeApi);
+  private readonly stable = signal<StableHorse[] | null>(null);
+  private readonly best = computed(() => bestHorse(this.stable() ?? []));
+  protected readonly cardColors = computed(() => this.best()?.colors ?? null);
+  protected readonly cardHat = computed(() => { const b = this.best(); return b ? wornHat(b) : null; });
+
   constructor() {
+    effect(() => {
+      if (!this.session.signedIn()) return this.stable.set(null);
+      this.me.stable().then((res) => this.stable.set(res.horses), () => this.stable.set(null));
+    });
     effect(() => {
       if (this.authError()) void this.router.navigate([], { queryParams: { auth_error: null }, queryParamsHandling: 'merge', replaceUrl: true });
     });

@@ -108,9 +108,33 @@ describe('HomePage signed in', () => {
     await settle();
     expect([...el().querySelectorAll('td-org-list a.row')].map((a) => a.getAttribute('href'))).toEqual(['/org/acme', '/org/Stackone']);
     expect(el().querySelector('td-loader')).toBeNull();
-    expect(el().querySelector('td-you-card .card.disabled')?.textContent).toContain('Omar');
+    expect(el().querySelector('td-you-card a')?.getAttribute('href')).toBe('/me');
+    expect(el().querySelector('td-you-card')?.textContent).toContain('Omar');
     expect(el().querySelector('td-account-menu')).not.toBeNull();
     expect(el().querySelector('td-google-button')).toBeNull();
+  });
+
+  it('dresses your card as your best horse once your stable loads', async () => {
+    const { el, http, settle } = await open('/', SIGNED_IN);
+    http.expectOne('/api/organisations').flush(orgs('Stackone'));
+    const C = { body: '#123456', mane: '#000000', tail: '#000000', saddle: '#abcdef' };
+    http.expectOne('/api/stable').flush({ horses: [
+      { stable_horse_id: 'a', name: 'Plain', colors: { ...C, body: '#999999' }, created_at: 'x', xp: 0, wins: 0 },
+      { stable_horse_id: 'b', name: 'Champ', colors: C, created_at: 'x', xp: 0, wins: 3, hats: [{ id: 'party_hat', obtained_at: 'x' }], equipped_hat: 0 },
+    ] });
+    await settle();
+    const svg = el().querySelector('td-you-card td-horse-head')!.innerHTML;
+    expect(svg.toLowerCase()).toContain('#123456');
+    expect(el().querySelector('td-you-card .horse-hat-party_hat')).not.toBeNull();
+  });
+
+  it('keeps your card linked and quiet when your stable fails to load', async () => {
+    const { el, http, settle } = await open('/', SIGNED_IN);
+    http.expectOne('/api/organisations').flush(orgs('Stackone'));
+    http.expectOne('/api/stable').flush({ code: 'INTERNAL', message: 'x' }, { status: 500, statusText: 'Error' });
+    await settle();
+    expect(el().querySelector('td-you-card a')?.getAttribute('href')).toBe('/me');
+    expect(el().textContent).not.toContain("Couldn't load your stable");
   });
 
   it('says you have no orgs and opens Find an org', async () => {
