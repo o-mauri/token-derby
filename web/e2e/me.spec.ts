@@ -39,3 +39,14 @@ test('the home card opens your page', async ({ page }) => {
   await expect(page).toHaveURL('/me');
   await expect(page.locator('[data-page="me"] .stable .horse')).toHaveCount(2);
 });
+
+test('every panel label fits on a 1366×768 laptop', async ({ page }) => {
+  await signIn(page);
+  await fakeApi(page, meRoutes());
+  await page.goto('/me');
+  await expect(page.locator('.stable .horse').first()).toBeVisible();
+  await page.evaluate(() => document.fonts.ready);
+  const clipped = await page.evaluate(() => [...document.querySelectorAll<HTMLElement>('[data-page="me"] td-panel .spine')]
+    .filter((s) => s.scrollHeight > s.clientHeight + 1).map((s) => `${s.textContent?.trim()} ${s.scrollHeight}/${s.clientHeight}`));
+  expect(clipped).toEqual([]);
+});

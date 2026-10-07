@@ -22,5 +22,7 @@ export const Linked: StoryObj<Panel> = { args: { link: ['/org', 'acme', 'races']
 export const Plain: StoryObj<Panel> = { args: { spine: 'LEAGUE' } };
 /** Not available yet, e.g. Market. */
 export const Disabled: StoryObj<Panel> = { args: { spine: 'MARKET', disabled: true } };
+/** A smaller spine, for a short panel with a long label. */
+export const Compact: StoryObj<Panel> = { args: { spine: 'ACHIEVEMENTS', compact: true }, decorators: [(s) => ({ ...s(), template: `<div style="height:320px">${s().template}</div>` })] };
 /** Under 700px wide the spine becomes a heading. */
 export const Narrow: StoryObj<Panel> = { args: { link: ['/x'] }, decorators: [(s) => ({ ...s(), template: `<div style="width:360px">${s().template}</div>` })] };

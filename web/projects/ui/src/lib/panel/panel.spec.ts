@@ -5,14 +5,15 @@ import { Panel } from './panel';
 
 @Component({
   imports: [Panel],
-  template: `<td-panel spine="LIVE" [link]="link()" [disabled]="disabled()"><p class="inside">content</p></td-panel>`,
+  template: `<td-panel spine="LIVE" [link]="link()" [disabled]="disabled()" [compact]="compact()"><p class="inside">content</p></td-panel>`,
 })
 class Host {
   readonly link = input<readonly string[] | null>(null);
   readonly disabled = input(false);
+  readonly compact = input(false);
 }
 
-async function render(inputs: { link?: readonly string[] | null; disabled?: boolean } = {}) {
+async function render(inputs: { link?: readonly string[] | null; disabled?: boolean; compact?: boolean } = {}) {
   TestBed.configureTestingModule({ providers: [provideRouter([])] });
   const f = TestBed.createComponent(Host);
   for (const [k, v] of Object.entries(inputs)) f.componentRef.setInput(k, v);
@@ -45,5 +46,11 @@ describe('Panel', () => {
     const frame = el.querySelector('.frame')!;
     expect(frame.getAttribute('aria-disabled')).toBe('true');
     expect(el.querySelector('td-panel')!.classList.contains('disabled')).toBe(true);
+  });
+
+  it('can use a smaller spine, for short panels with long labels', async () => {
+    expect((await render()).querySelector('td-panel')!.classList.contains('compact')).toBe(false);
+    TestBed.resetTestingModule();
+    expect((await render({ compact: true })).querySelector('td-panel')!.classList.contains('compact')).toBe(true);
   });
 });
