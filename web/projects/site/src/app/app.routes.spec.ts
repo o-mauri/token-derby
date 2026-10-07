@@ -26,6 +26,10 @@ describe('site routes', () => {
     expect(el.querySelector('.auth-error')?.textContent?.trim()).toBe('That sign-in took too long. Try again.');
   });
 
+  it('sends the old /link hand-off from `token-derby link` to the Google link page', async () => {
+    expect((await go('/link')).getAttribute('data-page')).toBe('link-google');
+  });
+
   it('maps /race/ABC123 to the race page', async () => {
     expect((await go('/race/ABC123')).getAttribute('data-page')).toBe('race');
   });

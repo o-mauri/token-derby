@@ -48,6 +48,8 @@ export const routes: Routes = [
   { path: 'about', loadComponent: () => import('./info/about.page').then((m) => m.AboutPage) },
   { path: 'privacy', loadComponent: () => import('./info/privacy.page').then((m) => m.PrivacyPage) },
   { path: 'cli', loadComponent: () => import('./cli/cli-approve.page').then((m) => m.CliApprovePage) },
+  // `token-derby link` opens /link; the page lives at /link-google.
+  { path: 'link', redirectTo: 'link-google' },
   { path: 'link-google', loadComponent: () => import('./cli/link-google.page').then((m) => m.LinkGooglePage) },
   ...previewRoutes,
   { path: 'paddock', loadComponent: () => import('./paddock/paddock.page').then((m) => m.PaddockPage) },
