@@ -74,7 +74,9 @@ export async function count(harness: Harness): Promise<CountResult> {
     await cache.save();
     for (const notice of reading.notices ?? []) notices.add(notice);
     for (const [id, families] of reading.byConversation) add(id, families);
-    return { byFamily, notices: [...notices] };
+    const unreadable = (reading.unreadable ?? []).map(id => `${harness.id}:${id}`);
+    if (unreadable.length > 0) notices.add(unreadableNotice(harness, unreadable.length));
+    return { byFamily, notices: [...notices], ...(unreadable.length > 0 ? { unreadable } : {}) };
   }
 
   // One unreadable file is skipped and named, never counted as zero and never
@@ -94,11 +96,12 @@ export async function count(harness: Harness): Promise<CountResult> {
     for (const notice of reading.notices ?? []) notices.add(notice);
     add(id, reading.families);
   });
-  if (unreadable.size > 0) {
-    const n = unreadable.size;
-    notices.add(`${n} ${harness.label} conversation${n === 1 ? '' : 's'} couldn't be read and ${n === 1 ? "isn't" : "aren't"} counted for now`);
-  }
+  if (unreadable.size > 0) notices.add(unreadableNotice(harness, unreadable.size));
   return { byFamily, notices: [...notices], unreadable: [...unreadable] };
+}
+
+function unreadableNotice(harness: Harness, n: number): string {
+  return `${n} ${harness.label} conversation${n === 1 ? '' : 's'} couldn't be read and ${n === 1 ? "isn't" : "aren't"} counted for now`;
 }
 
 /**

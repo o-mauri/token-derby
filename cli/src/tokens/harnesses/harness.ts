@@ -63,6 +63,8 @@ export type CustomReading = {
   /** Conversation id (unprefixed) -> its tokens, split by family. */
   byConversation: Map<string, FamilyTotals>;
   notices?: string[];
+  /** Conversation ids (unprefixed) with a file that failed to read, so nothing was counted for it. */
+  unreadable?: string[];
 };
 
 export interface Harness {
