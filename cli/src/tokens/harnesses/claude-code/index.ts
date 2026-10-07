@@ -62,9 +62,13 @@ const HOUR = /^\d{4}-\d{2}-\d{2}T\d{2}/;
 
 // `usage` is reported per REQUEST, but Claude Code writes one transcript line
 // per content block — a turn with thinking + text + three tool calls is five
-// lines, each repeating the same usage verbatim. A response's lines are
-// contiguous, so collapsing against the previous line keeps the per-file list
-// short; the cross-file dedupe in readAll catches everything else.
+// lines, each repeating the same usage. A response's lines are contiguous, so
+// collapsing against the previous line keeps the per-file list short; the
+// cross-file dedupe in readAll catches everything else.
+//
+// "The same usage" is not quite true: an early block can be written while the
+// response is still streaming, so it reports less output than the last one
+// (measured: 12% of requests, ~10% of output). The collapse keeps the largest.
 const CLAUDE_FOLD: FileFold<ClaudeFileState> = {
   empty: () => ({ responses: [] }),
   append: (acc, lines) => {
@@ -80,15 +84,24 @@ const CLAUDE_FOLD: FileFold<ClaudeFileState> = {
       // the worse failure. `last` still advances, so a run of id-less lines is
       // never collapsed into one.
       const id: string | undefined = parsed?.requestId ?? parsed?.message?.id ?? undefined;
-      if (id !== undefined && id === last) continue;
+      const input = addNum(usage.input_tokens) + addNum(usage.cache_creation_input_tokens);
+      const output = addNum(usage.output_tokens);
+      const prev = responses[responses.length - 1];
+      if (id !== undefined && id === last && prev?.id === id) {
+        // Replace rather than edit: the old entry belongs to the cached value.
+        if (input > prev.input || output > prev.output) {
+          responses[responses.length - 1] = { ...prev, input: Math.max(prev.input, input), output: Math.max(prev.output, output) };
+        }
+        continue;
+      }
       last = id;
       const ts = parsed?.timestamp;
       const hour = typeof ts === 'string' && HOUR.test(ts) ? ts.slice(0, 13) : undefined;
       responses.push({
         ...(id !== undefined ? { id } : {}),
         ...(hour !== undefined ? { hour } : {}),
-        input: addNum(usage.input_tokens) + addNum(usage.cache_creation_input_tokens),
-        output: addNum(usage.output_tokens),
+        input,
+        output,
       });
     }
     return last === undefined ? { responses } : { responses, last };
@@ -134,6 +147,30 @@ function sessionOf(file: string, root: string): string {
   return `${project}/${session.replace(/\.jsonl$/, '')}`;
 }
 
+/** One request as counted by this process: where it was credited, and its usage. */
+type Counted = { conversation: string; input: number; output: number };
+
+/** What this process has seen under one projects root. In memory only, see readAll. */
+type ClaudeRun = {
+  /** requestId → the request, kept after its last copy is deleted. */
+  counted: Map<string, Counted>;
+  /** Files that failed to read before they ever read: counted under their session. */
+  unanchored: Set<string>;
+  /** Files that have read successfully at least once. */
+  read: Set<string>;
+};
+
+const runs = new Map<string, ClaudeRun>();
+
+function runFor(root: string): ClaudeRun {
+  let run = runs.get(root);
+  if (!run) {
+    run = { counted: new Map(), unanchored: new Set(), read: new Set() };
+    runs.set(root, run);
+  }
+  return run;
+}
+
 /**
  * Read every transcript, then count each request once across all of them.
  *
@@ -144,16 +181,23 @@ function sessionOf(file: string, root: string): string {
  * written — a fact every copy shares — not by session. Only undated (legacy)
  * lines fall back to the session they were found in.
  *
- * Deleting the only copy of a request drops its hour's total; the tracker's
- * monotonic floor keeps what was already credited, so that can only under-count.
+ * An hour is shared by every session, and the tracker never lets a conversation
+ * move down. So if deleting a request's only copy lowered its hour, every other
+ * session's work in that hour would go uncredited until the total climbed back.
+ * A request therefore stays counted, at the conversation it was first seen in,
+ * for as long as this process runs. Nothing is persisted: every join anchors on
+ * a fresh scan, so a restart can't re-credit what it forgot.
  *
- * One unreadable file is skipped and named rather than failing the whole tool.
- * Its session is reported unreadable, but its requests would land in hour
- * buckets once it reads again, so a file that recovers mid-race can credit
- * whatever of it was never copied elsewhere — the same gap a recovering
- * subagent file has under per-session grouping.
+ * One unreadable file is skipped and named rather than failing the whole tool,
+ * and its session is reported unreadable. The tracker anchors that session id
+ * the first time it appears instead of crediting it. So if the file had never
+ * read before it failed, any request first seen there is grouped under that
+ * session from then on, not an hour bucket. Otherwise its pre-race history would
+ * land in hours and be credited. A file that read cleanly before it failed only
+ * adds requests written since, so they go to their hour as usual.
  */
 async function readAll(cache: ScanCache, files: string[], root: string): Promise<CustomReading> {
+  const run = runFor(root);
   const sorted = [...files].sort(); // deterministic winner for undated copies
   const states = await mapWithConcurrency(sorted, SCAN_CONCURRENCY, f =>
     cache.readIncremental(f, CLAUDE_FOLD).catch((err: any) => {
@@ -165,28 +209,49 @@ async function readAll(cache: ScanCache, files: string[], root: string): Promise
     }),
   );
 
-  const byConversation: CustomReading['byConversation'] = new Map();
   const unreadable = new Set<string>();
-  const seen = new Set<string>();
+  const readable: { file: string; state: ClaudeFileState; unanchored: boolean }[] = [];
   sorted.forEach((file, i) => {
     const state = states[i];
     if (!state) return;
     if ('failed' in state) {
+      if (!run.read.has(file)) run.unanchored.add(file);
       unreadable.add(sessionOf(file, root));
       return;
     }
-    for (const r of state.responses) {
-      if (r.id !== undefined) {
-        if (seen.has(r.id)) continue;
-        seen.add(r.id);
-      }
-      const conversation = r.hour !== undefined ? `@${r.hour}` : sessionOf(file, root);
-      const totals = byConversation.get(conversation)?.anthropic ?? { input: 0, output: 0 };
-      totals.input += r.input;
-      totals.output += r.output;
-      byConversation.set(conversation, { anthropic: totals });
-    }
+    readable.push({ file, state, unanchored: run.unanchored.has(file) });
   });
+  // Unanchored files last, so a request with a copy in another file goes to that
+  // copy's hour. The sort is stable, so path order holds within each group.
+  readable.sort((a, b) => Number(a.unanchored) - Number(b.unanchored));
+
+  const byConversation: CustomReading['byConversation'] = new Map();
+  const add = (conversation: string, input: number, output: number) => {
+    const totals = byConversation.get(conversation)?.anthropic ?? { input: 0, output: 0 };
+    totals.input += input;
+    totals.output += output;
+    byConversation.set(conversation, { anthropic: totals });
+  };
+  for (const { file, state, unanchored } of readable) {
+    for (const r of state.responses) {
+      const conversation = !unanchored && r.hour !== undefined ? `@${r.hour}` : sessionOf(file, root);
+      // No id ⇒ can't be matched to a copy, so it counts wherever it's found.
+      if (r.id === undefined) {
+        add(conversation, r.input, r.output);
+        continue;
+      }
+      const counted = run.counted.get(r.id);
+      if (!counted) {
+        run.counted.set(r.id, { conversation, input: r.input, output: r.output });
+      } else {
+        // A copy taken mid-stream can hold less than the finished response.
+        counted.input = Math.max(counted.input, r.input);
+        counted.output = Math.max(counted.output, r.output);
+      }
+    }
+    run.read.add(file);
+  }
+  for (const c of run.counted.values()) add(c.conversation, c.input, c.output);
   return { byConversation, ...(unreadable.size > 0 ? { unreadable: [...unreadable] } : {}) };
 }
 
