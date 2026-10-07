@@ -50,5 +50,6 @@ export const routes: Routes = [
   { path: 'cli', loadComponent: () => import('./cli/cli-approve.page').then((m) => m.CliApprovePage) },
   { path: 'link-google', loadComponent: () => import('./cli/link-google.page').then((m) => m.LinkGooglePage) },
   ...previewRoutes,
+  { path: 'me', loadComponent: () => import('./me/me.page').then((m) => m.MePage) },
   { path: '**', loadComponent: () => import('./not-found/not-found.page').then((m) => m.NotFoundPage) },
 ];

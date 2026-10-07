@@ -1,0 +1,81 @@
+<header class="top">
+  <td-crumbs [parts]="[{ label: session.signedIn() ? name() : 'Token Derby', link: session.signedIn() ? ['/account'] : ['/'] }, { label: 'Me' }]" />
+  <span class="actions">
+    <td-theme-picker compact />
+    <a td-button size="sm" routerLink="/">← Home</a>
+  </span>
+</header>
+
+@if (session.signedIn()) {
+  <main class="grid">
+    <td-panel class="you" spine="YOU">
+      @switch (load().status) {
+        @case ('loading') { <div class="centre"><td-loader /></div> }
+        @case ('error') {
+          <div class="failed centre"><p>Couldn't load your page.</p><button td-button size="sm" type="button" (click)="reload()">Retry</button></div>
+        }
+        @default {
+          <h1 class="name">{{ ready()?.jockey?.display_name ?? name() }}</h1>
+          <p class="joined">{{ joined() }}</p>
+          <dl class="totals">
+            @for (t of totals(); track t[0]) { <div class="total"><dt>{{ t[0] }}</dt> <dd>{{ t[1] }}</dd></div> }
+          </dl>
+        }
+      }
+    </td-panel>
+
+    <td-panel class="stable" spine="STABLE">
+      @if (load().status === 'loading') {
+        <div class="centre"><td-loader /></div>
+      } @else if (ready()) {
+        @if (horses().length) {
+          <div class="scroll"><ul class="list">
+            @for (h of horses(); track h.stable_horse_id) {
+              <li class="horse">
+                <div class="row">
+                  <td-horse class="sprite" [colors]="h.colors" [hat]="worn(h)" />
+                  <span class="name">{{ h.name }}</span>
+                  <span class="stats">
+                    <span><b>{{ h.races_entered ?? 0 }}</b> races</span>
+                    <span><b>{{ h.wins ?? 0 }}</b> wins</span>
+                    <span><b>{{ h.podiums ?? 0 }}</b> podiums</span>
+                    <span>Avg {{ avg(h) }}</span>
+                    <span>XP {{ h.xp ?? 0 }}</span>
+                  </span>
+                  <button type="button" class="hats-toggle" [attr.aria-expanded]="open().has(h.stable_horse_id)"
+                    [attr.aria-label]="'Hats for ' + h.name" (click)="toggle(h.stable_horse_id)">
+                    Hats ({{ h.hats?.length ?? 0 }}) {{ open().has(h.stable_horse_id) ? '▾' : '▸' }}
+                  </button>
+                </div>
+                @if (open().has(h.stable_horse_id)) {
+                  <ul class="hats">
+                    @for (hat of hats(h); track $index) {
+                      <li class="hat">
+                        <td-horse class="mini" [colors]="h.colors" [hat]="{ id: hat.id, variant: hat.variant }" />
+                        <span class="hat-name">{{ hat.name }}</span>
+                        <span class="rarity" [style.color]="'var(--td-rarity-' + hat.rarity + ')'">{{ hat.rarity }}</span>
+                        @if (hat.equipped) { <span class="equipped">equipped</span> }
+                      </li>
+                    } @empty {
+                      <li class="none">No hats yet.</li>
+                    }
+                  </ul>
+                }
+              </li>
+            }
+          </ul></div>
+        } @else {
+          <p class="empty centre">No horses yet. Run <code>token-derby</code> to enter your first race.</p>
+        }
+      }
+    </td-panel>
+
+    <td-panel class="trophies" spine="TROPHIES" disabled><p class="soon">Coming soon</p></td-panel>
+    <td-panel class="achievements" spine="ACHIEVEMENTS" disabled><p class="soon">Coming soon</p></td-panel>
+  </main>
+} @else {
+  <main class="signin">
+    <p>Sign in to see your page</p>
+    <td-google-button [href]="signInHref()" />
+  </main>
+}
