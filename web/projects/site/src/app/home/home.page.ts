@@ -4,8 +4,8 @@ import { Router, RouterLink } from '@angular/router';
 import { ORG_NAME_PATTERN } from '@token-derby/shared';
 import { AccountMenu, GoBox, GoogleButton, HorseFace, Loader, OrgList, Page, ThemePicker, YouCard, pollResource } from '@token-derby/ui';
 import type { StableHorse } from '@token-derby/shared';
-import { MeApi } from '../me/me-api';
-import { bestHorse, wornHat } from '../me/me-model';
+import { PaddockApi } from '../paddock/paddock-api';
+import { bestHorse, wornHat } from '../paddock/paddock-model';
 import { Session } from '../session/session';
 import { AUTH_ERROR_TEXT, HomeApi, sortOrgs } from './home-api';
 import { hostScale } from './home-scale';
@@ -59,7 +59,7 @@ export class HomePage {
   protected readonly scale = hostScale();
 
   // Your best horse dresses your card; if the stable can't load, the card keeps its plain look.
-  private readonly me = inject(MeApi);
+  private readonly me = inject(PaddockApi);
   private readonly stable = signal<StableHorse[] | null>(null);
   private readonly best = computed(() => bestHorse(this.stable() ?? []));
   protected readonly cardColors = computed(() => this.best()?.colors ?? null);

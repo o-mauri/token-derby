@@ -11,12 +11,12 @@
   display: grid;
   // Achievements gets the taller share so its long spine label fits.
   grid-template:
-    'you trophies' auto
+    'career trophies' auto
     'stable trophies' minmax(0, 1fr)
     'stable achievements' minmax(0, 2fr) / minmax(0, 2fr) minmax(0, 1fr);
   gap: var(--td-space-4);
 }
-.you { grid-area: you; }
+.career { grid-area: career; }
 .stable { grid-area: stable; }
 .trophies { grid-area: trophies; }
 .achievements { grid-area: achievements; }

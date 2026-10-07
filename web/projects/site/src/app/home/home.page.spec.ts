@@ -108,7 +108,7 @@ describe('HomePage signed in', () => {
     await settle();
     expect([...el().querySelectorAll('td-org-list a.row')].map((a) => a.getAttribute('href'))).toEqual(['/org/acme', '/org/Stackone']);
     expect(el().querySelector('td-loader')).toBeNull();
-    expect(el().querySelector('td-you-card a')?.getAttribute('href')).toBe('/me');
+    expect(el().querySelector('td-you-card a')?.getAttribute('href')).toBe('/paddock');
     expect(el().querySelector('td-you-card')?.textContent).toContain('Omar');
     expect(el().querySelector('td-account-menu')).not.toBeNull();
     expect(el().querySelector('td-google-button')).toBeNull();
@@ -133,7 +133,7 @@ describe('HomePage signed in', () => {
     http.expectOne('/api/organisations').flush(orgs('Stackone'));
     http.expectOne('/api/stable').flush({ code: 'INTERNAL', message: 'x' }, { status: 500, statusText: 'Error' });
     await settle();
-    expect(el().querySelector('td-you-card a')?.getAttribute('href')).toBe('/me');
+    expect(el().querySelector('td-you-card a')?.getAttribute('href')).toBe('/paddock');
     expect(el().textContent).not.toContain("Couldn't load your stable");
   });
 

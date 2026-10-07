@@ -1,6 +1,6 @@
 import { expect } from '@playwright/test';
 import { fakeApi, test, type Routes } from './support/fake-api';
-import { PREVIEW_JOIN_CODE, PREVIEW_ORG, accountRoutes, meRoutes, memberOrgRoutes, myOrgs, orgRoutes, raceRoutes, settingsRoutes } from './support/fixtures';
+import { PREVIEW_JOIN_CODE, PREVIEW_ORG, accountRoutes, paddockRoutes, memberOrgRoutes, myOrgs, orgRoutes, raceRoutes, settingsRoutes } from './support/fixtures';
 import { signIn } from './support/session';
 
 /** `knownIssue` keeps a failing case visible in every report until the page is fixed. */
@@ -21,7 +21,7 @@ const CASES: Case[] = [
   { path: `/org/${PREVIEW_ORG}/settings`, routes: settingsRoutes(true), signedIn: true },
   { path: `/org/${PREVIEW_ORG}/settings/racing`, routes: settingsRoutes(true), signedIn: true },
   { path: '/cli', routes: {}, signedIn: true },
-  { path: '/me', routes: meRoutes(), signedIn: true },
+  { path: '/paddock', routes: paddockRoutes(), signedIn: true },
 ];
 
 for (const c of CASES) {

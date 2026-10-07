@@ -1,5 +1,5 @@
 <header class="top">
-  <td-crumbs [parts]="[{ label: session.signedIn() ? name() : 'Token Derby', link: session.signedIn() ? ['/account'] : ['/'] }, { label: 'Me' }]" />
+  <td-crumbs [parts]="[{ label: session.signedIn() ? name() : 'Token Derby', link: session.signedIn() ? ['/account'] : ['/'] }, { label: 'Paddock' }]" />
   <span class="actions">
     <td-theme-picker compact />
     <a td-button size="sm" routerLink="/">← Home</a>
@@ -8,7 +8,7 @@
 
 @if (session.signedIn()) {
   <main class="grid">
-    <td-panel class="you" spine="YOU">
+    <td-panel class="career" spine="CAREER" compact>
       @switch (load().status) {
         @case ('loading') { <div class="centre"><td-loader /></div> }
         @case ('error') {
@@ -24,7 +24,7 @@
       }
     </td-panel>
 
-    <td-panel class="stable" spine="STABLE">
+    <td-panel class="stable" spine="STABLE" compact>
       @if (load().status === 'loading') {
         <div class="centre"><td-loader /></div>
       } @else if (ready()) {

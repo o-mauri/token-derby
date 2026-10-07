@@ -8,7 +8,7 @@ const withSession = () => ({ context: new HttpContext().set(WITH_SESSION, true) 
 
 /** Your own jockey and stable, read with the website session. */
 @Injectable({ providedIn: 'root' })
-export class MeApi {
+export class PaddockApi {
   private readonly http = inject(HttpClient);
 
   jockey(): Promise<GetJockeyResponse> {

@@ -20,13 +20,13 @@ export const STABLE: StableHorse[] = [
     xp: 420, races_entered: 12, wins: 1, podiums: 4, total_tokens: 900_000, total_finishing_position: 42, hats: [], equipped_hat: null },
 ];
 
-/** Your stable, as the signed-in home card and /me read it. */
+/** Your stable, as the signed-in home card and /paddock read it. */
 export function stableRoutes(horses: StableHorse[] = STABLE): Routes {
   return { 'GET /api/stable': ok<ListStableResponse>({ horses }) };
 }
 
-/** Everything /me loads: your jockey and your stable. */
-export function meRoutes(horses: StableHorse[] = STABLE): Routes {
+/** Everything /paddock loads: your jockey and your stable. */
+export function paddockRoutes(horses: StableHorse[] = STABLE): Routes {
   return {
     'GET /api/jockey/me': ok<GetJockeyResponse>({ user_id: 'u1', display_name: 'Omar', created_at: '2026-05-14T10:00:00Z', email: 'omar@example.com' }),
     ...stableRoutes(horses),

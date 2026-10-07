@@ -20,7 +20,7 @@
       <ng-container *ngTemplateOutlet="orgBox" />
     } @else {
       <section class="mine" aria-labelledby="your-orgs">
-        <td-you-card class="you" [name]="name()" [link]="['/me']" [colors]="cardColors()" [hat]="cardHat()" />
+        <td-you-card class="you" [name]="name()" [link]="['/paddock']" [colors]="cardColors()" [hat]="cardHat()" />
         <h2 class="heading" id="your-orgs">YOUR ORGS</h2>
         @if (!orgsLoaded() && orgs.status() !== 'error') {
           <div class="loading"><td-loader /></div>

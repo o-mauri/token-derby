@@ -3,23 +3,23 @@ import { Router, RouterLink } from '@angular/router';
 import type { GetJockeyResponse, StableHorse } from '@token-derby/shared';
 import { Button, Crumbs, GoogleButton, Horse, Loader, Panel, ThemePicker, compactTokens } from '@token-derby/ui';
 import { Session } from '../session/session';
-import { MeApi } from './me-api';
-import { avgFinish, hatCollection, sortStable, totals, wornHat } from './me-model';
+import { PaddockApi } from './paddock-api';
+import { avgFinish, hatCollection, sortStable, totals, wornHat } from './paddock-model';
 
 type Load = { status: 'loading' } | { status: 'error' } | { status: 'ready'; jockey: GetJockeyResponse; horses: StableHorse[] };
 
-/** Your own page: totals and your stable, with Trophies and Achievements to come. */
+/** Your paddock: your career totals and your stable, with Trophies and Achievements to come. */
 @Component({
-  selector: 'site-me-page',
+  selector: 'site-paddock-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [RouterLink, Button, Crumbs, GoogleButton, Horse, Loader, Panel, ThemePicker],
-  host: { 'data-page': 'me' },
-  templateUrl: './me.page.html',
-  styleUrl: './me.page.scss',
+  host: { 'data-page': 'paddock' },
+  templateUrl: './paddock.page.html',
+  styleUrl: './paddock.page.scss',
 })
-export class MePage {
+export class PaddockPage {
   protected readonly session = inject(Session);
-  private readonly api = inject(MeApi);
+  private readonly api = inject(PaddockApi);
   private readonly router = inject(Router);
 
   protected readonly load = signal<Load>({ status: 'loading' });

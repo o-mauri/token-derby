@@ -1,10 +1,10 @@
 import type { StableHorse } from '@token-derby/shared';
-import { avgFinish, bestHorse, hatCollection, sortStable, totals, wornHat } from './me-model';
+import { avgFinish, bestHorse, hatCollection, sortStable, totals, wornHat } from './paddock-model';
 
 const C = { body: '#000', mane: '#000', tail: '#000', saddle: '#000' };
 const horse = (over: Partial<StableHorse>): StableHorse => ({ stable_horse_id: 'h', name: 'H', colors: C, created_at: '2026-05-01T00:00:00Z', xp: 0, ...over });
 
-describe('me model', () => {
+describe('paddock model', () => {
   it('totals your horses, counting missing stats as 0', () => {
     const t = totals([
       horse({ races_entered: 30, wins: 4, podiums: 9, total_tokens: 1_000_000, xp: 900 }),

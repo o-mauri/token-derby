@@ -33,7 +33,7 @@ async function open(seed: Record<string, string> = SIGNED_IN) {
     ],
   });
   const harness = await RouterTestingHarness.create();
-  await harness.navigateByUrl('/me');
+  await harness.navigateByUrl('/paddock');
   const settle = async () => { for (let i = 0; i < 4; i++) { await tick(); await harness.fixture.whenStable(); } };
   await settle();
   const el = () => harness.routeNativeElement as HTMLElement;
@@ -48,13 +48,13 @@ async function open(seed: Record<string, string> = SIGNED_IN) {
   return { el, http, settle, answer, click, text };
 }
 
-describe('Me page', () => {
-  it('shows loaders in YOU and STABLE until both loads arrive', async () => {
+describe('Paddock page', () => {
+  it('shows loaders in CAREER and STABLE until both loads arrive', async () => {
     const p = await open();
-    expect(p.el().querySelectorAll('td-panel.you td-loader, td-panel.stable td-loader').length).toBe(2);
+    expect(p.el().querySelectorAll('td-panel.career td-loader, td-panel.stable td-loader').length).toBe(2);
     p.http.expectOne('/api/jockey/me').flush(JOCKEY);
     await p.settle();
-    expect(p.el().querySelector('td-panel.you td-loader')).not.toBeNull();
+    expect(p.el().querySelector('td-panel.career td-loader')).not.toBeNull();
     p.http.expectOne('/api/stable').flush({ horses: HORSES });
     await p.settle();
     expect(p.el().querySelector('td-loader')).toBeNull();
@@ -63,9 +63,9 @@ describe('Me page', () => {
   it('totals your horses and says when you joined', async () => {
     const p = await open();
     await p.answer();
-    expect(p.text('.you .name')).toBe('Omar');
-    expect(p.text('.you .joined')).toBe('joined May 2026');
-    const totals = [...p.el().querySelectorAll('.you .total')].map((t) => `${t.querySelector('dt')?.textContent?.trim()} ${t.querySelector('dd')?.textContent?.trim()}`);
+    expect(p.text('.career .name')).toBe('Omar');
+    expect(p.text('.career .joined')).toBe('joined May 2026');
+    const totals = [...p.el().querySelectorAll('.career .total')].map((t) => `${t.querySelector('dt')?.textContent?.trim()} ${t.querySelector('dd')?.textContent?.trim()}`);
     expect(totals).toEqual(['Horses 2', 'Races 42', 'Wins 5', 'Podiums 13', 'Tokens 2.13M', 'XP 1.32K']);
   });
 
@@ -104,8 +104,8 @@ describe('Me page', () => {
     p.http.expectOne('/api/jockey/me').flush(JOCKEY);
     p.http.expectOne('/api/stable').flush({ code: 'INTERNAL', message: 'x' }, { status: 500, statusText: 'Err' });
     await p.settle();
-    expect(p.text('.you .failed')).toContain("Couldn't load your page.");
-    await p.click('.you .failed button');
+    expect(p.text('.career .failed')).toContain("Couldn't load your page.");
+    await p.click('.career .failed button');
     await p.answer();
     expect(p.el().querySelector('.failed')).toBeNull();
     expect(p.el().querySelectorAll('.stable .horse').length).toBe(2);
@@ -120,12 +120,12 @@ describe('Me page', () => {
 
   it('puts you in the breadcrumb', async () => {
     const p = await open();
-    expect([...p.el().querySelectorAll('td-crumbs .part')].map((x) => x.textContent?.trim())).toEqual(['Omar', 'Me']);
+    expect([...p.el().querySelectorAll('td-crumbs .part')].map((x) => x.textContent?.trim())).toEqual(['Omar', 'Paddock']);
   });
 
   it('asks you to sign in when signed out, coming back here', async () => {
     const p = await open({});
-    expect(p.el().querySelector('td-google-button a')?.getAttribute('href')).toBe('/api/auth/google/start?return_to=%2Fme');
+    expect(p.el().querySelector('td-google-button a')?.getAttribute('href')).toBe('/api/auth/google/start?return_to=%2Fpaddock');
     p.http.expectNone('/api/stable');
   });
 });
