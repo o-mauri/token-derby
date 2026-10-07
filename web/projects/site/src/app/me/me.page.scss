@@ -9,10 +9,11 @@
   flex: 1;
   min-height: 0;
   display: grid;
+  // Achievements gets the taller share so its long spine label fits.
   grid-template:
     'you trophies' auto
     'stable trophies' minmax(0, 1fr)
-    'stable achievements' minmax(0, 1fr) / minmax(0, 2fr) minmax(0, 1fr);
+    'stable achievements' minmax(0, 2fr) / minmax(0, 2fr) minmax(0, 1fr);
   gap: var(--td-space-4);
 }
 .you { grid-area: you; }
@@ -53,6 +54,8 @@
   :host { height: auto; min-height: 100vh; }
   .grid { display: flex; flex-direction: column; }
   .totals { grid-template-columns: repeat(3, minmax(0, auto)); }
+  .row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; }
+  .stats { grid-column: 1 / -1; }
   .scroll { height: auto; overflow-y: visible; }
   .top { flex-wrap: wrap; }
   .actions { gap: var(--td-space-3); }
