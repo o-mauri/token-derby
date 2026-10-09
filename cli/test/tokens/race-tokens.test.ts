@@ -21,7 +21,7 @@ vi.mock('../../src/tokens/harnesses/engine.js', () => ({
   count: (h: { id: HarnessKey }) => counts[h.id](),
 }));
 
-const { readAllSources, isStall, scoreFor } = await import('../../src/tokens/race-tokens.js');
+const { readAllSources, isStall, scoreFor, resolveInputWeight } = await import('../../src/tokens/race-tokens.js');
 import type { AllSources } from '../../src/tokens/race-tokens.js';
 
 /** A CountResult for one family, keyed as the engine would key it. */
@@ -68,6 +68,46 @@ describe('scoreFor', () => {
 
   it('rounds weighted input to avoid fractional tokens', () => {
     expect(scoreFor({ input: 33, output: 10 }, 0.3)).toBe(20);
+  });
+});
+
+describe('resolveInputWeight', () => {
+  const envKey = 'TOKEN_DERBY_INPUT_WEIGHT';
+  afterEach(() => { delete process.env[envKey]; });
+
+  it('defaults to 1 when no argument and no env var', () => {
+    expect(resolveInputWeight()).toBe(1);
+  });
+
+  it('uses the explicit value when provided', () => {
+    expect(resolveInputWeight(0.2)).toBe(0.2);
+  });
+
+  it('falls back to the env var when no argument', () => {
+    process.env[envKey] = '0.3';
+    expect(resolveInputWeight()).toBe(0.3);
+  });
+
+  it('prefers the explicit value over the env var', () => {
+    process.env[envKey] = '0.9';
+    expect(resolveInputWeight(0.2)).toBe(0.2);
+  });
+
+  it('clamps negative values to 0', () => {
+    expect(resolveInputWeight(-5)).toBe(0);
+  });
+
+  it('clamps values above 1 to 1', () => {
+    expect(resolveInputWeight(999)).toBe(1);
+  });
+
+  it('returns 1 for NaN', () => {
+    expect(resolveInputWeight(NaN)).toBe(1);
+  });
+
+  it('returns 1 for a garbage env var', () => {
+    process.env[envKey] = 'abc';
+    expect(resolveInputWeight()).toBe(1);
   });
 });
 

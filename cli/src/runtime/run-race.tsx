@@ -4,7 +4,7 @@ import type { GetRaceResponse, HeartbeatResponse } from '@token-derby/shared';
 import { StatusScreen } from '../ui/StatusScreen.js';
 import { describeAchievement, type RecentEvent } from '@token-derby/shared';
 import { runHeartbeatLoop } from './heartbeat-loop.js';
-import { readAllSources, isStall, scanWithTimeout, type BeatReading, type DegradedSource } from '../tokens/race-tokens.js';
+import { readAllSources, isStall, scanWithTimeout, resolveInputWeight, type BeatReading, type DegradedSource } from '../tokens/race-tokens.js';
 import { ScanProgress, diagnoseScanTimeout } from '../tokens/scan-progress.js';
 import { RaceScoreTracker, joinState, type RaceScoreState } from '../tokens/race-score.js';
 import * as endpoints from '../api/endpoints.js';
@@ -33,7 +33,7 @@ export function RunRace({ active, initialState, pendingMode, ownUserName }: RunR
 
   const trackerRef = useRef(new RaceScoreTracker(initialState));
   const pendingRef = useRef(pendingMode);
-  const inputWeightRef = useRef(parseFloat(process.env.TOKEN_DERBY_INPUT_WEIGHT ?? '1'));
+  const inputWeightRef = useRef(resolveInputWeight());
   const ctrl = useRef(new AbortController());
   const [stalled, setStalled] = useState(false);
   const [stallReason, setStallReason] = useState<string | null>(null);
@@ -105,7 +105,7 @@ export function RunRace({ active, initialState, pendingMode, ownUserName }: RunR
         setLastHbAt(new Date());
         setLastHbOk(true);
         setRace(raceViewFrom(resp));
-        inputWeightRef.current = resp.race.input_weight ?? parseFloat(process.env.TOKEN_DERBY_INPUT_WEIGHT ?? '1');
+        inputWeightRef.current = resolveInputWeight(resp.race.input_weight);
         const own = resp.horses.find(h => h.horse_id === active.horse_id);
         const candidates = (own?.recent_events ?? []).filter(e => e.at > shownAchievementAtRef.current);
         if (candidates.length > 0) {
@@ -211,7 +211,7 @@ export async function buildInitialState(args: {
 }): Promise<{ initialState: RaceScoreState; pendingMode: boolean; degraded: DegradedSource[] }> {
   // Anchors always come from a fresh scan, never from the persisted state — that
   // is what stops a rejoin counting the player's whole transcript history.
-  const iw = args.inputWeight ?? parseFloat(process.env.TOKEN_DERBY_INPUT_WEIGHT ?? '1');
+  const iw = resolveInputWeight(args.inputWeight);
   const now = await readAllSources(undefined, iw).catch(() => null);
   return {
     initialState: joinState(now, args.serverLastSeq),

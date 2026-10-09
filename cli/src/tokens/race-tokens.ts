@@ -83,6 +83,13 @@ function emptyByFamily(): Record<ModelFamily, Map<string, number>> {
   return { anthropic: new Map(), openai: new Map(), google: new Map() };
 }
 
+/** Parse, clamp and default the input weight. Handles NaN, negatives and >1. */
+export function resolveInputWeight(raw?: number): number {
+  const fromEnv = parseFloat(process.env.TOKEN_DERBY_INPUT_WEIGHT ?? '');
+  const v = raw ?? (Number.isFinite(fromEnv) ? fromEnv : 1);
+  return Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 1;
+}
+
 /** Collapse a conversation's totals to a single number. */
 export function scoreFor(t: TokenTotals, inputWeight = 1): number {
   return Math.round(t.input * inputWeight) + t.output;
