@@ -3,7 +3,7 @@ import { handler as hbHandler } from '../../src/handlers/heartbeat.js';
 import { handler as createHandler } from '../../src/handlers/create-race.js';
 import { handler as joinHandler } from '../../src/handlers/join-race.js';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
-import { listHorses } from '../../src/db/horses.js';
+import { getHorseForHeartbeat, listHorses } from '../../src/db/horses.js';
 import { ddb, TABLE } from '../../src/db/client.js';
 import { raceMetaKey, horseKey } from '../../src/db/keys.js';
 import { UpdateCommand } from '@aws-sdk/lib-dynamodb';
@@ -177,7 +177,7 @@ describe('heartbeat handler', () => {
     expect(horse.current_tokens).toBe(5_000_000);
     expect(horse.model_tokens?.openai).toBe(5_000_000);
     expect(warn).toHaveBeenCalledWith('heartbeat over per-beat cap', expect.objectContaining({
-      race_id, horse_id, claimed: 30_405_384, applied: 5_000_000, discarded: 25_405_384,
+      race_id, horse_id, cli_version: CURRENT_CLI_VERSION, claimed: 30_405_384, applied: 5_000_000, discarded: 25_405_384,
     }));
     warn.mockRestore();
   });
@@ -202,7 +202,7 @@ describe('heartbeat handler', () => {
       expect(horse.last_seq).toBe(1);
       expect(Date.parse(horse.last_heartbeat)).toBeGreaterThan(Date.parse(before.last_heartbeat));
       expect(warn).toHaveBeenCalledWith('heartbeat claimed tokens before the race started', expect.objectContaining({
-        race_id, horse_id, claimed: 750_000,
+        race_id, horse_id, cli_version: CURRENT_CLI_VERSION, claimed: 750_000,
       }));
       warn.mockRestore();
     });
@@ -216,6 +216,458 @@ describe('heartbeat handler', () => {
       await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { seq: 2, delta: 300 }));
 
       expect((await listHorses(race_id))[0]?.current_tokens).toBe(300);
+    });
+  });
+
+  describe('the ledger a beat carries about its predecessor', () => {
+    // Newer than the current release, in the same minor so the race's version pin still admits it.
+    const LEDGER_CAPABLE_CLI_VERSION = SAME_MINOR_CLI_VERSION;
+    const tokens = (anthropic: number) => ({ anthropic, openai: 0, google: 0 });
+
+    // One horse, a few beats at a time, the way a CLI of the given version would send them.
+    const raceOf = async (cliVersion = LEDGER_CAPABLE_CLI_VERSION) => {
+      const ctx = await setup(cliVersion);
+      const sendAs = async (version: string, body: Record<string, unknown>) => {
+        const res: any = await hbHandler(hbEvent(ctx.join_code, ctx.horse_id, ctx.heartbeat_token, body, version));
+        expect(res.statusCode).toBe(200);
+        return JSON.parse(res.body);
+      };
+      const send = (body: Record<string, unknown>) => sendAs(cliVersion, body);
+      const horse = async () => (await listHorses(ctx.race_id))[0]!;
+      const stored = () => getHorseForHeartbeat(ctx.race_id, ctx.horse_id, ctx.heartbeat_token);
+      // A write the CLI never made: tokens on the horse and a point on its chart, with
+      // the seq moved on, as though another caller's beat had landed first.
+      const plantForeignBeat = async (seq: number, amount: number) => {
+        await ddb.send(new UpdateCommand({
+          TableName: TABLE,
+          Key: horseKey(ctx.race_id, ctx.horse_id),
+          UpdateExpression: 'SET last_seq = :seq, model_tokens.#a = model_tokens.#a + :n ADD current_tokens :n, scored_tokens :n',
+          ExpressionAttributeNames: { '#a': 'anthropic' },
+          ExpressionAttributeValues: { ':seq': seq, ':n': amount },
+        }));
+        const { appendSeriesPoint } = await import('../../src/db/series.js');
+        await appendSeriesPoint(ctx.race_id, ctx.horse_id, seq, { t: Date.now(), d: amount });
+      };
+      return { ...ctx, send, sendAs, horse, stored, plantForeignBeat };
+    };
+
+    it('gives a CLI that predates the ledger no base, and never checks it', async () => {
+      const race = await raceOf(CURRENT_CLI_VERSION);
+      await race.send({ seq: 1, components: tokens(100) });
+      await race.plantForeignBeat(2, 5_000);
+      await race.send({ seq: 3, components: tokens(10), previous: { seq: 2, components: tokens(30), counted: tokens(130) } });
+
+      expect((await race.stored())?.ledger_base).toBeUndefined();
+      expect((await race.horse()).current_tokens).toBe(5_110);
+    });
+
+    it('starts the check from the first beat of a CLI that sends one, which has no previous', async () => {
+      const race = await raceOf();
+      await race.send({ seq: 1, components: tokens(100) });
+      expect((await race.stored())?.ledger_base).toEqual({ anthropic: 0, openai: 0, google: 0 });
+    });
+
+    it('leaves a consistent chain of beats alone', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const race = await raceOf();
+      await race.send({ seq: 1, components: tokens(100) });
+      await race.send({ seq: 2, components: tokens(50), previous: { seq: 1, components: tokens(100), counted: tokens(100) } });
+      await race.send({ seq: 3, components: tokens(25), previous: { seq: 2, components: tokens(50), counted: tokens(150) } });
+
+      expect((await race.horse()).current_tokens).toBe(175);
+      expect(warn).not.toHaveBeenCalledWith('heartbeat ledger corrected', expect.anything());
+      warn.mockRestore();
+    });
+
+    it('removes what the CLI never counted, and restores the beat it displaced', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const race = await raceOf();
+      await race.send({ seq: 1, components: tokens(100) });
+      await race.plantForeignBeat(2, 5_000);
+      // The CLI's own seq 2 is dropped as a resend, so it resyncs and restates it with seq 3.
+      await race.send({ seq: 2, components: tokens(30), previous: { seq: 1, components: tokens(100), counted: tokens(100) } });
+      expect((await race.horse()).current_tokens).toBe(5_100);
+
+      await race.send({ seq: 3, components: tokens(50), previous: { seq: 2, components: tokens(30), counted: tokens(130) } });
+
+      const horse = await race.horse();
+      expect(horse.current_tokens).toBe(180);
+      expect(horse.scored_tokens).toBe(180);
+      expect(horse.model_tokens?.anthropic).toBe(180);
+      expect(warn).toHaveBeenCalledWith('heartbeat ledger corrected', expect.objectContaining({
+        race_id: race.race_id, horse_id: race.horse_id, seq: 3, previous_seq: 2, cli_version: LEDGER_CAPABLE_CLI_VERSION,
+      }));
+      warn.mockRestore();
+    });
+
+    it('restates the previous beat\'s chart point so the graph still adds up to the horse', async () => {
+      const { listSeriesPoints } = await import('../../src/db/series.js');
+      const race = await raceOf();
+      await race.send({ seq: 1, components: tokens(100) });
+      await race.plantForeignBeat(2, 5_000);
+      await race.send({ seq: 3, components: tokens(50), previous: { seq: 2, components: tokens(30), counted: tokens(130) } });
+
+      const points = await listSeriesPoints(race.race_id, race.horse_id);
+      const plotted = points.reduce((sum, point) => sum + (point.s ?? point.d), 0);
+      expect(plotted).toBe((await race.horse()).scored_tokens);
+    });
+
+    it('gives back tokens the CLI counted that the server never applied, up to what that beat claimed', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const race = await raceOf();
+      await race.send({ seq: 1, components: tokens(100) });
+      await race.send({ seq: 2, components: tokens(10), previous: { seq: 1, components: tokens(100), counted: tokens(250) } });
+
+      expect((await race.horse()).current_tokens).toBe(210);   // 100 + 10 + 100, not the 150 asked for
+      warn.mockRestore();
+    });
+
+    it('corrects a drift once, not again on every later beat', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const race = await raceOf();
+      await race.send({ seq: 1, components: tokens(100) });
+      await race.send({ seq: 2, components: tokens(10), previous: { seq: 1, components: tokens(100), counted: tokens(250) } });
+      await race.send({ seq: 3, components: tokens(10), previous: { seq: 2, components: tokens(10), counted: tokens(260) } });
+
+      expect((await race.horse()).current_tokens).toBe(220);
+      warn.mockRestore();
+    });
+
+    it('does not undo the pre-race gate by treating the ignored tokens as drift', async () => {
+      const race = await raceOf();
+      await setRaceStartTime(race.race_id, new Date(Date.now() + 60 * 60 * 1000).toISOString());
+      await race.send({ seq: 1, components: tokens(750_000) });
+      await setRaceStartTime(race.race_id, new Date(Date.now() - 60_000).toISOString());
+      await race.send({ seq: 2, components: tokens(10), previous: { seq: 1, components: tokens(750_000), counted: tokens(750_000) } });
+
+      expect((await race.horse()).current_tokens).toBe(10);
+    });
+
+    it('does not read what the sanity cap discarded as drift', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const race = await raceOf();
+      await race.send({ seq: 1, components: tokens(30_000_000) });
+      await race.send({ seq: 2, components: tokens(10), previous: { seq: 1, components: tokens(30_000_000), counted: tokens(30_000_000) } });
+
+      expect((await race.horse()).current_tokens).toBe(5_000_010);
+      warn.mockRestore();
+    });
+
+    it('treats a ledger it cannot read as a first beat, and checks nothing', async () => {
+      const race = await raceOf();
+      await race.send({ seq: 1, components: tokens(100) });
+      await race.send({ seq: 2, components: tokens(10), previous: { seq: 'one', components: 'many' } as any });
+
+      expect((await race.horse()).current_tokens).toBe(110);
+      expect((await race.stored())?.ledger_base).toEqual({ anthropic: 100, openai: 0, google: 0 });
+    });
+
+    it('keeps the base out of the horses it returns', async () => {
+      const race = await raceOf();
+      const body = await race.send({ seq: 1, components: tokens(100) });
+      expect(body.horses[0]).not.toHaveProperty('ledger_base');
+      expect(await race.horse()).not.toHaveProperty('ledger_base');
+    });
+
+    describe('a racer\'s journey, as a CLI process would send it', () => {
+      type Race = Awaited<ReturnType<typeof raceOf>>;
+
+      // Acks and retries the way the CLI's tracker does: counted and the restated beat move
+      // on a reply, a seq resyncs to the server's, and a retry reuses its seq.
+      const processOn = (race: Race, options: { version?: string; startSeq?: number } = {}) => {
+        const version = options.version ?? LEDGER_CAPABLE_CLI_VERSION;
+        let seq = options.startSeq ?? 0;
+        let counted = 0;
+        let acked: { seq: number; components: ReturnType<typeof tokens> } | undefined;
+        let inFlight: { seq: number; components: ReturnType<typeof tokens>; previous?: unknown } | undefined;
+
+        const bodyFor = (delta: number) => ({
+          seq: seq + 1,
+          components: tokens(delta),
+          ...(acked ? { previous: { seq: acked.seq, components: acked.components, counted: tokens(counted) } } : {}),
+        });
+        const settle = (body: { seq: number; components: ReturnType<typeof tokens> }, reply: { last_seq: number }) => {
+          counted += body.components.anthropic;
+          acked = { seq: body.seq, components: body.components };
+          seq = Math.max(body.seq, reply.last_seq);
+          inFlight = undefined;
+        };
+        return {
+          beat: async (delta: number) => {
+            const body = bodyFor(delta);
+            settle(body, await race.sendAs(version, body));
+          },
+          // The server applied the beat but the reply never arrived, so nothing is acked.
+          beatLosingReply: async (delta: number) => {
+            inFlight = bodyFor(delta);
+            await race.sendAs(version, inFlight);
+          },
+          // The same seq again, carrying whatever has been read since.
+          retry: async (delta: number) => {
+            const body = { ...inFlight!, components: tokens(delta) };
+            settle(body, await race.sendAs(version, body));
+          },
+        };
+      };
+
+      it('a racer who joins mid-race is credited for exactly what they produce', async () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const race = await raceOf();
+        const cli = processOn(race);
+        for (const delta of [100, 40, 0, 60]) await cli.beat(delta);
+
+        expect((await race.horse()).current_tokens).toBe(200);
+        expect(warn).not.toHaveBeenCalledWith('heartbeat ledger corrected', expect.anything());
+        warn.mockRestore();
+      });
+
+      it('a racer who joins before the start is credited from the gun, not for the wait', async () => {
+        const race = await raceOf();
+        await setRaceStartTime(race.race_id, new Date(Date.now() + 60 * 60 * 1000).toISOString());
+        const cli = processOn(race);
+        await cli.beat(0);
+        await cli.beat(0);
+        await setRaceStartTime(race.race_id, new Date(Date.now() - 60_000).toISOString());
+        await cli.beat(100);
+        await cli.beat(50);
+
+        expect((await race.horse()).current_tokens).toBe(150);
+      });
+
+      it('a racer who restarts the CLI keeps what they had and carries on cleanly', async () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const race = await raceOf();
+        const first = processOn(race);
+        await first.beat(100);
+        await first.beat(50);
+
+        const second = processOn(race, { startSeq: 2 });
+        await second.beat(70);
+        await second.beat(30);
+
+        expect((await race.horse()).current_tokens).toBe(250);
+        expect(warn).not.toHaveBeenCalledWith('heartbeat ledger corrected', expect.anything());
+        warn.mockRestore();
+      });
+
+      it('a racer who upgrades the CLI mid-race starts being checked without losing anything', async () => {
+        const race = await raceOf();
+        await race.sendAs(CURRENT_CLI_VERSION, { seq: 1, components: tokens(100) });
+        await race.sendAs(CURRENT_CLI_VERSION, { seq: 2, components: tokens(50) });
+        expect((await race.stored())?.ledger_base).toBeUndefined();
+
+        const upgraded = processOn(race, { startSeq: 2 });
+        await upgraded.beat(70);
+        await upgraded.beat(30);
+
+        expect((await race.horse()).current_tokens).toBe(250);
+        expect((await race.stored())?.ledger_base).toEqual({ anthropic: 150, openai: 0, google: 0 });
+      });
+
+      it('a racer who drops back to an older CLI and upgrades again is checked afresh, without losing anything', async () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const race = await raceOf();
+        const before = processOn(race);
+        await before.beat(100);
+        await race.sendAs(CURRENT_CLI_VERSION, { seq: 2, components: tokens(40) });
+
+        const after = processOn(race, { startSeq: 2 });
+        await after.beat(10);
+        await after.beat(5);
+
+        expect((await race.horse()).current_tokens).toBe(155);
+        expect(warn).not.toHaveBeenCalledWith('heartbeat ledger corrected', expect.anything());
+        warn.mockRestore();
+      });
+
+      it('a beat whose reply was lost is not counted twice, and what grew before the retry is not lost', async () => {
+        const race = await raceOf();
+        const cli = processOn(race);
+        await cli.beat(100);
+        await cli.beatLosingReply(40);
+        await cli.retry(55);   // the server already has this seq, but 15 more has been read since
+        await cli.beat(10);
+
+        expect((await race.horse()).current_tokens).toBe(165);   // 100 + 55 + 10
+      });
+
+      it('a racer with an older-format model_tokens row keeps their tokens', async () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const race = await raceOf();
+        await ddb.send(new UpdateCommand({
+          TableName: TABLE,
+          Key: horseKey(race.race_id, race.horse_id),
+          UpdateExpression: 'SET model_tokens = :old, current_tokens = :t, scored_tokens = :t',
+          ExpressionAttributeValues: { ':old': { claude: 700, codex: 300, gemini: 0 }, ':t': 1000 },
+        }));
+        const cli = processOn(race);
+        await cli.beat(100);
+        await cli.beat(50);
+        await cli.beat(25);
+
+        expect((await race.horse()).current_tokens).toBe(1_175);
+        expect(warn).not.toHaveBeenCalledWith('heartbeat ledger corrected', expect.anything());
+        warn.mockRestore();
+      });
+
+      // Seeded, so a failure names the seed that reproduces it.
+      const seeded = (seed: number) => {
+        let state = seed >>> 0;
+        return () => {
+          state = (state * 1664525 + 1013904223) >>> 0;
+          return state / 2 ** 32;
+        };
+      };
+
+      it('a racer whose replies go missing, whose retries grow, and who restarts is still credited exactly', async () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        for (let seed = 1; seed <= 12; seed += 1) {
+          const random = seeded(seed);
+          const between = (low: number, high: number) => low + Math.floor(random() * (high - low + 1));
+          const race = await raceOf();
+          let cli = processOn(race);
+          let produced = 0;
+          let sent = 0;
+          const beatEverything = async () => {
+            const delta = produced - sent;
+            await cli.beat(delta);
+            sent += delta;
+          };
+
+          for (let step = 0; step < 25; step += 1) {
+            produced += between(0, 400);
+            const roll = random();
+            if (roll < 0.7) {
+              await beatEverything();
+            } else if (roll < 0.85) {
+              await cli.beatLosingReply(produced - sent);
+              produced += between(0, 60);
+              const grown = produced - sent;
+              await cli.retry(grown);
+              sent += grown;
+            } else {
+              await beatEverything();
+              cli = processOn(race, { startSeq: (await race.stored())!.last_seq });
+            }
+          }
+          await beatEverything();
+          await cli.beat(0);   // a correction lands with the beat after the one it repairs
+
+          expect(`seed ${seed}: ${(await race.horse()).current_tokens}`).toBe(`seed ${seed}: ${produced}`);
+        }
+        warn.mockRestore();
+      }, 60_000);
+
+      // Two processes racing for each seq drop each other's beats, which loses work with or
+      // without the ledger. It is only asked here not to make that worse.
+      it('two processes on one horse are never further from the real total than without the check', async () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const runSchedule = async (seed: number, version: string) => {
+          const random = seeded(seed);
+          const race = await raceOf(version);
+          const first = processOn(race, { version });
+          let produced = 100;
+          let firstSent = 100;
+          await first.beat(100);
+          const second = processOn(race, { version, startSeq: 1 });
+          let secondSent = 0;
+          for (let step = 0; step < 12; step += 1) {
+            produced += Math.floor(random() * 300);
+            const order = random() < 0.5 ? [first, second] : [second, first];
+            for (const cli of order) {
+              if (random() < 0.15) continue;   // this process skips the tick
+              const sentSoFar = cli === first ? firstSent : secondSent;
+              const delta = produced - sentSoFar;
+              await cli.beat(delta);
+              if (cli === first) firstSent += delta; else secondSent += delta;
+            }
+          }
+          return Math.abs((await race.horse()).current_tokens - produced);
+        };
+
+        for (let seed = 1; seed <= 12; seed += 1) {
+          const withCheck = await runSchedule(seed, LEDGER_CAPABLE_CLI_VERSION);
+          const without = await runSchedule(seed, CURRENT_CLI_VERSION);
+          expect(`seed ${seed}: ${withCheck <= without}`).toBe(`seed ${seed}: true`);
+        }
+        warn.mockRestore();
+      }, 60_000);
+
+      const endRace = (race: Race) => setRaceEndTime(race.race_id, new Date(Date.now() - 1_000).toISOString());
+
+      it('a beat that arrives after the race has ended applies nothing and leaves the check as it was', async () => {
+        const race = await raceOf();
+        const cli = processOn(race);
+        await cli.beat(100);
+        await cli.beat(50);
+        const baseBefore = (await race.stored())?.ledger_base;
+
+        await endRace(race);
+        const reply = await race.send({ seq: 3, components: tokens(70), previous: { seq: 2, components: tokens(50), counted: tokens(150) } });
+
+        expect(reply.race_status).toBe('finished');
+        expect((await race.horse()).current_tokens).toBe(150);
+        expect((await race.stored())?.ledger_base).toEqual(baseBefore);
+      });
+
+      it('a correction made on the last live beat is what the final standings are built from', async () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const race = await raceOf();
+        await race.send({ seq: 1, components: tokens(100) });
+        await race.plantForeignBeat(2, 5_000);
+        await race.send({ seq: 3, components: tokens(50), previous: { seq: 2, components: tokens(30), counted: tokens(130) } });
+
+        await endRace(race);
+        await race.send({ seq: 4, components: tokens(10), previous: { seq: 3, components: tokens(50), counted: tokens(180) } });
+
+        const horse = await race.horse();
+        expect(horse.current_tokens).toBe(180);
+        expect(horse.final_tokens).toBe(180);
+        expect(horse.final_scored_tokens).toBe(180);
+        warn.mockRestore();
+      });
+
+      it('a stray call after the last accepted beat stands in the final standings, because nothing is checked once the race is over', async () => {
+        const race = await raceOf();
+        const cli = processOn(race);
+        await cli.beat(100);
+        await race.plantForeignBeat(2, 5_000);
+
+        await endRace(race);
+        await race.send({ seq: 2, components: tokens(30), previous: { seq: 1, components: tokens(100), counted: tokens(100) } });
+
+        expect((await race.horse()).final_tokens).toBe(5_100);
+      });
+
+      it('a beat that lands after the race has been finalised changes no total', async () => {
+        const race = await raceOf();
+        const cli = processOn(race);
+        await cli.beat(100);
+        await endRace(race);
+        await race.send({ seq: 2, components: tokens(10), previous: { seq: 1, components: tokens(100), counted: tokens(100) } });
+        const finalised = await race.horse();
+
+        await race.send({ seq: 3, components: tokens(500), previous: { seq: 2, components: tokens(10), counted: tokens(110) } });
+
+        const after = await race.horse();
+        expect(after.current_tokens).toBe(finalised.current_tokens);
+        expect(after.final_tokens).toBe(finalised.final_tokens);
+      });
+
+      it('two processes on one horse, in step and reading the same work, are credited for it once', async () => {
+        const race = await raceOf();
+        const first = processOn(race);
+        await first.beat(100);
+        const second = processOn(race, { startSeq: 1 });
+        for (let tick = 0; tick < 4; tick += 1) {
+          await first.beat(100);
+          await second.beat(100);
+        }
+        // The real work is 500. Each tick the slower process's beat meets a seq already taken
+        // and is dropped, so only one process's reading of it lands. Timing that interleaves
+        // them differently is not covered.
+        expect((await race.horse()).current_tokens).toBe(500);
+      });
     });
   });
 

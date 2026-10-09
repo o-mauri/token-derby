@@ -73,6 +73,8 @@ Resuming or forking a Claude Code session copies the original's history into a n
 
 Nothing counts before a race has started.
 
+Each heartbeat also restates the one before it, along with your running total. The server checks that against what it applied and corrects any difference in the same update. Tokens it holds that your CLI never counted, from a call that didn't come from it, are removed. Tokens your CLI counted that never landed are given back, up to what that one beat claimed. The check starts again from scratch whenever the CLI restarts.
+
 ## Stamina
 
 Some races turn on stamina. Push a horse far above a sustainable pace and it tires — its tokens still count, but at a fraction of face value until it recovers. A normal working pace never triggers this; stamina only bites once you're running well past what the race considers sustainable.
