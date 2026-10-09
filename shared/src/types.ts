@@ -120,6 +120,8 @@ export type Race = {
   // already running when the map replaced it. Never written.
   stamina?: boolean;
   stamina_config?: StaminaConfig;
+  // 0–1 multiplier applied to fresh-input tokens before scoring. Absent = 1 (full weight).
+  input_weight?: number;
 };
 
 export type HorseView = Horse & {

@@ -163,7 +163,7 @@ export async function joinCommand(joinCode: string | undefined, argv: string[] =
   };
   await saveActiveRace(active);
 
-  const initial = await buildInitialState({ active, raceStatus: status, serverLastSeq: ownHorse?.last_seq ?? 0 });
+  const initial = await buildInitialState({ active, raceStatus: status, serverLastSeq: ownHorse?.last_seq ?? 0, inputWeight: race.input_weight });
   for (const d of initial.degraded) {
     console.warn(`⚠ ${d.label} couldn't be read (${d.message}). Nothing from it counts until it can be read, and from then on only new usage counts.`);
   }
