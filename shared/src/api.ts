@@ -29,10 +29,19 @@ export type JoinRaceResponse = {
   heartbeat_token: string;
 };
 
+// The CLI's account of its previous beat, sent with the next one so the server can
+// check it against what it applied. Absent on a process's first beat.
+export type HeartbeatLedger = {
+  seq: number;                             // the previous beat's seq
+  components: Record<string, number>;      // that beat's per-family tokens, as the CLI sent them
+  counted: Record<string, number>;         // the CLI's running total per family through that beat
+};
+
 export type HeartbeatRequest = {
   seq: number;
   components?: Record<string, number>;     // per-family deltas (each ≥ 0); legacy keys accepted
   delta?: number;                         // legacy single delta (pre-multi-model CLIs)
+  previous?: HeartbeatLedger;
 };
 
 export type HeartbeatResponse = {

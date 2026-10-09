@@ -1,4 +1,4 @@
-import { PutCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
+import { GetCommand, PutCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
 import { ddb, TABLE } from './client.js';
 import { seriesPointKey, seriesPointPrefix, RACE_PK_PREFIX } from './keys.js';
 import type { SeriesPoint } from '@token-derby/shared';
@@ -38,6 +38,33 @@ export async function appendSeriesPoint(
   } catch (e: any) {
     if (e?.name !== 'ConditionalCheckFailedException') throw e;
   }
+}
+
+// Restate one beat's point by a signed amount, keeping the chart's total equal to
+// the horse's. A beat the server never applied has no point, so one is made. The
+// result never goes below zero, so a point cannot plot negative pace.
+export async function adjustSeriesPoint(
+  race_id: string,
+  horse_id: string,
+  seq: number,
+  adjustment: { d: number; s: number; now: number },
+): Promise<void> {
+  const key = seriesPointKey(race_id, horse_id, seq);
+  const { Item } = await ddb.send(new GetCommand({ TableName: TABLE, Key: key }));
+  const existing = Item ? readPoint(Item) : undefined;
+  const t = existing?.t ?? adjustment.now;
+  const d = Math.max(0, (existing?.d ?? 0) + adjustment.d);
+  const s = Math.max(0, (existing?.s ?? existing?.d ?? 0) + adjustment.s);
+  await ddb.send(new PutCommand({
+    TableName: TABLE,
+    Item: {
+      ...key,
+      t,
+      d,
+      ...(s !== d ? { s } : {}),
+      ttl: Math.floor((t + SERIES_RETENTION_MS) / 1000),
+    },
+  }));
 }
 
 export async function listSeriesPoints(race_id: string, horse_id: string): Promise<SeriesPoint[]> {

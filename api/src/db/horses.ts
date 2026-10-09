@@ -139,6 +139,9 @@ export type HorseHeartbeatRecord = {
   last_heartbeat: string;
   last_seq: number;
   model_tokens?: Record<ModelFamily, number>;
+  // What the CLI's own running total is measured from; see heartbeat-ledger.ts.
+  // Absent on a horse that has not yet beaten since the ledger existed.
+  ledger_base?: Record<ModelFamily, number>;
   live_xp: number;
   last_rank: number | undefined;
   racer_streak_ms: number;
@@ -172,6 +175,7 @@ export async function getHorseForHeartbeat(
     last_heartbeat: String(Item.last_heartbeat ?? ''),
     last_seq: Number(Item.last_seq ?? 0),
     model_tokens: Item.model_tokens as Record<ModelFamily, number> | undefined,
+    ledger_base: Item.ledger_base as Record<ModelFamily, number> | undefined,
     live_xp: Number(Item.live_xp ?? 0),
     last_rank: Item.last_rank == null ? undefined : Number(Item.last_rank),
     racer_streak_ms: Number(Item.racer_streak_ms ?? 0),
@@ -281,6 +285,9 @@ export type ApplyHeartbeatDeltaInput = {
   // This beat's applied delta split by source. Sums to `applied`, and is written
   // in the same conditional update so the split can never drift from the total.
   components: Record<ModelFamily, number>;
+  // The base the NEXT beat's ledger check measures from. Written in the same
+  // update as the totals so the two can never disagree. Omitted to leave it as it is.
+  ledger_base?: Record<ModelFamily, number>;
   // True only on a horse's first-ever apply, or on the first apply after the
   // harness/family rename. Skips the redundant seed round-trips on later beats.
   needsSeed: boolean;
@@ -292,7 +299,7 @@ export type ApplyHeartbeatDeltaInput = {
 // advances last_seq ONLY when the incoming seq is newer. Returns false (no
 // mutation) for a duplicate/out-of-order seq.
 export async function applyHeartbeatDelta(input: ApplyHeartbeatDeltaInput): Promise<boolean> {
-  const { race_id, horse_id, seq, applied, scored_applied, modifier_states, last_heartbeat, state, components, needsSeed, legacyModelTokens } = input;
+  const { race_id, horse_id, seq, applied, scored_applied, modifier_states, last_heartbeat, state, components, ledger_base, needsSeed, legacyModelTokens } = input;
   if (needsSeed) await Promise.all([seedScoredTokens(race_id, horse_id), seedModelTokens(race_id, horse_id, legacyModelTokens)]);
 
   const eav: Record<string, unknown> = {
@@ -322,6 +329,10 @@ export async function applyHeartbeatDelta(input: ApplyHeartbeatDeltaInput): Prom
   const removeParts: string[] = [];
   const addParts = ['current_tokens :applied', 'scored_tokens :sapplied'];
   eav[':sapplied'] = scored_applied;
+  if (ledger_base) {
+    setParts.push('ledger_base = :lb');
+    eav[':lb'] = ledger_base;
+  }
 
   // ADD is documented as top-level only, so the nested counters use arithmetic.
   // DynamoDB Local accepts `ADD model_tokens.claude` but the real service does
@@ -380,7 +391,7 @@ export async function applyHeartbeatDelta(input: ApplyHeartbeatDeltaInput): Prom
 function pickHorse(item: Record<string, any>): Horse {
   const horse_id = parseHorseId(item.sk);
   if (!horse_id) throw new Error(`not a horse item: ${item.sk}`);
-  const { pk: _pk, sk: _sk, heartbeat_token: _hb, stamina: _stam, ...rest } = item;
+  const { pk: _pk, sk: _sk, heartbeat_token: _hb, stamina: _stam, ledger_base: _lb, ...rest } = item;
   const modifier_states = readModifierStates(item);
   return { ...rest, horse_id, ...(modifier_states ? { modifier_states } : {}) } as Horse;
 }

@@ -23,7 +23,7 @@ export function setReadChunkBytesForTests(bytes: number | null): void {
 
 // Bump whenever the meaning of a folded value changes (e.g. which usage fields
 // count), so entries written by older logic are discarded rather than trusted.
-const CACHE_VERSION = 3;
+const CACHE_VERSION = 4;
 
 /** How a source turns appended lines into its running per-file value. */
 export type FileFold<T> = {

@@ -1,16 +1,17 @@
 import type { ApiHandler } from '../lib/http.js';
 import type { HeartbeatRequest, HeartbeatResponse } from '@token-derby/shared';
-import { minorMatches, MIDRACE_THRESHOLDS, MODEL_FAMILIES, scoreTick, scoredOf, zeroPerFamily, type ModelFamily } from '@token-derby/shared';
+import { minorMatches, MIDRACE_THRESHOLDS, MODEL_FAMILIES, scoreTick, scoredOf, totalFor, zeroPerFamily, type ModelFamily } from '@token-derby/shared';
 import { getRaceByJoinCode } from '../db/races.js';
 import { getHorseForHeartbeat, applyHeartbeatDelta, listHorses } from '../db/horses.js';
-import { appendSeriesPoint } from '../db/series.js';
+import { adjustSeriesPoint, appendSeriesPoint } from '../db/series.js';
 import { evaluateAchievements } from '../lib/evaluate-achievements.js';
 import { computeStatus, timeLeftSeconds } from '../lib/status.js';
 import { resolveHeartbeatDelta, capBeat } from '../lib/heartbeat-delta.js';
+import { nextLedgerBase, reconcileLedger, resolveLedger } from '../lib/heartbeat-ledger.js';
 import { rankHorses } from '../lib/rank-horses.js';
 import { finaliseRace } from '../lib/finalise-race.js';
 import { ok, err, parseJson } from '../lib/http.js';
-import { readCliVersion, meetsMinimumCliVersion, versionMismatchMessage } from '../lib/version.js';
+import { readCliVersion, meetsMinimumCliVersion, sendsLedger, versionMismatchMessage } from '../lib/version.js';
 
 export const handler: ApiHandler = async (event) => {
   const join_code = event.pathParameters?.join_code;
@@ -68,16 +69,46 @@ export const handler: ApiHandler = async (event) => {
       const prevMs = Date.parse(horse.last_heartbeat);
       return Number.isFinite(prevMs) ? now.getTime() - prevMs : 0;
     })();
+    // Nothing scores before the gun. The CLI already holds its anchors still until
+    // then, so this only stops a client that doesn't from banking a head start. The
+    // beat still lands, or last_heartbeat would be stale when the race goes live and
+    // the first live beat would count the whole wait as elapsed time.
+    const beforeStart = race_status === 'pending';
+    const claimed = beforeStart ? { total: 0, components: zeroPerFamily() } : resolved;
+    if (beforeStart && resolved.total > 0) {
+      console.warn('heartbeat claimed tokens before the race started', {
+        race_id: race.race_id, horse_id, seq: body.seq, cli_version: caller_version, claimed: resolved.total,
+      });
+    }
     // A sanity cap only: anything one beat claims above it is thrown away and logged.
-    const capped = capBeat(resolved);
+    const capped = capBeat(claimed);
     if (capped.discarded > 0) {
       console.warn('heartbeat over per-beat cap', {
-        race_id: race.race_id, horse_id, seq: body.seq,
+        race_id: race.race_id, horse_id, seq: body.seq, cli_version: caller_version,
         claimed: resolved.total, applied: capped.total, discarded: capped.discarded,
       });
     }
     const applied = capped.total;
     const appliedComponents = capped.components;
+
+    // The CLI restates its previous beat and its running total. Whatever the server
+    // holds that it does not (a call that did not come from it), or the reverse, is
+    // corrected here, in the same write as this beat. Before the gun nothing is
+    // applied, so there is nothing to check.
+    // An older CLI sends no ledger, so it is neither checked nor given a base. From
+    // the version that does, a beat without a usable `previous` is a process's first,
+    // and the check starts from it.
+    const checksLedger = sendsLedger(caller_version);
+    const ledger = checksLedger ? resolveLedger(body.previous) : null;
+    const modelTokensBefore = hasFamilyKeys(horse.model_tokens) ? horse.model_tokens! : zeroPerFamily();
+    const { drift, fix } = reconcileLedger({
+      ledger: beforeStart ? null : ledger,
+      modelTokens: modelTokensBefore,
+      ledgerBase: horse.ledger_base,
+    });
+    const fixTotal = totalFor(fix);
+    const corrected = MODEL_FAMILIES.some(family => fix[family] !== 0);
+
     const allHorsesBefore = await listHorses(race.race_id);
     const scoring = scoreTick({
       delta: applied,
@@ -92,14 +123,19 @@ export const handler: ApiHandler = async (event) => {
       field: allHorsesBefore,
     });
     const scoredApplied = scoring.scored_delta;
-    const newTokens = prevTokens + applied;
-    const newScored = scoredOf(horse) + scoredApplied;
+    // A correction is not work done this beat, so it earns no XP and triggers no
+    // achievement. It scales by the horse's own scored-to-raw ratio.
+    const scoredRatio = horse.current_tokens > 0 ? scoredOf(horse) / horse.current_tokens : 1;
+    const scoredAfterBeat = scoredOf(horse) + scoredApplied;
+    const scoredFix = Math.max(-scoredAfterBeat, Math.round(fixTotal * scoredRatio));
+    const newTokens = prevTokens + applied + fixTotal;
+    const newScored = scoredAfterBeat + scoredFix;
 
     // Project the per-model split forward too, or the response would report the
     // split one beat behind the total it is supposed to add up to.
     const prevModelTokens = horse.model_tokens ?? zeroPerFamily();
     const newModelTokens = Object.fromEntries(
-      MODEL_FAMILIES.map(k => [k, (prevModelTokens[k] ?? 0) + appliedComponents[k]]),
+      MODEL_FAMILIES.map(k => [k, (prevModelTokens[k] ?? 0) + appliedComponents[k] + fix[k]]),
     ) as Record<ModelFamily, number>;
     const updatedHorses = allHorsesBefore.map(h =>
       h.horse_id === horse_id
@@ -139,7 +175,7 @@ export const handler: ApiHandler = async (event) => {
       },
       now_ms: now.getTime(),
       last_heartbeat_at_ms: lastHeartbeatMs,
-      scored_tokens: newScored,
+      scored_tokens: scoredAfterBeat,
       prev_scored_tokens: scoredOf(horse),
       new_rank: ownRanked.rank,
       total_horses: ranked.length,
@@ -148,14 +184,27 @@ export const handler: ApiHandler = async (event) => {
     });
 
     const didApply = await applyHeartbeatDelta({
-      race_id: race.race_id, horse_id, seq: body.seq, applied, scored_applied: scoredApplied,
+      race_id: race.race_id, horse_id, seq: body.seq, applied: applied + fixTotal, scored_applied: scoredApplied + scoredFix,
       modifier_states: scoring.modifier_states, last_heartbeat: now.toISOString(), state: evalResult.next,
-      components: appliedComponents,
+      components: Object.fromEntries(MODEL_FAMILIES.map(k => [k, appliedComponents[k] + fix[k]])) as Record<ModelFamily, number>,
+      // A row still in the older harness-key spelling is carried across by this very
+      // write, so the totals projected here are short by whatever it holds. A base
+      // taken from them would read that as drift on the next beat, so it waits.
+      ...(checksLedger && hasFamilyKeys(horse.model_tokens)
+        ? { ledger_base: nextLedgerBase({ modelTokensAfter: newModelTokens, ledger, claimed: resolved.components }) }
+        : {}),
       needsSeed: horse.scored_tokens === undefined || !hasFamilyKeys(horse.model_tokens),
       ...(horse.model_tokens && !hasFamilyKeys(horse.model_tokens) ? { legacyModelTokens: horse.model_tokens } : {}),
     });
 
     if (didApply) {
+      if (corrected && ledger) {
+        console.warn('heartbeat ledger corrected', {
+          race_id: race.race_id, horse_id, seq: body.seq, cli_version: caller_version, previous_seq: ledger.seq,
+          drift, applied_fix: fix, scored_fix: scoredFix,
+        });
+        await adjustSeriesPoint(race.race_id, horse_id, ledger.seq, { d: fixTotal, s: scoredFix, now: now.getTime() });
+      }
       if (applied > 0) {
         // `s` only when a mechanic changed the beat: on a race running none it
         // would repeat `d` on every point, for every horse, forever.

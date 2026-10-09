@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { claudeCode } from '../../src/tokens/harnesses/claude-code/index.js';
+import { claudeCode, setBirthLookupForTests } from '../../src/tokens/harnesses/claude-code/index.js';
 import { totalOf } from './harnesses/helpers.js';
 
 const dirs: string[] = [];
@@ -16,8 +16,11 @@ beforeEach(async () => {
   const h = await fs.mkdtemp(path.join(os.tmpdir(), 'td-dup-home-'));
   dirs.push(h);
   process.env.TOKEN_DERBY_HOME = h;
+  // Fixtures are dated in the past but written now, which would read as a fork.
+  setBirthLookupForTests(async () => undefined);
 });
 afterEach(async () => {
+  setBirthLookupForTests(null);
   delete process.env.TOKEN_DERBY_CLAUDE_DIR;
   delete process.env.TOKEN_DERBY_HOME;
   for (const d of dirs.splice(0)) await fs.rm(d, { recursive: true, force: true });

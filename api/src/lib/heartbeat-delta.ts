@@ -4,6 +4,20 @@ function finiteNonNeg(v: unknown): number {
   return typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : 0;
 }
 
+/**
+ * A client's per-family numbers keyed by family, whichever spelling it sent.
+ * A key naming no family we score is ignored, and a negative or non-finite value
+ * counts as zero.
+ */
+export const resolvePerFamily = (raw: Record<string, number>): Record<ModelFamily, number> => {
+  const resolved = zeroPerFamily();
+  for (const [key, value] of Object.entries(raw)) {
+    const family = familyForKey(key);
+    if (family) resolved[family] += finiteNonNeg(value);
+  }
+  return resolved;
+};
+
 /** A heartbeat's delta, split by model family. `components` always sums to `total`. */
 export type ResolvedDelta = {
   total: number;
@@ -28,11 +42,7 @@ export function resolveHeartbeatDelta(
   body: { delta?: number; components?: Record<string, number> },
 ): ResolvedDelta | null {
   if (body.components && typeof body.components === 'object') {
-    const components = zeroPerFamily();
-    for (const [key, value] of Object.entries(body.components)) {
-      const family = familyForKey(key);
-      if (family) components[family] += finiteNonNeg(value);
-    }
+    const components = resolvePerFamily(body.components);
     return { total: totalFor(components), components };
   }
   if (typeof body.delta === 'number' && Number.isFinite(body.delta) && body.delta >= 0) {
