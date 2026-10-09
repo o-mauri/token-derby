@@ -84,8 +84,8 @@ function emptyByFamily(): Record<ModelFamily, Map<string, number>> {
 }
 
 /** Collapse a conversation's totals to a single number. */
-export function scoreFor(t: TokenTotals): number {
-  return t.input + t.output;
+export function scoreFor(t: TokenTotals, inputWeight = 1): number {
+  return Math.round(t.input * inputWeight) + t.output;
 }
 
 /**
@@ -102,7 +102,7 @@ export function scoreFor(t: TokenTotals): number {
  * machines have every tool installed, so an absent root counts as zero and earns
  * no warning.
  */
-export async function readAllSources(progress?: ScanProgress): Promise<BeatReading> {
+export async function readAllSources(progress?: ScanProgress, inputWeight = 1): Promise<BeatReading> {
   // Read per beat, not at join: toggling a harness takes effect on the next
   // heartbeat rather than needing a restart. A disabled harness is never
   // scanned at all, so this doubles as the escape hatch for a history large
@@ -134,7 +134,7 @@ export async function readAllSources(progress?: ScanProgress): Promise<BeatReadi
     }
     readCleanly.push(outcome.key);
     unreadable.push(...(outcome.result.unreadable ?? []));
-    mergeInto(byFamily, outcome.result);
+    mergeInto(byFamily, outcome.result, inputWeight);
     for (const notice of outcome.result.notices) notices.add(notice);
   }
   return { byFamily, degraded, notices: [...notices], readCleanly, unreadable };
@@ -144,11 +144,11 @@ export async function readAllSources(progress?: ScanProgress): Promise<BeatReadi
  * Fold one harness's contribution into the shared per-family maps. Several
  * harnesses can feed the same family, which is the whole point of the split.
  */
-function mergeInto(byFamily: Record<ModelFamily, Map<string, number>>, result: CountResult): void {
+function mergeInto(byFamily: Record<ModelFamily, Map<string, number>>, result: CountResult, inputWeight = 1): void {
   for (const family of MODEL_FAMILIES) {
     const conversations = result.byFamily.get(family);
     if (!conversations) continue;
     const target = byFamily[family];
-    for (const [id, totals] of conversations) target.set(id, scoreFor(totals));
+    for (const [id, totals] of conversations) target.set(id, scoreFor(totals, inputWeight));
   }
 }

@@ -55,8 +55,19 @@ afterEach(async () => {
 });
 
 describe('scoreFor', () => {
-  it('sums input and output', () => {
+  it('sums input and output at full weight by default', () => {
     expect(scoreFor({ input: 100, output: 20 })).toBe(120);
+    expect(scoreFor({ input: 1000, output: 500 })).toBe(1500);
+    expect(scoreFor({ input: 1000, output: 500 }, 1)).toBe(1500);
+  });
+
+  it('scales input by the given weight', () => {
+    expect(scoreFor({ input: 100, output: 20 }, 0.2)).toBe(40);
+    expect(scoreFor({ input: 1000, output: 500 }, 0.5)).toBe(1000);
+  });
+
+  it('rounds weighted input to avoid fractional tokens', () => {
+    expect(scoreFor({ input: 33, output: 10 }, 0.3)).toBe(20);
   });
 });
 

@@ -33,6 +33,7 @@ export function RunRace({ active, initialState, pendingMode, ownUserName }: RunR
 
   const trackerRef = useRef(new RaceScoreTracker(initialState));
   const pendingRef = useRef(pendingMode);
+  const inputWeightRef = useRef(parseFloat(process.env.TOKEN_DERBY_INPUT_WEIGHT ?? '1'));
   const ctrl = useRef(new AbortController());
   const [stalled, setStalled] = useState(false);
   const [stallReason, setStallReason] = useState<string | null>(null);
@@ -62,7 +63,7 @@ export function RunRace({ active, initialState, pendingMode, ownUserName }: RunR
       const progress = new ScanProgress();
       try {
         return await scanWithTimeout(
-          () => readAllSources(progress),
+          () => readAllSources(progress, inputWeightRef.current),
           SCAN_TIMEOUT_MS,
           () => diagnoseScanTimeout(SCAN_TIMEOUT_MS, progress),
         );
@@ -104,6 +105,7 @@ export function RunRace({ active, initialState, pendingMode, ownUserName }: RunR
         setLastHbAt(new Date());
         setLastHbOk(true);
         setRace(raceViewFrom(resp));
+        inputWeightRef.current = resp.race.input_weight ?? parseFloat(process.env.TOKEN_DERBY_INPUT_WEIGHT ?? '1');
         const own = resp.horses.find(h => h.horse_id === active.horse_id);
         const candidates = (own?.recent_events ?? []).filter(e => e.at > shownAchievementAtRef.current);
         if (candidates.length > 0) {
@@ -205,10 +207,12 @@ export async function buildInitialState(args: {
   active: ActiveRace;
   raceStatus: 'pending' | 'live';
   serverLastSeq: number;
+  inputWeight?: number;
 }): Promise<{ initialState: RaceScoreState; pendingMode: boolean; degraded: DegradedSource[] }> {
   // Anchors always come from a fresh scan, never from the persisted state — that
   // is what stops a rejoin counting the player's whole transcript history.
-  const now = await readAllSources().catch(() => null);
+  const iw = args.inputWeight ?? parseFloat(process.env.TOKEN_DERBY_INPUT_WEIGHT ?? '1');
+  const now = await readAllSources(undefined, iw).catch(() => null);
   return {
     initialState: joinState(now, args.serverLastSeq),
     pendingMode: args.raceStatus === 'pending',
