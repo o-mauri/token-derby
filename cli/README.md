@@ -67,7 +67,11 @@ The CLI sums `message.usage.output_tokens` across every `*.jsonl` under `~/.clau
 
 If a tool's history can't be read when you join (or you turn a tool on mid-race), nothing from it counts until it can be read, and from then on only new usage counts, so a recovered tool never adds its past history in one go. A single unreadable transcript is skipped and named in the status view; the rest of that tool still counts. One heartbeat can add at most 5,000,000 tokens; the server throws away anything above that.
 
-Races can optionally also count *fresh input tokens* — i.e. `input_tokens + cache_creation_input_tokens` (your new context this turn) in addition to output. `cache_read_input_tokens` is never counted, since those reflect passive context size rather than work. The race creator opts in at `token-derby create` time; thresholds for Stampede!, Pulled Away!, and the heartbeat rate cap scale 10× in these races so the achievement cadence stays comparable.
+Fresh input counts as well as output: `input_tokens + cache_creation_input_tokens`, the new context you send each turn. `cache_read_input_tokens` never counts, since it reflects passive context size rather than work.
+
+Resuming or forking a Claude Code session copies the original's history into a new transcript. Each request counts once across every transcript, and history older than the fork's own file is never counted for the fork, even if the original has been pruned since. That check uses the file's creation time, so on a platform that doesn't report one the CLI falls back to counting each request once.
+
+Nothing counts before a race has started.
 
 ## Stamina
 

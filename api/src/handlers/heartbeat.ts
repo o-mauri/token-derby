@@ -68,8 +68,19 @@ export const handler: ApiHandler = async (event) => {
       const prevMs = Date.parse(horse.last_heartbeat);
       return Number.isFinite(prevMs) ? now.getTime() - prevMs : 0;
     })();
+    // Nothing scores before the gun. The CLI already holds its anchors still until
+    // then, so this only stops a client that doesn't from banking a head start. The
+    // beat still lands, or last_heartbeat would be stale when the race goes live and
+    // the first live beat would count the whole wait as elapsed time.
+    const beforeStart = race_status === 'pending';
+    const claimed = beforeStart ? { total: 0, components: zeroPerFamily() } : resolved;
+    if (beforeStart && resolved.total > 0) {
+      console.warn('heartbeat claimed tokens before the race started', {
+        race_id: race.race_id, horse_id, seq: body.seq, claimed: resolved.total,
+      });
+    }
     // A sanity cap only: anything one beat claims above it is thrown away and logged.
-    const capped = capBeat(resolved);
+    const capped = capBeat(claimed);
     if (capped.discarded > 0) {
       console.warn('heartbeat over per-beat cap', {
         race_id: race.race_id, horse_id, seq: body.seq,

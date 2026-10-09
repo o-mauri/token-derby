@@ -23,6 +23,16 @@ async function setRaceEndTime(race_id: string, end_time: string) {
   }));
 }
 
+// Move a race's start, so a live race reads as not yet started (or started) without a real wait.
+async function setRaceStartTime(race_id: string, start_time: string) {
+  await ddb.send(new UpdateCommand({
+    TableName: TABLE,
+    Key: raceMetaKey(race_id),
+    UpdateExpression: 'SET start_time = :s',
+    ExpressionAttributeValues: { ':s': start_time },
+  }));
+}
+
 async function setup(cliVersion = CURRENT_CLI_VERSION) {
   const user = await makeUser('HB_User');
   const horse = await makeHorse(user, 'HB_Gary', COLORS);
@@ -170,6 +180,43 @@ describe('heartbeat handler', () => {
       race_id, horse_id, claimed: 30_405_384, applied: 5_000_000, discarded: 25_405_384,
     }));
     warn.mockRestore();
+  });
+
+  describe('when the race has not started', () => {
+    const FUTURE = () => new Date(Date.now() + 60 * 60 * 1000).toISOString();
+
+    it('applies nothing, but still records the beat', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const { join_code, race_id, horse_id, heartbeat_token } = await setup();
+      await setRaceStartTime(race_id, FUTURE());
+      const before = (await listHorses(race_id))[0]!;
+      await new Promise(resolve => setTimeout(resolve, 5));
+
+      const res: any = await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { seq: 1, delta: 750_000 }));
+      const horse = (await listHorses(race_id))[0]!;
+
+      expect(JSON.parse(res.body).race_status).toBe('pending');
+      expect(horse.current_tokens).toBe(0);
+      expect(horse.scored_tokens).toBe(0);
+      expect(horse.model_tokens?.anthropic).toBe(0);
+      expect(horse.last_seq).toBe(1);
+      expect(Date.parse(horse.last_heartbeat)).toBeGreaterThan(Date.parse(before.last_heartbeat));
+      expect(warn).toHaveBeenCalledWith('heartbeat claimed tokens before the race started', expect.objectContaining({
+        race_id, horse_id, claimed: 750_000,
+      }));
+      warn.mockRestore();
+    });
+
+    it('scores normally once the race has started', async () => {
+      const { join_code, race_id, horse_id, heartbeat_token } = await setup();
+      await setRaceStartTime(race_id, FUTURE());
+      await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { seq: 1, delta: 10_000 }));
+      await setRaceStartTime(race_id, new Date(Date.now() - 60_000).toISOString());
+
+      await hbHandler(hbEvent(join_code, horse_id, heartbeat_token, { seq: 2, delta: 300 }));
+
+      expect((await listHorses(race_id))[0]?.current_tokens).toBe(300);
+    });
   });
 
   it('dedups a resent seq (no double-apply)', async () => {
