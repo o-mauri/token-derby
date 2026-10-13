@@ -362,6 +362,29 @@ describe('heartbeat handler', () => {
       expect((await race.stored())?.ledger_base).toEqual({ anthropic: 100, openai: 0, google: 0 });
     });
 
+    it('cannot be used to add more than one request may, whatever the previous beat claims to have been', async () => {
+      const race = await raceOf();
+      await race.send({ seq: 1, components: tokens(100) });
+      await race.send({ seq: 2, components: tokens(10), previous: { seq: 1, components: tokens(1e12), counted: tokens(1e12) } });
+
+      const horse = await race.horse();
+      expect(horse.current_tokens).toBeLessThanOrEqual(100 + 5_000_000);
+      expect(horse.scored_tokens).toBeLessThanOrEqual(100 + 5_000_000);
+    });
+
+    it('treats a previous seq the horse has not reached as no ledger, so it cannot pre-empt a real beat\'s chart point', async () => {
+      const { listSeriesPoints } = await import('../../src/db/series.js');
+      const race = await raceOf();
+      await race.send({ seq: 1, components: tokens(100) });
+      await race.send({ seq: 2, components: tokens(10), previous: { seq: 5, components: tokens(500), counted: tokens(600) } });
+      for (const [seq, delta] of [[3, 1], [4, 1], [5, 7]] as const) await race.send({ seq, components: tokens(delta) });
+
+      const points = await listSeriesPoints(race.race_id, race.horse_id);
+      const plotted = points.reduce((sum, point) => sum + (point.s ?? point.d), 0);
+      expect(plotted).toBe((await race.horse()).scored_tokens);
+      expect((await race.horse()).current_tokens).toBe(119);
+    });
+
     it('keeps the base out of the horses it returns', async () => {
       const race = await raceOf();
       const body = await race.send({ seq: 1, components: tokens(100) });

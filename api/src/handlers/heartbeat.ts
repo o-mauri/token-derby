@@ -6,7 +6,7 @@ import { getHorseForHeartbeat, applyHeartbeatDelta, listHorses } from '../db/hor
 import { adjustSeriesPoint, appendSeriesPoint } from '../db/series.js';
 import { evaluateAchievements } from '../lib/evaluate-achievements.js';
 import { computeStatus, timeLeftSeconds } from '../lib/status.js';
-import { resolveHeartbeatDelta, capBeat } from '../lib/heartbeat-delta.js';
+import { resolveHeartbeatDelta, capBeat, MAX_RAW_TOKENS_PER_BEAT } from '../lib/heartbeat-delta.js';
 import { nextLedgerBase, reconcileLedger, resolveLedger } from '../lib/heartbeat-ledger.js';
 import { rankHorses } from '../lib/rank-horses.js';
 import { finaliseRace } from '../lib/finalise-race.js';
@@ -99,12 +99,14 @@ export const handler: ApiHandler = async (event) => {
     // the version that does, a beat without a usable `previous` is a process's first,
     // and the check starts from it.
     const checksLedger = sendsLedger(caller_version);
-    const ledger = checksLedger ? resolveLedger(body.previous) : null;
+    const ledger = checksLedger ? resolveLedger(body.previous, horse.last_seq) : null;
     const modelTokensBefore = hasFamilyKeys(horse.model_tokens) ? horse.model_tokens! : zeroPerFamily();
     const { drift, fix } = reconcileLedger({
       ledger: beforeStart ? null : ledger,
       modelTokens: modelTokensBefore,
       ledgerBase: horse.ledger_base,
+      // One request adds no more than the sanity cap, whichever way the tokens arrive.
+      headroom: MAX_RAW_TOKENS_PER_BEAT - applied,
     });
     const fixTotal = totalFor(fix);
     const corrected = MODEL_FAMILIES.some(family => fix[family] !== 0);

@@ -10,11 +10,17 @@ export type ResolvedLedger = {
   counted: PerFamily;
 };
 
-/** The ledger a heartbeat carries, or null when there is none or it is unusable. */
-export const resolveLedger = (raw: HeartbeatLedger | undefined): ResolvedLedger | null => {
+/**
+ * The ledger a heartbeat carries, or null when there is none or it is unusable.
+ *
+ * It restates a beat the CLI has already had answered, so its seq can be no higher
+ * than the last the server has applied for the horse. One beyond that names a beat
+ * that has not happened, and would be used to pre-empt the chart point of a real one.
+ */
+export const resolveLedger = (raw: HeartbeatLedger | undefined, lastAppliedSeq: number): ResolvedLedger | null => {
   if (!raw || typeof raw !== 'object') return null;
   const { seq, components, counted } = raw;
-  if (typeof seq !== 'number' || !Number.isFinite(seq) || seq < 1) return null;
+  if (typeof seq !== 'number' || !Number.isFinite(seq) || seq < 1 || seq > lastAppliedSeq) return null;
   if (!components || typeof components !== 'object' || !counted || typeof counted !== 'object') return null;
   return { seq, components: resolvePerFamily(components), counted: resolvePerFamily(counted) };
 };
@@ -37,7 +43,9 @@ export type Reconciliation = {
  * running total, which makes any difference between them tokens one side saw and
  * the other did not. The correction is bounded: it can remove no more than the
  * server holds, and give back no more than the previous beat claimed, so one
- * beat's check cannot rewrite a horse's history.
+ * beat's check cannot rewrite a horse's history. What it gives back also has to fit
+ * in `headroom`, the room this request has left under the per-beat sanity cap, since
+ * the previous beat's size is only the CLI's word and must not be a way round it.
  *
  * Nothing is checked without both a ledger and a base, which is a process's first
  * beat, a CLI that predates the ledger, or a horse from before the server did.
@@ -46,8 +54,9 @@ export const reconcileLedger = (input: {
   ledger: ResolvedLedger | null;
   modelTokens: PerFamily;
   ledgerBase: PerFamily | undefined;
+  headroom: number;
 }): Reconciliation => {
-  const { ledger, modelTokens, ledgerBase } = input;
+  const { ledger, modelTokens, ledgerBase, headroom } = input;
   const drift = zeroPerFamily();
   const fix = zeroPerFamily();
   if (!ledger || !ledgerBase) return { drift, fix };
@@ -58,6 +67,14 @@ export const reconcileLedger = (input: {
     fix[family] = drift[family] < 0
       ? -Math.min(-drift[family], Math.max(0, Math.min(held, modelTokens[family])))
       : Math.min(drift[family], ledger.components[family]);
+  }
+
+  const givenBack = MODEL_FAMILIES.reduce((sum, family) => sum + Math.max(0, fix[family]), 0);
+  if (givenBack > headroom) {
+    const scale = Math.max(0, headroom) / givenBack;
+    for (const family of MODEL_FAMILIES) {
+      if (fix[family] > 0) fix[family] = Math.floor(fix[family] * scale);
+    }
   }
   return { drift, fix };
 };
