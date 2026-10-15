@@ -79,7 +79,6 @@ describe('RaceTrack', () => {
       const line = el.querySelector<HTMLElement>('.nose-line')!;
       expect(line.style.getPropertyValue('--p')).toBe('30');
       expect(line.textContent?.trim()).toBe('2ND');
-      expect(el.querySelector('.lane-outline')).not.toBeNull();
 
       hit(el, 1).dispatchEvent(pointer('pointerleave'));
       await f.whenStable();

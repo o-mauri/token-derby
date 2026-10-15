@@ -23,17 +23,6 @@ $nose-offset: calc(var(--td-lane-height) * 0.8 * 32 / 24 * 0.36);
 $strip-width: calc(100% - var(--td-label-col) - 2 * var(--td-space-3));
 $nose-x: calc(var(--td-space-3) + var(--td-label-col) + $strip-width * var(--p) / 100 + $nose-offset);
 
-// Outlines the hovered horse's strip, past the name-tag column.
-.lane-outline {
-  position: absolute;
-  z-index: 2;
-  left: calc(var(--td-space-3) + var(--td-label-col));
-  right: var(--td-space-3);
-  border: var(--td-line) solid var(--td-coin);
-  border-radius: var(--td-radius);
-  pointer-events: none;
-}
-
 .nose-line {
   position: absolute;
   z-index: 2;

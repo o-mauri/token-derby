@@ -10,7 +10,7 @@ import type { LaneState, LaneView } from '../models';
 // Past this progress the card opens to the horse's left, so it stays on the track.
 const FLIP_AT = 55;
 
-type Geometry = { lineTop: number; lineHeight: number; rowTop: number; rowHeight: number; cardTop: number };
+type Geometry = { lineTop: number; lineHeight: number; cardTop: number };
 
 /** The field of lanes. Scrolls (and auto-bounces) when the field is taller than the screen.
  *  Hovering or tapping a horse shows its stats card and a line through every lane at its nose. */
@@ -27,7 +27,6 @@ type Geometry = { lineTop: number; lineHeight: number; rowTop: number; rowHeight
     }
     @if (inspected(); as l) {
       @let g = geometry();
-      <div class="lane-outline" [style.top.px]="g?.rowTop" [style.height.px]="g?.rowHeight"></div>
       <div class="nose-line" [style.--p]="inspectedProgress()" [style.top.px]="g?.lineTop" [style.height.px]="g?.lineHeight">
         <span class="flag">{{ flag() }}</span>
       </div>
@@ -80,7 +79,6 @@ export class RaceTrack {
         return {
           lineTop: first.offsetTop,
           lineHeight: lastEl.offsetTop + lastEl.offsetHeight - first.offsetTop,
-          rowTop: row.offsetTop, rowHeight: row.offsetHeight,
           cardTop: Math.max(top, Math.min(max, centre)),
         };
       },
