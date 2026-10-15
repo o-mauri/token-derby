@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest';
+import { readdirSync, statSync } from 'node:fs';
+import * as path from 'node:path';
 import { SITE_REWRITE_CODE } from '../lib/site-rewrite';
 
 type Req = { uri: string; cookies?: Record<string, { value: string }> };
@@ -36,5 +38,18 @@ describe('site rewrite', () => {
 
   it('copes with a request that has no cookies object', () => {
     expect(handler({ request: { uri: '/x' } }).uri).toBe('/index.html');
+  });
+
+  it('maps every built v2 asset to its v2/ key', () => {
+    const dist = path.resolve(__dirname, '..', '..', 'web', 'dist', 'site', 'browser');
+    const walk = (d: string, prefix: string): string[] =>
+      readdirSync(d).flatMap((e) => statSync(path.join(d, e)).isDirectory()
+        ? walk(path.join(d, e), `${prefix}/${e}`)
+        : [`${prefix}/${e}`]);
+    const assets = walk(dist, '');
+    expect(assets.length).toBeGreaterThan(0);
+    for (const asset of assets) {
+      expect(rewrite(asset, { td_site: 'v2' }), asset).toBe(`/v2${asset}`);
+    }
   });
 });

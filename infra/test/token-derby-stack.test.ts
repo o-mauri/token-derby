@@ -313,4 +313,24 @@ describe('domains', () => {
   it('does not proxy the API from the admin host', () => {
     expect(configFor(CONFIG.adminDomain).CacheBehaviors ?? []).toEqual([]);
   });
+
+});
+
+describe('v2 opt-in wiring', () => {
+  let prod: Template;
+  beforeAll(() => { prod = synth(); });
+
+  it('deploys the v2 site under v2/ and keeps v1 from pruning it', () => {
+    const deployments = prod.findResources('Custom::CDKBucketDeployment');
+    const props = Object.values(deployments).map((d) => (d as { Properties: Record<string, unknown> }).Properties);
+    expect(props.some((p) => p['DestinationBucketKeyPrefix'] === 'v2/')).toBe(true);
+    expect(props.some((p) => JSON.stringify(p['Exclude'] ?? []).includes('v2/*'))).toBe(true);
+  });
+
+  it('gives the app distribution the version-switching rewrite and admin the plain one', () => {
+    const fns = Object.values(prod.findResources('AWS::CloudFront::Function'))
+      .map((f) => (f as { Properties: { FunctionCode: string } }).Properties.FunctionCode);
+    expect(fns.some((c) => c.includes('td_site'))).toBe(true);
+    expect(fns.some((c) => !c.includes('td_site') && c.includes("'/index.html'"))).toBe(true);
+  });
 });

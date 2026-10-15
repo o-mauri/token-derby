@@ -1,4 +1,4 @@
-.PHONY: install build build-site build-admin test dynamodb-up dynamodb-down local-api bootstrap deploy _deploy-site destroy publish-cli announce-release
+.PHONY: install build build-site build-admin build-web test dynamodb-up dynamodb-down local-api bootstrap deploy _deploy-site destroy publish-cli announce-release
 
 # AWS profile for all deployment targets. Override with: make deploy AWS_PROFILE=other
 AWS_PROFILE ?= personal
@@ -14,6 +14,9 @@ build-site:
 
 build-admin:
 	npm run build --workspace=@token-derby/admin
+
+build-web:
+	cd web && npm run build
 
 test:
 	npm test
@@ -38,9 +41,9 @@ deploy:
 	AWS_PROFILE=$(AWS_PROFILE) node scripts/release.mjs site
 
 # Internal: build + deploy without a version bump (invoked by release.mjs).
-# Builds admin as well as site: cdk deploy uploads admin/dist from disk, so
-# skipping it ships whatever stale bundle happens to be there.
-_deploy-site: build-site build-admin
+# Builds v1 and the v2 web app: cdk deploy uploads site/dist and web/dist from
+# disk, so skipping a build ships whatever stale bundle happens to be there.
+_deploy-site: build-site build-web
 	cd infra && AWS_PROFILE=$(AWS_PROFILE) npx cdk deploy --require-approval never
 
 destroy:
