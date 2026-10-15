@@ -34,4 +34,12 @@ describe('SiteVersion', () => {
     expect(doc.cookie).not.toContain('td_site=v2');
     expect(go).toHaveBeenCalledWith('/org/acme');
   });
+
+  it('never carries a sign-in hash across', async () => {
+    const go = vi.fn();
+    TestBed.configureTestingModule({ providers: [provideRouter([{ path: '**', children: [] }]), { provide: REDIRECT, useValue: go }] });
+    await TestBed.inject(Router).navigateByUrl('/org/acme#code=abc');
+    TestBed.inject(SiteVersion).useV1();
+    expect(go).toHaveBeenCalledWith('/org/acme');
+  });
 });

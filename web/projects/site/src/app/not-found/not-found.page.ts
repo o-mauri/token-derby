@@ -13,6 +13,9 @@ import { SiteVersionSwitch } from '../version/version-switch';
       <td-not-found title="Page not found" [message]="message" backLabel="← Home" (back)="router.navigate(['/'])" />
     </td-page>
   `,
+  styles: `
+    .top { display: flex; justify-content: flex-end; align-items: center; padding: var(--td-space-5); }
+  `,
 })
 export class NotFoundPage {
   protected readonly router = inject(Router);
