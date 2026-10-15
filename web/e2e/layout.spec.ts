@@ -9,7 +9,7 @@ type Case = { path: string; routes: Routes; signedIn?: boolean; mayScroll?: bool
 const CASES: Case[] = [
   { path: '/', routes: {} },
   { path: '/', routes: { ...myOrgs(), ...memberOrgRoutes() }, signedIn: true },
-  { path: `/org/${PREVIEW_ORG}`, routes: orgRoutes(), knownIssue: 'the dashboard grid is ~60px taller than a 1366×768 window' },
+  { path: `/org/${PREVIEW_ORG}`, routes: orgRoutes() },
   { path: `/org/${PREVIEW_ORG}/races`, routes: orgRoutes() },
   { path: `/org/${PREVIEW_ORG}/league`, routes: orgRoutes() },
   { path: `/race/${PREVIEW_JOIN_CODE}`, routes: raceRoutes('finished'), mayScroll: true },
