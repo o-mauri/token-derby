@@ -9,6 +9,7 @@ import { raceMetaKey, horseKey } from '../../src/db/keys.js';
 import { UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { makeUser, makeHorse, type TestUser } from '../helpers/auth-helper.js';
 import { staminaOf } from '@token-derby/shared';
+import { LAST_LEDGERLESS_CLI_VERSION } from '../../src/lib/version.js';
 import { CURRENT_CLI_VERSION, SAME_MINOR_CLI_VERSION, MISMATCHED_MINOR_CLI_VERSION, OUTDATED_CLI_VERSION } from '../helpers/cli-version.js';
 
 const COLORS = { body: '#8B4513', mane: '#000', tail: '#000', saddle: '#C0392B' };
@@ -223,6 +224,10 @@ describe('heartbeat handler', () => {
     // Newer than the current release, in the same minor so the race's version pin still admits it.
     const LEDGER_CAPABLE_CLI_VERSION = SAME_MINOR_CLI_VERSION;
     const tokens = (anthropic: number) => ({ anthropic, openai: 0, google: 0 });
+    // The API floor now rejects a ledgerless CLI, so tests of one lower it back to that release.
+    const LEDGER_CAPABLE_PRE_FLOOR_VERSION = `${LAST_LEDGERLESS_CLI_VERSION.split('.').slice(0, 2).join('.')}.99`;
+    const admitLedgerlessCli = () => vi.stubEnv('TOKEN_DERBY_MIN_CLI_VERSION', LAST_LEDGERLESS_CLI_VERSION);
+    afterEach(() => { vi.unstubAllEnvs(); });
 
     // One horse, a few beats at a time, the way a CLI of the given version would send them.
     const raceOf = async (cliVersion = LEDGER_CAPABLE_CLI_VERSION) => {
@@ -252,7 +257,8 @@ describe('heartbeat handler', () => {
     };
 
     it('gives a CLI that predates the ledger no base, and never checks it', async () => {
-      const race = await raceOf(CURRENT_CLI_VERSION);
+      admitLedgerlessCli();
+      const race = await raceOf(LAST_LEDGERLESS_CLI_VERSION);
       await race.send({ seq: 1, components: tokens(100) });
       await race.plantForeignBeat(2, 5_000);
       await race.send({ seq: 3, components: tokens(10), previous: { seq: 2, components: tokens(30), counted: tokens(130) } });
@@ -474,12 +480,13 @@ describe('heartbeat handler', () => {
       });
 
       it('a racer who upgrades the CLI mid-race starts being checked without losing anything', async () => {
-        const race = await raceOf();
-        await race.sendAs(CURRENT_CLI_VERSION, { seq: 1, components: tokens(100) });
-        await race.sendAs(CURRENT_CLI_VERSION, { seq: 2, components: tokens(50) });
+        admitLedgerlessCli();
+        const race = await raceOf(LEDGER_CAPABLE_PRE_FLOOR_VERSION);
+        await race.sendAs(LAST_LEDGERLESS_CLI_VERSION, { seq: 1, components: tokens(100) });
+        await race.sendAs(LAST_LEDGERLESS_CLI_VERSION, { seq: 2, components: tokens(50) });
         expect((await race.stored())?.ledger_base).toBeUndefined();
 
-        const upgraded = processOn(race, { startSeq: 2 });
+        const upgraded = processOn(race, { version: LEDGER_CAPABLE_PRE_FLOOR_VERSION, startSeq: 2 });
         await upgraded.beat(70);
         await upgraded.beat(30);
 

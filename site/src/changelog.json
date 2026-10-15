@@ -1,5 +1,33 @@
 [
   {
+    "version": "0.18.1",
+    "date": "2026-10-15",
+    "component": "site",
+    "changes": [
+      "stability fixes around tracking beats",
+      "stamina control ui fix"
+    ]
+  },
+  {
+    "version": "4.2.0",
+    "date": "2026-10-15",
+    "component": "cli",
+    "changes": [
+      "fairer scoring for forks, pre-start beats and stray calls (StuBehan)"
+    ]
+  },
+  {
+    "version": "4.1.0",
+    "date": "2026-10-07",
+    "component": "cli",
+    "changes": [
+      "stamina displays correctly in cli",
+      "pi tokens count correctly",
+      "forked or resumed sessions dont double count",
+      "cli calls new tokenderby.co.uk domain"
+    ]
+  },
+  {
     "version": "0.18.0",
     "date": "2026-10-01",
     "component": "site",

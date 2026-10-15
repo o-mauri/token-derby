@@ -1,7 +1,7 @@
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { CLI_VERSION_HEADER, gteSemver } from '@token-derby/shared';
 
-export const MIN_CLI_VERSION_DEFAULT = '4.0.0';
+export const MIN_CLI_VERSION_DEFAULT = '4.1.0';
 
 // The release before the CLI began restating its previous beat with the next. Any
 // CLI newer than it sends that ledger, so a beat from one is checked against it,
