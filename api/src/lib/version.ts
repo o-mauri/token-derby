@@ -3,6 +3,14 @@ import { CLI_VERSION_HEADER, gteSemver } from '@token-derby/shared';
 
 export const MIN_CLI_VERSION_DEFAULT = '4.0.0';
 
+// The release before the CLI began restating its previous beat with the next. Any
+// CLI newer than it sends that ledger, so a beat from one is checked against it,
+// and one without it is a process's first.
+export const LAST_LEDGERLESS_CLI_VERSION = '4.0.0';
+
+export const sendsLedger = (cli_version: string): boolean =>
+  gteSemver(cli_version, LAST_LEDGERLESS_CLI_VERSION) && !gteSemver(LAST_LEDGERLESS_CLI_VERSION, cli_version);
+
 
 export function readCliVersion(event: APIGatewayProxyEventV2): string | undefined {
   const h = event.headers ?? {};

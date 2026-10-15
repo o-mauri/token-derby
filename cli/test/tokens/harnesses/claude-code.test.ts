@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { claudeCode } from '../../../src/tokens/harnesses/claude-code/index.js';
+import { claudeCode, setBirthLookupForTests } from '../../../src/tokens/harnesses/claude-code/index.js';
 import { totalOf, conversationsOf } from './helpers.js';
 import { count } from '../../../src/tokens/harnesses/engine.js';
 import { readAllSources, isStall, type AllSources } from '../../../src/tokens/race-tokens.js';
@@ -22,8 +22,12 @@ beforeEach(async () => {
   const h = await fs.mkdtemp(path.join(os.tmpdir(), 'td-tx-home-'));
   dirs.push(h);
   process.env.TOKEN_DERBY_HOME = h;
+  // Fixtures are dated in the past but written now, which would read as a fork.
+  // Tests about forks say when their files were created.
+  setBirthLookupForTests(async () => undefined);
 });
 afterEach(async () => {
+  setBirthLookupForTests(null);
   delete process.env.TOKEN_DERBY_CLAUDE_DIR;
   delete process.env.TOKEN_DERBY_HOME;
   for (const d of dirs.splice(0)) await fs.rm(d, { recursive: true, force: true });
@@ -308,6 +312,68 @@ describe('forked and resumed sessions', () => {
   });
 });
 
+describe("a fork's copied history", () => {
+  const FORKED_AT = Date.parse('2026-10-01T16:00:00Z');
+
+  function resp(id: string, ts: string, output: number): string {
+    return JSON.stringify({ requestId: id, timestamp: ts, message: { usage: { output_tokens: output } } });
+  }
+  const createdAt = (births: Record<string, number>) =>
+    setBirthLookupForTests(async (file) => births[path.basename(file)]);
+
+  async function projectDir(): Promise<string> {
+    const proj = path.join(await tmpProjects(), 'proj');
+    await fs.mkdir(proj, { recursive: true });
+    return proj;
+  }
+
+  it('is not credited to the fork when the original is gone', async () => {
+    const proj = await projectDir();
+    createdAt({ 'fork.jsonl': FORKED_AT });
+    await fs.writeFile(path.join(proj, 'fork.jsonl'), [
+      resp('r1', '2026-10-01T15:00:00Z', 100),
+      resp('r2', '2026-10-01T15:30:00Z', 50),
+      resp('r3', '2026-10-01T16:00:05Z', 7),
+    ].join('\n') + '\n');
+
+    expect((await totalOf(claudeCode)).output).toBe(7);
+  });
+
+  it('is credited once, to the original, while the original is still on disk', async () => {
+    const proj = await projectDir();
+    createdAt({ 'donor.jsonl': Date.parse('2026-10-01T14:00:00Z'), 'fork.jsonl': FORKED_AT });
+    const history = [resp('r1', '2026-10-01T15:00:00Z', 100), resp('r2', '2026-10-01T15:30:00Z', 50)];
+    await fs.writeFile(path.join(proj, 'donor.jsonl'), history.join('\n') + '\n');
+    await fs.writeFile(path.join(proj, 'fork.jsonl'), [...history, resp('r3', '2026-10-01T16:00:05Z', 7)].join('\n') + '\n');
+
+    expect((await totalOf(claudeCode)).output).toBe(157);
+  });
+
+  it("still counts a session's own opening lines, stamped a beat before its file was created", async () => {
+    const proj = await projectDir();
+    createdAt({ 'a.jsonl': FORKED_AT });
+    await fs.writeFile(path.join(proj, 'a.jsonl'), resp('r1', '2026-10-01T15:59:56Z', 40) + '\n');
+
+    expect((await totalOf(claudeCode)).output).toBe(40);
+  });
+
+  it('counts everything when the platform cannot say when the file was created', async () => {
+    const proj = await projectDir();
+    createdAt({});
+    await fs.writeFile(path.join(proj, 'fork.jsonl'), resp('r1', '2026-10-01T09:00:00Z', 100) + '\n');
+
+    expect((await totalOf(claudeCode)).output).toBe(100);
+  });
+
+  it('never skips a line that carries no timestamp', async () => {
+    const proj = await projectDir();
+    createdAt({ 'a.jsonl': FORKED_AT });
+    await fs.writeFile(path.join(proj, 'a.jsonl'), line(25) + '\n');
+
+    expect((await totalOf(claudeCode)).output).toBe(25);
+  });
+});
+
 // Through the race tracker, the way a live race scores: join on one reading,
 // then credit only what later readings add.
 describe('race crediting', () => {
@@ -395,5 +461,25 @@ describe('race crediting', () => {
     await fs.writeFile(file, [resp('a1', 100), resp('a2', 40)].join('\n') + '\n');
     tracker.recordReading(await reading());
     expect(tracker.nextBeat().components.anthropic).toBe(40);
+  });
+
+  it("credits a fork started mid-race only for its own work when the original was pruned", async () => {
+    const root = await tmpProjects();
+    const proj = path.join(root, 'proj');
+    await fs.mkdir(proj, { recursive: true });
+    await fs.writeFile(path.join(proj, 'a.jsonl'), resp('a1', 1000) + '\n');
+    const tracker = new RaceScoreTracker(joinState(await reading(), 0));
+
+    // Copied hours the tracker has never seen would credit from zero, were they counted.
+    const forkedAt = Date.parse('2026-10-01T16:00:00Z');
+    setBirthLookupForTests(async (file) => (path.basename(file) === 'fork.jsonl' ? forkedAt : undefined));
+    await fs.writeFile(path.join(proj, 'fork.jsonl'), [
+      resp('x1', 5000, '2026-10-01T09'),
+      resp('x2', 3000, '2026-10-01T10'),
+      resp('x3', 70, '2026-10-01T16'),
+    ].join('\n') + '\n');
+    tracker.recordReading(await reading());
+
+    expect(tracker.nextBeat().components.anthropic).toBe(70);
   });
 });

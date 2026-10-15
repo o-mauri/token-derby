@@ -91,6 +91,68 @@ describe('RaceScoreTracker — acking', () => {
   });
 });
 
+describe('RaceScoreTracker — restating the previous beat', () => {
+  it('has nothing to restate on this process\'s first beat', () => {
+    const t = new RaceScoreTracker(baseState());
+    t.recordReading(reading({ anthropic: { a: 100 } }));
+    expect(t.nextBeat()).not.toHaveProperty('previous');
+  });
+
+  it('carries the previous beat and the running total through it once one has been acked', () => {
+    const t = new RaceScoreTracker(baseState());
+    t.recordReading(reading({ anthropic: { a: 100 }, openai: { r: 7 } }));
+    t.ack(t.nextBeat(), 1);
+
+    t.recordReading(reading({ anthropic: { a: 160 }, openai: { r: 7 } }));
+    const second = t.nextBeat();
+    expect(second.previous).toEqual({
+      seq: 1,
+      components: { anthropic: 100, openai: 7, google: 0 },
+      counted: { anthropic: 100, openai: 7, google: 0 },
+    });
+    expect(second.components.anthropic).toBe(60);
+  });
+
+  it('keeps counting the running total across beats', () => {
+    const t = new RaceScoreTracker(baseState());
+    t.recordReading(reading({ anthropic: { a: 100 } }));
+    t.ack(t.nextBeat(), 1);
+    t.recordReading(reading({ anthropic: { a: 160 } }));
+    t.ack(t.nextBeat(), 2);
+
+    t.recordReading(reading({ anthropic: { a: 175 } }));
+    expect(t.nextBeat().previous).toEqual({
+      seq: 2,
+      components: { anthropic: 60, openai: 0, google: 0 },
+      counted: { anthropic: 160, openai: 0, google: 0 },
+    });
+  });
+
+  it('restates the beat the server answered, under the seq it was sent with, even after the seq resyncs', () => {
+    const t = new RaceScoreTracker(baseState());
+    t.recordReading(reading({ anthropic: { a: 30 } }));
+    t.ack(t.nextBeat(), 5);   // another caller moved the server's seq on
+    expect(t.nextBeat().seq).toBe(6);
+    expect(t.nextBeat().previous?.seq).toBe(1);
+  });
+
+  it('sends the same restatement on a retry, since nextBeat is pure', () => {
+    const t = new RaceScoreTracker(baseState());
+    t.recordReading(reading({ anthropic: { a: 100 } }));
+    t.ack(t.nextBeat(), 1);
+    t.recordReading(reading({ anthropic: { a: 130 } }));
+    expect(t.nextBeat()).toEqual(t.nextBeat());
+  });
+
+  it('does not restate a beat that was never acked', () => {
+    const t = new RaceScoreTracker(baseState());
+    t.recordReading(reading({ anthropic: { a: 100 } }));
+    t.nextBeat();
+    t.recordReading(reading({ anthropic: { a: 120 } }));
+    expect(t.nextBeat()).not.toHaveProperty('previous');
+  });
+});
+
 describe('RaceScoreTracker — stalls', () => {
   it('a null reading is a stall and does not move anchors', () => {
     const t = new RaceScoreTracker(baseState());

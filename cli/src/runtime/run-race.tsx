@@ -91,6 +91,7 @@ export function RunRace({ active, initialState, pendingMode, ownUserName }: RunR
       sendBeat: async (snapshot) => {
         return endpoints.heartbeat(active.join_code, active.horse_id, active.heartbeat_token, {
           seq: snapshot.seq, components: snapshot.components,
+          ...(snapshot.previous ? { previous: snapshot.previous } : {}),
         });
       },
       onSuccess: (resp, snapshot) => {

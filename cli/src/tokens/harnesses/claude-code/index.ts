@@ -42,6 +42,10 @@ const TRANSCRIPT_EXT = '.jsonl';
 // sit in many files at once. Counted a file at a time, every fork re-credited
 // the whole conversation so far — measured at ~30x real usage under an SDK
 // proxy. Each request is therefore counted once across every file.
+//
+// Counting once is not enough when the original is gone: a fork's copy of a
+// pruned or off-machine donor would then be credited to the fork. So history
+// older than the fork's own file is never counted for it, see FORK_SLACK_MS.
 
 /** One API response, with enough identity to spot a copy of it in another file. */
 type ClaudeResponse = {
@@ -49,6 +53,8 @@ type ClaudeResponse = {
   id?: string;
   /** UTC hour the response was written, `YYYY-MM-DDTHH`. Copies keep it verbatim. */
   hour?: string;
+  /** When the response was written (epoch ms). Copies keep it verbatim too. */
+  at?: number;
   input: number;
   output: number;
 };
@@ -97,9 +103,11 @@ const CLAUDE_FOLD: FileFold<ClaudeFileState> = {
       last = id;
       const ts = parsed?.timestamp;
       const hour = typeof ts === 'string' && HOUR.test(ts) ? ts.slice(0, 13) : undefined;
+      const at = typeof ts === 'string' ? Date.parse(ts) : Number.NaN;
       responses.push({
         ...(id !== undefined ? { id } : {}),
         ...(hour !== undefined ? { hour } : {}),
+        ...(Number.isFinite(at) ? { at } : {}),
         input,
         output,
       });
@@ -147,6 +155,29 @@ function sessionOf(file: string, root: string): string {
   return `${project}/${session.replace(/\.jsonl$/, '')}`;
 }
 
+// Transcript lines are stamped when a message is made, a moment before the file
+// is first written, so a session's own opening lines can predate its creation by
+// a beat. Copied history predates it by far more.
+const FORK_SLACK_MS = 10_000;
+
+type BirthLookup = (file: string) => Promise<number | undefined>;
+
+// Where a platform keeps no creation time, Node returns 0 or the ctime instead.
+// A ctime moves with every append and would date the whole file as copied, but it
+// equals the reported birthtime exactly, which a real creation time of a file
+// written to since never does.
+const statBirth: BirthLookup = async (file) => {
+  const stats = await fs.stat(file).catch(() => undefined);
+  if (!stats || !(stats.birthtimeMs > 0) || stats.birthtimeMs === stats.ctimeMs) return undefined;
+  return stats.birthtimeMs;
+};
+
+let birthOf: BirthLookup = statBirth;
+
+export const setBirthLookupForTests = (lookup: BirthLookup | null): void => {
+  birthOf = lookup ?? statBirth;
+};
+
 /** One request as counted by this process: where it was credited, and its usage. */
 type Counted = { conversation: string; input: number; output: number };
 
@@ -158,6 +189,8 @@ type ClaudeRun = {
   unanchored: Set<string>;
   /** Files that have read successfully at least once. */
   read: Set<string>;
+  /** When each file was created, or undefined where the platform cannot say. Looked up once. */
+  birth: Map<string, number | undefined>;
 };
 
 const runs = new Map<string, ClaudeRun>();
@@ -165,7 +198,7 @@ const runs = new Map<string, ClaudeRun>();
 function runFor(root: string): ClaudeRun {
   let run = runs.get(root);
   if (!run) {
-    run = { counted: new Map(), unanchored: new Set(), read: new Set() };
+    run = { counted: new Map(), unanchored: new Set(), read: new Set(), birth: new Map() };
     runs.set(root, run);
   }
   return run;
@@ -195,6 +228,10 @@ function runFor(root: string): ClaudeRun {
  * session from then on, not an hour bucket. Otherwise its pre-race history would
  * land in hours and be credited. A file that read cleanly before it failed only
  * adds requests written since, so they go to their hour as usual.
+ *
+ * A response dated before the file that holds it was created is a fork's copy of
+ * earlier history and is skipped outright. It is not kept for later either: the
+ * original's own file, where it is new, is the only place it is credited.
  */
 async function readAll(cache: ScanCache, files: string[], root: string): Promise<CustomReading> {
   const run = runFor(root);
@@ -224,6 +261,9 @@ async function readAll(cache: ScanCache, files: string[], root: string): Promise
   // Unanchored files last, so a request with a copy in another file goes to that
   // copy's hour. The sort is stable, so path order holds within each group.
   readable.sort((a, b) => Number(a.unanchored) - Number(b.unanchored));
+  await mapWithConcurrency(readable.filter(({ file }) => !run.birth.has(file)), SCAN_CONCURRENCY, async ({ file }) => {
+    run.birth.set(file, await birthOf(file));
+  });
 
   const byConversation: CustomReading['byConversation'] = new Map();
   const add = (conversation: string, input: number, output: number) => {
@@ -233,7 +273,12 @@ async function readAll(cache: ScanCache, files: string[], root: string): Promise
     byConversation.set(conversation, { anthropic: totals });
   };
   for (const { file, state, unanchored } of readable) {
+    const birth = run.birth.get(file);
+    const copiedBefore = birth === undefined ? Number.NEGATIVE_INFINITY : birth - FORK_SLACK_MS;
     for (const r of state.responses) {
+      // Written before this file existed, so copied in from the session it was
+      // forked from. That history belongs to the original, never to the fork.
+      if (r.at !== undefined && r.at < copiedBefore) continue;
       const conversation = !unanchored && r.hour !== undefined ? `@${r.hour}` : sessionOf(file, root);
       // No id ⇒ can't be matched to a copy, so it counts wherever it's found.
       if (r.id === undefined) {
