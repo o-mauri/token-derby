@@ -60,4 +60,8 @@ export class OrgData {
   /** A failure with nothing loaded yet; once races have loaded, a later failure keeps showing them. */
   readonly racesFailed = computed(() => this.racesPoll.error() !== undefined && !this.notFound() && this.races() === undefined);
   readonly loading = computed(() => this.races() === undefined && this.racesPoll.error() === undefined);
+  /** The dashboard waits for every panel's data — races, standings and any live race — to answer once. */
+  readonly dashboardLoading = computed(() => this.loading()
+    || (!this.standingsLoaded() && this.standingsPoll.error() === undefined)
+    || (this.liveCode() !== null && this.livePoll.value() === undefined && this.livePoll.error() === undefined));
 }

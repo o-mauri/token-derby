@@ -6,11 +6,12 @@
   </span>
 </header>
 
-@if (session.signedIn()) {
+@if (session.signedIn() && load().status === 'loading') {
+  <main class="loading"><td-loader /></main>
+} @else if (session.signedIn()) {
   <main class="grid">
     <td-panel class="career" spine="CAREER" compact>
       @switch (load().status) {
-        @case ('loading') { <div class="centre"><td-loader /></div> }
         @case ('error') {
           <div class="failed centre"><p>Couldn't load your page.</p><button td-button size="sm" type="button" (click)="reload()">Retry</button></div>
         }
@@ -25,9 +26,7 @@
     </td-panel>
 
     <td-panel class="stable" spine="STABLE" compact>
-      @if (load().status === 'loading') {
-        <div class="centre"><td-loader /></div>
-      } @else if (ready()) {
+      @if (ready()) {
         @if (horses().length) {
           <div class="scroll"><ul class="list">
             @for (h of horses(); track h.stable_horse_id) {

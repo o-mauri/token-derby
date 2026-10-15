@@ -108,16 +108,26 @@ describe('OrgPage data lifetime and league states', () => {
     expect(shell().injector.get(OrgData)).not.toBe(first);
   });
 
-  it('shows nothing in LEAGUE while standings load, rather than "No league"', async () => {
+  it('keeps one central loader, and no panels, until the standings and the live race answer', async () => {
     const { el, http, settle } = await open('/org/Acme');
+    const onlyLoader = () => el().querySelector('td-loader') !== null && el().querySelector('td-panel') === null;
     answer(http, RACES, 'later');
     await settle();
-    expect(el().querySelector('td-panel.league')?.textContent).not.toContain('No league');
+    expect(onlyLoader()).toBe(true);
+    http.match('/api/organisations/Acme/league/standings').forEach((r) => r.flush({ standings: null }));
+    await settle();
+    expect(onlyLoader()).toBe(true);
+    http.match('/api/races/K7QX').forEach((r) => r.flush({ join_code: 'K7QX', status: 'live', time_left_seconds: 3600, horses: [] }));
+    await settle();
+    expect(el().querySelector('td-loader')).toBeNull();
+    expect(el().querySelectorAll('td-panel').length).toBeGreaterThan(0);
   });
 
   it('says so inside LEAGUE when the standings fail to load', async () => {
     const { el, http, settle } = await open('/org/Acme');
     answer(http, RACES, 'down');
+    await settle();
+    http.match('/api/races/K7QX').forEach((r) => r.flush({ join_code: 'K7QX', status: 'live', time_left_seconds: 3600, horses: [] }));
     await settle();
     expect(el().querySelector('td-panel.league .failed')?.textContent).toContain("Couldn't load the league");
   });

@@ -49,12 +49,13 @@ async function open(seed: Record<string, string> = SIGNED_IN) {
 }
 
 describe('Paddock page', () => {
-  it('shows loaders in CAREER and STABLE until both loads arrive', async () => {
+  it('shows one central loader, and no panels, until both loads arrive', async () => {
     const p = await open();
-    expect(p.el().querySelectorAll('td-panel.career td-loader, td-panel.stable td-loader').length).toBe(2);
+    const onlyLoader = () => p.el().querySelector('main.loading td-loader') !== null && p.el().querySelector('td-panel') === null;
+    expect(onlyLoader()).toBe(true);
     p.http.expectOne('/api/jockey/me').flush(JOCKEY);
     await p.settle();
-    expect(p.el().querySelector('td-panel.career td-loader')).not.toBeNull();
+    expect(onlyLoader()).toBe(true);
     p.http.expectOne('/api/jockey/me/horses').flush({ horses: HORSES });
     await p.settle();
     expect(p.el().querySelector('td-loader')).toBeNull();
