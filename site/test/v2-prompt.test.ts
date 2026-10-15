@@ -6,7 +6,9 @@ describe('v2 prompt', () => {
 
   it('says what it is and offers Try v2 / Not now', () => {
     const el = createV2Prompt(document);
-    expect(el.getAttribute('role')).toBe('dialog');
+    expect(el.tagName).toBe('ASIDE');
+    expect(el.getAttribute('role')).toBeNull();
+    expect(el.querySelector('#' + el.getAttribute('aria-labelledby'))?.textContent).toBe('Try the new Token Derby');
     expect(el.textContent).toContain('Try the new Token Derby');
     expect(el.textContent).toContain('You can switch back any time with the V2 switch at the top right.');
     expect(Array.from(el.querySelectorAll('button')).map((b) => b.textContent)).toEqual(['Try v2', 'Not now']);
@@ -22,8 +24,11 @@ describe('v2 prompt', () => {
 
   it('Try v2 opts in and is remembered', () => {
     const go = vi.fn();
-    createV2Prompt(document, { go }).querySelector<HTMLButtonElement>('.v2-prompt-try')!.click();
+    const el = createV2Prompt(document, { go });
+    document.body.appendChild(el);
+    el.querySelector<HTMLButtonElement>('.v2-prompt-try')!.click();
     expect(go).toHaveBeenCalled();
+    expect(document.querySelector('.v2-prompt')).toBeNull();
     expect(localStorage.getItem('td_v2_prompt')).toBe('done');
   });
 

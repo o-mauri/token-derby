@@ -14,7 +14,6 @@ export function shouldPrompt(route: Route['type'], hash: string, storage?: Stora
 export function createV2Prompt(doc: Document, opts: { storage?: Storage | null; go?: (url: string) => void } = {}): HTMLElement {
   const el = doc.createElement('aside');
   el.className = 'v2-prompt';
-  el.setAttribute('role', 'dialog');
   el.setAttribute('aria-labelledby', 'v2-prompt-title');
   el.innerHTML = `
     <h2 id="v2-prompt-title">Try the new Token Derby</h2>
@@ -24,7 +23,7 @@ export function createV2Prompt(doc: Document, opts: { storage?: Storage | null; 
       <button type="button" class="v2-prompt-later">Not now</button>
     </div>
   `;
-  el.querySelector('.v2-prompt-try')!.addEventListener('click', () => { markPromptDone(opts.storage); chooseV2(doc, opts.go); });
+  el.querySelector('.v2-prompt-try')!.addEventListener('click', () => { markPromptDone(opts.storage); chooseV2(doc, opts.go); el.remove(); });
   el.querySelector('.v2-prompt-later')!.addEventListener('click', () => { markPromptDone(opts.storage); el.remove(); });
   return el;
 }
