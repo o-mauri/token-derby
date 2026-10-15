@@ -2,7 +2,7 @@
   <td-crumbs [parts]="[{ label: orgName(), link: ['..'], key: 'org-name' }, { label: 'Settings' }]" />
   <span class="actions">
     @if (session.signedIn()) {
-      <td-account-menu [name]="name()" [accountLink]="['/account']" (signOut)="signOut()" />
+      <td-account-menu [name]="name()" [meLink]="['/paddock']" [accountLink]="['/account']" (signOut)="signOut()" />
     }
     <site-version-switch /><td-theme-picker compact />
     <a td-button size="sm" routerLink="/">← Home</a>

@@ -190,6 +190,18 @@ describe('HomePage signed in', () => {
     expect(el().querySelector('td-go-box.org')).not.toBeNull();
   });
 
+  it('links My page in the menu to your paddock', async () => {
+    const { el, http, settle } = await open('/', SIGNED_IN);
+    http.expectOne('/api/organisations').flush(orgs('acme'));
+    http.expectOne('/api/jockey/me/horses').flush({ horses: [] });
+    await settle();
+    el().querySelector<HTMLButtonElement>('td-account-menu button.trigger')!.click();
+    await settle();
+    const me = [...document.body.querySelectorAll<HTMLElement>('.item')].find((i) => i.textContent?.includes('My page'))!;
+    expect(me.getAttribute('href')).toBe('/paddock');
+    expect(me.textContent).not.toContain('Soon');
+  });
+
   it('signs out from the menu', async () => {
     const { el, http, settle } = await open('/', SIGNED_IN);
     http.expectOne('/api/organisations').flush(orgs('acme'));
