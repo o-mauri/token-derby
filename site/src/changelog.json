@@ -1,5 +1,21 @@
 [
   {
+    "version": "0.19.1",
+    "date": "2026-10-15",
+    "component": "site",
+    "changes": [
+      "performance improvements on org page loading"
+    ]
+  },
+  {
+    "version": "0.19.0",
+    "date": "2026-10-15",
+    "component": "site",
+    "changes": [
+      "v2 site beta"
+    ]
+  },
+  {
     "version": "0.18.1",
     "date": "2026-10-15",
     "component": "site",
