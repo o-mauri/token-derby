@@ -13,6 +13,8 @@ import { renderCliApprove } from './render/cli-approve.js';
 import { renderLinkGoogle } from './render/link-google.js';
 import { initTheme } from './theme.js';
 import { createNotFound } from './render/not-found.js';
+import { handOffSignIn } from './hand-off.js';
+import { chooseV2, isV2OnlyPath } from './v2-opt-in.js';
 
 // Legendary hat keyframes are installed lazily on the first buildHatGroup
 // call (see hat-svg.ts), so every entry point — main.ts, preview-race.ts,
@@ -32,6 +34,7 @@ function route() {
 
   if (activeCleanup) { activeCleanup(); activeCleanup = null; }
 
+  handOffSignIn(window.location, (url) => history.replaceState(null, '', url));
   const r = parseRoute(window.location.pathname);
   if (r.type === 'home') {
     renderHome(root);
@@ -54,7 +57,13 @@ function route() {
   } else if (r.type === 'link') {
     activeCleanup = renderLinkGoogle(root);
   } else {
-    root.replaceChildren(createNotFound(document, {
+    const v2Only = isV2OnlyPath(window.location.pathname);
+    root.replaceChildren(createNotFound(document, v2Only ? {
+      title: 'Only on the new site',
+      message: ['This page is part of the new Token Derby.'],
+      back: { label: '← Home', href: '/' },
+      action: { label: 'Try v2', onClick: () => chooseV2(document) },
+    } : {
       title: 'Page not found',
       message: ["There's nothing at this address."],
       back: { label: '← Home', href: '/' },

@@ -42,6 +42,8 @@ export interface NotFoundOptions {
   // Text parts; { strong } marks the value the visitor typed. Always rendered as text.
   message: NotFoundMessagePart[];
   back: { label: string; href: string };
+  // An optional second button beside the back link.
+  action?: { label: string; onClick: () => void };
 }
 
 export function createNotFound(doc: Document, opts: NotFoundOptions): HTMLElement {
@@ -79,6 +81,14 @@ export function createNotFound(doc: Document, opts: NotFoundOptions): HTMLElemen
     window.history.pushState({}, '', opts.back.href);
     window.dispatchEvent(new PopStateEvent('popstate'));
   });
+  if (opts.action) {
+    const btn = doc.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn';
+    btn.textContent = opts.action.label;
+    btn.addEventListener('click', opts.action.onClick);
+    link.after(btn);
+  }
   return el;
 }
 

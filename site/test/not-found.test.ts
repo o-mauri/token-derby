@@ -49,4 +49,14 @@ describe('createNotFound', () => {
     expect(location.pathname).toBe('/org/Acme');
     expect(onPop).toHaveBeenCalledTimes(1);
   });
+
+  it('can offer a second action button', () => {
+    const onClick = vi.fn();
+    const el = createNotFound(document, { ...opts, action: { label: 'Try v2', onClick } });
+    const buttons = el.querySelectorAll('.btn');
+    expect(buttons).toHaveLength(2);
+    expect(buttons[1]!.textContent).toBe('Try v2');
+    (buttons[1] as HTMLElement).click();
+    expect(onClick).toHaveBeenCalled();
+  });
 });
