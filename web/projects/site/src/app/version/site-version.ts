@@ -1,6 +1,6 @@
 import { DOCUMENT, Injectable, inject } from '@angular/core';
 import { Router } from '@angular/router';
-import { REDIRECT } from '../session/redirect';
+import { REPLACE_LOCATION } from '../session/redirect';
 
 const V1_EQUIVALENT: readonly [RegExp, (m: RegExpMatchArray) => string][] = [
   [/^\/paddock$/, () => '/'],
@@ -22,15 +22,15 @@ export function v1PathFor(url: string): string {
   return query ? `${p}?${query}` : p;
 }
 
-/** Leaves v2: clears the opt-in cookie and reloads the matching v1 page. */
+/** Leaves v2: clears the opt-in cookie and replaces this page with the matching v1 one. */
 @Injectable({ providedIn: 'root' })
 export class SiteVersion {
   private readonly doc = inject(DOCUMENT);
   private readonly router = inject(Router);
-  private readonly redirect = inject(REDIRECT);
+  private readonly replace = inject(REPLACE_LOCATION);
 
   useV1(): void {
     this.doc.cookie = 'td_site=; Path=/; Max-Age=0; SameSite=Lax';
-    this.redirect(v1PathFor(this.router.url));
+    this.replace(v1PathFor(this.router.url));
   }
 }

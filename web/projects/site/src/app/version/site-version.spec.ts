@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { DOCUMENT } from '@angular/core';
 import { Router, provideRouter } from '@angular/router';
-import { REDIRECT } from '../session/redirect';
+import { REDIRECT, REPLACE_LOCATION } from '../session/redirect';
 import { SiteVersion, v1PathFor } from './site-version';
 
 describe('v1PathFor', () => {
@@ -26,18 +26,21 @@ describe('v1PathFor', () => {
 describe('SiteVersion', () => {
   it('clears the cookie and leaves for the v1 page', async () => {
     const go = vi.fn();
-    TestBed.configureTestingModule({ providers: [provideRouter([{ path: '**', children: [] }]), { provide: REDIRECT, useValue: go }] });
+    const assign = vi.fn();
+    TestBed.configureTestingModule({ providers: [provideRouter([{ path: '**', children: [] }]), { provide: REPLACE_LOCATION, useValue: go }, { provide: REDIRECT, useValue: assign }] });
     const doc = TestBed.inject(DOCUMENT);
     doc.cookie = 'td_site=v2; Path=/';
     await TestBed.inject(Router).navigateByUrl('/org/acme/league');
     TestBed.inject(SiteVersion).useV1();
     expect(doc.cookie).not.toContain('td_site=v2');
     expect(go).toHaveBeenCalledWith('/org/acme');
+    expect(assign).not.toHaveBeenCalled();
   });
 
   it('never carries a sign-in hash across', async () => {
     const go = vi.fn();
-    TestBed.configureTestingModule({ providers: [provideRouter([{ path: '**', children: [] }]), { provide: REDIRECT, useValue: go }] });
+    const assign = vi.fn();
+    TestBed.configureTestingModule({ providers: [provideRouter([{ path: '**', children: [] }]), { provide: REPLACE_LOCATION, useValue: go }, { provide: REDIRECT, useValue: assign }] });
     await TestBed.inject(Router).navigateByUrl('/org/acme#code=abc');
     TestBed.inject(SiteVersion).useV1();
     expect(go).toHaveBeenCalledWith('/org/acme');

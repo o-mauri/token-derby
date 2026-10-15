@@ -7,3 +7,11 @@ export const REDIRECT = new InjectionToken<(url: string) => void>('REDIRECT', {
     return (url: string) => win?.location.assign(url);
   },
 });
+
+/** Swaps the current page for another without a history entry, so Back skips it; a token for tests. */
+export const REPLACE_LOCATION = new InjectionToken<(url: string) => void>('REPLACE_LOCATION', {
+  factory: () => {
+    const win = inject(DOCUMENT).defaultView;
+    return (url: string) => win?.location.replace(url);
+  },
+});
