@@ -9,7 +9,7 @@
   border-block: var(--td-line-thin) solid var(--td-border);
 }
 
-.month { font-family: 'Bitcount Prop Single', var(--td-font-pixel); font-size: var(--td-text-md); letter-spacing: var(--td-tracking-wide); color: var(--td-highlight); }
+.month { font-size: var(--td-text-md); letter-spacing: var(--td-tracking-wide); color: var(--td-highlight); }
 .count { font-family: var(--td-font-pixel); color: var(--td-text-muted); font-size: var(--td-text-sm); letter-spacing: normal; }
 
 .prev, .next {

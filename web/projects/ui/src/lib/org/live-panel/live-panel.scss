@@ -3,7 +3,7 @@
 :host { display: grid; grid-template-rows: auto 1fr; height: 100%; min-height: 0; gap: var(--td-space-3); }
 
 .title { overflow: hidden; white-space: nowrap; padding-bottom: var(--td-space-2); border-bottom: var(--td-line-thin) solid var(--td-border); }
-.race { font-family: 'Bitcount Prop Single', var(--td-font-pixel); font-size: var(--td-text-lg); letter-spacing: var(--td-tracking); }
+.race { font-size: var(--td-text-lg); letter-spacing: var(--td-tracking); }
 
 .hero {
   display: grid;
@@ -19,10 +19,10 @@
 .lead { display: grid; gap: var(--td-space-1); min-width: 0; }
 .label { font-size: var(--td-text-xs); letter-spacing: var(--td-tracking-wide); color: var(--td-text-muted); }
 .lead .name-row { overflow: hidden; white-space: nowrap; }
-.lead .name { font-family: 'Bitcount Prop Single', var(--td-font-pixel); font-size: var(--td-text-xl); color: var(--td-medal-gold); }
+.lead .name { font-size: var(--td-text-xl); color: var(--td-medal-gold); }
 .lead .meta { color: var(--td-text-muted); font-size: var(--td-text-sm); }
-.tokens { font-family: 'Bitcount Prop Single', var(--td-font-pixel); color: var(--td-highlight); text-shadow: 0 0 6px color-mix(in srgb, var(--td-highlight) 45%, transparent); }
-.lead .tokens { font-size: var(--td-text-xl); }
+.tokens { color: var(--td-highlight); text-shadow: 0 0 6px color-mix(in srgb, var(--td-highlight) 45%, transparent); }
+.lead .tokens { font-family: 'Bitcount Prop Single', var(--td-font-pixel); font-size: var(--td-text-xl); }
 
 .chasers { display: grid; min-width: 0; }
 .row {
@@ -49,7 +49,7 @@
 .bar i { display: block; height: 100%; background: var(--td-highlight); }
 
 .waiting { margin: 0; color: var(--td-text-muted); }
-.none { margin: 0; height: 100%; display: grid; place-items: center; font-family: 'Bitcount Prop Single', var(--td-font-pixel); font-size: var(--td-text-xl); color: var(--td-text-muted); letter-spacing: var(--td-tracking-wide); }
+.none { margin: 0; height: 100%; display: grid; place-items: center; font-size: var(--td-text-xl); color: var(--td-text-muted); letter-spacing: var(--td-tracking-wide); }
 
 @include marquee.marquee('.name');
 @include marquee.marquee('.race', 10s);

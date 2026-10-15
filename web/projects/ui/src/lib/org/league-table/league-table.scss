@@ -10,7 +10,7 @@
   margin-bottom: var(--td-space-1);
   border-bottom: var(--td-line-thin) solid var(--td-border);
 }
-.name-head { font-family: 'Bitcount Prop Single', var(--td-font-pixel); font-size: var(--td-text-md); letter-spacing: var(--td-tracking-wide); text-transform: uppercase; color: var(--td-highlight); }
+.name-head { font-size: var(--td-text-md); letter-spacing: var(--td-tracking-wide); text-transform: uppercase; color: var(--td-highlight); }
 .count { color: var(--td-text-muted); font-size: var(--td-text-sm); }
 
 .row {
@@ -34,7 +34,7 @@
 .name { flex: none; max-width: 100%; font-weight: bold; }
 .owner { flex: 0 100 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--td-text-muted); font-size: var(--td-text-sm); }
 
-.points { font-family: 'Bitcount Prop Single', var(--td-font-pixel); color: var(--td-highlight); text-shadow: 0 0 6px color-mix(in srgb, var(--td-highlight) 45%, transparent); }
+.points { color: var(--td-highlight); text-shadow: 0 0 6px color-mix(in srgb, var(--td-highlight) 45%, transparent); }
 .empty { margin: var(--td-space-4) 0; color: var(--td-text-muted); }
 
 @include marquee.marquee('.name');

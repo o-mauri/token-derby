@@ -53,4 +53,8 @@ describe('Panel', () => {
     TestBed.resetTestingModule();
     expect((await render({ compact: true })).querySelector('td-panel')!.classList.contains('compact')).toBe(true);
   });
+
+  it('exposes the spine length, so the label can shrink to fit the panel', async () => {
+    expect((await render()).querySelector<HTMLElement>('td-panel')!.style.getPropertyValue('--td-spine-len')).toBe('4');
+  });
 });

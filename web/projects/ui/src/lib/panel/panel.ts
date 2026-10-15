@@ -8,7 +8,7 @@ import { RouterLink } from '@angular/router';
   selector: 'td-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [RouterLink, NgTemplateOutlet],
-  host: { '[class.disabled]': 'disabled()', '[class.linked]': '!!link() && !disabled()', '[class.compact]': 'compact()' },
+  host: { '[class.disabled]': 'disabled()', '[class.linked]': '!!link() && !disabled()', '[class.compact]': 'compact()', '[style.--td-spine-len]': 'spine().length' },
   template: `
     @if (link() && !disabled()) {
       <a class="frame" [routerLink]="link()"><ng-container [ngTemplateOutlet]="inner" /></a>

@@ -22,8 +22,11 @@
 .market { grid-column: span 2; }
 .races { grid-column: span 3; }
 
+// Each panel fills a fixed cell, so its height can shrink a long spine label to fit.
+@media (width >= 700px) { .grid > td-panel { container-type: size; } }
+
 .failed, .soon { margin: 0; height: 100%; display: grid; place-items: center; color: var(--td-text-muted); }
-.soon { font-family: 'Bitcount Prop Single', var(--td-font-pixel); font-size: var(--td-text-lg); }
+.soon { font-size: var(--td-text-lg); }
 
 @media (width < 700px) {
   :host { height: auto; min-height: 100vh; }

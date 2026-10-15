@@ -26,15 +26,15 @@ a.frame:focus-visible { outline: var(--td-focus-width) solid var(--td-highlight)
   padding: 0 var(--td-space-4);
   border-left: var(--td-line) solid var(--td-border);
   font-family: 'Bitcount Prop Single', var(--td-font-pixel);
-  font-size: calc(var(--td-text-xl) * 1.8);
+  // Full size, unless the label would overrun a height container around it (each letter is ~0.8em with its tracking).
+  font-size: min(calc(var(--td-text-xl) * 1.8), calc(88cqh / (var(--td-spine-len, 6) * 0.8)));
   letter-spacing: var(--td-tracking-wide);
+  // Balances the tracking after the last letter, so the word sits centred.
+  text-indent: var(--td-tracking-wide);
   text-transform: uppercase;
   white-space: nowrap;
   overflow: hidden;
 }
-
-// Short laptop screens: a touch smaller, so a three-row grid of panels still fits one screen.
-@media (width >= 700px) and (height < 830px) { .spine { font-size: calc(var(--td-text-xl) * 1.6); } }
 
 :host(.compact) .spine { font-size: var(--td-text-xl); }
 
@@ -54,5 +54,6 @@ a.frame:focus-visible { outline: var(--td-focus-width) solid var(--td-highlight)
     border-left: 0;
     border-bottom: var(--td-line) solid var(--td-border);
     font-size: var(--td-text-xl);
+    text-indent: 0;
   }
 }

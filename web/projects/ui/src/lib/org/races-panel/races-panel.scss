@@ -13,7 +13,7 @@
 }
 .tag { color: var(--td-level-up); font-size: var(--td-text-xs); letter-spacing: var(--td-tracking-wide); }
 .head { display: flex; justify-content: space-between; align-items: baseline; padding-top: var(--td-space-2); }
-.title { font-family: 'Bitcount Prop Single', var(--td-font-pixel); font-size: var(--td-text-sm); letter-spacing: var(--td-tracking-wide); color: var(--td-highlight); }
+.title { font-size: var(--td-text-sm); letter-spacing: var(--td-tracking-wide); color: var(--td-highlight); }
 .count, .date, .ran { color: var(--td-text-muted); font-size: var(--td-text-sm); }
 .result {
   display: grid;
@@ -27,7 +27,7 @@
 .winner { display: flex; align-items: center; gap: var(--td-space-3); min-width: 0; }
 .sprite { width: 1.8rem; flex: none; }
 .name-row { overflow: hidden; white-space: nowrap; min-width: 0; }
-.tokens { font-family: 'Bitcount Prop Single', var(--td-font-pixel); color: var(--td-highlight); text-align: right; }
+.tokens { color: var(--td-highlight); text-align: right; }
 
 @include marquee.marquee('.name');
 

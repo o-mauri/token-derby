@@ -3,7 +3,7 @@
 :host { display: grid; grid-template-rows: auto 1fr auto; gap: var(--td-space-3); height: 100%; min-height: 0; }
 
 .head { display: flex; align-items: center; gap: var(--td-space-4); font-size: var(--td-text-sm); }
-.s { font-family: 'Bitcount Prop Single', var(--td-font-pixel); font-size: var(--td-text-md); }
+.s { font-size: var(--td-text-md); }
 .r, .to-go { color: var(--td-text-muted); }
 .bar { flex: 1; height: var(--td-space-2); background: var(--td-xp-track); border-radius: var(--td-radius-pill); overflow: hidden; }
 .bar i { display: block; height: 100%; background: var(--td-highlight); }
@@ -12,13 +12,13 @@
 .cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--td-space-6); min-height: 0; overflow: clip; overflow-clip-margin: var(--td-space-2); align-items: start; }
 .division { display: grid; min-width: 0; padding-left: var(--td-space-5); border-left: var(--td-line-thin) solid var(--td-border); }
 .division:first-child { padding-left: 0; border-left: 0; }
-.div-name { font-family: 'Bitcount Prop Single', var(--td-font-pixel); font-size: var(--td-text-sm); letter-spacing: var(--td-tracking-wide); text-transform: uppercase; color: var(--td-highlight); }
+.div-name { font-size: var(--td-text-sm); letter-spacing: var(--td-tracking-wide); text-transform: uppercase; color: var(--td-highlight); }
 .leader { display: flex; align-items: center; gap: var(--td-space-4); padding: var(--td-space-2) 0; min-width: 0; }
 .lead-sprite { width: 3.6rem; flex: none; }
 .lead-text { display: grid; min-width: 0; }
 .name-row { overflow: hidden; white-space: nowrap; min-width: 0; }
 .lead-text .name { font-weight: bold; }
-.pts { font-family: 'Bitcount Prop Single', var(--td-font-pixel); color: var(--td-highlight); font-size: var(--td-text-lg); }
+.pts { color: var(--td-highlight); font-size: var(--td-text-lg); }
 .pts.small { font-size: var(--td-text-sm); }
 .unit { color: var(--td-text-muted); font-size: var(--td-text-xs); }
 .runner { display: grid; grid-template-columns: 1.2rem 1.6rem minmax(0, 1fr) auto; align-items: center; gap: var(--td-space-3); padding: var(--td-space-1) 0; }
@@ -26,7 +26,7 @@
 .runner:nth-of-type(2) .place { color: var(--td-medal-bronze); }
 .sprite { width: 100%; }
 .more, .more-divisions { color: var(--td-text-muted); font-size: var(--td-text-sm); padding-top: var(--td-space-1); }
-.empty { margin: 0; height: 100%; display: grid; place-items: center; color: var(--td-text-muted); font-family: 'Bitcount Prop Single', var(--td-font-pixel); font-size: var(--td-text-lg); }
+.empty { margin: 0; height: 100%; display: grid; place-items: center; color: var(--td-text-muted); font-size: var(--td-text-lg); }
 
 @include marquee.marquee('.name');
 

@@ -5,7 +5,7 @@
 .line { display: flex; justify-content: space-between; align-items: center; gap: var(--td-space-4); padding: var(--td-space-2) 0; border-bottom: var(--td-line-thin) solid var(--td-border); min-width: 0; }
 .k { color: var(--td-text-muted); white-space: nowrap; }
 .v { display: flex; align-items: center; gap: var(--td-space-3); min-width: 0; }
-.led { font-family: 'Bitcount Prop Single', var(--td-font-pixel); color: var(--td-highlight); text-shadow: 0 0 6px color-mix(in srgb, var(--td-highlight) 45%, transparent); }
+.led { color: var(--td-highlight); text-shadow: 0 0 6px color-mix(in srgb, var(--td-highlight) 45%, transparent); }
 .races-run .led { font-size: var(--td-text-lg); }
 .sprite { width: 1.8rem; flex: none; }
 .name-row { overflow: hidden; white-space: nowrap; min-width: 0; }

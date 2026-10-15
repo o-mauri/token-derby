@@ -31,7 +31,6 @@
   margin-top: var(--td-space-5);
   padding: 0 var(--td-space-2) var(--td-space-2);
   border-bottom: var(--td-line-thin) solid var(--td-border);
-  font-family: 'Bitcount Prop Single', var(--td-font-pixel);
   font-size: var(--td-text-sm);
   letter-spacing: var(--td-tracking-wide);
   color: var(--td-text-muted);
@@ -42,7 +41,7 @@
 .date, .code, .ran, .note, .time { color: var(--td-text-muted); }
 .code, .note, .time { font-size: var(--td-text-sm); }
 .winner { display: flex; align-items: center; gap: var(--td-space-3); min-width: 0; }
-.tokens { font-family: 'Bitcount Prop Single', var(--td-font-pixel); color: var(--td-highlight); }
+.tokens { color: var(--td-highlight); }
 .total { color: var(--td-text-muted); }
 .soon { color: var(--td-level-up); }
 .go { color: var(--td-text-muted); font-size: var(--td-text-lg); text-align: right; }
