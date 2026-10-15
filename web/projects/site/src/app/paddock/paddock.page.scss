@@ -16,7 +16,7 @@
     'stable achievements' minmax(0, 2fr) / minmax(0, 2fr) minmax(0, 1fr);
   gap: var(--td-space-4);
 }
-.career { grid-area: career; }
+.career { grid-area: career; min-height: 10rem; } // Room for its spine label to sit clear of both ends.
 .stable { grid-area: stable; }
 .trophies { grid-area: trophies; }
 .achievements { grid-area: achievements; }
