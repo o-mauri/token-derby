@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import type { OrgLink } from '../models';
 
@@ -7,6 +7,7 @@ import type { OrgLink } from '../models';
   selector: 'td-org-list',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [RouterLink],
+  host: { '[style.--td-org-rows]': 'reserved()' },
   template: `
     <div class="rows">
       @for (org of orgs(); track org.name) {
@@ -18,4 +19,6 @@ import type { OrgLink } from '../models';
 })
 export class OrgList {
   readonly orgs = input.required<readonly OrgLink[]>();
+  // Rows kept visible however short the space: all of them, up to three.
+  protected readonly reserved = computed(() => Math.min(this.orgs().length, 3));
 }

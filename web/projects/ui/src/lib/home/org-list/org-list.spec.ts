@@ -17,6 +17,16 @@ describe('OrgList', () => {
     expect([...el.querySelectorAll('a.row')].map((a) => a.getAttribute('href'))).toEqual(['/org/Acme', '/org/Zed']);
   });
 
+  it('reserves room for no more rows than it has, up to three', async () => {
+    const rows = async (n: number) => {
+      TestBed.resetTestingModule();
+      return (await render(Array.from({ length: n }, (_, i) => ({ name: `O${i}` })))).style.getPropertyValue('--td-org-rows');
+    };
+    expect(await rows(1)).toBe('1');
+    expect(await rows(2)).toBe('2');
+    expect(await rows(7)).toBe('3');
+  });
+
   it('shows each name with a chevron', async () => {
     const el = await render([{ name: 'Acme' }]);
     const text = el.querySelector('a.row')?.textContent ?? '';
