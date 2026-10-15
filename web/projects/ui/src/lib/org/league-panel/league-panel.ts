@@ -30,8 +30,8 @@ export class LeaguePanel {
   protected readonly columns = computed(() => {
     const fit = this.fit();
     return (this.view()?.columns ?? []).map((c) => {
-      // The "+N more" line takes a row of its own.
-      const shown = c.rest.length > fit ? Math.max(2, fit - 1) : c.rest.length;
+      // The "+N more" line takes a row of its own; a tight panel drops to just 2nd place.
+      const shown = c.rest.length > fit ? Math.max(1, fit - 1) : c.rest.length;
       return { ...c, shown: c.rest.slice(0, shown), more: c.rest.length - shown };
     });
   });

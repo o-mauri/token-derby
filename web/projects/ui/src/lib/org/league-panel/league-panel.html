@@ -31,7 +31,7 @@
       </section>
     }
   </div>
-  @if (v.moreDivisions > 0) { <span class="more-divisions">+{{ v.moreDivisions }} more divisions</span> }
+  @if (v.moreDivisions > 0) { <span class="more-divisions">+{{ v.moreDivisions }} more {{ v.moreDivisions === 1 ? 'division' : 'divisions' }}</span> }
 } @else {
   <p class="empty">No league</p>
 }

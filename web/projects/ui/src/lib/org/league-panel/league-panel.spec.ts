@@ -49,8 +49,17 @@ describe('LeaguePanel', () => {
     expect(el.querySelector('.division .leader .name')?.textContent?.trim()).toBe('Gallopz');
   });
 
-  it('shows two runners per column until it knows its height', async () => {
-    expect(counts(await render(LEAGUE_VIEW))).toEqual([2, 2, 2]);
+  it('shows 2nd place and the count until it knows its height', async () => {
+    const el = await render(LEAGUE_VIEW);
+    expect(counts(el)).toEqual([1, 1, 1]);
+    expect(el.querySelector('.division .more')?.textContent?.trim()).toBe('+7 more');
+  });
+
+  it('drops 3rd place in a tight panel, so "+N more" still fits', async () => {
+    // 2 rows fit: 2nd place, then the count.
+    const el = await render(LEAGUE_VIEW, { body: 110, head: 60, row: 24 });
+    expect(counts(el)).toEqual([1, 1, 1]);
+    expect(el.querySelector('.division .more')?.textContent?.trim()).toBe('+7 more');
   });
 
   it('fills a tall panel with as many rows as fit, the same in every column', async () => {
@@ -68,6 +77,9 @@ describe('LeaguePanel', () => {
   it('notes divisions beyond the third', async () => {
     const el = await render({ ...LEAGUE_VIEW!, moreDivisions: 2 });
     expect(el.querySelector('.more-divisions')?.textContent?.trim()).toBe('+2 more divisions');
+    TestBed.resetTestingModule();
+    const one = await render({ ...LEAGUE_VIEW!, moreDivisions: 1 });
+    expect(one.querySelector('.more-divisions')?.textContent?.trim()).toBe('+1 more division');
   });
 
   it('says "No league" when the org has none', async () => {
