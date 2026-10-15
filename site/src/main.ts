@@ -1,5 +1,6 @@
 import { parseRoute, type Route } from './route.js';
 import { mountFloatingV2Toggle } from './render/v2-toggle.js';
+import { createV2Prompt, shouldPrompt } from './render/v2-prompt.js';
 import { renderHome } from './render/home.js';
 import { renderRace } from './render/race.js';
 import { renderOrg } from './render/org.js';
@@ -60,6 +61,8 @@ function route() {
     }));
   }
   mountFloatingV2Toggle(document, FLOATING.has(r.type));
+  if (!shouldPrompt(r.type, window.location.hash)) document.querySelector('.v2-prompt')?.remove();
+  else if (!document.querySelector('.v2-prompt')) document.body.appendChild(createV2Prompt(document));
 }
 
 window.addEventListener('popstate', route);
