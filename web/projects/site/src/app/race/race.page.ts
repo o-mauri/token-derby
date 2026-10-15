@@ -1,3 +1,4 @@
+import { SiteVersionSwitch } from '../version/version-switch';
 import { ChangeDetectionStrategy, Component, TemplateRef, computed, effect, inject, input, signal, untracked, viewChild } from '@angular/core';
 import { Router } from '@angular/router';
 import type { DialogRef } from '@angular/cdk/dialog';
@@ -15,7 +16,7 @@ const POLL_MS = 60_000;
 @Component({
   selector: 'site-race-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Crowd, DialogFrame, DivisionResults, Finished, Loader, NotFound, Page, PendingBanner, RaceChart, RaceGraphs, RaceHeader, RaceTrack, SeasonStandingsTable, ThemePicker, Ticker, TimedTab],
+  imports: [SiteVersionSwitch, Crowd, DialogFrame, DivisionResults, Finished, Loader, NotFound, Page, PendingBanner, RaceChart, RaceGraphs, RaceHeader, RaceTrack, SeasonStandingsTable, ThemePicker, Ticker, TimedTab],
   host: { 'data-page': 'race', '[attr.data-race-state]': 'race()?.status' },
   templateUrl: './race.page.html',
   styleUrl: './race.page.scss',

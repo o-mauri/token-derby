@@ -7,7 +7,7 @@
     <td-crumbs [parts]="[{ label: orgName(), key: 'org-name' }]" />
     <span class="actions">
       @if (owner.isOwner()) { <a td-button size="sm" class="settings" routerLink="settings">⚙ Settings</a> }
-      <td-theme-picker compact />
+      <site-version-switch /><td-theme-picker compact />
       <a td-button size="sm" routerLink="/">← Home</a>
     </span>
   </header>

@@ -1,3 +1,4 @@
+import { SiteVersionSwitch } from '../version/version-switch';
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import {
@@ -11,7 +12,7 @@ import { leaguePanelView, livePanelView, racesPanelView, statsPanelView } from '
 @Component({
   selector: 'site-org-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Button, Crumbs, LeaguePanel, LivePanel, Loader, NotFound, Page, Panel, RacesPanel, StatsPanel, ThemePicker, RouterLink],
+  imports: [SiteVersionSwitch, Button, Crumbs, LeaguePanel, LivePanel, Loader, NotFound, Page, Panel, RacesPanel, StatsPanel, ThemePicker, RouterLink],
   host: { 'data-page': 'org' },
   templateUrl: './org.page.html',
   styleUrl: './org.page.scss',

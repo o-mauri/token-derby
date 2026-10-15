@@ -4,7 +4,7 @@
     @if (session.signedIn()) {
       <td-account-menu [name]="name()" [accountLink]="['/account']" (signOut)="signOut()" />
     }
-    <td-theme-picker compact />
+    <site-version-switch /><td-theme-picker compact />
     <a td-button size="sm" routerLink="/">← Home</a>
   </span>
 </header>

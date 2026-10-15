@@ -3,7 +3,7 @@
     @if (session.signedIn()) {
       <td-account-menu [name]="name()" [accountLink]="['/account']" (signOut)="signOut()" />
     }
-    <td-theme-picker compact />
+    <site-version-switch /><td-theme-picker compact />
   </div>
 
   <div class="column">

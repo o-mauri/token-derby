@@ -1,3 +1,4 @@
+import { SiteVersionSwitch } from '../version/version-switch';
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, linkedSignal, signal } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
@@ -16,7 +17,7 @@ const RACE_CODE = /^[A-Za-z0-9]{6}$/;
 @Component({
   selector: 'site-home-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Page, ThemePicker, HorseFace, Loader, AccountMenu, GoogleButton, GoBox, OrgList, YouCard, RouterLink, NgTemplateOutlet],
+  imports: [SiteVersionSwitch, Page, ThemePicker, HorseFace, Loader, AccountMenu, GoogleButton, GoBox, OrgList, YouCard, RouterLink, NgTemplateOutlet],
   providers: [HomeApi],
   host: { 'data-page': 'home', '[style.--home-scale]': 'scale()' },
   templateUrl: './home.page.html',

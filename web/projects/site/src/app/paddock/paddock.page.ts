@@ -1,3 +1,4 @@
+import { SiteVersionSwitch } from '../version/version-switch';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import type { GetJockeyResponse, StableHorse } from '@token-derby/shared';
@@ -12,7 +13,7 @@ type Load = { status: 'loading' } | { status: 'error' } | { status: 'ready'; joc
 @Component({
   selector: 'site-paddock-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, Button, Crumbs, GoogleButton, Horse, Loader, Panel, ThemePicker],
+  imports: [SiteVersionSwitch, RouterLink, Button, Crumbs, GoogleButton, Horse, Loader, Panel, ThemePicker],
   host: { 'data-page': 'paddock' },
   templateUrl: './paddock.page.html',
   styleUrl: './paddock.page.scss',

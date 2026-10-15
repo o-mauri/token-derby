@@ -1,7 +1,7 @@
 <header class="top">
   <td-crumbs [parts]="[{ label: session.signedIn() ? name() : 'Token Derby', link: session.signedIn() ? ['/account'] : ['/'] }, { label: 'Paddock' }]" />
   <span class="actions">
-    <td-theme-picker compact />
+    <site-version-switch /><td-theme-picker compact />
     <a td-button size="sm" routerLink="/">← Home</a>
   </span>
 </header>

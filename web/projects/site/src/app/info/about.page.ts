@@ -1,3 +1,4 @@
+import { SiteVersionSwitch } from '../version/version-switch';
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Button, Crumbs, ThemePicker } from '@token-derby/ui';
@@ -7,12 +8,12 @@ import { CHANGELOG, CLI_VERSION, SITE_VERSION, changeLines } from './release-dat
 @Component({
   selector: 'site-about-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, Button, Crumbs, ThemePicker],
+  imports: [SiteVersionSwitch, RouterLink, Button, Crumbs, ThemePicker],
   host: { 'data-page': 'about' },
   template: `
     <header class="top">
       <td-crumbs [parts]="[{ label: 'Token Derby', link: ['/'] }, { label: 'About' }]" />
-      <span class="actions"><td-theme-picker compact /><a td-button size="sm" routerLink="/">← Home</a></span>
+      <span class="actions"><site-version-switch /><td-theme-picker compact /><a td-button size="sm" routerLink="/">← Home</a></span>
     </header>
     <main class="column">
       <p class="versions">Current · Site <b>v{{ site }}</b> · CLI <b>v{{ cli }}</b></p>

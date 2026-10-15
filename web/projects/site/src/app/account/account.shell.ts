@@ -1,3 +1,4 @@
+import { SiteVersionSwitch } from '../version/version-switch';
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { Router, RouterLink, RouterOutlet } from '@angular/router';
 import { AccountMenu, Button, Crumbs, GoogleButton, ThemePicker, type TabLink, Tabs } from '@token-derby/ui';
@@ -12,7 +13,7 @@ const TABS: TabLink[] = [{ label: 'Profile', link: ['.'] }, { label: 'Devices', 
 @Component({
   selector: 'site-account-shell',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterOutlet, RouterLink, AccountMenu, Button, Crumbs, GoogleButton, ThemePicker, Tabs],
+  imports: [SiteVersionSwitch, RouterOutlet, RouterLink, AccountMenu, Button, Crumbs, GoogleButton, ThemePicker, Tabs],
   providers: [AccountApi],
   host: { 'data-page': 'account', '[style.--home-scale]': 'scale()' },
   templateUrl: './account.shell.html',

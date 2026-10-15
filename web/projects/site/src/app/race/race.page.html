@@ -6,7 +6,7 @@
   @let r = race();
   <td-race-header [name]="r?.name ?? ''" [status]="r?.status ?? null" [anchor]="anchor()" [joinCode]="joinCode()"
     [orgName]="r?.organisation_name ?? null" (home)="router.navigate(['/'])" (org)="goOrg()" (graphs)="openGraphs()">
-    <td-theme-picker compact />
+    <site-version-switch /><td-theme-picker compact />
   </td-race-header>
 
   @if (!r) {

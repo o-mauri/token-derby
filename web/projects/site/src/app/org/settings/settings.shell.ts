@@ -1,3 +1,4 @@
+import { SiteVersionSwitch } from '../../version/version-switch';
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { Router, RouterLink, RouterOutlet } from '@angular/router';
 import {
@@ -19,7 +20,7 @@ const TABS: TabLink[] = [
 @Component({
   selector: 'site-settings-shell',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterOutlet, RouterLink, AccountMenu, Button, Confirm, Crumbs, GoogleButton, Loader, NotFound, ThemePicker, Tabs],
+  imports: [SiteVersionSwitch, RouterOutlet, RouterLink, AccountMenu, Button, Confirm, Crumbs, GoogleButton, Loader, NotFound, ThemePicker, Tabs],
   host: { 'data-page': 'org-settings', '[style.--home-scale]': 'scale()' },
   templateUrl: './settings.shell.html',
   styleUrl: './settings.shell.scss',

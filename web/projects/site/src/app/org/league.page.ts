@@ -1,3 +1,4 @@
+import { SiteVersionSwitch } from '../version/version-switch';
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import {
@@ -11,7 +12,7 @@ import { leaguePageView, seasonToShow } from './org-view';
 @Component({
   selector: 'site-org-league-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Button, ColumnTemplate, ColumnWindow, Crumbs, LeagueTable, Loader, NotFound, Page, SeasonPager, ThemePicker, RouterLink],
+  imports: [SiteVersionSwitch, Button, ColumnTemplate, ColumnWindow, Crumbs, LeagueTable, Loader, NotFound, Page, SeasonPager, ThemePicker, RouterLink],
   host: { 'data-page': 'org-league' },
   templateUrl: './league.page.html',
   styleUrl: './league.page.scss',

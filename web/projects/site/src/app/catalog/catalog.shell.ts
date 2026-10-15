@@ -1,3 +1,4 @@
+import { SiteVersionSwitch } from '../version/version-switch';
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import { Router, RouterLink, RouterOutlet } from '@angular/router';
 import { Button, ChipGroup, Crumbs, type TabLink, Tabs, type TdOption, ThemePicker } from '@token-derby/ui';
@@ -8,7 +9,7 @@ import { PALETTES, RARITIES, collectibles, hatsOf, paletteFor, rarityLabel } fro
 @Component({
   selector: 'site-catalog-shell',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterOutlet, RouterLink, Button, ChipGroup, Crumbs, Tabs, ThemePicker],
+  imports: [SiteVersionSwitch, RouterOutlet, RouterLink, Button, ChipGroup, Crumbs, Tabs, ThemePicker],
   host: { 'data-page': 'catalog', '[style.--home-scale]': 'scale()' },
   templateUrl: './catalog.shell.html',
   styleUrl: './catalog.shell.scss',

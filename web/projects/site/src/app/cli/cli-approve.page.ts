@@ -1,3 +1,4 @@
+import { SiteVersionSwitch } from '../version/version-switch';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { normaliseUserCode } from '@token-derby/shared';
@@ -13,7 +14,7 @@ type Step = 'enter' | 'confirm' | 'done';
 @Component({
   selector: 'site-cli-approve-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, Button, CodeInput, Crumbs, GoogleButton],
+  imports: [SiteVersionSwitch, RouterLink, Button, CodeInput, Crumbs, GoogleButton],
   providers: [CliApi],
   host: { 'data-page': 'cli', '[style.--home-scale]': 'scale()' },
   templateUrl: './cli-approve.page.html',

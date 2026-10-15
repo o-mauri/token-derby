@@ -1,3 +1,4 @@
+import { SiteVersionSwitch } from '../version/version-switch';
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Button, Crumbs, ThemePicker } from '@token-derby/ui';
@@ -6,12 +7,12 @@ import { Button, Crumbs, ThemePicker } from '@token-derby/ui';
 @Component({
   selector: 'site-privacy-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, Button, Crumbs, ThemePicker],
+  imports: [SiteVersionSwitch, RouterLink, Button, Crumbs, ThemePicker],
   host: { 'data-page': 'privacy' },
   template: `
     <header class="top">
       <td-crumbs [parts]="[{ label: 'Token Derby', link: ['/'] }, { label: 'Privacy' }]" />
-      <span class="actions"><td-theme-picker compact /><a td-button size="sm" routerLink="/">← Home</a></span>
+      <span class="actions"><site-version-switch /><td-theme-picker compact /><a td-button size="sm" routerLink="/">← Home</a></span>
     </header>
     <main class="column prose">
       <p>Token Derby is a hobby project that races a horse for every participant,

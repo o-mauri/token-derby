@@ -2,7 +2,7 @@
 :host { display: flex; flex-direction: column; height: max(100dvh, 32rem); position: relative; }
 
 .top { display: flex; justify-content: space-between; align-items: center; gap: var(--td-space-5); flex-wrap: wrap; padding: var(--td-space-5); }
-.actions { display: flex; align-items: center; gap: var(--td-space-4); }
+.actions { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: var(--td-space-4); }
 .tab { flex: 1; min-height: 0; display: flex; flex-direction: column; position: relative; zoom: var(--home-scale, 1); }
 .centre { flex: 1; display: grid; place-content: center; justify-items: center; gap: var(--td-space-5); padding: var(--td-space-6); text-align: center; font-size: var(--td-text-lg); }
 .centre p { margin: 0; }
