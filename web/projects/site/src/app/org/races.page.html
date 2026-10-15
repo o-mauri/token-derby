@@ -7,6 +7,7 @@
     <td-crumbs [parts]="[{ label: orgName(), link: ['..'], key: 'org-name' }, { label: 'Races' }]" />
     <span class="actions">
       <td-theme-picker compact />
+      @if (orgName()) { <a td-button size="sm" class="back" routerLink="..">← {{ orgName() }}</a> }
       <a td-button size="sm" routerLink="/">← Home</a>
     </span>
   </header>

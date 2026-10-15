@@ -19,6 +19,16 @@ test('the races tab lists races and the league tab shows standings', async ({ pa
   await expect(page.locator('[data-page="org-league"] td-league-table').first()).toBeVisible();
 });
 
+for (const tab of ['races', 'league']) {
+  test(`the ${tab} page has a button back to the org`, async ({ page }) => {
+    await fakeApi(page, orgRoutes());
+    await page.goto(`/org/${PREVIEW_ORG}/${tab}`);
+    await page.getByRole('link', { name: `← ${PREVIEW_ORG}` }).click();
+    await expect(page).toHaveURL(new RegExp(`/org/${PREVIEW_ORG}$`));
+    await expect(page.locator('[data-page="org"]')).toBeVisible();
+  });
+}
+
 test('an unknown org shows not-found naming it', async ({ page }) => {
   await fakeApi(page, {
     'GET /api/organisations/Nope/races': notFound('ORG_NOT_FOUND'),
