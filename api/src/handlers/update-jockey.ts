@@ -1,12 +1,13 @@
 import type { ApiHandler } from '../lib/http.js';
 import type { UpdateJockeyRequest, UpdateJockeyResponse } from '@token-derby/shared';
 import { USER_NAME_MAX_LENGTH } from '@token-derby/shared';
-import { authenticate } from '../lib/auth.js';
+import { resolveCaller } from '../lib/auth.js';
 import { updateUserDisplayName } from '../db/users.js';
+import { setUserWebSessionsDisplayName } from '../db/web-sessions.js';
 import { ok, err, parseJson } from '../lib/http.js';
 
 export const handler: ApiHandler = async (event) => {
-  const auth = await authenticate(event);
+  const auth = await resolveCaller(event);
   if ('error' in auth) return err('UNAUTHENTICATED', auth.error);
 
   const body = parseJson<UpdateJockeyRequest>(event.body);
@@ -19,6 +20,8 @@ export const handler: ApiHandler = async (event) => {
   }
 
   await updateUserDisplayName(auth.user_id, display_name);
+  // Web sessions carry the name they were signed in with; later requests in them stamp that name.
+  await setUserWebSessionsDisplayName(auth.user_id, display_name);
   const response: UpdateJockeyResponse = { user_id: auth.user_id, display_name };
   return ok(response);
 };

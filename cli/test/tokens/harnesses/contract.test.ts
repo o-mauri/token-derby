@@ -92,8 +92,11 @@ describe.each(HARNESS_KEYS)('Harness contract — %s', (key) => {
     await fs.chmod(file, 0o000);   // unreadable, but discoverable
     try {
       if (harness.counting.mode === 'custom') {
-        // Whole-history readers can't single out one file, so the harness fails as a whole.
-        await expect(count(harness)).rejects.toThrow();
+        // A whole-history reader either fails as a whole or names the file's
+        // conversation -- never a silent zero.
+        const outcome = await count(harness).catch((e: unknown) => e);
+        if (outcome instanceof Error) return;
+        expect((outcome as Awaited<ReturnType<typeof count>>).unreadable).toHaveLength(1);
       } else {
         const result = await count(harness);
         expect(result.unreadable).toHaveLength(1);

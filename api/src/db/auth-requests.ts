@@ -11,6 +11,7 @@ export type PendingAuthRequest = {
   nonce: string;
   redirect_uri: string;
   link_to_user_id?: string;
+  return_to?: string;
 };
 
 export async function putAuthRequest(req: PendingAuthRequest & {
@@ -25,6 +26,7 @@ export async function putAuthRequest(req: PendingAuthRequest & {
       nonce: req.nonce,
       redirect_uri: req.redirect_uri,
       ...(req.link_to_user_id ? { link_to_user_id: req.link_to_user_id } : {}),
+      ...(req.return_to ? { return_to: req.return_to } : {}),
       created_at: new Date().toISOString(),
       ttl: nowSeconds() + req.ttlSeconds,
     },
@@ -52,5 +54,6 @@ export async function consumeAuthRequest(state: string): Promise<PendingAuthRequ
     nonce: String(Item.nonce),
     redirect_uri: String(Item.redirect_uri),
     ...(Item.link_to_user_id ? { link_to_user_id: String(Item.link_to_user_id) } : {}),
+    ...(Item.return_to ? { return_to: String(Item.return_to) } : {}),
   };
 }

@@ -1,11 +1,11 @@
 import type { ApiHandler } from '../lib/http.js';
 import type { GetJockeyResponse } from '@token-derby/shared';
-import { authenticate } from '../lib/auth.js';
+import { resolveCaller } from '../lib/auth.js';
 import { getUserById } from '../db/users.js';
 import { ok, err } from '../lib/http.js';
 
 export const handler: ApiHandler = async (event) => {
-  const auth = await authenticate(event);
+  const auth = await resolveCaller(event);
   if ('error' in auth) return err('UNAUTHENTICATED', auth.error);
 
   const user = await getUserById(auth.user_id);

@@ -3,7 +3,7 @@ import type { ApiHandler } from '../lib/http.js';
 import { loadAuthConfig } from '../lib/auth-config.js';
 import { putAuthRequest } from '../db/auth-requests.js';
 import {
-  generatePkce, signState, buildAuthorizeUrl, originOf, stateCookie, AUTH_REQUEST_TTL_SECONDS,
+  generatePkce, signState, safeReturnTo, buildAuthorizeUrl, originOf, stateCookie, AUTH_REQUEST_TTL_SECONDS,
 } from '../lib/oauth.js';
 
 export const handler: ApiHandler = async (event) => {
@@ -16,6 +16,7 @@ export const handler: ApiHandler = async (event) => {
   await putAuthRequest({
     state, code_verifier: verifier, nonce, redirect_uri: redirectUri,
     ttlSeconds: AUTH_REQUEST_TTL_SECONDS,
+    return_to: safeReturnTo(event.queryStringParameters?.return_to),
   });
 
   return {

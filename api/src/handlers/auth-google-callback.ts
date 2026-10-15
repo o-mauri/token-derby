@@ -2,7 +2,7 @@ import type { APIGatewayProxyEventV2, APIGatewayProxyStructuredResultV2 } from '
 import type { ApiHandler } from '../lib/http.js';
 import { loadAuthConfig } from '../lib/auth-config.js';
 import { consumeAuthRequest } from '../db/auth-requests.js';
-import { verifyState, originOf, hasStateCookie } from '../lib/oauth.js';
+import { verifyState, originOf, hasStateCookie, siteUrl } from '../lib/oauth.js';
 import { verifyGoogleIdToken } from '../lib/google-id-token.js';
 import { resolveGoogleIdentity, EmailAlreadyLinkedError } from '../lib/identity-link.js';
 import { putWebGrant } from '../db/web-sessions.js';
@@ -27,8 +27,8 @@ function redirect(location: string): APIGatewayProxyStructuredResultV2 {
   return { statusCode: 302, headers: { location, 'cache-control': 'no-store' }, body: '' };
 }
 
-const fail = (origin: string, code: string) =>
-  redirect(`${origin}/org-manager?auth_error=${encodeURIComponent(code)}`);
+const fail = (origin: string, code: string, returnTo?: string) =>
+  redirect(siteUrl(origin, returnTo, { error: code }));
 
 export async function handleCallback(
   event: APIGatewayProxyEventV2,
@@ -55,14 +55,17 @@ export async function handleCallback(
     // burn the single-use request belonging to the browser that started it.
     if (!hasStateCookie(event, state)) return fail(origin, 'sso_failed');
 
-    if (q.error) return fail(origin, 'sso_failed');
-
+    // The pending row is read before Google's error, so a cancelled sign-in
+    // still returns to the page that started it.
     const pending = await consumeAuthRequest(state);
     if (!pending) return fail(origin, 'expired');
     origin = siteOriginFrom(pending.redirect_uri);
+    const back = pending.return_to;
+
+    if (q.error) return fail(origin, 'sso_failed', back);
 
     const code = q.code;
-    if (!code) return fail(origin, 'sso_failed');
+    if (!code) return fail(origin, 'sso_failed', back);
 
     try {
       const res = await fetchImpl(TOKEN_URL, {
@@ -77,10 +80,10 @@ export async function handleCallback(
           code_verifier: pending.code_verifier,
         }).toString(),
       });
-      if (!res.ok) return fail(origin, 'sso_failed');
+      if (!res.ok) return fail(origin, 'sso_failed', back);
 
       const payload = (await res.json()) as { id_token?: string };
-      if (!payload.id_token) return fail(origin, 'sso_failed');
+      if (!payload.id_token) return fail(origin, 'sso_failed', back);
 
       const claims = await verifyIdToken(payload.id_token, {
         clientId: cfg.clientId,
@@ -94,10 +97,10 @@ export async function handleCallback(
       const grant = generateWebSessionCode();
       await putWebGrant(grant, identity.user_id, identity.display_name, GRANT_TTL_SECONDS);
 
-      return redirect(`${origin}/org-manager#code=${grant}`);
+      return redirect(siteUrl(origin, back, { hash: `code=${grant}` }));
     } catch (e) {
-      if (e instanceof EmailAlreadyLinkedError) return fail(origin, 'email_already_linked');
-      return fail(origin, 'sso_failed');
+      if (e instanceof EmailAlreadyLinkedError) return fail(origin, 'email_already_linked', back);
+      return fail(origin, 'sso_failed', back);
     }
   } catch (e) {
     // The only auth telemetry on this flow — without it a config or SSM failure

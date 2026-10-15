@@ -4,7 +4,7 @@ import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import {
   generatePkce, signState, verifyState, buildAuthorizeUrl, originOf,
   stateCookie, stateCookieName, hasStateCookie, STATE_COOKIE_PREFIX, STATE_COOKIE_TTL_SECONDS,
-  AUTH_REQUEST_TTL_SECONDS,
+  AUTH_REQUEST_TTL_SECONDS, safeReturnTo, siteUrl,
 } from '../../src/lib/oauth.js';
 
 describe('generatePkce', () => {
@@ -151,5 +151,30 @@ describe('buildAuthorizeUrl', () => {
     expect(url.searchParams.get('nonce')).toBe('no');
     expect(url.searchParams.get('code_challenge')).toBe('ch');
     expect(url.searchParams.get('code_challenge_method')).toBe('S256');
+  });
+});
+
+describe('safeReturnTo', () => {
+  it.each([['/', '/'], ['/org/Acme?x=1', '/org/Acme?x=1']])('keeps same-site path %s', (input, out) => {
+    expect(safeReturnTo(input)).toBe(out);
+  });
+  it.each([undefined, '', 'org', '//evil.com', '/\\evil.com', 'https://evil.com', 'javascript:alert(1)', '/' + 'a'.repeat(512),
+    '/\t/evil.com', '/\n/evil.com', '/\r/evil.com', '/\t\\evil.com', '/a\\b'])(
+    'drops %s', (input) => { expect(safeReturnTo(input)).toBeUndefined(); },
+  );
+});
+
+describe('siteUrl', () => {
+  it('adds the code as the fragment', () => {
+    expect(siteUrl('https://app.x', '/?x=1', { hash: 'code=AB' })).toBe('https://app.x/?x=1#code=AB');
+  });
+  it('merges auth_error into an existing query and drops any fragment', () => {
+    expect(siteUrl('https://app.x', '/?x=1#y', { error: 'expired' })).toBe('https://app.x/?x=1&auth_error=expired');
+  });
+  it('never leaves the origin, whatever slips past the path check', () => {
+    expect(siteUrl('https://app.x', '/\t/evil.com', { hash: 'code=AB' })).toBe('https://app.x/org-manager#code=AB');
+  });
+  it('defaults to /org-manager', () => {
+    expect(siteUrl('https://app.x', undefined, { error: 'sso_failed' })).toBe('https://app.x/org-manager?auth_error=sso_failed');
   });
 });

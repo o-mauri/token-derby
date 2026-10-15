@@ -5,6 +5,7 @@ import { getOrganisationByName } from '../db/organisations.js';
 import { getLeague } from '../db/leagues.js';
 import { getLeagueSeason } from '../db/league-seasons.js';
 import { listSeasonStandings } from '../db/league-standings.js';
+import { getStableHorseLooks } from '../db/stable.js';
 import { ok, err } from '../lib/http.js';
 
 export const handler: ApiHandler = async (event) => {
@@ -32,16 +33,26 @@ export const handler: ApiHandler = async (event) => {
   const seasonRow = await getLeagueSeason(org.org_id, season);
   const standings = await listSeasonStandings(org.org_id, season);
 
+  // Colours and hats are cosmetic: if the lookup fails, the table still loads without them.
+  const looks = await getStableHorseLooks(standings.map((s) => ({ user_id: s.user_id, stable_horse_id: s.stable_horse_id })))
+    .catch(() => new Map<string, never>());
+  const built = buildSeasonStandings({
+    org_name: org.org_name,
+    divisions: league.divisions,
+    boundaries: league.boundaries,
+    races_per_season: league.races_per_season,
+    season,
+    round: seasonRow?.fixtures_materialised ?? 0,
+    standings,
+  });
   const response: GetLeagueStandingsResponse = {
-    standings: buildSeasonStandings({
-      org_name: org.org_name,
-      divisions: league.divisions,
-      boundaries: league.boundaries,
-      races_per_season: league.races_per_season,
-      season,
-      round: seasonRow?.fixtures_materialised ?? 0,
-      standings,
-    }),
+    standings: {
+      ...built,
+      divisions: built.divisions.map((d) => ({
+        ...d,
+        rows: d.rows.map((r) => ({ ...r, ...looks.get(r.stable_horse_id) })),
+      })),
+    },
   };
   return ok(response);
 };

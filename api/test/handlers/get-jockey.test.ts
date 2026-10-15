@@ -92,3 +92,22 @@ describe('get-jockey handler', () => {
     expect(body.device_label).toBe('omars-desktop');
   });
 });
+
+describe('get-jockey with a web session', () => {
+  it('answers the signed-in website user, with no device label', async () => {
+    const { putWebSession } = await import('../../src/db/web-sessions.js');
+    const user_id = randomUUID();
+    await createUserWithEmail({ user_id, email: `${user_id}@example.com`, idp_sub: `sub-${user_id}`, display_name: 'Web' });
+    await putWebSession(`web-${user_id}`, user_id, 'Web', new Date(Date.now() + 3_600_000).toISOString(), 3600);
+    const res: any = await getJockey({ ...meEvent('', ''), headers: { authorization: `Bearer web-${user_id}` } });
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body).toMatchObject({ user_id, display_name: 'Web', email: `${user_id}@example.com` });
+    expect(body.device_label).toBeUndefined();
+  });
+
+  it('refuses a request with no credentials', async () => {
+    const res: any = await getJockey({ ...meEvent('', ''), headers: {} });
+    expect(res.statusCode).toBe(401);
+  });
+});

@@ -1,4 +1,4 @@
-import { GetCommand, QueryCommand, TransactWriteCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
+import { BatchGetCommand, GetCommand, QueryCommand, TransactWriteCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { ddb, TABLE } from './client.js';
 import {
   stableHorseKey,
@@ -6,7 +6,7 @@ import {
   USER_PK_PREFIX,
   STABLE_HORSE_SK_PREFIX,
 } from './keys.js';
-import type { CollectedHat, StableHorse } from '@token-derby/shared';
+import type { CollectedHat, HorseColors, StableHorse } from '@token-derby/shared';
 import { adjustEquippedAfterRemoval } from '../lib/hat-removal.js';
 
 /**
@@ -351,4 +351,31 @@ export async function removeStableHorseHat(
     hats,
     equipped_hat: nextEquipped === null ? undefined : nextEquipped,
   };
+}
+
+/** Colours and equipped hat for many stable horses at once, keyed by stable_horse_id. Missing horses are absent. */
+export async function getStableHorseLooks(
+  keys: { user_id: string; stable_horse_id: string }[],
+): Promise<Map<string, { colors: HorseColors; hat?: CollectedHat }>> {
+  const out = new Map<string, { colors: HorseColors; hat?: CollectedHat }>();
+  const unique = [...new Map(keys.map((k) => [`${k.user_id}#${k.stable_horse_id}`, k])).values()];
+  // BatchGet is limited to 100 keys per request.
+  for (let i = 0; i < unique.length; i += 100) {
+    const chunk = unique.slice(i, i + 100);
+    const { Responses } = await ddb.send(new BatchGetCommand({
+      RequestItems: {
+        [TABLE]: {
+          Keys: chunk.map((k) => stableHorseKey(k.user_id, k.stable_horse_id)),
+          ProjectionExpression: 'stable_horse_id, colors, hats, equipped_hat',
+        },
+      },
+    }));
+    for (const row of Responses?.[TABLE] ?? []) {
+      const horse = row as Pick<StableHorse, 'stable_horse_id' | 'colors' | 'hats' | 'equipped_hat'>;
+      const idx = horse.equipped_hat;
+      const hat = typeof idx === 'number' ? horse.hats?.[idx] : undefined;
+      out.set(horse.stable_horse_id, { colors: horse.colors, ...(hat ? { hat } : {}) });
+    }
+  }
+  return out;
 }
