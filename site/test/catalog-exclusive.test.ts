@@ -36,3 +36,11 @@ describe('the real catalog', () => {
     expect(html).toContain('hat-exclusive');
   });
 });
+
+describe('catalog header', () => {
+  it('holds the V2 switch', () => {
+    const root = document.createElement('div');
+    renderCatalog(root);
+    expect(root.querySelector('.catalog-header .v2-toggle')).not.toBeNull();
+  });
+});

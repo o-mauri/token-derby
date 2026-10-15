@@ -1,4 +1,5 @@
-import { parseRoute } from './route.js';
+import { parseRoute, type Route } from './route.js';
+import { mountFloatingV2Toggle } from './render/v2-toggle.js';
 import { renderHome } from './render/home.js';
 import { renderRace } from './render/race.js';
 import { renderOrg } from './render/org.js';
@@ -18,6 +19,9 @@ import { createNotFound } from './render/not-found.js';
 
 document.body.classList.add('tv'); // TV is the only mode
 initTheme();
+
+// Routes whose pages have no header of their own to hold the V2 switch.
+const FLOATING = new Set<Route['type']>(['home', 'about', 'privacy', 'org-manager', 'cli', 'link', 'not-found']);
 
 let activeCleanup: (() => void) | null = null;
 
@@ -55,6 +59,7 @@ function route() {
       back: { label: '← Home', href: '/' },
     }));
   }
+  mountFloatingV2Toggle(document, FLOATING.has(r.type));
 }
 
 window.addEventListener('popstate', route);

@@ -11,6 +11,7 @@ import { createTicker, collectFreshItems, leagueOrderCells, leagueStandingsCells
 import { applyCheerJitter, crowdColumns, syncSpectators } from './crowd.js';
 import { createRaceGraphs } from './race-graphs.js';
 import { createThemePicker } from './theme-picker.js';
+import { createV2Toggle } from './v2-toggle.js';
 import { createLoader } from './loader.js';
 import { createNotFound } from './not-found.js';
 
@@ -56,6 +57,7 @@ export function renderRace(root: HTMLElement, joinCode: string, opts: RenderRace
   // the header's trailing edge.
   const meta = frame.querySelector<HTMLElement>('.race-header .meta')!;
   meta.insertBefore(createThemePicker(root.ownerDocument), meta.querySelector('.org-btn'));
+  meta.insertBefore(createV2Toggle(root.ownerDocument), meta.querySelector('.theme-picker'));
 
   const track = frame.querySelector<HTMLElement>('.track')!;
   track.appendChild(createLoader(root.ownerDocument));
