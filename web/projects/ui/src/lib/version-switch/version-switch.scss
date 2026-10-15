@@ -1,0 +1,9 @@
+:host { display: inline-block; }
+button { display: inline-flex; align-items: center; gap: var(--td-space-2); background: none; border: 0; padding: var(--td-space-1); color: var(--td-text-muted); font: inherit; font-family: var(--td-font-pixel); font-size: var(--td-text-sm); letter-spacing: var(--td-tracking-wide); cursor: pointer; }
+button:hover, button:focus-visible { color: var(--td-text); }
+button:focus-visible { outline: var(--td-focus-width) solid var(--td-highlight); outline-offset: var(--td-focus-offset); }
+.track { position: relative; width: 1.9rem; height: 1rem; border: var(--td-line) solid var(--td-border); border-radius: var(--td-radius-pill); background: var(--td-surface-raised); box-sizing: border-box; }
+.knob { position: absolute; top: 50%; left: 0.15rem; width: 0.5rem; height: 0.5rem; border-radius: 50%; background: var(--td-text-muted); transform: translateY(-50%); }
+button[aria-checked='true'] .track { border-color: var(--td-highlight); }
+button[aria-checked='true'] .knob { left: auto; right: 0.15rem; background: var(--td-highlight); }
+button[aria-checked='true'] { color: var(--td-text); }
