@@ -11,7 +11,10 @@ vi.mock('../src/api.js', async () => {
 // org-live only orchestrates *which* race it shows, so stub it.
 const raceCleanup = vi.fn();
 const renderRace = vi.fn((_root: HTMLElement, _joinCode: string) => raceCleanup);
-vi.mock('../src/render/race.js', () => ({ renderRace: (root: HTMLElement, code: string) => renderRace(root, code) }));
+const raceOpts = vi.fn();
+vi.mock('../src/render/race.js', () => ({
+  renderRace: (root: HTMLElement, code: string, opts?: unknown) => { raceOpts(opts); return renderRace(root, code); },
+}));
 
 import { renderOrgLive, pickLiveOrLastRace } from '../src/render/org-live.js';
 import { ApiError } from '../src/api.js';
@@ -115,6 +118,14 @@ describe('renderOrgLive', () => {
     await vi.advanceTimersByTimeAsync(60_000);
     expect(raceCleanup).toHaveBeenCalledTimes(1);
     expect(renderRace).toHaveBeenLastCalledWith(root, 'LIV222');
+    cleanup();
+  });
+
+  it('renders the race without the V2 switch', async () => {
+    fetchOrgRaces.mockResolvedValue(resp([race({ join_code: 'LIV222', status: 'live' })]));
+    const cleanup = renderOrgLive(root, 'Acme');
+    await flush();
+    expect(raceOpts).toHaveBeenCalledWith({ v2Toggle: false });
     cleanup();
   });
 

@@ -43,4 +43,12 @@ describe('catalog header', () => {
     renderCatalog(root);
     expect(root.querySelector('.catalog-header .v2-toggle')).not.toBeNull();
   });
+
+  it('keeps the Home button navigating to /', () => {
+    const root = document.createElement('div');
+    renderCatalog(root);
+    window.history.pushState({}, '', '/catalog');
+    root.querySelector<HTMLButtonElement>('.catalog-header .home-btn')!.click();
+    expect(window.location.pathname).toBe('/');
+  });
 });

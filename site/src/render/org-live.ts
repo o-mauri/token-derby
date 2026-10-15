@@ -46,7 +46,7 @@ export function renderOrgLive(root: HTMLElement, orgName: string): () => void {
 
     innerCleanup?.();
     shownJoinCode = pick.join_code;
-    innerCleanup = renderRace(root, pick.join_code);
+    innerCleanup = renderRace(root, pick.join_code, { v2Toggle: false });
   };
 
   void resolve();

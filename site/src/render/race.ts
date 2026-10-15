@@ -24,6 +24,8 @@ type RenderRaceOpts = {
   // Mid-race graph popup. Off by default so the org-live TV view, which has no
   // pointer, does not get a control nobody can click.
   showGraphs?: boolean;
+  // The V2 switch in the header; the TV view turns it off.
+  v2Toggle?: boolean;
 };
 
 export function renderRace(root: HTMLElement, joinCode: string, opts: RenderRaceOpts = {}): () => void {
@@ -57,7 +59,7 @@ export function renderRace(root: HTMLElement, joinCode: string, opts: RenderRace
   // the header's trailing edge.
   const meta = frame.querySelector<HTMLElement>('.race-header .meta')!;
   meta.insertBefore(createThemePicker(root.ownerDocument), meta.querySelector('.org-btn'));
-  meta.insertBefore(createV2Toggle(root.ownerDocument), meta.querySelector('.theme-picker'));
+  if (opts.v2Toggle !== false) meta.insertBefore(createV2Toggle(root.ownerDocument), meta.querySelector('.theme-picker'));
 
   const track = frame.querySelector<HTMLElement>('.track')!;
   track.appendChild(createLoader(root.ownerDocument));

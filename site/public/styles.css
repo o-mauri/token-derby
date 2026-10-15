@@ -3215,6 +3215,7 @@ body.tv .race-header .meta .theme-select { padding: 3px 10px; font-size: 0.9rem;
   /* Last thing to go. Home still gets you out, and the org page is one click
      from there — whereas nothing else here has a second route to it. */
   .race-header .meta .org-btn { display: none; }
+  .race-header .meta .v2-toggle { display: none; }
   .race-header .meta .btn { padding: 3px 6px; }
 }
 
