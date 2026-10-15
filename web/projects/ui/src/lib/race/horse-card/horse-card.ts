@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 import { HorseFace } from '../../horse-face/horse-face';
+import { discTone } from '../../horse-head/horse-head';
 import { Marquee } from '../../horse-chip/marquee';
 import { medalOf, ordinal } from '../../horse-chip/ordinal';
 import { GapTrack, type GapMark } from '../gap-track/gap-track';
@@ -27,6 +28,11 @@ export class HorseCard {
   readonly field = input.required<readonly LaneView[]>();
 
   protected readonly face = computed(() => ({ body: this.lane().colors.body, mane: this.lane().colors.mane }));
+  // Light behind a dark horse, dark behind a light one, mid-grey when coat and mane differ so neither vanishes.
+  protected readonly portraitTone = computed(() => {
+    const [body, mane] = [discTone(this.lane().colors.body), discTone(this.lane().colors.mane)];
+    return body === mane ? body : 'mixed';
+  });
   protected readonly place = computed(() => {
     const [, num, suffix] = /^(\d+)(\D+)$/.exec(ordinal(this.lane().position))!;
     const medal = medalOf(this.lane().position);

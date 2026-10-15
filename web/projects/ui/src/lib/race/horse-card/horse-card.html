@@ -1,6 +1,6 @@
 @let l = lane();
 <header class="silks" [style.--silk]="l.colors.saddle" [style.--silk-edge]="l.colors.body">
-  <span class="portrait"><td-horse-face [colors]="face()" /></span>
+  <span [class]="'portrait ' + portraitTone()"><td-horse-face [colors]="face()" /></span>
   <div class="who">
     <div class="name-row"><span class="name" [tdMarquee]="l.name">{{ l.name }}</span></div>
     <div class="tags">

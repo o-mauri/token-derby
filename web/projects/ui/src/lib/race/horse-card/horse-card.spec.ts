@@ -39,6 +39,16 @@ describe('HorseCard', () => {
     expect(silks.style.getPropertyValue('--silk-edge')).toBe('#ecebe6');
   });
 
+  it('backs the face with a tone both its coat and mane stand out against', async () => {
+    const tone = async (body: string, mane: string) => {
+      const el = await render('c', FIELD.map((l) => (l.id === 'c' ? { ...l, colors: { ...l.colors, body, mane } } : l)));
+      return el.querySelector('.portrait')!.className.replace('portrait', '').trim();
+    };
+    expect(await tone('#111111', '#000000')).toBe('light');
+    expect(await tone('#ffffff', '#f5e9d3')).toBe('dark');
+    expect(await tone('#ffffff', '#000000')).toBe('mixed');
+  });
+
   it('gives a plain rosette below the medals', async () => {
     const el = await render('d');
     expect(el.querySelector('.rosette')!.classList).toContain('place');
