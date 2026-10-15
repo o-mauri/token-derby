@@ -1,0 +1,12 @@
+@let d = division();
+<header class="head"><span class="name-head">{{ d.name }}</span><span class="count">{{ d.rows.length }} horses</span></header>
+@for (r of d.rows; track r.id) {
+  <div class="row" [class.promote]="r.zone === 'promote'" [class.relegate]="r.zone === 'relegate'">
+    <span [class]="'place ' + medal(r.place)">{{ r.place }}</span>
+    <td-horse-head [colors]="r.colors" [hat]="r.hat" size="1.5rem" />
+    <span class="who"><span class="name" [tdMarquee]="r.name">{{ r.name }}</span><span class="owner">{{ r.owner }}</span></span>
+    <span class="points">{{ r.points }}</span>
+  </div>
+} @empty {
+  <p class="empty">No horses yet</p>
+}

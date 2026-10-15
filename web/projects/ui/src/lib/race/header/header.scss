@@ -1,0 +1,89 @@
+@use '../../forms/control' as control;
+
+// The header sizes itself to its own width, so it sheds by container size rather than by screen.
+:host { display: block; container-type: inline-size; border-bottom: var(--td-line) solid var(--td-surface-raised); }
+
+// One row whenever the title can keep its floor; below that the controls wrap rather than squash it.
+.bar {
+  min-width: 0;
+  padding: var(--td-space-4) calc(var(--td-space-7) * 2);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--td-space-6);
+}
+
+.title {
+  min-width: 16rem;
+  max-width: 100%;
+  flex: 1 1 0;
+}
+
+// Race names are unbounded, so the row clips and marquees rather than sizing the header.
+.name-row { display: block; min-width: 0; overflow: hidden; white-space: nowrap; }
+.name.scrolling { animation: name-marquee 9s ease-in-out infinite; }
+
+@keyframes name-marquee {
+  0%, 16% { transform: translateX(0); }
+  46%, 54% { transform: translateX(var(--shift, 0)); }
+  84%, 100% { transform: translateX(0); }
+}
+
+.meta {
+  color: var(--td-text-muted);
+  display: flex;
+  align-items: center;
+  gap: var(--td-space-8);
+  flex-wrap: nowrap;
+  flex-shrink: 0;
+  min-width: 0;
+  font-size: var(--td-text-md);
+}
+
+.meta b { color: var(--td-text); font-weight: normal; }
+.item, .meta button { white-space: nowrap; flex-shrink: 0; }
+// A grid, so whatever is projected stretches to the slot (projected nodes do not get this component's styles).
+.slot { display: grid; min-width: 0; width: 11rem; }
+.sr-only { @include control.sr-only; }
+
+
+// Shed in order of what a racer can most afford to lose; each is reachable elsewhere.
+@container (max-width: 1200px) {
+  .bar { padding: var(--td-space-3) var(--td-space-6); }
+  .meta { gap: var(--td-space-5); font-size: var(--td-text-sm); }
+  .meta button { padding: var(--td-space-1) var(--td-space-4); font-size: var(--td-text-xs); }
+  .title { font-size: var(--td-text-md); }
+}
+
+// The two variable-width controls give ground first: the theme picker and the org button.
+@container (max-width: 900px) {
+  .slot { width: 7rem; }
+  .org { max-width: 7.5rem; overflow: hidden; text-overflow: ellipsis; }
+}
+
+// The join code is already in the address bar.
+@container (max-width: 820px) {
+  .join-code { display: none; }
+  .meta { gap: var(--td-space-4); }
+}
+
+// The theme picker also lives on the home page.
+@container (max-width: 660px) {
+  .slot { display: none; }
+}
+
+// A running countdown already says the race is live.
+@container (max-width: 520px) {
+  .status-item { display: none; }
+}
+
+// Last to go: Home still gets you out, and the org is one click from there.
+@container (max-width: 440px) {
+  .org { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .name { display: block !important; overflow: hidden; text-overflow: ellipsis; }
+  .name.scrolling { animation: none; }
+}

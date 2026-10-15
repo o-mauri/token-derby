@@ -36,7 +36,7 @@ function ok(body: unknown) {
 }
 
 describe('webCommand', () => {
-  it('mints a code, builds the /org-manager URL, prints and opens it', async () => {
+  it('mints a code and opens the home page signed in', async () => {
     (globalThis as any).fetch = vi.fn(async (url: any) => {
       if (String(url).endsWith('/web-sessions')) return ok({ code: 'CODE123' });
       throw new Error(`unexpected ${url}`);
@@ -48,10 +48,12 @@ describe('webCommand', () => {
 
     expect(rc).toBe(0);
     const out = logs.join('\n');
-    expect(out).toContain('https://example.test/org-manager#code=CODE123');
+    expect(out).toContain('https://example.test/#code=CODE123');
+    expect(out).toContain('Opening Token Derby in your browser');
+    expect(out).not.toContain('org manager');
     expect(spawnImpl).toHaveBeenCalled();
     // The opener is invoked with the exact URL as an argument.
     const args = spawnImpl.mock.calls[0];
-    expect(JSON.stringify(args)).toContain('https://example.test/org-manager#code=CODE123');
+    expect(JSON.stringify(args)).toContain('https://example.test/#code=CODE123');
   });
 });

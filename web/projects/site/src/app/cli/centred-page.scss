@@ -1,0 +1,53 @@
+@use '../../../../ui/src/lib/slant';
+
+// One viewport tall on desktop, the column scaled with the window like the home page.
+:host { display: flex; flex-direction: column; height: max(100dvh, 32rem); font-family: var(--td-font-pixel); }
+
+.top { display: flex; justify-content: space-between; align-items: center; gap: var(--td-space-5); flex-wrap: wrap; padding: var(--td-space-5); }
+
+.column {
+  flex: 1;
+  min-height: 0;
+  width: min(100%, 28rem);
+  margin: 0 auto;
+  padding: 0 var(--td-space-6) var(--td-space-6);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--td-space-5);
+  text-align: center;
+  font-size: var(--td-text-lg);
+  zoom: var(--home-scale, 1);
+  p { margin: 0; }
+}
+.stack { display: grid; justify-items: center; gap: var(--td-space-5); }
+.row { display: flex; gap: var(--td-space-5); align-items: center; }
+.confirm-label { color: var(--td-highlight); font-size: var(--td-text-xl); overflow-wrap: anywhere; }
+.done { color: var(--td-live); font-size: var(--td-text-xl); }
+.error { color: var(--td-error); }
+.warning {
+  padding: var(--td-space-4) var(--td-space-5);
+  border: var(--td-line-thin) solid var(--td-highlight);
+  background: color-mix(in srgb, var(--td-highlight) 8%, var(--td-surface));
+  color: var(--td-highlight);
+  font-size: var(--td-text-md);
+  text-align: left;
+}
+.cancel {
+  background: none;
+  border: var(--td-line-thin) solid var(--td-border);
+  color: var(--td-text-muted);
+  font: inherit;
+  font-size: var(--td-text-md);
+  padding: var(--td-space-2) var(--td-space-6);
+  cursor: pointer;
+  @include slant.slant;
+  &:focus-visible { outline: var(--td-focus-width) solid var(--td-highlight); outline-offset: var(--td-focus-offset); }
+}
+code { color: var(--td-live); font-family: inherit; }
+
+@media (width < 700px) {
+  :host { height: auto; min-height: 100dvh; }
+}

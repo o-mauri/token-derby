@@ -1,0 +1,8 @@
+:host { display: flex; flex-direction: column; min-height: 100dvh; font-family: var(--td-font-pixel); }
+
+.top { display: flex; justify-content: flex-end; padding: var(--td-space-5); }
+.centre { flex: 1; display: flex; align-items: center; justify-content: center; padding: var(--td-space-6); }
+.card { width: min(100%, 22rem); display: grid; gap: var(--td-space-5); padding: var(--td-space-6); background: var(--td-surface); border: var(--td-line) solid var(--td-border); font-size: var(--td-text-md); }
+.title { margin: 0; font-weight: normal; font-size: var(--td-text-xl); letter-spacing: var(--td-tracking-wide); }
+.tag { color: var(--td-highlight); }
+.error { margin: 0; color: var(--td-error); }

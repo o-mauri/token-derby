@@ -1,0 +1,32 @@
+:host { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+
+.column { flex: 1; min-height: 0; overflow-y: auto; display: grid; grid-template-columns: minmax(0, 26rem) minmax(0, 1fr); gap: var(--td-space-7); align-content: start; padding: var(--td-space-5) var(--td-space-6) var(--td-space-7); font-size: var(--td-text-md); }
+.heading { margin: 0; font-weight: normal; font-size: var(--td-text-md); letter-spacing: var(--td-tracking-wide); color: var(--td-highlight); }
+
+.generator, .past { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--td-space-4); align-content: start; min-width: 0; }
+.entry { display: flex; align-items: center; gap: var(--td-space-3); }
+.entry .hat { flex: 1; min-width: 0; }
+// Hat labels are long; on narrow screens the select shrinks to its row and clips its label.
+.entry td-select.hat { min-width: 0; overflow: hidden; }
+.settings { display: flex; align-items: flex-end; gap: var(--td-space-4); flex-wrap: wrap; }
+.num { width: 8rem; }
+.result { display: grid; gap: var(--td-space-3); padding: var(--td-space-4); border: var(--td-line) solid var(--td-highlight); }
+.warning { margin: 0; color: var(--td-text-muted); font-size: var(--td-text-sm); }
+.error, .limit { margin: 0; color: var(--td-error); }
+
+.link { justify-self: start; background: none; border: 0; padding: 0; font: inherit; color: var(--td-text-muted); cursor: pointer; text-decoration: underline; text-underline-offset: 0.2em; }
+.link:hover:not(:disabled), .link:focus-visible { color: var(--td-highlight); }
+.link:disabled { opacity: 0.35; cursor: not-allowed; text-decoration: none; }
+
+.redemptions { margin: 0; padding-left: var(--td-space-6); display: grid; gap: var(--td-space-1); color: var(--td-text-muted); }
+.empty, .muted { margin: 0; color: var(--td-text-muted); }
+.failed { display: grid; gap: var(--td-space-4); justify-items: start; }
+.failed p { margin: 0; color: var(--td-text-muted); }
+
+@media (width < 1000px) {
+  .column { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (width < 700px) {
+  .column { padding: var(--td-space-4); overflow-y: visible; }
+}

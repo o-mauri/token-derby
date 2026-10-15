@@ -38,11 +38,13 @@ describe('SPA rewrite function', () => {
     }
   });
 
-  for (const app of ['site', 'admin'] as const) {
+  const DISTS = {
+    site: path.resolve(__dirname, '..', '..', 'site', 'dist'),
+    admin: path.resolve(__dirname, '..', '..', 'web', 'dist', 'admin', 'browser'),
+  } as const;
+  for (const [app, dist] of Object.entries(DISTS)) {
     it(`leaves every built ${app} asset untouched`, () => {
-      const dist = path.resolve(__dirname, '..', '..', app, 'dist');
       const assets = filesIn(dist);
-
       expect(assets.length).toBeGreaterThan(0);
       for (const asset of assets) {
         expect(rewrite(asset), `${asset} would be swallowed by the SPA rewrite`).toBe(asset);

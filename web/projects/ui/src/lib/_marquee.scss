@@ -1,0 +1,14 @@
+// The scroll for a [tdMarquee] element that overflows its row; under reduced motion it's cut off with an ellipsis.
+@mixin marquee($selector, $duration: 8s) {
+  #{$selector}.scrolling { animation: td-marquee $duration ease-in-out infinite; will-change: transform; }
+
+  @media (prefers-reduced-motion: reduce) {
+    #{$selector}.scrolling { animation: none; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+  }
+
+  @keyframes td-marquee {
+    0%, 12% { transform: translateX(0); }
+    46%, 54% { transform: translateX(var(--shift, 0)); }
+    88%, 100% { transform: translateX(0); }
+  }
+}

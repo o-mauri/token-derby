@@ -1,0 +1,23 @@
+@if (showDust()) { <span class="horse-dust"></span> }
+<svg class="horse-sprite" [attr.viewBox]="viewBox" shape-rendering="crispEdges" aria-hidden="true">
+  <g class="leg-back">
+    <g class="leg-back-upper">
+      @for (c of parts.backUpper; track $index) { <rect [attr.x]="c.x" [attr.y]="c.y" width="1" height="1" [attr.fill]="c.fill" /> }
+    </g>
+    <g class="leg-back-lower">
+      @for (c of parts.backLower; track $index) { <rect [attr.x]="c.x" [attr.y]="c.y" width="1" height="1" [attr.fill]="c.fill" /> }
+    </g>
+  </g>
+  <g class="leg-front">
+    <g class="leg-front-upper">
+      @for (c of parts.frontUpper; track $index) { <rect [attr.x]="c.x" [attr.y]="c.y" width="1" height="1" [attr.fill]="c.fill" /> }
+    </g>
+    <g class="leg-front-lower">
+      @for (c of parts.frontLower; track $index) { <rect [attr.x]="c.x" [attr.y]="c.y" width="1" height="1" [attr.fill]="c.fill" /> }
+    </g>
+  </g>
+  <g class="horse-body">
+    @for (c of parts.body; track $index) { <rect [attr.x]="c.x" [attr.y]="c.y" width="1" height="1" [attr.fill]="c.fill" /> }
+  </g>
+  @if (hatDef(); as h) { <g td-hat-pixels [hat]="h" [variant]="hat()?.variant ?? 0" /> }
+</svg>

@@ -1,0 +1,40 @@
+@if (data.notFound()) {
+  <td-page>
+    <td-not-found title="Organisation not found" [message]="notFoundMessage()" backLabel="← Home" (back)="router.navigate(['/'])" />
+  </td-page>
+} @else {
+  <header class="top">
+    <td-crumbs [parts]="[{ label: orgName(), key: 'org-name' }]" />
+    <span class="actions">
+      @if (owner.isOwner()) { <a td-button size="sm" class="settings" routerLink="settings">⚙ Settings</a> }
+      <site-version-switch /><td-theme-picker compact />
+      <a td-button size="sm" routerLink="/">← Home</a>
+    </span>
+  </header>
+
+  @if (data.loading()) {
+    <div class="loading"><td-loader /></div>
+  } @else {
+    <main class="grid">
+      <td-panel class="live" [spine]="live().kind === 'next' ? 'NEXT' : 'LIVE'" [link]="liveLink()">
+        @if (data.racesFailed()) { <p class="failed">Couldn't load races. Try again later.</p> }
+        @else { <td-org-live-panel [view]="live()" /> }
+      </td-panel>
+      <td-panel class="league" spine="LEAGUE" [disabled]="data.standingsLoaded() && !league()" [link]="league() ? ['league'] : null">
+        @if (data.standingsFailed()) { <p class="failed">Couldn't load the league. Try again later.</p> }
+        @else if (data.standingsLoaded()) { <td-org-league-panel [view]="league()" /> }
+      </td-panel>
+      <td-panel class="stats" spine="STATS">
+        @if (data.racesFailed()) { <p class="failed">Couldn't load races. Try again later.</p> }
+        @else { <td-org-stats-panel [view]="stats()" /> }
+      </td-panel>
+      <td-panel class="market" spine="MARKET" disabled>
+        <p class="soon">Coming soon</p>
+      </td-panel>
+      <td-panel class="races" spine="RACES" [link]="['races']">
+        @if (data.racesFailed()) { <p class="failed">Couldn't load races. Try again later.</p> }
+        @else { <td-org-races-panel [view]="recent()" /> }
+      </td-panel>
+    </main>
+  }
+}

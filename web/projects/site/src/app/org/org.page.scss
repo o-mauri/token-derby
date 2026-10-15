@@ -1,0 +1,36 @@
+// One screen on desktop; stacked and scrolling on phones.
+// Exactly a screen tall, but never shorter than the panels need: in a short window the page scrolls instead.
+:host { display: flex; flex-direction: column; height: max(100vh, 42rem); padding: var(--td-space-4); gap: var(--td-space-4); box-sizing: border-box; }
+
+.top { display: flex; justify-content: space-between; align-items: center; gap: var(--td-space-5); padding: 0 var(--td-space-3); }
+.actions { display: flex; align-items: center; gap: var(--td-space-4); }
+.actions a { white-space: nowrap; }
+
+.loading { flex: 1; display: flex; }
+
+.grid {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-rows: repeat(3, minmax(0, 1fr));
+  gap: var(--td-space-4);
+}
+.live { grid-column: 1 / -1; }
+.league { grid-column: span 3; }
+.stats { grid-column: span 2; }
+.market { grid-column: span 2; }
+.races { grid-column: span 3; }
+
+// Each panel fills a fixed cell, so its height can shrink a long spine label to fit.
+@media (width >= 700px) { .grid > td-panel { container-type: size; } }
+
+.failed, .soon { margin: 0; height: 100%; display: grid; place-items: center; color: var(--td-text-muted); }
+.soon { font-size: var(--td-text-lg); }
+
+@media (width < 700px) {
+  :host { height: auto; min-height: 100vh; }
+  .grid { display: flex; flex-direction: column; }
+  .actions { gap: var(--td-space-3); }
+  .top { flex-wrap: wrap; }
+}

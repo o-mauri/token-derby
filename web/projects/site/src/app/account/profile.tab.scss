@@ -1,0 +1,42 @@
+@use '../../../../ui/src/lib/slant';
+
+:host { flex: 1; min-height: 0; overflow-y: auto; }
+
+.column { width: min(100%, 32rem); margin: 0 auto; padding: var(--td-space-7) var(--td-space-6); display: grid; gap: var(--td-space-6); font-family: var(--td-font-pixel); }
+.section { display: grid; gap: var(--td-space-4); padding-top: var(--td-space-4); border-top: var(--td-line-thin) solid var(--td-border); justify-items: start; }
+.heading { margin: 0; font-size: var(--td-text-md); font-weight: normal; letter-spacing: var(--td-tracking-wide); color: var(--td-highlight); }
+
+.field { display: flex; gap: var(--td-space-4); align-items: center; width: 100%; }
+.name {
+  flex: 1;
+  min-width: 0;
+  padding: var(--td-space-2) var(--td-space-4);
+  background: var(--td-surface);
+  color: inherit;
+  border: var(--td-line-thin) solid var(--td-border);
+  font: inherit;
+  font-size: var(--td-text-lg);
+  &:focus-visible { outline: var(--td-focus-width) solid var(--td-highlight); outline-offset: var(--td-focus-offset); }
+  &[aria-invalid='true'] { border-color: var(--td-error); }
+}
+.saved { margin: 0; color: var(--td-live); }
+.error { margin: 0; color: var(--td-error); }
+.muted { margin: 0; color: var(--td-text-muted); }
+
+.google { margin: 0; display: flex; align-items: center; gap: var(--td-space-4); font-size: var(--td-text-lg); overflow-wrap: anywhere; }
+.mark { width: 0.9em; height: 0.9em; flex: none; border-radius: var(--td-radius-round); background: conic-gradient(var(--td-error) 0 25%, var(--td-highlight) 0 50%, var(--td-live) 0 75%, var(--td-rarity-rare) 0); }
+
+.signouts { display: flex; flex-wrap: wrap; gap: var(--td-space-4); }
+.signout {
+  background: none;
+  color: var(--td-error);
+  border: var(--td-line) solid var(--td-error);
+  padding: var(--td-space-2) var(--td-space-6);
+  font: inherit;
+  font-size: var(--td-text-md);
+  cursor: pointer;
+  @include slant.slant;
+  &:hover:not(:disabled) { background: var(--td-error-wash); }
+  &:disabled { opacity: 0.35; cursor: not-allowed; }
+  &:focus-visible { outline: var(--td-focus-width) solid var(--td-highlight); outline-offset: var(--td-focus-offset); }
+}

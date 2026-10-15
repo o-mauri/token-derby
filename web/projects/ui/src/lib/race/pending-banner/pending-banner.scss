@@ -1,0 +1,13 @@
+:host {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: var(--td-space-6);
+  padding: var(--td-space-7);
+  background: var(--td-surface-raised);
+  border-bottom: var(--td-line) solid var(--td-accent);
+  font-size: var(--td-text-xl);
+  color: var(--td-accent);
+  letter-spacing: var(--td-tracking-wide);
+  text-transform: uppercase;
+}

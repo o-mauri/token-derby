@@ -3,6 +3,7 @@ import type { Hat, HatRarity, HorseColors } from '@token-derby/shared';
 import { horseFaceSvg } from '../horse-face.js';
 import { buildHorseSvg } from '../sprite-svg.js';
 import { buildHatGroup } from '../hat-svg.js';
+import { createV2Toggle } from './v2-toggle.js';
 
 type Palette = HorseColors & { name: string };
 
@@ -27,7 +28,7 @@ export function renderCatalog(root: HTMLElement): () => void {
   section.innerHTML = `
     <header class="catalog-header">
       <h1>${horseFaceSvg()} HAT CATALOG <span class="horse-face-flip">${horseFaceSvg()}</span></h1>
-      <button type="button" class="btn home-btn">← Home</button>
+      <div class="catalog-actions"><button type="button" class="btn home-btn">← Home</button></div>
     </header>
     <p class="catalog-intro">
       Every hat in the catalog, one row per hat with all variants laid out side-by-side.
@@ -45,6 +46,7 @@ export function renderCatalog(root: HTMLElement): () => void {
     </p>
   `;
   root.appendChild(section);
+  section.querySelector('.catalog-actions')!.prepend(createV2Toggle(doc));
 
   const homeBtn = section.querySelector<HTMLButtonElement>('.home-btn')!;
   homeBtn.addEventListener('click', () => {

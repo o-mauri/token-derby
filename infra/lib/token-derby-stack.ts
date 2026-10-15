@@ -19,6 +19,7 @@ import * as eventsTargets from 'aws-cdk-lib/aws-events-targets';
 import * as path from 'path';
 import type { EnvConfig } from './env-config';
 import { SPA_REWRITE_CODE } from './spa-rewrite';
+import { SITE_REWRITE_CODE } from './site-rewrite';
 import { API_PREFIX_CODE, redirectCode } from './edge-functions';
 
 interface TokenDerbyStackProps extends cdk.StackProps {
@@ -480,6 +481,9 @@ export class TokenDerbyStack extends cdk.Stack {
     // for the guard on the rule it uses.
     const spaRewriteAssociation = viewerRequest('SpaRewriteFn', SPA_REWRITE_CODE);
 
+    // app.: the SPA rewrite plus the v2 opt-in. See site-rewrite.ts.
+    const siteRewriteAssociation = viewerRequest('SiteRewriteFn', SITE_REWRITE_CODE);
+
     // Redirect-only distributions answer at the edge; this origin is never reached.
     const redirectOrigin = new origins.HttpOrigin(APP_DOMAIN);
 
@@ -490,7 +494,7 @@ export class TokenDerbyStack extends cdk.Stack {
         origin: origins.S3BucketOrigin.withOriginAccessControl(siteBucket),
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
         cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
-        functionAssociations: spaRewriteAssociation,
+        functionAssociations: siteRewriteAssociation,
       },
       additionalBehaviors: { '/api/auth/*': apiBehaviour() },
       domainNames: [APP_DOMAIN],
@@ -498,16 +502,30 @@ export class TokenDerbyStack extends cdk.Stack {
       defaultRootObject: 'index.html',
     });
 
+    const siteCache = [
+      s3deploy.CacheControl.setPublic(),
+      s3deploy.CacheControl.maxAge(cdk.Duration.seconds(0)),
+      s3deploy.CacheControl.mustRevalidate(),
+    ];
+
+    // v1 at the root; exclude keeps its prune away from the v2 build below.
     new s3deploy.BucketDeployment(this, 'DeploySite', {
       sources: [s3deploy.Source.asset(path.resolve(__dirname, '..', '..', 'site', 'dist'))],
       destinationBucket: siteBucket,
+      exclude: ['v2/*'],
       distribution: appDistribution,
       distributionPaths: ['/*'],
-      cacheControl: [
-        s3deploy.CacheControl.setPublic(),
-        s3deploy.CacheControl.maxAge(cdk.Duration.seconds(0)),
-        s3deploy.CacheControl.mustRevalidate(),
-      ],
+      cacheControl: siteCache,
+    });
+
+    // The opt-in v2 site, built to load its scripts from /v2/; SiteRewriteFn serves its index to td_site=v2.
+    new s3deploy.BucketDeployment(this, 'DeploySiteV2', {
+      sources: [s3deploy.Source.asset(path.resolve(__dirname, '..', '..', 'web', 'dist', 'site-optin', 'browser'))],
+      destinationBucket: siteBucket,
+      destinationKeyPrefix: 'v2/',
+      distribution: appDistribution,
+      distributionPaths: ['/*'],
+      cacheControl: siteCache,
     });
 
     const appRecord = new route53.ARecord(this, 'AppAliasRecord', {
@@ -549,15 +567,11 @@ export class TokenDerbyStack extends cdk.Stack {
     });
 
     new s3deploy.BucketDeployment(this, 'DeployAdminSite', {
-      sources: [s3deploy.Source.asset(path.resolve(__dirname, '..', '..', 'admin', 'dist'))],
+      sources: [s3deploy.Source.asset(path.resolve(__dirname, '..', '..', 'web', 'dist', 'admin', 'browser'))],
       destinationBucket: adminBucket,
       distribution: adminAppDistribution,
       distributionPaths: ['/*'],
-      cacheControl: [
-        s3deploy.CacheControl.setPublic(),
-        s3deploy.CacheControl.maxAge(cdk.Duration.seconds(0)),
-        s3deploy.CacheControl.mustRevalidate(),
-      ],
+      cacheControl: siteCache,
     });
 
     const adminRecord = new route53.ARecord(this, 'AdminAppAliasRecord', {

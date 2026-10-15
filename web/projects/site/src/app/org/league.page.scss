@@ -1,0 +1,19 @@
+:host { display: flex; flex-direction: column; min-height: 100vh; padding: var(--td-space-4) var(--td-space-5); gap: var(--td-space-5); box-sizing: border-box; }
+
+.top { display: flex; justify-content: space-between; align-items: center; gap: var(--td-space-5); flex-wrap: wrap; }
+.actions { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: var(--td-space-4); }
+.actions a { white-space: nowrap; }
+
+.body { display: grid; gap: var(--td-space-5); width: 100%; max-width: 90rem; margin: 0 auto; }
+.loading { flex: 1; display: flex; min-height: 12rem; }
+.message { margin: auto; color: var(--td-text-muted); text-align: center; }
+.message a { color: var(--td-highlight); }
+
+.legend { display: flex; gap: var(--td-space-6); margin: 0; color: var(--td-text-muted); font-size: var(--td-text-sm); }
+.key::before { content: ''; display: inline-block; width: 0.6em; height: 0.6em; margin-right: var(--td-space-2); vertical-align: middle; }
+.key.promote::before { background: var(--td-zone-promote); }
+.key.relegate::before { background: var(--td-zone-relegate); }
+
+@media (width < 700px) {
+  .actions { gap: var(--td-space-3); }
+}

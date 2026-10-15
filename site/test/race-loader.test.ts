@@ -37,4 +37,12 @@ describe('renderRace loader', () => {
     expect(root.querySelector('.race-name')?.textContent).toBe('Showdown');
     cleanup();
   });
+
+  it('sits the V2 switch in the header', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {})));
+    const root = document.createElement('div');
+    const cleanup = renderRace(root, 'ABC123');
+    expect(root.querySelector('.race-header .meta .v2-toggle')).not.toBeNull();
+    cleanup();
+  });
 });

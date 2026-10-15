@@ -1,0 +1,30 @@
+:host { display: block; min-width: 0; }
+
+.card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--td-space-5);
+  padding: var(--td-space-3) var(--td-space-5);
+  background: var(--td-surface-raised);
+  border: var(--td-line-thin) solid var(--td-highlight);
+  color: inherit;
+  text-decoration: none;
+}
+a.card:hover, a.card:focus-visible { background: var(--td-surface); }
+a.card:focus-visible { outline: var(--td-focus-width) solid var(--td-highlight); outline-offset: var(--td-focus-offset); }
+.card.disabled { opacity: .45; border-color: var(--td-border); cursor: default; }
+
+.name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--td-font-pixel);
+  font-size: var(--td-text-xl);
+  letter-spacing: var(--td-tracking);
+  text-transform: uppercase;
+  color: var(--td-highlight);
+}
+.go { color: var(--td-highlight); }
+.soon { color: var(--td-text-muted); font-size: var(--td-text-sm); }

@@ -1,0 +1,37 @@
+@if (view(); as v) {
+  <div class="head">
+    <span class="season"><span class="s">Season {{ v.season }}</span>&ngsp;<span class="r">Round {{ v.round }} of {{ v.total }}</span></span>
+    <span class="bar" aria-hidden="true"><i [style.width.%]="(v.round / v.total) * 100"></i></span>
+    <span class="to-go">{{ toGo() }} to go</span>
+  </div>
+  <div class="cols" #cols>
+    @for (c of columns(); track c.name) {
+      <section class="division">
+        <div class="top">
+          <span class="div-name">{{ c.name }}</span>
+          @if (c.leader; as l) {
+            <div class="leader">
+              <td-horse class="lead-sprite" [colors]="l.colors" [hat]="l.hat" />
+              <div class="lead-text">
+                <span class="name-row"><span class="name" [tdMarquee]="l.name">{{ l.name }}</span></span>
+                <span><span class="pts">{{ l.points }}</span> <span class="unit">pts</span></span>
+              </div>
+            </div>
+          }
+        </div>
+        @for (r of c.shown; track r.id) {
+          <div class="runner">
+            <span class="place">{{ r.place }}</span>
+            <td-horse class="sprite" [colors]="r.colors" [hat]="r.hat" />
+            <span class="name-row"><span class="name" [tdMarquee]="r.name">{{ r.name }}</span></span>
+            <span class="pts small">{{ r.points }}</span>
+          </div>
+        }
+        @if (c.more > 0) { <span class="more">+{{ c.more }} more</span> }
+      </section>
+    }
+  </div>
+  @if (v.moreDivisions > 0) { <span class="more-divisions">+{{ v.moreDivisions }} more {{ v.moreDivisions === 1 ? 'division' : 'divisions' }}</span> }
+} @else {
+  <p class="empty">No league</p>
+}

@@ -1,0 +1,36 @@
+@use '../../slant';
+
+:host {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  margin: var(--td-space-6) 0 var(--td-space-3);
+  padding: var(--td-space-3) 0;
+  border-block: var(--td-line-thin) solid var(--td-border);
+}
+
+.month { font-size: var(--td-text-md); letter-spacing: var(--td-tracking-wide); color: var(--td-highlight); }
+.count { font-family: var(--td-font-pixel); color: var(--td-text-muted); font-size: var(--td-text-sm); letter-spacing: normal; }
+
+.prev, .next {
+  justify-self: start;
+  padding: var(--td-space-2) var(--td-space-5);
+  background: var(--td-accent);
+  color: var(--td-surface);
+  font-weight: bold;
+  font-size: var(--td-text-sm);
+  text-decoration: none;
+  border-radius: var(--td-radius);
+  @include slant.slant;
+}
+.next { justify-self: end; }
+.prev:hover, .next:hover, .prev:focus-visible, .next:focus-visible { filter: brightness(1.1); }
+.prev:focus-visible, .next:focus-visible { outline: var(--td-focus-width) solid var(--td-text); outline-offset: var(--td-focus-offset); }
+.end { opacity: 0.35; cursor: not-allowed; }
+
+// Phones: just the arrows, so the month name has the room.
+@container (width < 700px) {
+  :host { grid-template-columns: auto 1fr auto; gap: var(--td-space-3); }
+  .month { text-align: center; font-size: var(--td-text-sm); }
+  .lbl { display: none; }
+}

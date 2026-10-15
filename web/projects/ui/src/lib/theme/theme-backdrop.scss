@@ -1,0 +1,96 @@
+// Ported from the old site's .rain-backdrop and London body::before. Every fall is a
+// transform so each layer rasterises once; the race pauses it all when it finishes.
+:host { display: contents; }
+.fog, .rain { display: none; }
+
+// London fog drifts in front of the page, kept faint so text keeps its contrast.
+:host-context(:root[data-theme="london"]) .fog {
+  display: block;
+  position: fixed;
+  inset: 0 auto 0 0;
+  width: 200vw;
+  z-index: 2;
+  pointer-events: none;
+  // Fixed art: three soft banks, each fading out inside its own 100vw tile.
+  /* stylelint-disable function-disallowed-list */
+  background:
+    radial-gradient(34vw 40vh at 25vw 78vh, rgba(197, 214, 232, 0.13), rgba(197, 214, 232, 0) 70%),
+    radial-gradient(30vw 32vh at 58vw 46vh, rgba(186, 205, 226, 0.09), rgba(186, 205, 226, 0) 70%),
+    radial-gradient(24vw 30vh at 82vw 92vh, rgba(205, 219, 234, 0.12), rgba(205, 219, 234, 0) 70%);
+  /* stylelint-enable function-disallowed-list */
+  background-size: 100vw 100%;
+  background-repeat: repeat-x;
+}
+
+// London rain sits in front (weather between you and the course); Matrix rain sits behind.
+:host-context(:root[data-theme="london"]) .rain {
+  display: block;
+  position: fixed;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  overflow: hidden;
+  opacity: 0.32;
+}
+:host-context(:root[data-theme="matrix"]) .rain {
+  display: block;
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  opacity: 0.2;
+}
+
+// Each layer has a tile of headroom on the edges it travels away from, so the loop is seamless.
+:host-context(:root[data-theme="london"]) .rain > i {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  background: url('/img/london-rain.svg') repeat;
+  &:nth-child(1) { top: -480px; right: -120px; background-size: 120px 480px; background-position: 0 0; }
+  &:nth-child(2) { top: -336px; right: -84px; background-size: 84px 336px; background-position: 40px 0; }
+  &:nth-child(3) { top: -672px; right: -168px; background-size: 168px 672px; background-position: 70px 0; }
+}
+:host-context(:root[data-theme="matrix"]) .rain > i {
+  position: absolute;
+  inset: auto 0 0;
+  background: url('/img/matrix-rain.svg') repeat;
+  image-rendering: auto; // vector glyphs, not sprite art
+  &:nth-child(1) { top: -600px; background-size: 300px 600px; background-position: 0 0; }
+  &:nth-child(2) { top: -420px; background-size: 210px 420px; background-position: 90px 0; }
+  &:nth-child(3) { top: -840px; background-size: 420px 840px; background-position: 30px 0; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  :host-context(:root[data-theme="london"]) {
+    .fog { animation: fog-drift 90s linear infinite; }
+    .rain > i:nth-child(1) { animation: london-fall-1 0.9s linear infinite; }
+    .rain > i:nth-child(2) { animation: london-fall-2 0.9s linear infinite; }
+    .rain > i:nth-child(3) { animation: london-fall-3 0.9s linear infinite; }
+  }
+  :host-context(:root[data-theme="matrix"]) {
+    .rain { animation: matrix-breathe 19s ease-in-out infinite; }
+    .rain > i:nth-child(1) { animation: matrix-fall-1 6s linear infinite; }
+    .rain > i:nth-child(2) { animation: matrix-fall-2 6s linear infinite; }
+    .rain > i:nth-child(3) { animation: matrix-fall-3 6s linear infinite; }
+  }
+}
+
+// The page stops moving once the race is over.
+:host-context(:root:has([data-race-state="finished"])) :is(.fog, .rain, .rain > i) {
+  animation-play-state: paused;
+}
+
+@keyframes fog-drift { to { transform: translateX(-100vw); } }
+@keyframes london-fall-1 { to { transform: translate3d(-120px, 480px, 0); } }
+@keyframes london-fall-2 { to { transform: translate3d(-84px, 336px, 0); } }
+@keyframes london-fall-3 { to { transform: translate3d(-168px, 672px, 0); } }
+@keyframes matrix-fall-1 { to { transform: translate3d(0, 600px, 0); } }
+@keyframes matrix-fall-2 { to { transform: translate3d(0, 420px, 0); } }
+@keyframes matrix-fall-3 { to { transform: translate3d(0, 840px, 0); } }
+// Held off any multiple of the fall so the swell drifts against the rain.
+@keyframes matrix-breathe {
+  0%, 100% { opacity: 0.08; }
+  50% { opacity: 0.28; }
+}

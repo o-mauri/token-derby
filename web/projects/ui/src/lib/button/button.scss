@@ -1,0 +1,27 @@
+@use '../slant';
+
+:host {
+  display: inline-block;
+  background: var(--td-accent);
+  color: var(--td-surface);
+  border: none;
+  padding: var(--td-space-4) var(--td-space-6);
+  font: inherit;
+  font-size: var(--td-text-sm);
+  font-weight: bold;
+  letter-spacing: var(--td-tracking-tight);
+  text-decoration: none;
+  cursor: pointer;
+  border-radius: var(--td-radius);
+  @include slant.slant;
+}
+
+.label { @include slant.upright; }
+
+:host(.sm) { padding: var(--td-space-2) var(--td-space-6); font-size: var(--td-text-sm); }
+
+:host(:hover), :host(:focus-visible) { filter: brightness(1.1); }
+:host(:focus-visible) { outline: var(--td-focus-width) solid var(--td-text); outline-offset: var(--td-focus-offset); }
+
+// Faded and inert, so it still reads as the same control but plainly can't be pressed.
+:host(:disabled), :host([aria-disabled='true']) { opacity: 0.35; cursor: not-allowed; filter: none; }

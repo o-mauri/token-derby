@@ -1,0 +1,14 @@
+<header class="bar">
+  <td-crumbs class="title" [parts]="[{ label: 'Race' }]" tail>
+    <span class="name-row"><span class="name" role="heading" aria-level="1" [tdMarquee]="name()" [attr.title]="name() || null">{{ name() }}</span></span>
+  </td-crumbs>
+  <div class="meta">
+    @if (showGraphs()) { <button td-button size="sm" type="button" [disabled]="status() === 'finished'" [attr.title]="status() === 'finished' ? 'The results show the charts' : null" (click)="graphs.emit()">Graphs</button> }
+    <span class="item status-item"><span class="sr-only">Status:</span><td-status-chip class="status" [status]="status()" /></span>
+    <span class="item"><span class="sr-only">Time left:</span><b><td-countdown [anchor]="anchor()" /></b></span>
+    <span class="item join-code"><span class="sr-only">Join code:</span><b>{{ joinCode() }}</b></span>
+    <span class="slot"><ng-content /></span>
+    @if (orgName(); as orgLabel) { <button td-button size="sm" type="button" class="org" (click)="org.emit()">← {{ orgLabel }}</button> }
+    <button td-button size="sm" type="button" (click)="home.emit()">← Home</button>
+  </div>
+</header>

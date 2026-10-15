@@ -8,7 +8,8 @@
     "infra",
     "cli",
     "site",
-    "admin"
+    "admin",
+    "web"
   ],
   "engines": {
     "node": ">=22"

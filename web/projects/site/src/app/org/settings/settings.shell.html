@@ -1,0 +1,40 @@
+<header class="top">
+  <td-crumbs [parts]="[{ label: orgName(), link: ['..'], key: 'org-name' }, { label: 'Settings' }]" />
+  <span class="actions">
+    @if (session.signedIn()) {
+      <td-account-menu [name]="name()" [accountLink]="['/account']" (signOut)="signOut()" />
+    }
+    <site-version-switch /><td-theme-picker compact />
+    <a td-button size="sm" routerLink="/">← Home</a>
+  </span>
+</header>
+
+@if (!session.signedIn()) {
+  <main class="centre">
+    <p>Sign in to manage {{ typedName() }}</p>
+    <td-google-button [href]="signInHref()" />
+  </main>
+} @else {
+  @switch (owner.status()) {
+    @case ('owner') {
+      <td-tabs label="Settings" [tabs]="tabs" />
+      <main class="tab"><router-outlet /></main>
+    }
+    @case ('not-owner') {
+      <main class="centre"><p class="message">Only the owner of {{ orgName() || typedName() }} can change its settings. <a routerLink="..">Back to {{ orgName() || typedName() }}</a></p></main>
+    }
+    @case ('not-found') {
+      <main class="centre"><td-not-found title="Organisation not found" [message]="notFoundMessage()" backLabel="← Home" (back)="home()" /></main>
+    }
+    @case ('error') {
+      <main class="centre"><p class="message">Couldn't load {{ typedName() }}'s settings. Try again later.</p></main>
+    }
+    @default {
+      <main class="centre"><td-loader /></main>
+    }
+  }
+}
+
+<td-confirm [open]="!!drafts.asking()" [message]="'Leave without saving?'"
+  [detail]="'Your changes to ' + (drafts.asking()?.tab ?? '') + ' will be lost.'" confirmLabel="Leave" tone="danger"
+  (confirm)="drafts.asking()?.answer(true)" (cancel)="drafts.asking()?.answer(false)" />

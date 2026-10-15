@@ -1,0 +1,15 @@
+<div class="lane" [class]="'lane ' + state()" [class.first]="index() === 0" [class.last]="last()">
+  <div class="label">
+    @let l = lane();
+    <td-horse-chip class="chip" [name]="l.name" [owner]="l.owner" [tokens]="l.tokens" [level]="l.level"
+      [pace]="l.pace" [position]="l.position" [league]="l.league" />
+  </div>
+  <div class="strip">
+    @if (index() === 0) { <div class="top-fence"></div> }
+    <div [class]="rainClass()"></div>
+    <div class="runner" [class.running]="running()" [style.left.%]="progress()">
+      <td-horse [colors]="l.colors" [hat]="l.hat" [running]="running()" [dust]="state() === 'live'" />
+      @if (l.stamina; as s) { <td-stamina-bar class="stamina" [value]="s.value" [band]="s.band" /> }
+    </div>
+  </div>
+</div>

@@ -1,0 +1,71 @@
+<div class="column">
+  @if (!loaded() && !loadFailed()) {
+    <div class="loading"><td-loader /></div>
+  } @else if (!loaded()) {
+    <p class="failed">Couldn't load {{ org() }}'s racing setup.</p>
+  } @else {
+    <td-segmented class="modes" label="How {{ org() }} races" [options]="modes" [value]="mode()" (valueChange)="mode.set($event ?? 'off')" />
+    @if (error(); as message) { <p class="error" role="alert">{{ message }}</p> }
+    @if (saved()) { <p class="saved" role="status">Saved.</p> }
+    @if (lostMode(); as lost) { <p class="mode-lost error" role="alert">{{ lost }}</p> }
+
+    @switch (mode()) {
+      @case ('off') {
+        @if (serverMode() === 'off') {
+          <div class="idle"><p>{{ org() }} isn't racing.</p><p class="hint">Pick a weekly schedule or a league above to start.</p></div>
+        } @else {
+          <div class="idle">
+            <p>Turn off racing?</p>
+            <p class="hint">{{ org() }} runs a {{ serverMode() === 'league' ? 'league' : 'weekly schedule' }} now. Turning racing off deletes it; past races and standings stay.</p>
+            <button type="button" class="danger-btn turn-off" [disabled]="busy()" (click)="turnOff()">Turn off racing</button>
+          </div>
+        }
+      }
+      @case ('schedule') {
+        <div class="schedule">
+          <ng-container *ngTemplateOutlet="when" />
+          <p class="summary">{{ summary() }}</p>
+          @if (scheduleProblem(); as p) { <p class="error">{{ p }}</p> }
+          <div class="bar">
+            @if (serverMode() === 'schedule') { <button type="button" class="danger-btn" (click)="removeCurrent()">Remove schedule</button> }
+            <button td-button type="button" class="save-schedule" [disabled]="!canSaveSchedule()" (click)="saveSchedule()">Save schedule</button>
+          </div>
+        </div>
+      }
+      @case ('league') {
+        <div class="league">
+          <div class="side">
+            <h2>DIVISIONS · TOP TO BOTTOM</h2>
+            <td-division-ladder [value]="ladder()" (valueChange)="setLadder($event)" />
+          </div>
+          <div class="side">
+            <h2>SEASON AND SCHEDULE</h2>
+            <td-text-input class="races" type="number" label="Races per season" [value]="shownCount(league().races_per_season)"
+              (valueChange)="patchLeague({ races_per_season: count($event) })" />
+            <ng-container *ngTemplateOutlet="when" />
+          </div>
+        </div>
+        @if (nextSeason()) { <p class="next-season">Division and season-length changes take effect next season. Days, times and options apply now.</p> }
+        @if (leagueProblem(); as p) { <p class="error">{{ p }}</p> }
+        <div class="bar">
+          @if (serverMode() === 'league') { <button type="button" class="danger-btn" (click)="removeCurrent()">Delete league</button> }
+          <button td-button type="button" class="save-league" [disabled]="!canSaveLeague()" (click)="saveLeague()">Save league</button>
+        </div>
+      }
+    }
+  }
+</div>
+
+<ng-template #when>
+  <td-chip-group class="days" label="Days" [options]="days" [value]="schedule().weekdays" (valueChange)="patchSchedule({ weekdays: [...$event] })" />
+  <div class="hours">
+    <td-text-input class="start" type="time" label="Races start" [value]="schedule().start_local" (valueChange)="patchSchedule({ start_local: '' + ($event ?? '') })" />
+    <td-text-input class="end" type="time" label="Races end" [value]="schedule().end_local" (valueChange)="patchSchedule({ end_local: '' + ($event ?? '') })" />
+  </div>
+  <td-select class="tz" label="Time zone" [options]="zones" [value]="schedule().tz" (valueChange)="patchSchedule({ tz: $event ?? schedule().tz })" />
+  <td-text-input class="race-name" label="Race name (optional)" [value]="schedule().race_name" (valueChange)="patchSchedule({ race_name: '' + ($event ?? '') })" />
+  <td-text-input class="max" type="number" label="Max runners (optional)" [value]="schedule().max_participants" (valueChange)="patchSchedule({ max_participants: num($event) })" />
+</ng-template>
+
+<td-confirm [open]="!!ask()" [message]="ask()?.message ?? ''" [detail]="ask()?.detail ?? ''" [confirmLabel]="ask()?.confirmLabel ?? 'Confirm'"
+  tone="danger" (confirm)="confirmed()" (cancel)="ask.set(null)" />

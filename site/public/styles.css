@@ -3215,5 +3215,22 @@ body.tv .race-header .meta .theme-select { padding: 3px 10px; font-size: 0.9rem;
   /* Last thing to go. Home still gets you out, and the org page is one click
      from there — whereas nothing else here has a second route to it. */
   .race-header .meta .org-btn { display: none; }
+  .race-header .meta .v2-toggle { display: none; }
   .race-header .meta .btn { padding: 3px 6px; }
 }
+
+/* V2 switch: an off/on pill matching the header buttons' scale. */
+.v2-toggle { display: inline-flex; align-items: center; gap: 6px; background: none; border: 0; padding: 4px; color: var(--muted); font: inherit; font-size: 0.85rem; letter-spacing: 0.1em; cursor: pointer; }
+.v2-toggle:hover, .v2-toggle:focus-visible { color: var(--text); outline: none; }
+.v2-toggle-track { position: relative; width: 30px; height: 16px; border: 2px solid var(--border); border-radius: 999px; background: var(--panel); }
+.v2-toggle-knob { position: absolute; top: 2px; left: 2px; width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.v2-toggle:hover .v2-toggle-track, .v2-toggle:focus-visible .v2-toggle-track { border-color: var(--accent); }
+.v2-toggle-floating { position: fixed; top: 12px; right: 16px; z-index: 50; }
+.catalog-actions { display: flex; align-items: center; gap: 12px; }
+/* One-time v2 invite: bottom-right, clear of the race ticker. */
+.v2-prompt { position: fixed; right: 16px; bottom: calc(var(--ticker-h) + 16px); z-index: 60; max-width: min(22rem, calc(100vw - 32px)); padding: 14px 16px; background: var(--panel); color: var(--text); border: 2px solid var(--border); border-radius: 4px; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5); }
+.v2-prompt h2 { margin: 0 0 6px; font-size: 1rem; letter-spacing: 0.05em; }
+.v2-prompt p { margin: 0 0 12px; color: var(--muted); font-size: 0.85rem; }
+.v2-prompt-actions { display: flex; gap: 12px; align-items: center; }
+.v2-prompt-later { background: none; border: 0; padding: 4px; color: var(--muted); font: inherit; font-size: 0.85rem; cursor: pointer; text-decoration: underline; }
+.v2-prompt-later:hover, .v2-prompt-later:focus-visible { color: var(--text); }

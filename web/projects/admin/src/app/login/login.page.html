@@ -1,0 +1,10 @@
+<header class="top"><td-theme-picker compact /></header>
+<main class="centre">
+  <form class="card" (submit)="submit($event)" novalidate>
+    <h1 class="title">TOKEN DERBY <span class="tag">ADMIN</span></h1>
+    <td-text-input label="Username" autocomplete="username" [(value)]="username" />
+    <td-text-input label="Password" type="password" autocomplete="current-password" [(value)]="password" />
+    <button td-button type="submit" [disabled]="!canSubmit()">Sign in</button>
+    @if (error(); as message) { <p class="error" role="alert">{{ message }}</p> }
+  </form>
+</main>

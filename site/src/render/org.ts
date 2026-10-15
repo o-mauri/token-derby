@@ -6,6 +6,7 @@ import { buildHorseSvg } from '../sprite-svg.js';
 import { buildHatGroup } from '../hat-svg.js';
 import { renderLeagueStandings } from './league-standings.js';
 import { createLoader } from './loader.js';
+import { createV2Toggle } from './v2-toggle.js';
 import { createNotFound, type NotFoundOptions } from './not-found.js';
 import {
   formatDuration,
@@ -39,6 +40,7 @@ export function renderOrg(root: HTMLElement, orgName: string): () => void {
     <div class="org-body"></div>
   `;
   root.appendChild(section);
+  section.querySelector('.org-header .meta')!.prepend(createV2Toggle(doc));
 
   const body = section.querySelector<HTMLElement>('.org-body')!;
   body.appendChild(createLoader(doc));

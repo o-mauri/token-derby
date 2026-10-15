@@ -31,9 +31,10 @@ export async function webCommand(deps: Deps = {}): Promise<number> {
     throw e;
   }
 
-  const url = `${webOrigin()}/org-manager#code=${code}`;
+  // Home signs you in from the code; older sites only took it on /org-manager, which v2 redirects home.
+  const url = `${webOrigin()}/#code=${code}`;
   console.log('');
-  console.log('  Opening the Token Derby org manager in your browser...');
+  console.log('  Opening Token Derby in your browser...');
   console.log(`  ${url}`);
   console.log('');
   console.log('  If it doesn\'t open, copy the link above. It expires in 60 seconds.');

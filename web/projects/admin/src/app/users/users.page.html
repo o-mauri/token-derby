@@ -1,0 +1,31 @@
+<main class="column">
+  @if (data.users.value()) {
+    <div class="bar">
+      <td-text-input class="filter" label="Filter by name or email" hideLabel placeholder="Filter by name or email" [(value)]="filter" />
+    </div>
+    @if (rows().length) {
+      <div class="td-table-scroll list">
+        <table class="td-table">
+          <thead><tr><th>Jockey</th><th>Email</th><th class="num">Horses</th><th class="num">Races</th><th class="num">Wins</th><th class="num">Podiums</th><th class="num">XP</th><th>Joined</th></tr></thead>
+          <tbody>
+            @for (r of rows(); track r.id) {
+              <tr>
+                <td><a [routerLink]="['/users', r.id]">{{ r.name }}</a></td>
+                <td class="muted">{{ r.email || '—' }}</td>
+                <td class="num">{{ r.horses }}</td><td class="num">{{ r.races }}</td><td class="num">{{ r.wins }}</td>
+                <td class="num">{{ r.podiums }}</td><td class="num">{{ r.xp }}</td>
+                <td class="muted">{{ r.joined }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    } @else {
+      <p class="empty">No users match "{{ needle() }}".</p>
+    }
+  } @else if (data.users.status() === 'error') {
+    <div class="failed"><p>Couldn't load users.</p><button td-button size="sm" type="button" (click)="data.users.reload()">Retry</button></div>
+  } @else {
+    <td-loader />
+  }
+</main>

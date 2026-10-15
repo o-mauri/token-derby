@@ -1,0 +1,32 @@
+<div class="column">
+  @if (error(); as message) { <p class="error" role="alert">{{ message }}</p> }
+
+  <section class="section">
+    <h2>JOIN TOKEN</h2>
+    <td-copy-field label="Current token" [value]="token()" />
+    @if (rotated()) { <p class="rotated" role="status">New token. The old one no longer works.</p> }
+    <p class="hint">Anyone with this can join with <code>token-derby join</code>. Treat it as a secret.</p>
+    <div class="row"><button td-button type="button" class="rotate" (click)="confirmRotate.set(true)">Rotate token</button></div>
+  </section>
+
+  @if (shown(); as a) {
+    <section class="section">
+      <h2>WHO CAN JOIN</h2>
+      <td-toggle class="token" label="Let anyone join with the join token" [checked]="a.join_token_enabled" [disabled]="busy()" (checkedChange)="flip('join_token_enabled', $event)" />
+      <td-toggle class="domain-join" label="Let people with a matching email domain join automatically" [checked]="a.domain_join_enabled" [disabled]="busy()" (checkedChange)="flip('domain_join_enabled', $event)" />
+      <td-toggle class="restrict" label="Require every way of joining to match a domain below" [checked]="a.restrict_to_allowed_domains" [disabled]="busy()" (checkedChange)="flip('restrict_to_allowed_domains', $event)" />
+    </section>
+
+    <section class="section">
+      <h2>ALLOWED DOMAINS</h2>
+      <td-domain-list label="Add a domain" [(value)]="domains" />
+      <div class="row">
+        <button td-button type="button" class="save-domains" [disabled]="!domainsDirty() || busy()" (click)="saveDomains()">Save domains</button>
+        @if (saved() && !domainsDirty()) { <span class="saved" role="status">Saved.</span> }
+      </div>
+    </section>
+  }
+</div>
+<td-confirm [open]="confirmRotate()" message="Rotate the join token?"
+  detail="The current token stops working straight away. Anyone who hasn't joined yet will need the new one." confirmLabel="Rotate" tone="danger"
+  (confirm)="rotate()" (cancel)="confirmRotate.set(false)" />

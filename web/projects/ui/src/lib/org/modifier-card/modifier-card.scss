@@ -1,0 +1,14 @@
+:host {
+  display: grid;
+  gap: var(--td-space-5);
+  padding: var(--td-space-5) var(--td-space-6);
+  background: var(--td-surface-raised);
+  border: var(--td-line-thin) solid var(--td-border);
+}
+.head { display: grid; gap: var(--td-space-2); }
+.description { margin: 0; color: var(--td-text-muted); }
+.sliders { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr)); gap: var(--td-space-5) var(--td-space-7); }
+.readout { border-top: var(--td-line-thin) solid var(--td-border); padding-top: var(--td-space-4); }
+.readout-title { margin: 0 0 var(--td-space-2); font-weight: normal; color: var(--td-highlight); letter-spacing: var(--td-tracking-wide); font-size: var(--td-text-sm); text-transform: uppercase; }
+.readout ul { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--td-space-1); color: var(--td-text-muted); }
+.readout strong { color: var(--td-text); font-weight: normal; }

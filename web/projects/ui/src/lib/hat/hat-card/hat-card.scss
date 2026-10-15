@@ -1,0 +1,28 @@
+:host {
+  display: grid;
+  gap: var(--td-space-4);
+  align-content: start;
+  padding: var(--td-space-4) var(--td-space-5);
+  background: var(--td-surface-raised);
+  border: var(--td-line-thin) solid var(--td-border);
+  font-family: var(--td-font-pixel);
+}
+.name { margin: 0; font-weight: normal; font-size: var(--td-text-lg); display: flex; gap: var(--td-space-3); align-items: baseline; flex-wrap: wrap; }
+.exclusive { font-size: var(--td-text-xs); letter-spacing: var(--td-tracking-wide); text-transform: uppercase; color: var(--td-highlight); border: var(--td-line-thin) solid var(--td-highlight); padding: 0 var(--td-space-2); }
+.variants { display: grid; grid-template-columns: repeat(auto-fill, minmax(4.5rem, 1fr)); gap: var(--td-space-3); }
+.variant {
+  margin: 0;
+  display: grid;
+  justify-items: center;
+  gap: var(--td-space-1);
+  padding: var(--td-space-2);
+  background: var(--td-surface);
+  border: var(--td-line-thin) solid var(--td-border);
+}
+// Dark hats would vanish on the card, so their tile goes light.
+.variant.light { background: var(--td-text-muted); }
+.variant.light figcaption { color: var(--td-surface); }
+.horse { width: 4rem; }
+figcaption { font-size: var(--td-text-sm); color: var(--td-text-muted); white-space: nowrap; }
+// A one-of-a-kind hat has the card to itself, with room for its caption.
+.variant.solo { grid-column: span 2; }

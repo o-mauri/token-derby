@@ -1,0 +1,20 @@
+<div class="column">
+  @if (!loaded() && list.status() !== 'error') {
+    <div class="loading"><td-loader /></div>
+  } @else if (!loaded()) {
+    <p class="failed">Couldn't load your devices.</p>
+  } @else {
+    @if (revokeError(); as message) { <p class="revoke-error" role="alert">{{ message }}</p> }
+    @if (shown().length) {
+      <td-device-list class="list" [devices]="shown()" [now]="now" (revoke)="ask($event)" />
+    } @else {
+      <p class="empty">No devices yet. Run <code>token-derby login</code>, then approve it at /cli.</p>
+    }
+    @if (list.value()?.has_legacy_credential) {
+      <p class="legacy">This account also has an older CLI credential from <code>token-derby init</code>. It keeps working until you run <code>token-derby login</code> on that machine.</p>
+    }
+  }
+</div>
+<td-confirm [open]="!!pending()" [message]="'Revoke ' + (pending()?.label ?? '') + '?'"
+  detail="It will need token-derby login again. You stay signed in here." confirmLabel="Revoke" tone="danger"
+  (confirm)="revoke()" (cancel)="pending.set(null)" />

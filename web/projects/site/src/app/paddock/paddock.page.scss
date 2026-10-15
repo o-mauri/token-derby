@@ -1,0 +1,62 @@
+// One screen on desktop, like the org dashboard; stacked and scrolling on phones.
+:host { display: flex; flex-direction: column; height: max(100vh, 40rem); padding: var(--td-space-4); gap: var(--td-space-4); box-sizing: border-box; font-family: var(--td-font-pixel); }
+
+.top { display: flex; justify-content: space-between; align-items: center; gap: var(--td-space-5); padding: 0 var(--td-space-3); }
+.actions { display: flex; align-items: center; gap: var(--td-space-4); }
+.actions a { white-space: nowrap; }
+
+.grid {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  // Achievements gets the taller share so its long spine label fits.
+  grid-template:
+    'career trophies' auto
+    'stable trophies' minmax(0, 1fr)
+    'stable achievements' minmax(0, 2fr) / minmax(0, 2fr) minmax(0, 1fr);
+  gap: var(--td-space-4);
+}
+.career { grid-area: career; min-height: 10rem; } // Room for its spine label to sit clear of both ends.
+.stable { grid-area: stable; }
+.trophies { grid-area: trophies; }
+.achievements { grid-area: achievements; }
+
+.centre { height: 100%; min-height: 6rem; display: grid; place-items: center; align-content: center; gap: var(--td-space-4); }
+.failed p, .empty, .soon { margin: 0; color: var(--td-text-muted); text-align: center; }
+.soon { height: 100%; display: grid; place-items: center; font-family: 'Bitcount Prop Single', var(--td-font-pixel); font-size: var(--td-text-lg); }
+
+.name { margin: 0; font-weight: normal; font-size: var(--td-text-xl); }
+.joined { margin: 0 0 var(--td-space-3); color: var(--td-text-muted); }
+.totals { margin: 0; display: grid; grid-template-columns: repeat(6, minmax(0, auto)); gap: var(--td-space-2) var(--td-space-6); justify-content: start; }
+.total { display: grid; }
+.total dt { color: var(--td-text-muted); font-size: var(--td-text-sm); letter-spacing: var(--td-tracking-wide); text-transform: uppercase; }
+.total dd { margin: 0; color: var(--td-highlight); font-size: var(--td-text-xl); }
+
+.scroll { height: 100%; overflow-y: auto; }
+.list, .hats { list-style: none; margin: 0; padding: 0; }
+.horse { border-bottom: var(--td-line-thin) solid var(--td-border); }
+.row { display: flex; align-items: center; gap: var(--td-space-4); padding: var(--td-space-3) 0; flex-wrap: wrap; }
+.sprite { width: 3.5rem; flex: none; }
+.row .name { font-size: var(--td-text-lg); min-width: 6rem; }
+.stats { flex: 1; display: flex; flex-wrap: wrap; gap: var(--td-space-2) var(--td-space-5); color: var(--td-text-muted); }
+.stats b { color: var(--td-highlight); font-weight: normal; }
+.hats-toggle { background: none; border: 0; padding: 0; font: inherit; color: var(--td-text-muted); cursor: pointer; text-decoration: underline; text-underline-offset: 0.2em; }
+.hats-toggle:hover, .hats-toggle:focus-visible { color: var(--td-highlight); }
+.hats { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 11rem), 1fr)); gap: var(--td-space-3); padding: 0 0 var(--td-space-4); }
+.hat { display: grid; grid-template-columns: auto 1fr; align-items: center; column-gap: var(--td-space-3); font-size: var(--td-text-sm); }
+.mini { width: 2.5rem; grid-row: span 3; }
+.equipped { color: var(--td-live); }
+.none { color: var(--td-text-muted); }
+
+.signin { flex: 1; display: grid; place-content: center; justify-items: center; gap: var(--td-space-5); font-size: var(--td-text-lg); }
+
+@media (width < 700px) {
+  :host { height: auto; min-height: 100vh; }
+  .grid { display: flex; flex-direction: column; }
+  .totals { grid-template-columns: repeat(3, minmax(0, auto)); }
+  .row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; }
+  .stats { grid-column: 1 / -1; }
+  .scroll { height: auto; overflow-y: visible; }
+  .top { flex-wrap: wrap; }
+  .actions { gap: var(--td-space-3); }
+}

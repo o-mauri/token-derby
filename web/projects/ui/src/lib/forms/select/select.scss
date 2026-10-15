@@ -1,0 +1,71 @@
+@use '../control' as control;
+@use '../../slant';
+
+:host { @include control.field-layout; @include control.errors; min-width: max-content; }
+.label { @include control.label; }
+.label.sr-only { @include control.sr-only; }
+
+// Same face as the old theme select.
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--td-space-5);
+  // Fills the room its container gives it, but never narrower than its longest option.
+  min-width: max-content;
+  width: 100%;
+  background: var(--td-surface-raised);
+  color: var(--td-text);
+  border: var(--td-line) solid var(--td-border);
+  border-radius: var(--td-radius);
+  padding: var(--td-space-2) var(--td-space-4);
+  font: inherit;
+  font-size: var(--td-text-sm);
+  letter-spacing: var(--td-tracking);
+  text-align: left;
+  cursor: pointer;
+  @include slant.slant;
+
+  &:hover, &:focus-visible, &[aria-expanded="true"] { outline: none; border-color: var(--td-accent); }
+  &:disabled { opacity: 0.5; cursor: not-allowed; border-color: var(--td-border); }
+}
+
+.current, .caret { @include slant.upright; }
+.current { white-space: nowrap; }
+// Stacks every option label in one grid cell: invisible, but it sets the trigger's width.
+.labels { display: grid; text-align: left; }
+.labels > * { grid-area: 1 / 1; }
+.sizer { display: grid; visibility: hidden; height: 0; overflow: hidden; }
+.sizer > span { grid-area: 1 / 1; white-space: nowrap; }
+.caret { flex: none; }
+.placeholder { color: var(--td-text-muted); }
+.caret { color: var(--td-text-muted); }
+
+.menu {
+  // The overlay pane is a flex row; fill it so the menu matches the trigger's width.
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  max-height: 16rem;
+  overflow-y: auto;
+  padding: var(--td-space-2) 0;
+  background: var(--td-surface-raised);
+  border: var(--td-line) solid var(--td-accent);
+  border-radius: var(--td-radius);
+  font-family: var(--td-font-pixel);
+  outline: none;
+}
+
+.option {
+  white-space: nowrap;
+  padding: var(--td-space-3) var(--td-space-5);
+  font-size: var(--td-text-sm);
+  letter-spacing: var(--td-tracking);
+  color: var(--td-text);
+  cursor: pointer;
+}
+
+.option[aria-selected="true"] { color: var(--td-accent); }
+.option[aria-selected="true"]::before { content: '› '; }
+// Keyboard highlight; the listbox holds focus while the menu is open.
+.option.cdk-option-active { background: var(--td-border); }

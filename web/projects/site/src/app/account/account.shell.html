@@ -1,0 +1,20 @@
+<header class="top">
+  <td-crumbs class="crumbs" [parts]="[{ label: session.signedIn() ? name() : 'Token Derby', link: session.signedIn() ? null : ['/'] }, { label: 'Account' }]" />
+  <span class="actions">
+    @if (session.signedIn()) {
+      <td-account-menu [name]="name()" [accountLink]="['/account']" (signOut)="signOut()" />
+    }
+    <site-version-switch /><td-theme-picker compact />
+    <a td-button size="sm" routerLink="/">← Home</a>
+  </span>
+</header>
+
+@if (session.signedIn()) {
+  <td-tabs label="Account" [tabs]="tabs" />
+  <main class="tab"><router-outlet /></main>
+} @else {
+  <main class="signin">
+    <p>Sign in to see your account</p>
+    <td-google-button [href]="signInHref()" />
+  </main>
+}

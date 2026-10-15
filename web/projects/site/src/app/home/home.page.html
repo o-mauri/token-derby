@@ -1,0 +1,60 @@
+<td-page>
+  <div tdPageHeader class="top">
+    @if (session.signedIn()) {
+      <td-account-menu [name]="name()" [accountLink]="['/account']" (signOut)="signOut()" />
+    }
+    <site-version-switch /><td-theme-picker compact />
+  </div>
+
+  <div class="column">
+    <h1 class="title">
+      <td-horse-face class="face" />
+      <span>TOKEN DERBY</span>
+      <td-horse-face class="face flip" />
+    </h1>
+
+    @if (!session.signedIn()) {
+      @if (errorText(); as message) { <p class="auth-error" role="alert">{{ message }}</p> }
+      <td-google-button [href]="signInHref" />
+      <p class="divider">— or find an organisation —</p>
+      <ng-container *ngTemplateOutlet="orgBox" />
+    } @else {
+      <section class="mine" aria-labelledby="your-orgs">
+        <td-you-card class="you" [name]="name()" [link]="['/paddock']" [colors]="cardColors()" [hat]="cardHat()" />
+        <h2 class="heading" id="your-orgs">YOUR ORGS</h2>
+        @if (!orgsLoaded() && orgs.status() !== 'error') {
+          <div class="loading"><td-loader /></div>
+        } @else if (orgs.status() === 'error' && !orgsLoaded()) {
+          <p class="failed">Couldn't load your orgs.</p>
+        } @else if (!orgLinks().length) {
+          <p class="empty">You're not in any orgs yet.</p>
+        } @else {
+          <td-org-list class="list" [orgs]="orgLinks()" />
+        }
+        @if (showFind()) {
+          <ng-container *ngTemplateOutlet="orgBox" />
+        } @else {
+          <button type="button" class="find" (click)="findOpen.set(true)">Find another org</button>
+        }
+      </section>
+    }
+
+    <p class="divider">— or watch a race —</p>
+    <td-go-box class="race" label="Race code" placeholder="ABC123" [pattern]="racePattern" [maxLength]="6" upper
+      invalidText="Race codes are exactly 6 letters or digits." action="Watch" (go)="goRace($event)" />
+
+    <nav class="links" aria-label="More">
+      <a class="link" routerLink="/catalog">Hat catalog</a>
+      <a class="link" routerLink="/about">About / What's new</a>
+      <a class="link" routerLink="/privacy">Privacy</a>
+    </nav>
+    <p class="install" aria-label="Install command">
+      <span class="prompt" aria-hidden="true">$</span><span>npm i -g &#64;mauricode/token-derby</span><span class="cursor" aria-hidden="true">█</span>
+    </p>
+  </div>
+</td-page>
+
+<ng-template #orgBox>
+  <td-go-box class="org" label="Organisation name" placeholder="myteam" [pattern]="orgPattern" [maxLength]="12"
+    invalidText="Org names are 1–12 letters or digits." action="Go" (go)="goOrg($event)" />
+</ng-template>

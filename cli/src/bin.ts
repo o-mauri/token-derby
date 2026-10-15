@@ -72,8 +72,8 @@ Organisations:
   token-derby organisation join [token]   Join an organisation with a join token,
                                           or leave the token out to join by your
                                           verified email domain
-  token-derby web                         Open the web org manager (create orgs,
-                                          manage schedules, webhooks, members)
+  token-derby web                         Open Token Derby in your browser, signed
+                                          in (your orgs, account and org settings)
 
 Races:
   token-derby create [--organisation <name>]

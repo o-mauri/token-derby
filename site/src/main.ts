@@ -1,4 +1,6 @@
-import { parseRoute } from './route.js';
+import { parseRoute, type Route } from './route.js';
+import { mountFloatingV2Toggle } from './render/v2-toggle.js';
+import { createV2Prompt, shouldPrompt } from './render/v2-prompt.js';
 import { renderHome } from './render/home.js';
 import { renderRace } from './render/race.js';
 import { renderOrg } from './render/org.js';
@@ -11,6 +13,8 @@ import { renderCliApprove } from './render/cli-approve.js';
 import { renderLinkGoogle } from './render/link-google.js';
 import { initTheme } from './theme.js';
 import { createNotFound } from './render/not-found.js';
+import { handOffSignIn } from './hand-off.js';
+import { chooseV2, isV2OnlyPath } from './v2-opt-in.js';
 
 // Legendary hat keyframes are installed lazily on the first buildHatGroup
 // call (see hat-svg.ts), so every entry point — main.ts, preview-race.ts,
@@ -18,6 +22,9 @@ import { createNotFound } from './render/not-found.js';
 
 document.body.classList.add('tv'); // TV is the only mode
 initTheme();
+
+// Routes whose pages have no header of their own to hold the V2 switch.
+const FLOATING = new Set<Route['type']>(['home', 'about', 'privacy', 'org-manager', 'cli', 'link', 'not-found']);
 
 let activeCleanup: (() => void) | null = null;
 
@@ -27,7 +34,10 @@ function route() {
 
   if (activeCleanup) { activeCleanup(); activeCleanup = null; }
 
-  const r = parseRoute(window.location.pathname);
+  handOffSignIn(window.location, (url) => history.replaceState(null, '', url));
+  // Read before rendering: the org manager wipes a sign-in #code= as it starts.
+  const at = { pathname: window.location.pathname, hash: window.location.hash };
+  const r = parseRoute(at.pathname);
   if (r.type === 'home') {
     renderHome(root);
   } else if (r.type === 'race') {
@@ -49,12 +59,21 @@ function route() {
   } else if (r.type === 'link') {
     activeCleanup = renderLinkGoogle(root);
   } else {
-    root.replaceChildren(createNotFound(document, {
+    const v2Only = isV2OnlyPath(at.pathname);
+    root.replaceChildren(createNotFound(document, v2Only ? {
+      title: 'Only on the new site',
+      message: ['This page is part of the new Token Derby.'],
+      back: { label: '← Home', href: '/' },
+      action: { label: 'Try v2', onClick: () => chooseV2(document) },
+    } : {
       title: 'Page not found',
       message: ["There's nothing at this address."],
       back: { label: '← Home', href: '/' },
     }));
   }
+  mountFloatingV2Toggle(document, FLOATING.has(r.type));
+  if (!shouldPrompt(r.type, at)) document.querySelector('.v2-prompt')?.remove();
+  else if (!document.querySelector('.v2-prompt')) document.body.appendChild(createV2Prompt(document));
 }
 
 window.addEventListener('popstate', route);

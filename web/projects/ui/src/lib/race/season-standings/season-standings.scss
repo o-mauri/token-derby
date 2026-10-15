@@ -1,0 +1,33 @@
+@use '../league-table';
+
+:host { display: block; padding: var(--td-space-4) var(--td-space-6); }
+
+.heading, .legend { margin: 0 0 var(--td-space-3); color: var(--td-text-muted); font-size: var(--td-text-sm); letter-spacing: var(--td-tracking); }
+.legend { display: flex; gap: var(--td-space-6); margin: var(--td-space-4) 0 0; }
+.key::before { content: ''; display: inline-block; width: 0.6em; height: 0.6em; margin-right: var(--td-space-2); vertical-align: middle; }
+.key.promote::before { background: var(--td-zone-promote); }
+.key.relegate::before { background: var(--td-zone-relegate); }
+
+.champion {
+  margin: 0 0 var(--td-space-3);
+  font-size: var(--td-text-md);
+  letter-spacing: var(--td-tracking-wide);
+}
+.champion .label, .champion .champ { color: var(--td-medal-gold); }
+
+.row { grid-template-columns: 1.4rem 2.2rem 2.2rem minmax(0, 1fr) auto 2.6rem; padding-left: var(--td-space-3); }
+.row.promote { box-shadow: inset calc(var(--td-line) * 1.5) 0 0 var(--td-zone-promote); }
+.row.relegate { box-shadow: inset calc(var(--td-line) * 1.5) 0 0 var(--td-zone-relegate); }
+
+.rank { font-size: var(--td-text-lg); color: var(--td-text-muted); }
+.move { font-size: var(--td-text-sm); text-align: center; color: var(--td-text-muted); }
+.move.up { color: var(--td-zone-promote); }
+.move.down { color: var(--td-zone-relegate); }
+.new {
+  font-size: var(--td-text-xs);
+  color: var(--td-level-up);
+  border: var(--td-line-thin) solid color-mix(in srgb, var(--td-level-up) 50%, transparent);
+  border-radius: var(--td-radius);
+  padding: 0 var(--td-space-1);
+}
+.gain-col { text-align: right; }

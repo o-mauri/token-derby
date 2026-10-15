@@ -1,0 +1,35 @@
+<div class="title">{{ title() }}</div>
+@if (!data()) {
+  <td-loader class="loading" />
+} @else if (data()!.hasData) {
+  @let g = geo()!;
+  <svg #svg class="svg" role="img" [attr.aria-label]="label()" [attr.viewBox]="'0 0 ' + g.width + ' ' + height">
+    @for (y of g.grid; track $index) {
+      <svg:line class="grid" [attr.x1]="g.pad.l" [attr.y1]="y" [attr.x2]="g.width - g.pad.r" [attr.y2]="y" />
+    }
+    @for (l of ordered(); track l.id) {
+      <svg:g class="series" [attr.data-id]="l.id" [class.active]="active() === l.id" [class.muted]="active() !== null && active() !== l.id">
+        @if (mode() === 'cumulative') {
+          <svg:path class="line" [attr.d]="l.d" fill="none" [attr.stroke]="l.colour" stroke-width="2" />
+          <svg:path class="hit" [attr.d]="l.d" (pointerenter)="pick(l.id)" (pointerleave)="pick(null)" (click)="toggle(l.id)" />
+        } @else {
+          <svg:polyline class="line" [attr.points]="l.points" fill="none" [attr.stroke]="l.colour" stroke-width="1.7" />
+          <svg:polyline class="hit" [attr.points]="l.points" (pointerenter)="pick(l.id)" (pointerleave)="pick(null)" (click)="toggle(l.id)" />
+        }
+      </svg:g>
+    }
+    <svg:text class="axis" font-size="10" [attr.x]="g.pad.l" [attr.y]="height - 8">{{ g.startLabel }}</svg:text>
+    <svg:text class="axis" font-size="10" [attr.x]="g.width - g.pad.r - 30" [attr.y]="height - 8">{{ g.endLabel }}</svg:text>
+    <svg:text class="axis" font-size="10" x="2" [attr.y]="g.pad.t + 6">{{ g.peakLabel }}</svg:text>
+  </svg>
+  <div class="legend">
+    @for (l of data()!.lines; track l.id) {
+      <button type="button" class="item" [class.active]="active() === l.id" [class.dim]="active() !== null && active() !== l.id"
+        (mouseenter)="pick(l.id)" (mouseleave)="pick(null)" (focus)="pick(l.id)" (blur)="pick(null)">
+        <span class="chip" [style.background]="l.colour"></span>{{ l.name }}
+      </button>
+    }
+  </div>
+} @else {
+  <p class="empty">No token data yet. Check back in a minute.</p>
+}

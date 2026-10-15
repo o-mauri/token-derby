@@ -1,0 +1,6 @@
+// Locked to the screen: the header stays put and the track scrolls (and auto-bounces) inside it.
+:host { display: flex; flex-direction: column; height: 100vh; min-height: 0; }
+.loading { flex: 1; display: flex; }
+.track { flex: 1; }
+.finished { flex: 1; min-height: 0; }
+.chart { height: 100%; padding: var(--td-space-5); box-sizing: border-box; }

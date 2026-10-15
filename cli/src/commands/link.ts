@@ -158,7 +158,7 @@ export async function linkCommand(argv: string[] = [], deps: LinkDeps = {}): Pro
     }
 
     console.log(`  This machine is now registered as "${label}", with a credential of its own`);
-    console.log('  that you can revoke separately under Account in the org manager.');
+    console.log('  that you can revoke separately under Account on the website.');
   };
 
   let me: Awaited<ReturnType<typeof apiGetJockey>>;

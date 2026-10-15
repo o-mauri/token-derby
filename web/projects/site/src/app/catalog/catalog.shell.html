@@ -1,0 +1,14 @@
+<header class="top">
+  <td-crumbs [parts]="[{ label: 'Token Derby', link: ['/'] }, { label: 'Hat catalog' }]" />
+  <span class="actions">
+    <site-version-switch /><td-theme-picker compact />
+    <a td-button size="sm" routerLink="/">← Home</a>
+  </span>
+</header>
+<div class="controls">
+  <td-chip-group class="horses" label="Horse" single [options]="palettes" [value]="picked()" (valueChange)="pick($event)" />
+  <span class="total">{{ total }} collectibles</span>
+</div>
+<td-tabs label="Rarity" [tabs]="tabs" queryParamsHandling="preserve" />
+<main class="tab"><router-outlet /></main>
+<p class="odds">Roll: a rarity first (37 / 15 / 7 / 1), then a hat within it, then a variant. Limited hats are never rolled.</p>

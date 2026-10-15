@@ -1,0 +1,246 @@
+{
+  "$schema": "./node_modules/@angular/cli/lib/config/schema.json",
+  "version": 1,
+  "cli": {
+    "packageManager": "npm"
+  },
+  "newProjectRoot": "projects",
+  "projects": {
+    "ui": {
+      "projectType": "library",
+      "root": "projects/ui",
+      "sourceRoot": "projects/ui/src",
+      "prefix": "lib",
+      "architect": {
+        "build": {
+          "builder": "@angular/build:ng-packagr",
+          "configurations": {
+            "production": {
+              "tsConfig": "projects/ui/tsconfig.lib.prod.json"
+            },
+            "development": {
+              "tsConfig": "projects/ui/tsconfig.lib.json"
+            }
+          },
+          "defaultConfiguration": "production"
+        },
+        "test": {
+          "builder": "@angular/build:unit-test",
+          "options": {
+            "tsConfig": "projects/ui/tsconfig.spec.json"
+          }
+        },
+        "storybook": {
+          "builder": "@storybook/angular-vite:start-storybook",
+          "options": {
+            "configDir": "projects/ui/.storybook",
+            "browserTarget": "ui:build",
+            "zoneless": true,
+            "compodoc": false,
+            "styles": [
+              "../node_modules/@angular/cdk/overlay-prebuilt.css",
+              "projects/ui/styles/index.css"
+            ],
+            "port": 6006
+          }
+        },
+        "build-storybook": {
+          "builder": "@storybook/angular-vite:build-storybook",
+          "options": {
+            "configDir": "projects/ui/.storybook",
+            "browserTarget": "ui:build",
+            "zoneless": true,
+            "compodoc": false,
+            "styles": [
+              "../node_modules/@angular/cdk/overlay-prebuilt.css",
+              "projects/ui/styles/index.css"
+            ],
+            "outputDir": "storybook-static"
+          }
+        },
+        "lint": {
+          "builder": "@angular-eslint/builder:lint",
+          "options": {
+            "lintFilePatterns": ["projects/ui/**/*.ts", "projects/ui/**/*.html"],
+            "eslintConfig": "projects/ui/eslint.config.js"
+          }
+        }
+      }
+    },
+    "site": {
+      "projectType": "application",
+      "schematics": {
+        "@schematics/angular:component": {
+          "style": "scss"
+        }
+      },
+      "root": "projects/site",
+      "sourceRoot": "projects/site/src",
+      "prefix": "app",
+      "architect": {
+        "build": {
+          "builder": "@angular/build:application",
+          "options": {
+            "browser": "projects/site/src/main.ts",
+            "tsConfig": "projects/site/tsconfig.app.json",
+            "inlineStyleLanguage": "scss",
+            "assets": [
+              {
+                "glob": "**/*",
+                "input": "projects/site/public"
+              },
+              {
+                "glob": "**/*",
+                "input": "projects/ui/assets",
+                "output": "/"
+              }
+            ],
+            "styles": [
+              "../node_modules/@angular/cdk/overlay-prebuilt.css",
+              "projects/ui/styles/index.css"
+            ]
+          },
+          "configurations": {
+            "production": {
+              "budgets": [
+                {
+                  "type": "initial",
+                  "maximumWarning": "500kB",
+                  "maximumError": "1MB"
+                },
+                {
+                  "type": "anyComponentStyle",
+                  "maximumWarning": "4kB",
+                  "maximumError": "8kB"
+                }
+              ],
+              "outputHashing": "all",
+              "fileReplacements": [
+                {
+                  "replace": "projects/site/src/app/preview/preview.routes.ts",
+                  "with": "projects/site/src/app/preview/preview.routes.prod.ts"
+                }
+              ]
+            },
+            "optin": {
+              "deployUrl": "/v2/",
+              "outputPath": "dist/site-optin"
+            },
+            "development": {
+              "optimization": false,
+              "extractLicenses": false,
+              "sourceMap": true
+            }
+          },
+          "defaultConfiguration": "production"
+        },
+        "serve": {
+          "builder": "@angular/build:dev-server",
+          "configurations": {
+            "production": {
+              "buildTarget": "site:build:production"
+            },
+            "development": {
+              "buildTarget": "site:build:development"
+            }
+          },
+          "defaultConfiguration": "development",
+          "options": {
+            "proxyConfig": "projects/site/proxy.conf.json"
+          }
+        },
+        "test": {
+          "builder": "@angular/build:unit-test"
+        },
+        "lint": {
+          "builder": "@angular-eslint/builder:lint",
+          "options": {
+            "lintFilePatterns": ["projects/site/**/*.ts", "projects/site/**/*.html"],
+            "eslintConfig": "projects/site/eslint.config.js"
+          }
+        }
+      }
+    },
+    "admin": {
+      "projectType": "application",
+      "schematics": {
+        "@schematics/angular:component": {
+          "style": "scss"
+        }
+      },
+      "root": "projects/admin",
+      "sourceRoot": "projects/admin/src",
+      "prefix": "app",
+      "architect": {
+        "build": {
+          "builder": "@angular/build:application",
+          "options": {
+            "browser": "projects/admin/src/main.ts",
+            "tsConfig": "projects/admin/tsconfig.app.json",
+            "inlineStyleLanguage": "scss",
+            "assets": [
+              {
+                "glob": "**/*",
+                "input": "projects/admin/public"
+              },
+              {
+                "glob": "**/*",
+                "input": "projects/ui/assets",
+                "output": "/"
+              }
+            ],
+            "styles": [
+              "../node_modules/@angular/cdk/overlay-prebuilt.css",
+              "projects/ui/styles/index.css"
+            ]
+          },
+          "configurations": {
+            "production": {
+              "budgets": [
+                {
+                  "type": "initial",
+                  "maximumWarning": "500kB",
+                  "maximumError": "1MB"
+                },
+                {
+                  "type": "anyComponentStyle",
+                  "maximumWarning": "4kB",
+                  "maximumError": "8kB"
+                }
+              ],
+              "outputHashing": "all"
+            },
+            "development": {
+              "optimization": false,
+              "extractLicenses": false,
+              "sourceMap": true
+            }
+          },
+          "defaultConfiguration": "production"
+        },
+        "serve": {
+          "builder": "@angular/build:dev-server",
+          "configurations": {
+            "production": {
+              "buildTarget": "admin:build:production"
+            },
+            "development": {
+              "buildTarget": "admin:build:development"
+            }
+          },
+          "defaultConfiguration": "development"
+        },
+        "test": {
+          "builder": "@angular/build:unit-test"
+        },
+        "lint": {
+          "builder": "@angular-eslint/builder:lint",
+          "options": {
+            "lintFilePatterns": ["projects/admin/**/*.ts", "projects/admin/**/*.html"],
+            "eslintConfig": "projects/admin/eslint.config.js"
+          }
+        }
+      }
+    }
+  }
+}

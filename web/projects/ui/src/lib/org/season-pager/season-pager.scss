@@ -1,0 +1,38 @@
+@use '../../slant';
+
+:host { display: grid; gap: var(--td-space-3); padding: var(--td-space-3) 0; border-block: var(--td-line-thin) solid var(--td-border); container-type: inline-size; }
+
+.bar-row { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: var(--td-space-4); }
+.middle { display: grid; justify-items: center; gap: var(--td-space-1); }
+.label { font-size: var(--td-text-lg); letter-spacing: var(--td-tracking-wide); color: var(--td-highlight); }
+.progress { display: flex; align-items: center; gap: var(--td-space-4); color: var(--td-text-muted); font-size: var(--td-text-sm); }
+.bar { width: 12rem; height: var(--td-space-2); background: var(--td-xp-track); border-radius: var(--td-radius-pill); overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--td-highlight); }
+.final { letter-spacing: var(--td-tracking-wide); color: var(--td-text-muted); font-size: var(--td-text-sm); }
+.champion { margin: 0; text-align: center; letter-spacing: var(--td-tracking); }
+.gold { color: var(--td-medal-gold); }
+
+.prev, .next {
+  justify-self: start;
+  padding: var(--td-space-2) var(--td-space-5);
+  background: var(--td-accent);
+  color: var(--td-surface);
+  font-weight: bold;
+  font-size: var(--td-text-sm);
+  text-decoration: none;
+  white-space: nowrap;
+  border-radius: var(--td-radius);
+  @include slant.slant;
+}
+.next { justify-self: end; }
+.prev:hover, .next:hover, .prev:focus-visible, .next:focus-visible { filter: brightness(1.1); }
+.prev:focus-visible, .next:focus-visible { outline: var(--td-focus-width) solid var(--td-text); outline-offset: var(--td-focus-offset); }
+.end { opacity: 0.35; cursor: not-allowed; }
+
+// Phones: just the arrows, and a shorter bar.
+@container (width < 700px) {
+  .bar-row { grid-template-columns: auto 1fr auto; gap: var(--td-space-3); }
+  .lbl { display: none; }
+  .bar { width: 5rem; }
+  .progress { gap: var(--td-space-2); font-size: var(--td-text-xs); }
+}

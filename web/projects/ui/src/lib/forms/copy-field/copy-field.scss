@@ -1,0 +1,40 @@
+@use '../control' as control;
+@use '../../slant';
+
+:host { @include control.field-layout; }
+.label { @include control.label; }
+.row { display: flex; align-items: center; gap: var(--td-space-5); flex-wrap: wrap; }
+
+.value {
+  font-family: var(--td-font-pixel);
+  font-size: var(--td-text-md);
+  letter-spacing: var(--td-tracking);
+  color: var(--td-text);
+  overflow-wrap: anywhere;
+}
+
+// The old .org-copy look: an outlined accent button.
+.copy {
+  background: none;
+  border: var(--td-line-thin) solid var(--td-border);
+  color: var(--td-accent);
+  padding: var(--td-space-2) var(--td-space-5);
+  font: inherit;
+  font-size: var(--td-text-sm);
+  border-radius: var(--td-radius);
+  cursor: pointer;
+  @include slant.slant;
+
+  &:hover, &:focus-visible { outline: none; border-color: var(--td-accent); }
+}
+
+.text { @include slant.upright; }
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

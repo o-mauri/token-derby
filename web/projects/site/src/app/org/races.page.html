@@ -1,0 +1,30 @@
+@if (data.notFound()) {
+  <td-page>
+    <td-not-found title="Organisation not found" [message]="notFoundMessage()" backLabel="← Home" (back)="router.navigate(['/'])" />
+  </td-page>
+} @else {
+  <header class="top">
+    <td-crumbs [parts]="[{ label: orgName(), link: ['..'], key: 'org-name' }, { label: 'Races' }]" />
+    <span class="actions">
+      <site-version-switch /><td-theme-picker compact />
+      @if (orgName()) { <a td-button size="sm" class="back" routerLink="..">← {{ orgName() }}</a> }
+      <a td-button size="sm" routerLink="/">← Home</a>
+    </span>
+  </header>
+
+  @if (data.loading()) {
+    <div class="loading"><td-loader /></div>
+  } @else if (data.racesFailed()) {
+    <p class="message">Couldn't load races. Try again later.</p>
+  } @else if (!races().length) {
+    <p class="message empty">No races yet. Create one with <code>token-derby create</code>.</p>
+  } @else {
+    <main class="list">
+      <td-race-list [live]="live()" [upcoming]="upcoming()" [results]="page()?.rows ?? []">
+        @if (page(); as p) {
+          <td-month-pager [label]="p.label" [count]="p.count" [prev]="p.prev" [next]="p.next" />
+        }
+      </td-race-list>
+    </main>
+  }
+}

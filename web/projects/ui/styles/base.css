@@ -1,0 +1,27 @@
+/* Reset and page defaults, carried over from the old site's styles.css. */
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--td-surface);
+  color: var(--td-text);
+  font-family: var(--td-font-pixel);
+  font-size: 18px; /* the old site's TV-mode size; v2 is TV-only */
+  line-height: 1.25;
+  min-height: 100vh;
+  image-rendering: pixelated;
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.td-app-root { min-height: 100vh; display: flex; flex-direction: column; }
+/* Matrix's glyph rain sits behind the page, so the page content stacks above it. */
+:root[data-theme="matrix"] .td-app-root > :not(td-theme-backdrop) { position: relative; z-index: 1; }
+
+/* Scrollbars follow the theme everywhere: a slim square thumb in the highlight colour on a clear track, with no light box in the corner. */
+* { scrollbar-width: thin; scrollbar-color: var(--td-highlight) transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--td-highlight); border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background-color: var(--td-text); }

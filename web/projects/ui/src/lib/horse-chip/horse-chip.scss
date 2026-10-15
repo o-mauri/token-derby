@@ -1,0 +1,90 @@
+// Ported from the old lane name tag at TV sizes, since the site is TV-only.
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: var(--td-space-1);
+  padding: var(--td-space-2) var(--td-space-4);
+  background: var(--td-track-label);
+  border: var(--td-line-thin) solid var(--td-border);
+  border-radius: var(--td-radius);
+  overflow: hidden;
+  line-height: 1;
+  letter-spacing: var(--td-tracking-tight);
+  font-family: var(--td-font-pixel);
+}
+
+// Each row clips; an overflowing child marquees (see Marquee).
+.row { overflow: hidden; white-space: nowrap; }
+.row + .row, .stats { margin-top: calc(var(--td-space-1) * -1); }
+
+.scrolling { animation: label-marquee 7s ease-in-out infinite; will-change: transform; }
+
+@keyframes label-marquee {
+  0%, 16% { transform: translateX(0); }
+  46%, 54% { transform: translateX(var(--shift, 0)); }
+  84%, 100% { transform: translateX(0); }
+}
+
+// The stats views share one cell and cross-fade.
+.stats { display: grid; align-items: center; overflow: hidden; }
+.view { grid-area: 1 / 1; min-width: 0; animation: stat-cycle 12s ease-in-out infinite; }
+.view:nth-child(2) { animation-delay: -9s; }
+.view:nth-child(3) { animation-delay: -6s; }
+.view:nth-child(4) { animation-delay: -3s; }
+.league .view { animation-name: stat-cycle-5; }
+.league .view:nth-child(2) { animation-delay: -9.6s; }
+.league .view:nth-child(3) { animation-delay: -7.2s; }
+.league .view:nth-child(4) { animation-delay: -4.8s; }
+.league .view:nth-child(5) { animation-delay: -2.4s; }
+
+@keyframes stat-cycle {
+  0%, 21% { opacity: 1; }
+  25%, 96% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+@keyframes stat-cycle-5 {
+  0%, 16% { opacity: 1; }
+  20%, 96% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+.name {
+  color: var(--td-text);
+  font-family: 'Bitcount Prop Single', var(--td-font-pixel);
+  font-size: var(--td-text-sm);
+  font-weight: 600;
+  letter-spacing: var(--td-tracking);
+}
+
+.tokens { color: var(--td-coin); font-size: var(--td-text-sm); font-weight: 600; }
+.owner { color: var(--td-text); opacity: 0.6; font-size: var(--td-text-xs); }
+.pace { color: var(--td-accent); font-size: var(--td-text-sm); font-weight: bold; }
+
+.level {
+  display: inline-block;
+  padding: var(--td-space-1) var(--td-space-3);
+  font-family: 'Barlow Semi Condensed', var(--td-font-pixel);
+  font-weight: 600;
+  font-size: var(--td-text-2xs);
+  text-transform: uppercase;
+  color: var(--td-level-text);
+  background: var(--td-level);
+  border-radius: var(--td-radius-pill);
+  letter-spacing: var(--td-tracking-tight);
+  line-height: 1.4;
+}
+
+.position { font-size: var(--td-text-sm); font-weight: bold; }
+.gold { color: var(--td-medal-gold); }
+.silver { color: var(--td-medal-silver); }
+.bronze { color: var(--td-medal-bronze); }
+.place { color: var(--td-place); }
+.league-pos { color: var(--td-league); font-size: var(--td-text-sm); font-weight: bold; }
+
+// Reduced motion: no marquee, and the stats row holds on the owner view.
+@media (prefers-reduced-motion: reduce) {
+  .scrolling { animation: none; }
+  .view { animation: none; opacity: 0; }
+  .view:first-child { opacity: 1; }
+}
