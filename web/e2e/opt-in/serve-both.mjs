@@ -1,7 +1,7 @@
 // Serves v1 and v2 behind the real edge rewrite function, with a minimal fake API.
 import { createReadStream, existsSync, readFileSync, statSync } from 'node:fs';
 import { createServer } from 'node:http';
-import { extname, join, normalize } from 'node:path';
+import { extname, join, normalize, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = (p) => fileURLToPath(new URL(p, import.meta.url));
@@ -17,6 +17,7 @@ const source = readFileSync(root('../../../infra/lib/site-rewrite.ts'), 'utf8');
 // The template literal after the export, not the backticks in the header comment.
 const start = source.indexOf('`', source.indexOf('SITE_REWRITE_CODE')) + 1;
 const code = source.slice(start, source.indexOf('`', start)).replaceAll('\\\\', '\\');
+if (!code.includes('function handler')) throw new Error('site-rewrite.ts: handler not found in the extracted code');
 const handler = new Function(`${code}; return handler;`)();
 
 const json = (res, status, body) => res.writeHead(status, { 'content-type': 'application/json' }).end(JSON.stringify(body));
@@ -50,8 +51,10 @@ createServer((req, res) => {
   const uri = handler({ request: { uri: url.pathname, cookies } }).uri;
   const v2 = uri.startsWith('/v2/');
   const base = v2 ? V2 : V1;
-  const file = normalize(join(base, decodeURIComponent(v2 ? uri.slice(3) : uri)));
-  if (!file.startsWith(base) || !existsSync(file) || !statSync(file).isFile()) { res.writeHead(404).end('Not found'); return; }
+  let path;
+  try { path = decodeURIComponent(v2 ? uri.slice(3) : uri); } catch { res.writeHead(400).end('Bad request'); return; }
+  const file = normalize(join(base, path));
+  if (!(file === base || file.startsWith(base + sep)) || !existsSync(file) || !statSync(file).isFile()) { res.writeHead(404).end('Not found'); return; }
   res.writeHead(200, { 'content-type': TYPES[extname(file)] ?? 'application/octet-stream' });
   createReadStream(file).pipe(res);
 }).listen(PORT, () => console.log(`both builds on http://localhost:${PORT}`));
