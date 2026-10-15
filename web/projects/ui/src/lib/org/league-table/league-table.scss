@@ -1,6 +1,7 @@
 @use '../../marquee';
 
-:host { display: block; min-width: 0; }
+// A raised card, so neighbouring divisions stand apart from the page and each other.
+:host { display: block; min-width: 0; background: var(--td-surface-raised); border-radius: var(--td-radius); padding: var(--td-space-3) var(--td-space-4); }
 
 .head {
   display: flex;
@@ -21,6 +22,7 @@
   padding: var(--td-space-2) var(--td-space-3);
   border-bottom: var(--td-line-thin) solid var(--td-border);
 }
+.row:last-child { border-bottom: 0; }
 .row.promote { box-shadow: inset calc(var(--td-line) * 1.5) 0 0 var(--td-zone-promote); }
 .row.relegate { box-shadow: inset calc(var(--td-line) * 1.5) 0 0 var(--td-zone-relegate); }
 
