@@ -83,6 +83,21 @@ describe('finaliseRace', () => {
     expect(findHorse(stored, 'Beta').final_tokens).toBe(250);
   });
 
+  it('stamps the race result with ended_at', async () => {
+    const horses = [makeHorse('Alpha', 100), makeHorse('Beta', 250)];
+    const race = await setupRace(horses);
+
+    const result = await finaliseRace(race, new Date());
+
+    const fetched = await getRaceById(race.race_id);
+    expect(fetched?.result).toEqual({
+      runners: 2,
+      total_tokens: 350,
+      highlight: { horse_name: 'Beta', tokens: 250, colors: horses[1]!.colors },
+    });
+    expect(result.race.result).toEqual(fetched?.result);
+  });
+
   it('is a no-op when called on an already-finalised race', async () => {
     const horses = [makeHorse('Alpha', 100)];
     const race = await setupRace(horses);

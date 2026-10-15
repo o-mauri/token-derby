@@ -1,7 +1,7 @@
 import { PutCommand, GetCommand, QueryCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { ddb, TABLE } from './client.js';
 import { raceMetaKey } from './keys.js';
-import type { Race } from '@token-derby/shared';
+import type { Race, RaceResult } from '@token-derby/shared';
 
 export async function putRace(race: Race, admin_code: string): Promise<void> {
   await ddb.send(new PutCommand({
@@ -60,15 +60,16 @@ export async function setRaceEnded(race_id: string, ended_at: string): Promise<v
 // Conditional finalisation lock — only the first caller persists ended_at and
 // wins the right to do downstream side-effects (final_tokens, future gold).
 // Returns the persisted ended_at: either the value we just wrote, or the value
-// the winning caller wrote if we lost the race.
-export async function setRaceEndedIfAbsent(race_id: string, ended_at: string): Promise<string> {
+// the winning caller wrote if we lost the race. The winner also stamps the race's result.
+export async function setRaceEndedIfAbsent(race_id: string, ended_at: string, result?: RaceResult): Promise<string> {
   try {
     const res = await ddb.send(new UpdateCommand({
       TableName: TABLE,
       Key: raceMetaKey(race_id),
-      UpdateExpression: 'SET ended_at = :e',
+      UpdateExpression: result ? 'SET ended_at = :e, #r = :r' : 'SET ended_at = :e',
       ConditionExpression: 'attribute_not_exists(ended_at)',
-      ExpressionAttributeValues: { ':e': ended_at },
+      ...(result ? { ExpressionAttributeNames: { '#r': 'result' } } : {}),
+      ExpressionAttributeValues: { ':e': ended_at, ...(result ? { ':r': result } : {}) },
       ReturnValues: 'ALL_NEW',
     }));
     return String(res.Attributes?.ended_at ?? ended_at);
@@ -80,14 +81,33 @@ export async function setRaceEndedIfAbsent(race_id: string, ended_at: string): P
 }
 
 export async function listRacesByOrgId(org_id: string): Promise<Race[]> {
-  const { Items = [] } = await ddb.send(new QueryCommand({
+  const items: Record<string, any>[] = [];
+  let ExclusiveStartKey: Record<string, any> | undefined;
+  do {
+    const page = await ddb.send(new QueryCommand({
+      TableName: TABLE,
+      IndexName: 'OrgRacesIndex',
+      KeyConditionExpression: 'org_id = :o',
+      ExpressionAttributeValues: { ':o': org_id },
+      ScanIndexForward: false,
+      ExclusiveStartKey,
+    }));
+    items.push(...(page.Items ?? []));
+    ExclusiveStartKey = page.LastEvaluatedKey;
+  } while (ExclusiveStartKey);
+  return items.map(pickRace);
+}
+
+/** Sets a finalised race's result; the backfill uses it for races finalised before results were stamped. */
+export async function setRaceResult(race_id: string, result: RaceResult): Promise<void> {
+  await ddb.send(new UpdateCommand({
     TableName: TABLE,
-    IndexName: 'OrgRacesIndex',
-    KeyConditionExpression: 'org_id = :o',
-    ExpressionAttributeValues: { ':o': org_id },
-    ScanIndexForward: false,
+    Key: raceMetaKey(race_id),
+    UpdateExpression: 'SET #r = :r',
+    ConditionExpression: 'attribute_exists(ended_at)',
+    ExpressionAttributeNames: { '#r': 'result' },
+    ExpressionAttributeValues: { ':r': result },
   }));
-  return Items.map(pickRace);
 }
 
 function pickRace(item: Record<string, any>): Race {

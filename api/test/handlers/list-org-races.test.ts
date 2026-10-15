@@ -5,7 +5,7 @@ import { handler as createRace } from '../../src/handlers/create-race.js';
 import { handler as joinRace } from '../../src/handlers/join-race.js';
 import { handler as equipHat } from '../../src/handlers/equip-hat.js';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
-import { setRaceEnded } from '../../src/db/races.js';
+import { setRaceEnded, setRaceResult } from '../../src/db/races.js';
 import { setHorseFinalTokens } from '../../src/db/horses.js';
 import { applyRollResult } from '../../src/db/stable.js';
 import { handler as joinOrg } from '../../src/handlers/join-organisation.js';
@@ -292,6 +292,29 @@ describe('listOrgRaces handler', () => {
     expect(summary.highlight.tokens).toBe(500);
     expect(summary.highlight.colors).toEqual(HCOLORS);
     expect(summary.time_left_seconds).toBeUndefined();
+  });
+
+  it('finalised race: reads its stored result instead of its horses', async () => {
+    const owner = await makeUser('LOR_Stored');
+    await createOrg(createOrgEvent('LorStored', owner));
+    const raceRes: any = await createRace(createRaceEvent({
+      name: 'Stored result',
+      start_time: '2020-01-01T00:00:00Z',
+      end_time: '2099-01-01T00:00:00Z',
+      tz: 'UTC',
+      organisation_name: 'LorStored',
+    }, owner));
+    const { race_id, join_code } = JSON.parse(raceRes.body);
+    await joinHorse(join_code, owner, 'Ignored');
+
+    // The stored result disagrees with the horses, so it can only come from the race record.
+    const stored = { runners: 7, total_tokens: 9000, highlight: { horse_name: 'Stamped', tokens: 4000, colors: HCOLORS } };
+    await setRaceEnded(race_id, '2020-01-01T01:00:00Z');
+    await setRaceResult(race_id, stored);
+
+    const summary = JSON.parse((await listOrgRaces(listEvent('LorStored')) as any).body).races[0];
+    expect(summary.status).toBe('finished');
+    expect(summary).toMatchObject(stored);
   });
 
   it('finished-but-never-finalized race: highlight tokens fall back to current_tokens', async () => {

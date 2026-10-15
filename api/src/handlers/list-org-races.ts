@@ -1,10 +1,10 @@
 import type { ApiHandler } from '../lib/http.js';
-import type { ListOrgRacesResponse, RaceSummary, RaceHighlight } from '@token-derby/shared';
-import { ORG_NAME_PATTERN, scoredOf } from '@token-derby/shared';
+import type { ListOrgRacesResponse, RaceSummary } from '@token-derby/shared';
+import { ORG_NAME_PATTERN } from '@token-derby/shared';
 import { getOrganisationByName } from '../db/organisations.js';
 import { listRacesByOrgId } from '../db/races.js';
 import { listHorses } from '../db/horses.js';
-import { rankHorses } from '../lib/rank-horses.js';
+import { raceResultOf } from '../lib/race-result.js';
 import { computeStatus, timeLeftSeconds } from '../lib/status.js';
 import { ok, err } from '../lib/http.js';
 
@@ -22,10 +22,9 @@ export const handler: ApiHandler = async (event) => {
   const now = new Date();
   const races = await listRacesByOrgId(org.org_id);
 
-  // Fan out per-race horse lookups concurrently (same pattern as
-  // get-org-leaderboard.ts). Pending races skip the lookup entirely; a failed
-  // lookup for one race just omits that race's highlight without failing the
-  // whole request. This endpoint never triggers race finalization.
+  // Pending races skip the horse lookup, as do finalised races (they carry their result).
+  // A failed lookup omits that race's highlight without failing the request.
+  // This endpoint never triggers race finalization.
   const summaries: RaceSummary[] = await Promise.all(
     races.map(async (race): Promise<RaceSummary> => {
       const status = computeStatus(race, now);
@@ -41,29 +40,11 @@ export const handler: ApiHandler = async (event) => {
       };
 
       if (status === 'pending') return summary;
+      // Finalised races carry their result, so only live and unfinalised races read their horses.
+      if (status === 'finished' && race.result) return { ...summary, ...race.result };
 
       try {
-        const horses = await listHorses(race.race_id);
-        // rankHorses sorts by scored distance desc, joined_at asc. The top horse
-        // is the winner (finished) or current leader (live).
-        const counted: RaceSummary = {
-          ...summary,
-          runners: horses.length,
-          total_tokens: horses.reduce((sum, h) => sum + (h.final_scored_tokens ?? scoredOf(h)), 0),
-        };
-        const leader = rankHorses(horses)[0];
-        if (!leader) return counted; // zero-horse races have no leader
-        const tokens =
-          status === 'finished'
-            ? leader.final_scored_tokens ?? scoredOf(leader)
-            : scoredOf(leader);
-        const highlight: RaceHighlight = {
-          horse_name: leader.name,
-          tokens,
-          colors: leader.colors,
-          ...(leader.equipped_hat ? { hat: leader.equipped_hat } : {}),
-        };
-        return { ...counted, highlight };
+        return { ...summary, ...raceResultOf(await listHorses(race.race_id), status) };
       } catch {
         // Tolerate a per-race lookup failure: omit highlight, keep the summary
         // (including time_left_seconds for live races).

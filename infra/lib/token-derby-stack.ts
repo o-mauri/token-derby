@@ -157,13 +157,13 @@ export class TokenDerbyStack extends cdk.Stack {
       SITE_ORIGIN: `https://${APP_DOMAIN}`,
     };
 
-    const makeFn = (name: string, fileBase: string, opts?: { timeout?: cdk.Duration }) => {
+    const makeFn = (name: string, fileBase: string, opts?: { timeout?: cdk.Duration; memorySize?: number }) => {
       const fn = new NodejsFunction(this, name, {
         runtime: lambda.Runtime.NODEJS_22_X,
         entry: path.join(apiDir, `${fileBase}.ts`),
         handler: 'handler',
         timeout: opts?.timeout ?? cdk.Duration.seconds(10),
-        memorySize: 256,
+        memorySize: opts?.memorySize ?? 256,
         environment: commonEnv,
         bundling: {
           target: 'node22',
@@ -192,7 +192,8 @@ export class TokenDerbyStack extends cdk.Stack {
     const joinOrgFn = makeFn('JoinOrgFn', 'join-organisation');
     const listOrgsFn = makeFn('ListOrgsFn', 'list-organisations');
     const getOrgFn = makeFn('GetOrgFn', 'get-organisation');
-    const listOrgRacesFn = makeFn('ListOrgRacesFn', 'list-org-races');
+    // More memory buys CPU and network for the per-race horse lookups on live and unfinalised races.
+    const listOrgRacesFn = makeFn('ListOrgRacesFn', 'list-org-races', { memorySize: 1024 });
     const getOrgLeaderboardFn = makeFn('GetOrgLeaderboardFn', 'get-org-leaderboard');
     const setOrgWebhookFn = makeFn('SetOrgWebhookFn', 'set-org-webhook');
     const getOrgWebhookFn = makeFn('GetOrgWebhookFn', 'get-org-webhook');

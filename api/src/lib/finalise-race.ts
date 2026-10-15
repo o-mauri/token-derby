@@ -9,6 +9,7 @@ import { listSeasonStandings } from '../db/league-standings.js';
 import { sendOrgWebhook } from './webhook.js';
 import { sendOrgSlack } from './slack/send.js';
 import { scoreLeagueRace } from './score-league-race.js';
+import { raceResultOf } from './race-result.js';
 import { randomUUID } from 'node:crypto';
 
 export type FinaliseResult = {
@@ -98,7 +99,8 @@ export async function finaliseRace(race: Race, now: Date): Promise<FinaliseResul
   // per (horse, round). The returned per-division breakdown feeds the webhook.
   const leagueResult = race.league_id ? await scoreLeagueRace(race, stamped) : null;
 
-  const ended_at = await setRaceEndedIfAbsent(race.race_id, now.toISOString());
+  const result = raceResultOf(stamped, 'finished');
+  const ended_at = await setRaceEndedIfAbsent(race.race_id, now.toISOString(), result);
 
   const newly_finalised = ended_at === now.toISOString();
   if (newly_finalised && race.org_id) {
@@ -168,7 +170,7 @@ export async function finaliseRace(race: Race, now: Date): Promise<FinaliseResul
   }
 
   return {
-    race: { ...race, ended_at },
+    race: newly_finalised ? { ...race, ended_at, result } : { ...race, ended_at },
     horses: stamped,
     newly_finalised,
   };

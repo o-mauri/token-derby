@@ -120,6 +120,8 @@ export type Race = {
   // already running when the map replaced it. Never written.
   stamina?: boolean;
   stamina_config?: StaminaConfig;
+  // Stamped with ended_at when the race is finalised, so org listings skip the horse lookup.
+  result?: RaceResult;
 };
 
 export type HorseView = Horse & {
@@ -138,6 +140,13 @@ export type RaceHighlight = {
   tokens: number;     // finished: final_scored_tokens (fallback scored/current tokens); live: scored/current tokens
   colors: HorseColors;
   hat?: CollectedHat; // equipped hat so the mini sprite matches the race page
+};
+
+// A finished race's field size, total scored tokens and winner.
+export type RaceResult = {
+  runners: number;
+  total_tokens: number;
+  highlight?: RaceHighlight;
 };
 
 export type RaceSummary = {

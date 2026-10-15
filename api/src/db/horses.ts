@@ -19,15 +19,22 @@ export async function putHorse(race_id: string, horse: Horse, heartbeat_token: s
 }
 
 export async function listHorses(race_id: string): Promise<Horse[]> {
-  const { Items = [] } = await ddb.send(new QueryCommand({
-    TableName: TABLE,
-    KeyConditionExpression: 'pk = :pk AND begins_with(sk, :hp)',
-    ExpressionAttributeValues: {
-      ':pk': `${RACE_PK_PREFIX}${race_id}`,
-      ':hp': HORSE_SK_PREFIX,
-    },
-  }));
-  return Items.map(pickHorse);
+  const items: Record<string, any>[] = [];
+  let ExclusiveStartKey: Record<string, any> | undefined;
+  do {
+    const page = await ddb.send(new QueryCommand({
+      TableName: TABLE,
+      KeyConditionExpression: 'pk = :pk AND begins_with(sk, :hp)',
+      ExpressionAttributeValues: {
+        ':pk': `${RACE_PK_PREFIX}${race_id}`,
+        ':hp': HORSE_SK_PREFIX,
+      },
+      ExclusiveStartKey,
+    }));
+    items.push(...(page.Items ?? []));
+    ExclusiveStartKey = page.LastEvaluatedKey;
+  } while (ExclusiveStartKey);
+  return items.map(pickHorse);
 }
 
 // No production callers (test helper only). Sets current_tokens without
