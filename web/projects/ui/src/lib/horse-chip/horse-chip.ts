@@ -1,11 +1,10 @@
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 import { Marquee } from './marquee';
-import { ordinal } from './ordinal';
+import { medalOf, ordinal } from './ordinal';
 
 export type HorseChipLeague = { rank: number; division: string };
 
 const tokenFmt = new Intl.NumberFormat('en-US');
-const MEDALS = ['gold', 'silver', 'bronze'] as const;
 
 /** A race lane's name tag: name, token total, and a row cycling owner / level / pace / position. */
 @Component({
@@ -31,7 +30,7 @@ export class HorseChip {
     return pace === null ? '—' : `+${tokenFmt.format(pace)}/min`;
   });
   protected readonly positionText = computed(() => ordinal(this.position()));
-  protected readonly medal = computed(() => MEDALS[this.position() - 1] ?? 'place');
+  protected readonly medal = computed(() => medalOf(this.position()));
   protected readonly leagueText = computed(() => {
     const league = this.league();
     return league ? `${ordinal(league.rank)} (${league.division})` : '';

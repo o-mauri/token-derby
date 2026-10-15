@@ -16,3 +16,55 @@
 
 // Lanes scrolling up go under the crowd's edge rather than over it.
 :host(.scrolled) { clip-path: inset(var(--td-space-8) 0 0); }
+
+// The hovered horse's nose, from the start column across the strip; --p is its progress in percent.
+// The runner is 80% of the lane's height at 32:24; its muzzle sits about 0.36 of that width ahead of its centre.
+$nose-offset: calc(var(--td-lane-height) * 0.8 * 32 / 24 * 0.36);
+$strip-width: calc(100% - var(--td-label-col) - 2 * var(--td-space-3));
+$nose-x: calc(var(--td-space-3) + var(--td-label-col) + $strip-width * var(--p) / 100 + $nose-offset);
+
+// Outlines the hovered horse's strip, past the name-tag column.
+.lane-outline {
+  position: absolute;
+  z-index: 2;
+  left: calc(var(--td-space-3) + var(--td-label-col));
+  right: var(--td-space-3);
+  border: var(--td-line) solid var(--td-coin);
+  border-radius: var(--td-radius);
+  pointer-events: none;
+}
+
+.nose-line {
+  position: absolute;
+  z-index: 2;
+  left: $nose-x;
+  border-left: var(--td-line) dashed var(--td-coin);
+  pointer-events: none;
+  transition: left 3s linear;
+}
+
+.flag {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform: translateX(-50%);
+  padding: 0 var(--td-space-3);
+  background: var(--td-coin);
+  color: var(--td-surface);
+  font-family: var(--td-font-pixel);
+  font-size: var(--td-text-sm);
+}
+
+.card {
+  position: absolute;
+  z-index: 3;
+  left: calc($nose-x + var(--td-space-6));
+  pointer-events: none;
+  transition: left 3s linear;
+}
+
+.card.flip { transform: translateX(calc(-100% - 2 * var(--td-space-6))); }
+
+@media (prefers-reduced-motion: reduce) {
+  .nose-line, .card { transition: none; }
+}

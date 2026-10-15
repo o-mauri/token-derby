@@ -62,4 +62,69 @@ describe('RaceTrack', () => {
     await f.whenStable();
     expect(host.classList.contains('scrolled')).toBe(false);
   });
+
+  describe('inspecting a horse', () => {
+    const hit = (el: HTMLElement, i: number) => el.querySelectorAll<HTMLElement>('td-race-lane .hit')[i]!;
+    const pointer = (type: string, pointerType = 'mouse') => Object.assign(new Event(type), { pointerType });
+    const card = (el: HTMLElement) => el.querySelector('td-horse-card .name')?.textContent?.trim() ?? null;
+
+    it('shows the card and the nose line while a horse is hovered, and hides them after', async () => {
+      const f = await render([lane('a', 1), lane('b', 2)], { a: 60, b: 30 });
+      const el = f.nativeElement as HTMLElement;
+      expect(card(el)).toBeNull();
+
+      hit(el, 1).dispatchEvent(pointer('pointerenter'));
+      await f.whenStable();
+      expect(card(el)).toBe('Horse b');
+      const line = el.querySelector<HTMLElement>('.nose-line')!;
+      expect(line.style.getPropertyValue('--p')).toBe('30');
+      expect(line.textContent?.trim()).toBe('2ND');
+      expect(el.querySelector('.lane-outline')).not.toBeNull();
+
+      hit(el, 1).dispatchEvent(pointer('pointerleave'));
+      await f.whenStable();
+      expect(card(el)).toBeNull();
+      expect(el.querySelector('.nose-line')).toBeNull();
+    });
+
+    it('opens the card on the horse\'s left once it is past the middle of the track', async () => {
+      const f = await render([lane('a', 1), lane('b', 2)], { a: 80, b: 30 });
+      const el = f.nativeElement as HTMLElement;
+      hit(el, 0).dispatchEvent(pointer('pointerenter'));
+      await f.whenStable();
+      expect(el.querySelector('td-horse-card')!.classList).toContain('flip');
+    });
+
+    it('ignores touch hovers, and pins the card on a tap until a click elsewhere', async () => {
+      const f = await render([lane('a', 1), lane('b', 2)], { a: 60, b: 30 });
+      const el = f.nativeElement as HTMLElement;
+      document.body.appendChild(el);
+
+      hit(el, 0).dispatchEvent(pointer('pointerenter', 'touch'));
+      await f.whenStable();
+      expect(card(el)).toBeNull();
+
+      hit(el, 0).click();
+      await f.whenStable();
+      expect(card(el)).toBe('Horse a');
+      hit(el, 0).dispatchEvent(pointer('pointerleave', 'touch'));
+      await f.whenStable();
+      expect(card(el)).toBe('Horse a');
+
+      document.body.click();
+      await f.whenStable();
+      expect(card(el)).toBeNull();
+      el.remove();
+    });
+
+    it('closes a pinned card when the same horse is tapped again', async () => {
+      const f = await render([lane('a', 1), lane('b', 2)], {});
+      const el = f.nativeElement as HTMLElement;
+      hit(el, 0).click();
+      await f.whenStable();
+      hit(el, 0).click();
+      await f.whenStable();
+      expect(card(el)).toBeNull();
+    });
+  });
 });

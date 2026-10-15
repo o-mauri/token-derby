@@ -1,0 +1,33 @@
+@let l = lane();
+<header class="silks" [style.--silk]="l.colors.saddle" [style.--silk-edge]="l.colors.body">
+  <span class="portrait"><td-horse-face [colors]="face()" /></span>
+  <div class="who">
+    <div class="name-row"><span class="name" [tdMarquee]="l.name">{{ l.name }}</span></div>
+    <div class="tags">
+      <span class="level">LV {{ l.level }}</span>
+      @if (l.owner) { <span class="owner">ridden by {{ l.owner }}</span> }
+    </div>
+  </div>
+  <span class="rosette" [class]="'rosette ' + place().medal" [style.--tone]="place().tone"><span class="num">{{ place().num }}</span><span class="suffix">{{ place().suffix }}</span></span>
+</header>
+
+<div class="body">
+  <div class="score">
+    <span class="tokens">{{ tokensText() }} <small>tok</small></span>
+    @if (paceText(); as pace) { <span class="pace">{{ pace }}</span> }
+  </div>
+
+  @if (marks().length) { <td-gap-track [marks]="marks()" /> }
+
+  @if (stamina(); as s) {
+    <div class="stamina" [class]="'stamina ' + s.band" [style.--tone]="s.tone">
+      <span class="label">STAMINA</span>
+      <span class="blocks">@for (on of s.blocks; track $index) { <i [class.on]="on"></i> }</span>
+      <span class="pct">{{ s.pct }}</span>
+    </div>
+  }
+
+  @if (leagueText(); as league) {
+    <div class="league"><span class="label">LEAGUE</span> <span>{{ league }}</span></div>
+  }
+</div>

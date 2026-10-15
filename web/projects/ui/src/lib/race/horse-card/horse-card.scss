@@ -1,0 +1,99 @@
+@use '../../marquee' as *;
+
+:host {
+  display: block;
+  width: 21rem;
+  background: var(--td-track-label);
+  border: var(--td-line) solid var(--td-border);
+  border-radius: var(--td-radius);
+  box-shadow: var(--td-space-3) var(--td-space-3) 0 color-mix(in srgb, var(--td-surface) 60%, transparent);
+  overflow: hidden;
+  color: var(--td-text);
+  font-family: var(--td-font-pixel);
+  line-height: 1;
+}
+
+// Racing silks: diagonal stripes in the saddle colour, edged in the horse's coat.
+.silks {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--td-space-5);
+  height: 4.4rem;
+  padding: var(--td-space-5) var(--td-space-5) 0;
+  background: repeating-linear-gradient(135deg, var(--silk) 0 14px, color-mix(in srgb, var(--silk) 86%, var(--td-text)) 14px 28px);
+  border-bottom: calc(var(--td-line) * 1.5) solid var(--silk-edge);
+}
+
+.portrait {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 3.6rem;
+  height: 4.2rem;
+  background: var(--td-surface);
+  border: var(--td-line) solid var(--td-coin);
+  font-size: calc(var(--td-text-xl) * 2.1);
+}
+
+.who { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: var(--td-space-2); }
+
+.name-row { overflow: hidden; white-space: nowrap; }
+
+@include marquee('.name');
+
+.name {
+  font-family: 'Bitcount Prop Single', var(--td-font-pixel);
+  font-size: var(--td-text-lg);
+  font-weight: 600;
+  letter-spacing: var(--td-tracking);
+  color: var(--td-text);
+  text-shadow: var(--td-line) var(--td-line) 0 var(--td-surface);
+}
+
+.tags { display: flex; align-items: center; gap: var(--td-space-3); min-width: 0; white-space: nowrap; }
+.level { background: var(--td-surface); padding: 0 var(--td-space-3); font-size: var(--td-text-sm); line-height: 1.25; }
+.owner { overflow: hidden; text-overflow: ellipsis; font-size: var(--td-text-md); text-shadow: var(--td-line-thin) var(--td-line-thin) 0 var(--td-surface); }
+
+.rosette {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 3.2rem;
+  height: 3.2rem;
+  border-radius: var(--td-radius-round);
+  border: calc(var(--td-line) * 1.5) solid var(--td-text);
+  box-shadow: 0 0 0 calc(var(--td-line) * 1.5) var(--td-surface);
+  background: var(--tone);
+  color: var(--td-surface);
+  line-height: 0.8;
+}
+
+.rosette .num { font-size: var(--td-text-xl); }
+.rosette .suffix { font-size: var(--td-text-sm); }
+.rosette.place { background: var(--td-surface-raised); color: var(--td-text); }
+
+.body { display: flex; flex-direction: column; gap: var(--td-space-6); padding: var(--td-space-7) var(--td-space-6) var(--td-space-6); }
+
+.score { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--td-space-4); }
+.tokens { color: var(--td-coin); font-size: calc(var(--td-text-xl) * 1.5); line-height: 0.8; white-space: nowrap; }
+.tokens small { font-size: var(--td-text-lg); }
+.pace { color: var(--td-stamina-high); border: var(--td-line-thin) solid currentcolor; padding: 0 var(--td-space-3); font-size: var(--td-text-md); white-space: nowrap; }
+
+.stamina { display: flex; align-items: center; gap: var(--td-space-5); color: var(--tone); font-size: var(--td-text-md); }
+.stamina .label { color: var(--td-text-muted); font-size: var(--td-text-sm); }
+.stamina .blocks { flex: 1; display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: var(--td-space-1); }
+.stamina .blocks i { height: 0.7rem; background: color-mix(in srgb, var(--td-text) 16%, transparent); }
+.stamina .blocks i.on { background: currentcolor; }
+
+.league {
+  display: flex;
+  justify-content: space-between;
+  border-top: var(--td-line-thin) dashed var(--td-border);
+  padding-top: var(--td-space-5);
+  font-size: var(--td-text-md);
+}
+
+.league .label { color: var(--td-text-muted); }

@@ -1,0 +1,42 @@
+// The numbers sit in fixed slots, the marks below them at their (clamped) share of the gap.
+:host { display: flex; flex-direction: column; gap: var(--td-space-2); }
+
+.slots { display: grid; grid-template-columns: repeat(var(--marks), minmax(0, 1fr)); align-items: end; }
+.slot { display: flex; flex-direction: column; align-items: center; min-width: 0; white-space: nowrap; }
+.slot:first-child { align-items: flex-start; }
+.slot:last-child { align-items: flex-end; }
+.slot .label { color: var(--td-text-muted); font-size: var(--td-text-sm); line-height: 0.9; }
+.slot .value { color: var(--tone); font-size: var(--td-text-lg); line-height: 0.9; }
+
+.ticks, .lane-track { position: relative; }
+.ticks { height: var(--td-space-4); }
+.ticks i { position: absolute; top: 0; bottom: 0; border-left: var(--td-line) solid var(--tone); }
+
+.lane-track {
+  height: 1.1rem;
+  background: var(--td-track-lane);
+  border-block: var(--td-line) solid var(--td-track-rail);
+}
+
+.mark {
+  position: absolute;
+  top: 50%;
+  width: 0.5rem;
+  height: 0.5rem;
+  transform: translate(-50%, -50%);
+  outline: var(--td-line) solid var(--td-surface);
+  background: var(--tone);
+}
+
+.mark.you { width: 0.65rem; height: 0.65rem; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .mark.you { animation: you-pulse 1.2s steps(2) infinite; }
+}
+
+@keyframes you-pulse { 50% { transform: translate(-50%, -50%) scale(1.35); } }
+
+.runners { display: grid; grid-template-columns: repeat(var(--marks), minmax(0, 1fr)); gap: var(--td-space-3); color: var(--td-text-muted); font-size: var(--td-text-sm); }
+.runners span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; text-align: center; }
+.runners span:first-child { text-align: left; }
+.runners span:last-child { text-align: right; }

@@ -87,6 +87,10 @@ $fence-height: calc(var(--td-lane-height) * 36 / 128);
   75% { transform: translate(-50%, 0.5px); }
 }
 
+// A generous target around the sprite, down to the lane's bottom, for hovering or tapping a horse.
+// `revert` restores the browser's focus ring, which `all: unset` clears.
+.hit { all: unset; outline: revert; position: absolute; inset: 35% -60% -60%; }
+
 // Under the sprite, nudged back towards the hindquarters.
 .stamina {
   position: absolute;

@@ -9,6 +9,9 @@
     <div [class]="rainClass()"></div>
     <div class="runner" [class.running]="running()" [style.left.%]="progress()">
       <td-horse [colors]="l.colors" [hat]="l.hat" [running]="running()" [dust]="state() === 'live'" />
+      <button type="button" class="hit" [attr.aria-label]="'Show stats for ' + l.name"
+        (pointerenter)="pointer($event, true)" (pointerleave)="pointer($event, false)"
+        (focus)="hover.emit(true)" (blur)="hover.emit(false)" (click)="tapped($event)"></button>
       @if (l.stamina; as s) { <td-stamina-bar class="stamina" [value]="s.value" [band]="s.band" /> }
     </div>
   </div>
