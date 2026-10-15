@@ -2,7 +2,7 @@
 import type {
   CliAuthApproveResponse, DeleteDeviceResponse, DeviceRecord, DivisionConfig, GetLeagueStandingsResponse, GetOrgLeagueResponse, GetOrgRaceSettingsResponse,
   GetJockeyResponse, GetOrgScheduleResponse, GetOrgSlackResponse, GetOrgWebhookResponse, GetOrganisationResponse, GetRaceResponse, GetRaceSeriesResponse, League,
-  ListDevicesResponse, ListOrgRacesResponse, ListOrganisationsResponse, ListStableResponse, OrgMembersResponse, SetOrgRaceSettingsResponse, StableHorse, UpdateJockeyResponse,
+  ListDevicesResponse, ListOrgRacesResponse, ListOrganisationsResponse, ListStableResponse, OrgMembersResponse, SetOrgRaceSettingsResponse, StableHorse, UpdateJockeyResponse, WebSessionsDeleteAllResponse,
 } from '@token-derby/shared';
 import { PREVIEW_ORG, previewLiveRace, previewOrgRaces, previewOrgStandings, type OrgPreviewOptions } from '../../projects/site/src/app/preview/org-fixture';
 import { PREVIEW_JOIN_CODE, PREVIEW_SERIES, previewRace, type PreviewRaceState } from '../../projects/site/src/app/preview/race-fixture';
@@ -116,8 +116,7 @@ export function accountRoutes(): Routes {
     'DELETE /api/devices/d2': ok<DeleteDeviceResponse>({ ok: true }),
     'PUT /api/jockey/me': (req) => ok<UpdateJockeyResponse>({ user_id: 'u1', display_name: (req.body as { display_name: string }).display_name }),
     'DELETE /api/web-sessions': ok<{ deleted: boolean }>({ deleted: true }),
-    // WebSessionsDeleteAllResponse in @token-derby/shared once this branch has main's API change.
-    'DELETE /api/web-sessions/all': ok<{ signed_out: number }>({ signed_out: 2 }),
+    'DELETE /api/web-sessions/all': ok<WebSessionsDeleteAllResponse>({ signed_out: 2 }),
   };
 }
 
