@@ -99,12 +99,29 @@ describe('HomePage signed out', () => {
 });
 
 describe('HomePage signed in', () => {
-  it('shows the loader, then your orgs sorted and linked, with your card', async () => {
+  it('shows only the loader until both your orgs and your stable have answered', async () => {
     const { el, http, settle } = await open('/', SIGNED_IN);
-    expect(el().querySelector('td-loader')).not.toBeNull();
+    const onlyLoader = () => {
+      const column = el().querySelector('.column')!;
+      return column.querySelector('td-loader') !== null && column.querySelector('h1, td-you-card, td-org-list, td-go-box, nav') === null;
+    };
+    expect(onlyLoader()).toBe(true);
+    http.expectOne('/api/organisations').flush(orgs('acme'));
+    await settle();
+    expect(onlyLoader()).toBe(true);
+    http.expectOne('/api/jockey/me/horses').flush({ horses: [] });
+    await settle();
+    expect(el().querySelector('td-loader')).toBeNull();
+    expect(el().querySelector('td-org-list')).not.toBeNull();
+    expect(el().querySelector('td-account-menu')).not.toBeNull();
+  });
+
+  it('shows your orgs sorted and linked, with your card', async () => {
+    const { el, http, settle } = await open('/', SIGNED_IN);
     const req = http.expectOne('/api/organisations');
     expect(req.request.headers.get('Authorization')).toBe('Bearer tok');
     req.flush(orgs('Stackone', 'acme'));
+    http.expectOne('/api/jockey/me/horses').flush({ horses: [] });
     await settle();
     expect([...el().querySelectorAll('td-org-list a.row')].map((a) => a.getAttribute('href'))).toEqual(['/org/acme', '/org/Stackone']);
     expect(el().querySelector('td-loader')).toBeNull();
@@ -140,6 +157,7 @@ describe('HomePage signed in', () => {
   it('says you have no orgs and opens Find an org', async () => {
     const { el, http, settle } = await open('/', SIGNED_IN);
     http.expectOne('/api/organisations').flush(orgs());
+    http.expectOne('/api/jockey/me/horses').flush({ horses: [] });
     await settle();
     expect(el().querySelector('.empty')?.textContent).toContain("You're not in any orgs yet.");
     expect(el().querySelector('td-go-box.org')).not.toBeNull();
@@ -148,6 +166,7 @@ describe('HomePage signed in', () => {
   it('keeps the race box when your orgs fail to load', async () => {
     const { el, http, settle } = await open('/', SIGNED_IN);
     http.expectOne('/api/organisations').flush({ code: 'INTERNAL', message: 'x' }, { status: 500, statusText: 'Error' });
+    http.expectOne('/api/jockey/me/horses').flush({ horses: [] });
     await settle();
     expect(el().querySelector('.failed')?.textContent).toContain("Couldn't load your orgs.");
     expect(el().querySelector('td-go-box.race')).not.toBeNull();
@@ -163,6 +182,7 @@ describe('HomePage signed in', () => {
   it('opens Find another org on request', async () => {
     const { el, http, settle } = await open('/', SIGNED_IN);
     http.expectOne('/api/organisations').flush(orgs('acme'));
+    http.expectOne('/api/jockey/me/horses').flush({ horses: [] });
     await settle();
     expect(el().querySelector('td-go-box.org')).toBeNull();
     el().querySelector<HTMLButtonElement>('button.find')!.click();
@@ -173,6 +193,7 @@ describe('HomePage signed in', () => {
   it('signs out from the menu', async () => {
     const { el, http, settle } = await open('/', SIGNED_IN);
     http.expectOne('/api/organisations').flush(orgs('acme'));
+    http.expectOne('/api/jockey/me/horses').flush({ horses: [] });
     await settle();
     el().querySelector<HTMLButtonElement>('td-account-menu button.trigger')!.click();
     await settle();

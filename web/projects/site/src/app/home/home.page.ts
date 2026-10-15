@@ -53,6 +53,9 @@ export class HomePage {
   });
   protected readonly orgLinks = computed(() => sortOrgs(this.orgs.value()?.organisations ?? []));
   protected readonly orgsLoaded = computed(() => this.orgs.value() !== undefined);
+  // Signed in, the page waits for your orgs and your card's horse together, so it never shows half-filled.
+  protected readonly ready = computed(() => !this.session.signedIn()
+    || ((this.orgsLoaded() || this.orgs.status() === 'error') && this.stableSettled()));
   protected readonly findOpen = signal(false);
   protected readonly showFind = computed(() => this.findOpen() || (this.orgsLoaded() && this.orgLinks().length === 0));
 
@@ -62,14 +65,16 @@ export class HomePage {
   // Your best horse dresses your card; if the stable can't load, the card keeps its plain look.
   private readonly me = inject(PaddockApi);
   private readonly stable = signal<StableHorse[] | null>(null);
+  private readonly stableSettled = signal(false);
   private readonly best = computed(() => bestHorse(this.stable() ?? []));
   protected readonly cardColors = computed(() => this.best()?.colors ?? null);
   protected readonly cardHat = computed(() => { const b = this.best(); return b ? wornHat(b) : null; });
 
   constructor() {
     effect(() => {
+      this.stableSettled.set(false);
       if (!this.session.signedIn()) return this.stable.set(null);
-      this.me.stable().then((res) => this.stable.set(res.horses), () => this.stable.set(null));
+      this.me.stable().then((res) => this.stable.set(res.horses), () => this.stable.set(null)).finally(() => this.stableSettled.set(true));
     });
     effect(() => {
       if (this.authError()) void this.router.navigate([], { queryParams: { auth_error: null }, queryParamsHandling: 'merge', replaceUrl: true });

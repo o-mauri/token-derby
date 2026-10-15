@@ -52,7 +52,6 @@
   letter-spacing: var(--td-tracking-wide);
   color: var(--td-highlight);
 }
-.loading { display: flex; min-height: 6rem; }
 .empty, .failed { margin: 0; text-align: center; color: var(--td-text-muted); }
 .failed { color: var(--td-error); }
 .mine > td-go-box { align-self: center; }
