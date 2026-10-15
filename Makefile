@@ -16,7 +16,7 @@ build-admin:
 	npm run build --workspace=@token-derby/admin
 
 build-web:
-	cd web && npm run build
+	cd web && npm run build:deploy
 
 test:
 	npm test

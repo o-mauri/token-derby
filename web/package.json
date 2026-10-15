@@ -5,6 +5,8 @@
     "ng": "ng",
     "prebuild": "npm run build --workspace=@token-derby/shared",
     "build": "ng build ui && ng build site && ng build admin",
+    "prebuild:deploy": "npm run build --workspace=@token-derby/shared",
+    "build:deploy": "ng build ui && ng build site -c production,optin && ng build admin",
     "test": "ng test ui --watch=false && ng test site --watch=false && ng test admin --watch=false",
     "lint:styles": "stylelint \"projects/**/*.{css,scss}\" --allow-empty-input",
     "pretest": "npm run build --workspace=@token-derby/shared",
@@ -12,7 +14,7 @@
     "build-storybook": "ng run ui:build-storybook",
     "lint": "ng lint ui && ng lint site && ng lint admin && npm run lint:styles",
     "e2e": "ng build site && ng build admin && tsc --noEmit -p e2e/tsconfig.json && playwright test -c e2e",
-    "e2e:opt-in": "npm run build -w @token-derby/site --prefix .. && ng build site && playwright test -c e2e/opt-in/opt-in.config.ts",
+    "e2e:opt-in": "npm run build -w @token-derby/site --prefix .. && ng build site -c production,optin && playwright test -c e2e/opt-in/opt-in.config.ts",
     "e2e:ui": "playwright test -c e2e --ui",
     "pree2e": "npm run build --workspace=@token-derby/shared"
   },

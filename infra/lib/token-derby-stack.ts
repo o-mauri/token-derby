@@ -518,9 +518,9 @@ export class TokenDerbyStack extends cdk.Stack {
       cacheControl: siteCache,
     });
 
-    // The opt-in v2 site, served by SiteRewriteFn to the td_site=v2 cookie.
+    // The opt-in v2 site, built to load its scripts from /v2/; SiteRewriteFn serves its index to td_site=v2.
     new s3deploy.BucketDeployment(this, 'DeploySiteV2', {
-      sources: [s3deploy.Source.asset(path.resolve(__dirname, '..', '..', 'web', 'dist', 'site', 'browser'))],
+      sources: [s3deploy.Source.asset(path.resolve(__dirname, '..', '..', 'web', 'dist', 'site-optin', 'browser'))],
       destinationBucket: siteBucket,
       destinationKeyPrefix: 'v2/',
       distribution: appDistribution,

@@ -122,6 +122,10 @@
                 }
               ]
             },
+            "optin": {
+              "deployUrl": "/v2/",
+              "outputPath": "dist/site-optin"
+            },
             "development": {
               "optimization": false,
               "extractLicenses": false,

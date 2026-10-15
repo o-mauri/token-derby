@@ -1,4 +1,5 @@
 // Serves v1 and v2 behind the real edge rewrite function, with a minimal fake API.
+// Bucket layout: /v2/* is the opt-in v2 build (prefix stripped), everything else is site/dist.
 import { createReadStream, existsSync, readFileSync, statSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { extname, join, normalize, sep } from 'node:path';
@@ -6,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = (p) => fileURLToPath(new URL(p, import.meta.url));
 const V1 = root('../../../site/dist');
-const V2 = root('../../dist/site/browser');
+const V2 = root('../../dist/site-optin/browser');
 const PORT = Number(process.env.PORT ?? 4302);
 const TYPES = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json',
