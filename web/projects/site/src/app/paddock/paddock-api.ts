@@ -16,6 +16,6 @@ export class PaddockApi {
   }
 
   stable(): Promise<ListStableResponse> {
-    return firstValueFrom(this.http.get<ListStableResponse>('/api/stable', withSession()));
+    return firstValueFrom(this.http.get<ListStableResponse>('/api/jockey/me/horses', withSession()));
   }
 }

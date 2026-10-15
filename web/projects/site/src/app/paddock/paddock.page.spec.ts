@@ -40,7 +40,7 @@ async function open(seed: Record<string, string> = SIGNED_IN) {
   const http = TestBed.inject(HttpTestingController);
   const answer = async (horses: StableHorse[] = HORSES) => {
     http.expectOne('/api/jockey/me').flush(JOCKEY);
-    http.expectOne('/api/stable').flush({ horses });
+    http.expectOne('/api/jockey/me/horses').flush({ horses });
     await settle();
   };
   const click = async (sel: string) => { el().querySelector<HTMLElement>(sel)!.click(); await settle(); };
@@ -55,7 +55,7 @@ describe('Paddock page', () => {
     p.http.expectOne('/api/jockey/me').flush(JOCKEY);
     await p.settle();
     expect(p.el().querySelector('td-panel.career td-loader')).not.toBeNull();
-    p.http.expectOne('/api/stable').flush({ horses: HORSES });
+    p.http.expectOne('/api/jockey/me/horses').flush({ horses: HORSES });
     await p.settle();
     expect(p.el().querySelector('td-loader')).toBeNull();
   });
@@ -102,7 +102,7 @@ describe('Paddock page', () => {
   it('shows an error when a load fails, and Retry loads both again', async () => {
     const p = await open();
     p.http.expectOne('/api/jockey/me').flush(JOCKEY);
-    p.http.expectOne('/api/stable').flush({ code: 'INTERNAL', message: 'x' }, { status: 500, statusText: 'Err' });
+    p.http.expectOne('/api/jockey/me/horses').flush({ code: 'INTERNAL', message: 'x' }, { status: 500, statusText: 'Err' });
     await p.settle();
     expect(p.text('.career .failed')).toContain("Couldn't load your page.");
     await p.click('.career .failed button');
@@ -126,6 +126,6 @@ describe('Paddock page', () => {
   it('asks you to sign in when signed out, coming back here', async () => {
     const p = await open({});
     expect(p.el().querySelector('td-google-button a')?.getAttribute('href')).toBe('/api/auth/google/start?return_to=%2Fpaddock');
-    p.http.expectNone('/api/stable');
+    p.http.expectNone('/api/jockey/me/horses');
   });
 });

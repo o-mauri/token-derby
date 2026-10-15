@@ -22,7 +22,7 @@ export const STABLE: StableHorse[] = [
 
 /** Your stable, as the signed-in home card and /paddock read it. */
 export function stableRoutes(horses: StableHorse[] = STABLE): Routes {
-  return { 'GET /api/stable': ok<ListStableResponse>({ horses }) };
+  return { 'GET /api/jockey/me/horses': ok<ListStableResponse>({ horses }) };
 }
 
 /** Everything /paddock loads: your jockey and your stable. */

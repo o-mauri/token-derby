@@ -32,7 +32,7 @@ function api(req, res, url) {
   } else if (key === 'POST /api/web-sessions/exchange') {
     json(res, 200, { token: 'tok', expires_at: new Date(Date.now() + 6 * 86_400_000).toISOString(), user: { user_id: 'u1', display_name: 'Omar' } });
   } else if (key === 'GET /api/organisations') json(res, 200, { organisations: [] });
-  else if (key === 'GET /api/stable') json(res, 200, STABLE);
+  else if (key === 'GET /api/jockey/me/horses') json(res, 200, STABLE);
   else if (key === 'GET /api/devices') json(res, 200, DEVICES);
   else if (key === 'GET /api/jockey/me') json(res, 200, { user_id: 'u1', display_name: 'Omar', created_at: '2026-05-14T10:00:00Z', email: 'omar@example.com' });
   else {
