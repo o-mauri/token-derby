@@ -1,12 +1,13 @@
 import type { Route } from '../route.js';
-import { chooseV2, markPromptDone, promptDone } from '../v2-opt-in.js';
+import { chooseV2, isV2OnlyPath, markPromptDone, promptDone } from '../v2-opt-in.js';
 
 const NEVER_ON = new Set<Route['type']>(['org-live', 'cli', 'link']);
 
-/** Shown until answered once; kept off the TV view and the sign-in hand-off pages. */
-export function shouldPrompt(route: Route['type'], hash: string, storage?: Storage | null): boolean {
+/** Shown until answered once; kept off the TV view, the sign-in hand-off pages and v1's "Only on the new site" page. */
+export function shouldPrompt(route: Route['type'], at: { pathname: string; hash: string }, storage?: Storage | null): boolean {
   if (NEVER_ON.has(route)) return false;
-  if (route === 'org-manager' && /(^#|&)code=/.test(hash)) return false;
+  if (route === 'org-manager' && /(^#|&)code=/.test(at.hash)) return false;
+  if (route === 'not-found' && isV2OnlyPath(at.pathname)) return false;
   return !promptDone(storage);
 }
 

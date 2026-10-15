@@ -1,6 +1,8 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { createV2Prompt, shouldPrompt } from '../src/render/v2-prompt.js';
 
+const at = (hash: string, pathname = '/') => ({ pathname, hash });
+
 describe('v2 prompt', () => {
   afterEach(() => { localStorage.clear(); document.cookie = 'td_site=; Path=/; Max-Age=0'; document.body.innerHTML = ''; });
 
@@ -19,7 +21,7 @@ describe('v2 prompt', () => {
     document.body.appendChild(el);
     el.querySelector<HTMLButtonElement>('.v2-prompt-later')!.click();
     expect(document.querySelector('.v2-prompt')).toBeNull();
-    expect(shouldPrompt('home', '')).toBe(false);
+    expect(shouldPrompt('home', at(''))).toBe(false);
   });
 
   it('Try v2 opts in and is remembered', () => {
@@ -33,18 +35,21 @@ describe('v2 prompt', () => {
   });
 
   it('shows on ordinary pages until answered, never on the TV view or sign-in hand-offs', () => {
-    expect(shouldPrompt('home', '')).toBe(true);
-    expect(shouldPrompt('race', '')).toBe(true);
-    expect(shouldPrompt('org-live', '')).toBe(false);
-    expect(shouldPrompt('cli', '')).toBe(false);
-    expect(shouldPrompt('link', '')).toBe(false);
-    expect(shouldPrompt('org-manager', '#code=abc')).toBe(false);
-    expect(shouldPrompt('org-manager', '')).toBe(true);
+    expect(shouldPrompt('home', at(''))).toBe(true);
+    expect(shouldPrompt('race', at(''))).toBe(true);
+    expect(shouldPrompt('org-live', at(''))).toBe(false);
+    expect(shouldPrompt('cli', at(''))).toBe(false);
+    expect(shouldPrompt('link', at(''))).toBe(false);
+    expect(shouldPrompt('org-manager', at('#code=abc'))).toBe(false);
+    expect(shouldPrompt('org-manager', at(''))).toBe(true);
+    expect(shouldPrompt('not-found', at('', '/paddock'))).toBe(false);
+    expect(shouldPrompt('not-found', at('', '/org/acme/league/'))).toBe(false);
+    expect(shouldPrompt('not-found', at('', '/nope'))).toBe(true);
   });
 
   it('still shows when storage is blocked', () => {
     const broken = { getItem: () => { throw new Error('x'); }, setItem: () => { throw new Error('x'); } } as unknown as Storage;
-    expect(shouldPrompt('home', '', broken)).toBe(true);
+    expect(shouldPrompt('home', at(''), broken)).toBe(true);
     expect(() => createV2Prompt(document, { storage: broken }).querySelector<HTMLButtonElement>('.v2-prompt-later')!.click()).not.toThrow();
   });
 });

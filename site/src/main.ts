@@ -35,7 +35,9 @@ function route() {
   if (activeCleanup) { activeCleanup(); activeCleanup = null; }
 
   handOffSignIn(window.location, (url) => history.replaceState(null, '', url));
-  const r = parseRoute(window.location.pathname);
+  // Read before rendering: the org manager wipes a sign-in #code= as it starts.
+  const at = { pathname: window.location.pathname, hash: window.location.hash };
+  const r = parseRoute(at.pathname);
   if (r.type === 'home') {
     renderHome(root);
   } else if (r.type === 'race') {
@@ -57,7 +59,7 @@ function route() {
   } else if (r.type === 'link') {
     activeCleanup = renderLinkGoogle(root);
   } else {
-    const v2Only = isV2OnlyPath(window.location.pathname);
+    const v2Only = isV2OnlyPath(at.pathname);
     root.replaceChildren(createNotFound(document, v2Only ? {
       title: 'Only on the new site',
       message: ['This page is part of the new Token Derby.'],
@@ -70,7 +72,7 @@ function route() {
     }));
   }
   mountFloatingV2Toggle(document, FLOATING.has(r.type));
-  if (!shouldPrompt(r.type, window.location.hash)) document.querySelector('.v2-prompt')?.remove();
+  if (!shouldPrompt(r.type, at)) document.querySelector('.v2-prompt')?.remove();
   else if (!document.querySelector('.v2-prompt')) document.body.appendChild(createV2Prompt(document));
 }
 
