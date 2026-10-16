@@ -167,6 +167,20 @@ What the lines mean when a race misbehaves:
   reaching the network and failing; `retry` counts the attempts.
 - `scan.timeout` — the scan blew its budget; `reason` names the source that was
   still running.
+- `update.registry_failed` or `update.npm_failed` — `token-derby update` did not
+  upgrade you. `code` is the underlying error (or npm's exit code) and
+  `stderr_tail` is the end of what npm said. `update.up_to_date`,
+  `update.declined` and `update.npm_ok` record the runs that did not fail.
+
+If `token-derby update` fails with a certificate error (`UNABLE_TO_GET_ISSUER_CERT_LOCALLY`
+and friends), a company security proxy is re-signing HTTPS traffic with a CA that
+Node and npm don't trust. Neither reads the system trust store, so point them at
+the proxy's CA certificate:
+
+```bash
+export NODE_EXTRA_CA_CERTS=/path/to/ca.pem
+npm config set cafile /path/to/ca.pem
+```
 
 Credentials are never written: identity and horse tokens, request headers and
 bodies are all omitted, and claim tokens and admin codes are masked out of the
